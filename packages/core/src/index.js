@@ -28,6 +28,7 @@ export {
   createModelRegistryState,
   normalizeModelRegistryState,
   registerModel,
+  recordPostIncidentReview,
   transitionModel,
   triggerKillSwitch,
   clearGlobalKillSwitch,

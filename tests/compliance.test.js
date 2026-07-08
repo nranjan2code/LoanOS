@@ -7,8 +7,10 @@ import {
   attachKfs,
   buildKeyFactStatement,
   classifyLoanAsset,
+  clearGlobalKillSwitch,
   computeDelinquency,
   createModelRegistryState,
+  recordPostIncidentReview,
   ELIGIBILITY_DECISIONS,
   estimateEmi,
   evaluateEligibility,
@@ -387,6 +389,94 @@ test("API drives the model lifecycle from draft to active", async (t) => {
   const badActivate = await postJson(`${base}/ai/models/col_llm_v1/transitions`, { action: "activate", actor: "model-risk" });
   assert.equal(badActivate.status, 422);
   assert.equal(badActivate.body.error.code, "model_transition_blocked");
+});
+
+test("kill-switch clearance requires a post-incident review", () => {
+  const base = createModelRegistryState();
+  const killed = triggerKillSwitch(base, {
+    scope: "global",
+    reason: "Systemic hallucination spike in generative underwriting",
+    actor: "chief-risk-officer"
+  });
+  assert.equal(killed.registry.globalKillSwitch.active, true);
+  assert(killed.incident.incidentId);
+  assert.equal(killed.registry.globalKillSwitch.incidentId, killed.incident.incidentId);
+  assert.equal(killed.registry.incidents[killed.incident.incidentId].status, "open");
+
+  // The switch cannot be cleared before a post-incident review.
+  const earlyClear = clearGlobalKillSwitch(killed.registry, { actor: "coo", approvalRef: "board_ref_1" });
+  assert.equal(earlyClear.summary.status, "blocked");
+  assert(earlyClear.findings.some((finding) => finding.path === "incidentId"));
+
+  // A review must capture root cause and remediation.
+  const incompleteReview = recordPostIncidentReview(killed.registry, {
+    incidentId: killed.incident.incidentId,
+    reviewedBy: "model-risk",
+    reviewRef: "pir_1"
+  });
+  assert.equal(incompleteReview.summary.status, "blocked");
+  assert(incompleteReview.findings.some((finding) => finding.path === "rootCause"));
+
+  const reviewed = recordPostIncidentReview(killed.registry, {
+    incidentId: killed.incident.incidentId,
+    reviewedBy: "model-risk",
+    reviewRef: "pir_1",
+    rootCause: "Prompt injection via unsanitised free-text field",
+    remediation: "Input sanitisation and a guardrail classifier before the generative model"
+  });
+  assert.equal(reviewed.incident.status, "reviewed");
+
+  const cleared = clearGlobalKillSwitch(reviewed.registry, { actor: "coo", approvalRef: "board_ref_1" });
+  assert.equal(cleared.summary.status, "ready");
+  assert.equal(cleared.registry.globalKillSwitch.active, false);
+  assert.equal(cleared.registry.globalKillSwitch.clearanceApprovalRef, "board_ref_1");
+  const closed = cleared.registry.incidents[killed.incident.incidentId];
+  assert.equal(closed.status, "closed");
+  // The original review evidence is retained after closure.
+  assert.equal(closed.postIncidentReview.rootCause, "Prompt injection via unsanitised free-text field");
+});
+
+test("API clears the global kill switch only after a post-incident review", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+
+  const killed = await postJson(`${base}/ai/kill-switch`, {
+    scope: "global",
+    reason: "Systemic drift across scoring models",
+    actor: "chief-risk-officer"
+  });
+  assert.equal(killed.status, 200);
+  const incidentId = killed.body.incident.incidentId;
+  assert(incidentId);
+
+  const earlyClear = await postJson(`${base}/ai/kill-switch/clear`, { actor: "coo", approvalRef: "board_ref_1" });
+  assert.equal(earlyClear.status, 422);
+  assert(earlyClear.body.findings.some((finding) => finding.path === "incidentId"));
+
+  const review = await postJson(`${base}/ai/incidents/${incidentId}/post-incident-review`, {
+    reviewedBy: "model-risk",
+    reviewRef: "pir_1",
+    rootCause: "Feature pipeline regression",
+    remediation: "Rollback and add drift alarms"
+  });
+  assert.equal(review.status, 200);
+  assert.equal(review.body.incident.status, "reviewed");
+
+  const cleared = await postJson(`${base}/ai/kill-switch/clear`, { actor: "coo", approvalRef: "board_ref_1" });
+  assert.equal(cleared.status, 200);
+  assert.equal(cleared.body.registry.globalKillSwitch.active, false);
+  assert.equal(cleared.body.incident.status, "closed");
 });
 
 test("regulated entity and product registries resolve an application", () => {

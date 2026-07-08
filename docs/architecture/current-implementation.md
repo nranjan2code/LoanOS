@@ -34,7 +34,7 @@ npm run dev:api
 | `packages/core/src/application-workflow.js` | LOS application state machine, KFS workflow, human review, decision proposal, manual underwriting override gate for referred applications, coded decline-reason taxonomy, maker-checker approval, disbursement transition. |
 | `packages/core/src/loan-account.js` | LMS loan account creation, amortization schedule, ledger balance reconstruction, interest accrual, payment posting, part-prepayment re-amortization, foreclosure quote and payoff, closure No-Objection Certificate, statements, charges, waivers, reversals, delinquency, recovery controls, asset classification, and CIC snapshots. |
 | `packages/core/src/loan-policy.js` | India-only loan validation, KFS validation, sanction readiness, disbursement checks. |
-| `packages/core/src/model-governance.js` | AI/model inventory, model status, governed lifecycle transitions with a validation gate, global/model kill switch, runtime model-use evaluation. |
+| `packages/core/src/model-governance.js` | AI/model inventory, model status, governed lifecycle transitions with a validation gate, global/model kill switch, kill-switch incident and post-incident review workflow, runtime model-use evaluation. |
 | `packages/core/src/workflow-tasks.js` | LWS task derivation from LOS/LMS state plus task assignment, start, release, and comment lifecycle. |
 | `packages/core/src/index.js` | Public exports for core domain modules. |
 | `apps/api/src/file-store.js` | Local JSON state load/save helpers. |
@@ -75,7 +75,8 @@ npm run dev:api
 | `POST /ai/models` | Registers or updates a model in inventory. |
 | `POST /ai/models/:id/transitions` | Moves a model through its governed lifecycle (submit, approve validation, activate, suspend, reinstate, retire). |
 | `POST /ai/kill-switch` | Triggers global or model-level kill switch. |
-| `POST /ai/kill-switch/clear` | Clears global kill switch with approval reference. |
+| `POST /ai/incidents/:id/post-incident-review` | Records the post-incident review (root cause, remediation) for a kill-switch incident. |
+| `POST /ai/kill-switch/clear` | Clears global kill switch with approval reference, only after the incident's post-incident review. |
 | `GET /workflow/tasks` | Lists active LWS tasks derived from application and loan-account state. |
 | `GET /workflow/tasks/:id` | Reads one active LWS task. |
 | `POST /workflow/tasks/:id/assignments` | Assigns an active task and stores assignment audit. |
@@ -172,6 +173,7 @@ npm run dev:api
 | AI model inventory | Blocks model use if missing from inventory. |
 | AI model validation | Blocks active use without approved validation. |
 | AI kill switch | Blocks model use when global switch is active or model is suspended. |
+| AI incident and clearance | A kill-switch trigger opens an incident; the global switch cannot be cleared until a post-incident review (root cause, remediation) is recorded, and clearance closes the incident while retaining the review evidence. |
 
 ## Known Limitations
 
@@ -199,6 +201,7 @@ Current tests prove:
 - KFS acceptance and delivery evidence gate sanction readiness.
 - AI model kill switch blocks model-assisted underwriting.
 - Model lifecycle blocks illegal transitions and un-validated approval, and only a validated, activated model can be used; API drives draft → active.
+- A kill-switch trigger opens an incident, the global switch cannot be cleared before a recorded post-incident review, and clearance closes the incident while retaining the review evidence.
 - API stores blocked compliance applications and supports lookup.
 - Regulated entity and product policy registries resolve an application.
 - Unsafe product penal-charge design is rejected.

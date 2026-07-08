@@ -192,8 +192,8 @@ Tasks:
 - Drift monitoring.
 - Hallucination and adversarial testing for generative AI.
 - Customer-facing AI disclosure and human handoff.
-- AI incident workflow.
-- Kill-switch post-incident review.
+- AI incident workflow. First slice done: a kill-switch trigger opens an incident record tracking scope, reason, trigger actor, and status.
+- Kill-switch post-incident review. First slice done: the global switch cannot be cleared until a post-incident review (root cause, remediation) is recorded, and clearance closes the incident while retaining the evidence.
 - Tests for global/model/workflow kill switch.
 
 Done when:

@@ -36,6 +36,7 @@ import {
   recordDocumentPacketDelivered,
   recordDocumentPacketDelivery,
   recordDocumentPacketGenerated,
+  recordPostIncidentReview,
   releaseWorkflowTask,
   renderLoanStatementDocument,
   resolveComplaint,
@@ -526,6 +527,35 @@ async function route(req, res, dataDir) {
     );
     await saveState(nextState, dataDir);
     sendJson(res, result.summary.status === "blocked" ? 422 : 200, result);
+    return;
+  }
+
+  const incidentReviewMatch = path.match(/^\/ai\/incidents\/([^/]+)\/post-incident-review$/);
+  if (method === "POST" && incidentReviewMatch) {
+    const body = await readJson(req);
+    const state = await loadState(dataDir);
+    const incidentId = decodeURIComponent(incidentReviewMatch[1]);
+    const result = recordPostIncidentReview(state.modelRegistry, { ...body, incidentId });
+    if (result.summary.status === "blocked") {
+      sendJson(res, 422, {
+        error: { code: "post_incident_review_blocked", message: "Post-incident review is blocked by governance findings." },
+        findings: result.findings
+      });
+      return;
+    }
+    const nextState = appendEvent(
+      {
+        ...state,
+        modelRegistry: result.registry
+      },
+      {
+        type: "api.ai.incident.reviewed",
+        incidentId,
+        actor: body.reviewedBy ?? null
+      }
+    );
+    await saveState(nextState, dataDir);
+    sendJson(res, 200, result);
     return;
   }
 

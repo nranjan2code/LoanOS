@@ -101,7 +101,7 @@ Exit criteria:
 
 ## Phase 5: AI Governance and Model Risk Hardening
 
-Status: started. A runtime model-use guard plus global/model kill switch exist, and a governed model lifecycle with an independent-validation gate is implemented as a first slice.
+Status: started. A runtime model-use guard plus global/model kill switch exist, a governed model lifecycle with an independent-validation gate is implemented, and kill-switch events open an incident that requires a post-incident review before the switch can be cleared.
 
 Deliverables:
 
@@ -109,8 +109,8 @@ Deliverables:
 - Independent validation workflow. Validation-gate first slice done: approval requires independent validation evidence and an approver independent of the owner.
 - Bias/fairness, explainability, drift, hallucination, and adversarial testing evidence.
 - Customer-facing AI disclosure and human handoff.
-- AI incident reporting and sectoral risk intelligence pack.
-- Global/model/workflow kill switch with post-incident review.
+- AI incident reporting and sectoral risk intelligence pack. Kill-switch incident record first slice done.
+- Global/model/workflow kill switch with post-incident review. First slice done: clearing the global switch requires a recorded post-incident review.
 
 Exit criteria:
 

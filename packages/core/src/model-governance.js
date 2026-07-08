@@ -35,11 +35,19 @@ export function createModelRegistryState() {
       actor: null,
       activatedAt: null,
       clearedAt: null,
-      clearanceApprovalRef: null
+      clearanceApprovalRef: null,
+      incidentId: null
     },
     models: {},
+    incidents: {},
     events: []
   };
+}
+
+// Local id helper. model-governance is imported by loan-policy, so importing
+// createLoanId from there would create a cycle; this mirrors its format.
+function createGovernanceId(prefix) {
+  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
 export function normalizeModelRegistryState(state) {
@@ -53,6 +61,7 @@ export function normalizeModelRegistryState(state) {
       ...(state.globalKillSwitch ?? {})
     },
     models: state.models ?? {},
+    incidents: state.incidents ?? {},
     events: Array.isArray(state.events) ? state.events : []
   };
 }
@@ -276,29 +285,53 @@ export function triggerKillSwitch(state, input, now = new Date()) {
   }
 
   const at = now.toISOString();
+  const incidentId = createGovernanceId("aiincident");
+  const incident = {
+    incidentId,
+    scope,
+    modelId: scope === "model" ? input.modelId : null,
+    reason,
+    triggeredBy: actor,
+    openedAt: at,
+    status: "open",
+    postIncidentReview: null,
+    closedAt: null,
+    clearanceApprovalRef: null,
+    clearedBy: null
+  };
   const event = {
     type: "model.kill_switch.triggered",
     scope,
     modelId: scope === "model" ? input.modelId : null,
+    incidentId,
     reason,
     actor,
     at
+  };
+  const withIncident = {
+    ...registry,
+    incidents: {
+      ...registry.incidents,
+      [incidentId]: incident
+    }
   };
 
   if (scope === "global") {
     return {
       registry: {
-        ...registry,
+        ...withIncident,
         globalKillSwitch: {
           active: true,
           reason,
           actor,
           activatedAt: at,
           clearedAt: null,
-          clearanceApprovalRef: null
+          clearanceApprovalRef: null,
+          incidentId
         },
         events: [...registry.events, event]
       },
+      incident,
       findings,
       summary
     };
@@ -307,7 +340,7 @@ export function triggerKillSwitch(state, input, now = new Date()) {
   const model = registry.models[input.modelId];
   return {
     registry: {
-      ...registry,
+      ...withIncident,
       models: {
         ...registry.models,
         [input.modelId]: {
@@ -319,6 +352,76 @@ export function triggerKillSwitch(state, input, now = new Date()) {
       },
       events: [...registry.events, event]
     },
+    incident,
+    findings,
+    summary
+  };
+}
+
+// A kill-switch incident must be reviewed before the switch can be cleared: the
+// review captures root cause and remediation and is retained as evidence.
+export function recordPostIncidentReview(state, input, now = new Date()) {
+  const registry = normalizeModelRegistryState(state);
+  const findings = [];
+  const incident = registry.incidents[input?.incidentId] ?? null;
+
+  if (!input?.incidentId || !incident) {
+    findings.push(createFinding("error", "RBI-MRM-DRAFT-2026", "Post-incident review requires an existing incidentId.", "incidentId"));
+  }
+  if (incident && incident.status === "closed") {
+    findings.push(createFinding("error", "RBI-MRM-DRAFT-2026", "Cannot review a closed incident.", "incidentId"));
+  }
+  if (!input?.reviewedBy) {
+    findings.push(createFinding("error", "RBI-MRM-DRAFT-2026", "Post-incident review requires reviewedBy.", "reviewedBy"));
+  }
+  if (!input?.reviewRef) {
+    findings.push(createFinding("error", "RBI-MRM-DRAFT-2026", "Post-incident review requires reviewRef.", "reviewRef"));
+  }
+  if (!input?.rootCause) {
+    findings.push(createFinding("error", "RBI-MRM-DRAFT-2026", "Post-incident review requires rootCause.", "rootCause"));
+  }
+  if (!input?.remediation) {
+    findings.push(createFinding("error", "RBI-MRM-DRAFT-2026", "Post-incident review requires remediation.", "remediation"));
+  }
+
+  const summary = summarizeFindings(findings);
+  if (summary.status === "blocked") {
+    return { registry, incident, findings, summary };
+  }
+
+  const at = now.toISOString();
+  const review = {
+    reviewRef: input.reviewRef,
+    reviewedBy: input.reviewedBy,
+    rootCause: input.rootCause,
+    remediation: input.remediation,
+    recordedAt: at
+  };
+  const updatedIncident = {
+    ...incident,
+    status: "reviewed",
+    postIncidentReview: review
+  };
+
+  return {
+    registry: {
+      ...registry,
+      incidents: {
+        ...registry.incidents,
+        [incident.incidentId]: updatedIncident
+      },
+      events: [
+        ...registry.events,
+        {
+          type: "model.incident.reviewed",
+          incidentId: incident.incidentId,
+          actor: input.reviewedBy,
+          reviewRef: input.reviewRef,
+          at
+        }
+      ]
+    },
+    incident: updatedIncident,
     findings,
     summary
   };
@@ -328,23 +431,41 @@ export function clearGlobalKillSwitch(state, input, now = new Date()) {
   const registry = normalizeModelRegistryState(state);
   const findings = [];
 
+  const incidentId = registry.globalKillSwitch.incidentId;
+  const incident = incidentId ? registry.incidents[incidentId] ?? null : null;
+
   if (!input?.actor) {
     findings.push(createFinding("error", "RBI-MRM-DRAFT-2026", "Clear actor is required.", "actor"));
   }
   if (!input?.approvalRef) {
     findings.push(createFinding("error", "RBI-MRM-DRAFT-2026", "Clear approvalRef is required.", "approvalRef"));
   }
+  if (!registry.globalKillSwitch.active) {
+    findings.push(createFinding("error", "RBI-MRM-DRAFT-2026", "Global kill switch is not active.", "globalKillSwitch"));
+  } else if (!incident || !incident.postIncidentReview) {
+    findings.push(
+      createFinding("error", "RBI-MRM-DRAFT-2026", "Global kill switch cannot be cleared before a post-incident review is recorded.", "incidentId")
+    );
+  }
 
   const summary = summarizeFindings(findings);
   if (summary.status === "blocked") {
     return {
       registry,
+      incident,
       findings,
       summary
     };
   }
 
   const at = now.toISOString();
+  const closedIncident = {
+    ...incident,
+    status: "closed",
+    closedAt: at,
+    clearanceApprovalRef: input.approvalRef,
+    clearedBy: input.actor
+  };
   return {
     registry: {
       ...registry,
@@ -354,6 +475,10 @@ export function clearGlobalKillSwitch(state, input, now = new Date()) {
         clearedAt: at,
         clearanceApprovalRef: input.approvalRef
       },
+      incidents: {
+        ...registry.incidents,
+        [closedIncident.incidentId]: closedIncident
+      },
       events: [
         ...registry.events,
         {
@@ -361,10 +486,12 @@ export function clearGlobalKillSwitch(state, input, now = new Date()) {
           scope: "global",
           actor: input.actor,
           approvalRef: input.approvalRef,
+          incidentId: closedIncident.incidentId,
           at
         }
       ]
     },
+    incident: closedIncident,
     findings,
     summary
   };
