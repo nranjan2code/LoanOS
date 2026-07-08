@@ -987,6 +987,59 @@ test("API routes material AI decisions to human review before proposal", async (
   assert.equal(secondDecision.body.status, "pending_decision_approval");
 });
 
+test("API routes a referred application to a manual underwriting task", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+  const application = await createRegistryBackedApplication(base, { requestedAmount: 360000 });
+
+  assert.equal(
+    (
+      await postJson(`${base}/loans/applications/${application.applicationId}/kfs`, {
+        acceptance: {
+          acceptedAt: "2026-07-08T07:00:00.000Z",
+          deliveryChannel: "email",
+          deliveryRef: "email_msg_123"
+        }
+      })
+    ).status,
+    201
+  );
+
+  const storedEligibility = await fetch(`${base}/loans/applications/${application.applicationId}/eligibility`);
+  assert.equal((await storedEligibility.json()).decision, "refer");
+
+  const referralTasksResponse = await fetch(`${base}/workflow/tasks?type=application.manual_underwriting`);
+  assert.equal(referralTasksResponse.status, 200);
+  const referralTasks = await referralTasksResponse.json();
+  assert.equal(referralTasks.count, 1);
+  assert.equal(referralTasks.tasks[0].queue, "credit_ops");
+  assert.equal(referralTasks.tasks[0].priority, "high");
+  assert.equal(referralTasks.tasks[0].sla.targetHours, 8);
+  assert.equal(referralTasks.tasks[0].context.eligibility.decision, "refer");
+
+  const creditDecisionTasksResponse = await fetch(`${base}/workflow/tasks?type=application.credit_decision`);
+  assert.equal((await creditDecisionTasksResponse.json()).count, 0);
+
+  const decision = await postJson(`${base}/loans/applications/${application.applicationId}/decision`, {
+    status: "approved",
+    proposedBy: "credit-maker-1",
+    reason: "Manual underwriting cleared affordability"
+  });
+  assert.equal(decision.status, 202);
+  assert.equal(decision.body.status, "pending_decision_approval");
+});
+
 test("API exposes LWS decision approval task with assignment lifecycle", async (t) => {
   const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
   t.after(async () => {

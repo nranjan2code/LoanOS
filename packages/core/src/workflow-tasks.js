@@ -15,6 +15,7 @@ const TASK_SLA_HOURS = {
   "application.compliance_exception": 24,
   "application.kfs_acceptance": 24,
   "application.credit_decision": 8,
+  "application.manual_underwriting": 8,
   "application.ai_human_review": 4,
   "application.decision_approval": 4,
   "application.document_packet_delivery": 4,
@@ -212,6 +213,29 @@ function deriveApplicationTasks(applications, asOf) {
     }
 
     if (application.status === APPLICATION_STATUSES.READY_FOR_DECISION) {
+      const openedAt = findApplicationWorkflowAt(application, ["application.kfs.accepted"]) ?? application.updatedAt;
+      if (application.eligibility?.decision === "refer") {
+        return [
+          applicationTask(application, {
+            type: "application.manual_underwriting",
+            title: "Manual underwriting review for referred application",
+            description: "Eligibility engine referred this application for manual affordability judgement before a credit decision.",
+            queue: "credit_ops",
+            role: "credit_officer",
+            priority: "high",
+            regulatoryRefs: ["RBI-DL-2025"],
+            openedAt,
+            action: {
+              method: "POST",
+              path: `/loans/applications/${application.applicationId}/decision`,
+              description: "Record manual underwriting judgement as an approve or decline decision."
+            },
+            context: {
+              eligibility: application.eligibility
+            }
+          })
+        ];
+      }
       return [
         applicationTask(application, {
           type: "application.credit_decision",
@@ -220,11 +244,14 @@ function deriveApplicationTasks(applications, asOf) {
           queue: "credit_ops",
           role: "credit_officer",
           priority: "medium",
-          openedAt: findApplicationWorkflowAt(application, ["application.kfs.accepted"]) ?? application.updatedAt,
+          openedAt,
           action: {
             method: "POST",
             path: `/loans/applications/${application.applicationId}/decision`,
             description: "Submit decision proposal."
+          },
+          context: {
+            eligibility: application.eligibility ?? null
           }
         })
       ];

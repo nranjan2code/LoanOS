@@ -82,7 +82,7 @@ Tasks:
 - Application state machine. Done.
 - Eligibility rules engine. First slice done: EMI/FOIR affordability, age-at-maturity, and amount/tenor bounds gate approval.
 - Underwriting policy rules.
-- Manual review queue. Partial.
+- Manual review queue. Partial. Eligibility `refer` outcomes route to a manual underwriting LWS task.
 - Maker-checker decision approval. Done.
 - AI model-use evidence on decision. Partial.
 - Offer generation.

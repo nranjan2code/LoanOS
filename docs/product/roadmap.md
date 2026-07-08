@@ -31,7 +31,7 @@ Deliverables:
 - Product registry and policy versioning. First slice done.
 - Borrower onboarding and consent ledger. First slice done.
 - KYC state machine with CKYC/V-CIP placeholders. First slice done.
-- Underwriting workflow with human review. Eligibility/affordability engine first slice done.
+- Underwriting workflow with human review. Eligibility/affordability engine first slice done; refer-band applications route to a manual underwriting queue.
 - Decision proposal and maker-checker approval. First slice done.
 - KFS generation and digitally delivered document packet. First slice done.
 - Sanction and disbursement readiness checks. First slice done.

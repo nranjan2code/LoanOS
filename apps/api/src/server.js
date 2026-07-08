@@ -754,9 +754,11 @@ async function route(req, res, dataDir) {
     const evaluation = evaluateLoanApplication(updated, {
       modelRegistry: state.modelRegistry
     });
+    const eligibility = evaluateEligibility(updated);
     const withCompliance = {
       ...updated,
-      compliance: evaluation
+      compliance: evaluation,
+      eligibility: eligibility.assessment
     };
     const stored = applyKfsWorkflow(withCompliance, evaluation);
     const nextState = appendEvent(
