@@ -124,10 +124,10 @@ npm run dev:api
 | LOS state machine | Tracks preflight, KFS issued/accepted, ready for decision, human review required, pending decision approval, approved/declined, and disbursed states. |
 | Eligibility rules engine | Computes reducing-balance EMI, FOIR against product ceiling, age at maturity, and amount/tenor bounds; returns eligible, refer, or ineligible with evidence, and blocks approval of ineligible borrowers while allowing declines. |
 | Manual underwriting referral | A `refer` eligibility outcome routes the ready-for-decision application to a dedicated manual underwriting LWS task instead of the straight-through credit-decision task. |
-| Manual underwriting override | Approving a `refer`-band application requires a manual underwriting override with underwriter, reason, and policy reference; the override is stored on the pending decision and carried into the final approved decision as evidence. Declines are unaffected. |
+| Manual underwriting override | Approving a `refer`-band application requires a manual underwriting override with underwriter, reason, and policy reference; the override is stored on the pending decision and carried into the final approved decision as evidence. The named underwriter must be a registered, active `credit_officer`. Declines are unaffected. |
 | Maker-checker decision approval | Decision submission creates a pending proposal; approval requires a registered `credit_checker` actor different from the maker before disbursement. |
 | Human review hook | Material AI/model decisions without human review are routed to `human_review_required`; human-review recording requires a registered `human_reviewer`. |
-| Regulated-action RBAC | Credit proposal, checker approval, human review, recovery assignment, and LWS task actions validate actor role and queue policy. |
+| Regulated-action RBAC | Credit proposal, manual underwriting override, checker approval, human review, recovery assignment, and LWS task actions validate actor role and queue policy. |
 | Complaint workflow | Tracks received, assigned, under-review, resolved, escalation-due, and RBI CMS escalation states with acknowledgement, closure, and CMS references. |
 | 30-day grievance clock | Computes due date, breach status, and escalation-due state from complaint received time. |
 | Execution document packet | Renders borrower-facing HTML/text KFS, sanction letter, agreement summary, and privacy notice with SHA-256 checksums and delivery evidence. |
@@ -193,6 +193,7 @@ Current tests prove:
 - API assesses eligibility and blocks approval of an ineligible borrower while allowing a decline.
 - API routes a refer-band application to a manual underwriting task instead of the straight-through credit-decision task.
 - API blocks approval of a refer-band application until a manual underwriting override is recorded and carries that override into the final approved decision.
+- API blocks a manual underwriting override whose named underwriter is not a registered, active credit officer.
 - API requires maker-checker approval before disbursement.
 - API blocks disbursement until the execution document packet is generated and delivered.
 - API routes material AI decisions to human review before decision proposal.

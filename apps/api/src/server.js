@@ -60,6 +60,7 @@ import {
   validateGrievanceOfficerAccess,
   validateHumanReviewAccess,
   validateKfsBeforeDecision,
+  validateManualUnderwritingAccess,
   validateRecoveryAssignmentAccess,
   validateWorkflowActorAccess,
   validateWorkflowAssignmentAccess,
@@ -802,7 +803,17 @@ async function route(req, res, dataDir) {
     const preDecision = evaluateLoanApplication(decisionApplication, {
       modelRegistry: state.modelRegistry
     });
-    const accessFindings = validateDecisionProposalAccess(state.staffActors, body);
+    // A refer-band approval carries a manual underwriting override; the named
+    // underwriter must be a registered, active credit officer. Presence and
+    // shape of the override are enforced separately by proposeDecision.
+    const requiresUnderwriterAccessCheck =
+      eligibility.assessment.decision === "refer" &&
+      body.status === "approved" &&
+      Boolean(body.manualUnderwriting?.underwriterId);
+    const accessFindings = [
+      ...validateDecisionProposalAccess(state.staffActors, body),
+      ...(requiresUnderwriterAccessCheck ? validateManualUnderwritingAccess(state.staffActors, body) : [])
+    ];
     const accessSummary = summarizeFindings(accessFindings);
     if (accessSummary.status === "blocked") {
       sendJson(res, 422, {

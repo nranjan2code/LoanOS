@@ -81,7 +81,7 @@ Tasks:
 
 - Application state machine. Done.
 - Eligibility rules engine. First slice done: EMI/FOIR affordability, age-at-maturity, and amount/tenor bounds gate approval.
-- Underwriting policy rules. First slice done: approving a refer-band application requires a recorded manual underwriting override (underwriter, reason, policy reference).
+- Underwriting policy rules. First slice done: approving a refer-band application requires a recorded manual underwriting override (underwriter, reason, policy reference), and the named underwriter must be a registered, active credit officer.
 - Manual review queue. Partial. Eligibility `refer` outcomes route to a manual underwriting LWS task, and that task's approval is gated on a manual underwriting override captured as decision evidence.
 - Maker-checker decision approval. Done.
 - AI model-use evidence on decision. Partial.

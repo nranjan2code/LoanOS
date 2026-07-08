@@ -1113,6 +1113,68 @@ test("API carries manual underwriting override into the approved decision", asyn
   ]);
 });
 
+test("API requires the manual underwriting override actor to be a credit officer", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+  const application = await createRegistryBackedApplication(base, { requestedAmount: 360000 });
+
+  assert.equal(
+    (
+      await postJson(`${base}/loans/applications/${application.applicationId}/kfs`, {
+        acceptance: {
+          acceptedAt: "2026-07-08T07:00:00.000Z",
+          deliveryChannel: "email",
+          deliveryRef: "email_msg_123"
+        }
+      })
+    ).status,
+    201
+  );
+
+  const overrideBody = {
+    status: "approved",
+    proposedBy: "credit-maker-1",
+    reason: "Review-band affordability cleared on manual assessment",
+    manualUnderwriting: {
+      reason: "Compensating savings balance supports the review-band FOIR.",
+      policyReference: "board_underwriting_policy_v1"
+    }
+  };
+
+  const wrongRole = await postJson(`${base}/loans/applications/${application.applicationId}/decision`, {
+    ...overrideBody,
+    manualUnderwriting: { ...overrideBody.manualUnderwriting, underwriterId: "credit-checker-1" }
+  });
+  assert.equal(wrongRole.status, 422);
+  assert.equal(wrongRole.body.error.code, "decision_access_blocked");
+  assert(wrongRole.body.findings.some((finding) => finding.path === "manualUnderwriting.underwriterId"));
+
+  const unregistered = await postJson(`${base}/loans/applications/${application.applicationId}/decision`, {
+    ...overrideBody,
+    manualUnderwriting: { ...overrideBody.manualUnderwriting, underwriterId: "ghost-underwriter" }
+  });
+  assert.equal(unregistered.status, 422);
+  assert.equal(unregistered.body.error.code, "decision_access_blocked");
+
+  const valid = await postJson(`${base}/loans/applications/${application.applicationId}/decision`, {
+    ...overrideBody,
+    manualUnderwriting: { ...overrideBody.manualUnderwriting, underwriterId: "credit-maker-1" }
+  });
+  assert.equal(valid.status, 202);
+  assert.equal(valid.body.status, "pending_decision_approval");
+});
+
 test("API exposes LWS decision approval task with assignment lifecycle", async (t) => {
   const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
   t.after(async () => {

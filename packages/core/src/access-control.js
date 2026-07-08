@@ -102,6 +102,15 @@ export function validateDecisionApprovalAccess(staffActors = {}, input) {
   return validateActorRole(staffActors, input?.approvedBy, STAFF_ROLES.CREDIT_CHECKER, "approvedBy");
 }
 
+export function validateManualUnderwritingAccess(staffActors = {}, input) {
+  return validateActorRole(
+    staffActors,
+    input?.manualUnderwriting?.underwriterId,
+    STAFF_ROLES.CREDIT_OFFICER,
+    "manualUnderwriting.underwriterId"
+  );
+}
+
 export function validateDocumentPacketAccess(staffActors = {}, actorId, path = "actor") {
   return validateActorRole(staffActors, actorId, STAFF_ROLES.LOAN_OFFICER, path);
 }

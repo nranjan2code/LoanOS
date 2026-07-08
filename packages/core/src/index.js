@@ -14,6 +14,7 @@ export {
   validateDecisionApprovalAccess,
   validateDecisionProposalAccess,
   validateDocumentPacketAccess,
+  validateManualUnderwritingAccess,
   validateGrievanceOfficerAccess,
   validateHumanReviewAccess,
   validateRecoveryAssignmentAccess,
