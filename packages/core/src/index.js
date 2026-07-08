@@ -24,9 +24,11 @@ export {
 } from "./access-control.js";
 
 export {
+  MODEL_STATUSES,
   createModelRegistryState,
   normalizeModelRegistryState,
   registerModel,
+  transitionModel,
   triggerKillSwitch,
   clearGlobalKillSwitch,
   evaluateModelUse

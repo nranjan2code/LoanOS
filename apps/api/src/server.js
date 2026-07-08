@@ -52,6 +52,7 @@ import {
   summarizeLoanAccount,
   startComplaintReview,
   startWorkflowTask,
+  transitionModel,
   triggerKillSwitch,
   upsertBorrowerProfile,
   upsertConsentRecord,
@@ -474,6 +475,36 @@ async function route(req, res, dataDir) {
     };
     await saveState(nextState, dataDir);
     sendJson(res, result.summary.status === "blocked" ? 422 : 201, result);
+    return;
+  }
+
+  const modelTransitionMatch = path.match(/^\/ai\/models\/([^/]+)\/transitions$/);
+  if (method === "POST" && modelTransitionMatch) {
+    const body = await readJson(req);
+    const state = await loadState(dataDir);
+    const modelId = decodeURIComponent(modelTransitionMatch[1]);
+    const result = transitionModel(state.modelRegistry, { ...body, modelId });
+    if (result.summary.status === "blocked") {
+      sendJson(res, 422, {
+        error: { code: "model_transition_blocked", message: "Model lifecycle transition is blocked by governance findings." },
+        findings: result.findings
+      });
+      return;
+    }
+    const nextState = appendEvent(
+      {
+        ...state,
+        modelRegistry: result.registry
+      },
+      {
+        type: "api.ai.model.transitioned",
+        modelId,
+        action: body.action ?? null,
+        actor: body.actor ?? null
+      }
+    );
+    await saveState(nextState, dataDir);
+    sendJson(res, 200, result);
     return;
   }
 

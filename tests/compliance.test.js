@@ -13,8 +13,10 @@ import {
   estimateEmi,
   evaluateEligibility,
   evaluateLoanApplication,
+  evaluateModelUse,
   generateRepaymentSchedule,
   registerModel,
+  transitionModel,
   resolveBorrowerApplicationReferences,
   resolveLoanApplicationReferences,
   triggerKillSwitch,
@@ -248,6 +250,143 @@ test("AI model kill switch blocks credit-impacting model use", () => {
 
   assert.equal(blocked.summary.status, "blocked");
   assert(blocked.findings.some((finding) => finding.message.includes("not active")));
+});
+
+test("model lifecycle enforces validation before a model can be used", () => {
+  const base = createModelRegistryState();
+  const registered = registerModel(base, {
+    modelId: "uw_llm_v2",
+    name: "Underwriting assistant",
+    owner: "risk-owner",
+    purpose: "credit_underwriting",
+    riskTier: "high",
+    validationStatus: "pending",
+    materialDecision: true,
+    actor: "model-risk"
+  });
+  assert.equal(registered.model.status, "draft");
+  assert.equal(evaluateModelUse(registered.registry, { modelId: "uw_llm_v2", humanReviewRef: "hr_1" }).allowed, false);
+
+  // Cannot jump straight from draft to active.
+  const badJump = transitionModel(registered.registry, { modelId: "uw_llm_v2", action: "activate", actor: "model-risk" });
+  assert.equal(badJump.summary.status, "blocked");
+  assert(badJump.findings.some((finding) => finding.path === "status"));
+
+  const submitted = transitionModel(registered.registry, {
+    modelId: "uw_llm_v2",
+    action: "submit_for_validation",
+    actor: "risk-owner"
+  });
+  assert.equal(submitted.model.status, "validation_pending");
+
+  // Approval requires independent validation evidence.
+  const noEvidence = transitionModel(submitted.registry, { modelId: "uw_llm_v2", action: "approve_validation", actor: "validator-1" });
+  assert.equal(noEvidence.summary.status, "blocked");
+  assert(noEvidence.findings.some((finding) => finding.path === "independentValidationRef"));
+
+  // The approver cannot be the model owner.
+  const ownerApproves = transitionModel(submitted.registry, {
+    modelId: "uw_llm_v2",
+    action: "approve_validation",
+    actor: "risk-owner",
+    independentValidationRef: "ivr_9",
+    fairnessAssessmentRef: "fair_9",
+    explainabilityRef: "xai_9",
+    monitoringPlanRef: "mon_9"
+  });
+  assert.equal(ownerApproves.summary.status, "blocked");
+  assert(ownerApproves.findings.some((finding) => finding.path === "actor"));
+
+  // A high-risk model requires fairness, explainability, and monitoring evidence.
+  const missingHighRisk = transitionModel(submitted.registry, {
+    modelId: "uw_llm_v2",
+    action: "approve_validation",
+    actor: "validator-1",
+    independentValidationRef: "ivr_9"
+  });
+  assert.equal(missingHighRisk.summary.status, "blocked");
+  assert(missingHighRisk.findings.some((finding) => finding.path === "fairnessAssessmentRef"));
+
+  const approved = transitionModel(submitted.registry, {
+    modelId: "uw_llm_v2",
+    action: "approve_validation",
+    actor: "validator-1",
+    independentValidationRef: "ivr_9",
+    fairnessAssessmentRef: "fair_9",
+    explainabilityRef: "xai_9",
+    monitoringPlanRef: "mon_9"
+  });
+  assert.equal(approved.summary.status, "ready");
+  assert.equal(approved.model.status, "approved");
+  assert.equal(approved.model.validationStatus, "approved");
+  assert.equal(approved.model.validatedBy, "validator-1");
+  // Approved but not yet activated cannot be used.
+  assert.equal(evaluateModelUse(approved.registry, { modelId: "uw_llm_v2", humanReviewRef: "hr_1" }).allowed, false);
+
+  const active = transitionModel(approved.registry, { modelId: "uw_llm_v2", action: "activate", actor: "model-risk" });
+  assert.equal(active.model.status, "active");
+  assert.equal(evaluateModelUse(active.registry, { modelId: "uw_llm_v2", humanReviewRef: "hr_1" }).allowed, true);
+
+  const retired = transitionModel(active.registry, {
+    modelId: "uw_llm_v2",
+    action: "retire",
+    actor: "model-risk",
+    reason: "Superseded by v3"
+  });
+  assert.equal(retired.model.status, "retired");
+  assert.equal(evaluateModelUse(retired.registry, { modelId: "uw_llm_v2", humanReviewRef: "hr_1" }).allowed, false);
+});
+
+test("API drives the model lifecycle from draft to active", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+
+  const register = await postJson(`${base}/ai/models`, {
+    modelId: "col_llm_v1",
+    name: "Collections assistant",
+    owner: "risk-owner",
+    purpose: "collections",
+    riskTier: "medium",
+    validationStatus: "pending",
+    actor: "model-risk"
+  });
+  assert.equal(register.status, 201);
+  assert.equal(register.body.model.status, "draft");
+
+  assert.equal(
+    (await postJson(`${base}/ai/models/col_llm_v1/transitions`, { action: "submit_for_validation", actor: "risk-owner" })).status,
+    200
+  );
+  const approve = await postJson(`${base}/ai/models/col_llm_v1/transitions`, {
+    action: "approve_validation",
+    actor: "validator-1",
+    independentValidationRef: "ivr_1"
+  });
+  assert.equal(approve.status, 200);
+  assert.equal(approve.body.model.status, "approved");
+
+  const activate = await postJson(`${base}/ai/models/col_llm_v1/transitions`, { action: "activate", actor: "model-risk" });
+  assert.equal(activate.status, 200);
+  assert.equal(activate.body.model.status, "active");
+
+  const models = await (await fetch(`${base}/ai/models`)).json();
+  assert.equal(models.models.col_llm_v1.status, "active");
+
+  // A transition from the wrong state surfaces a 422.
+  const badActivate = await postJson(`${base}/ai/models/col_llm_v1/transitions`, { action: "activate", actor: "model-risk" });
+  assert.equal(badActivate.status, 422);
+  assert.equal(badActivate.body.error.code, "model_transition_blocked");
 });
 
 test("regulated entity and product registries resolve an application", () => {

@@ -178,13 +178,15 @@ Done when:
 
 ## Epic 8: AI Governance and Model Risk
 
+Status: first executable slice complete.
+
 Goal: all model-assisted decisions are inventoried, validated, monitored, and kill-switchable.
 
 Tasks:
 
-- Model lifecycle states: draft, validation_pending, approved, active, suspended, retired.
-- Model validation workflow.
-- High-risk model approval workflow.
+- Model lifecycle states: draft, validation_pending, approved, active, suspended, retired. Done: governed transitions with legal state guards.
+- Model validation workflow. First slice done: approving validation requires independent validation evidence and an approver independent of the owner before a model can be activated.
+- High-risk model approval workflow. First slice done: high-risk approval additionally requires fairness, explainability, and monitoring evidence.
 - Bias/fairness evidence.
 - Explainability evidence.
 - Drift monitoring.

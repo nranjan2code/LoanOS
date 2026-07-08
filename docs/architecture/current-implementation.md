@@ -34,7 +34,7 @@ npm run dev:api
 | `packages/core/src/application-workflow.js` | LOS application state machine, KFS workflow, human review, decision proposal, manual underwriting override gate for referred applications, coded decline-reason taxonomy, maker-checker approval, disbursement transition. |
 | `packages/core/src/loan-account.js` | LMS loan account creation, amortization schedule, ledger balance reconstruction, interest accrual, payment posting, part-prepayment re-amortization, foreclosure quote and payoff, closure No-Objection Certificate, statements, charges, waivers, reversals, delinquency, recovery controls, asset classification, and CIC snapshots. |
 | `packages/core/src/loan-policy.js` | India-only loan validation, KFS validation, sanction readiness, disbursement checks. |
-| `packages/core/src/model-governance.js` | AI/model inventory, model status, global/model kill switch, runtime model-use evaluation. |
+| `packages/core/src/model-governance.js` | AI/model inventory, model status, governed lifecycle transitions with a validation gate, global/model kill switch, runtime model-use evaluation. |
 | `packages/core/src/workflow-tasks.js` | LWS task derivation from LOS/LMS state plus task assignment, start, release, and comment lifecycle. |
 | `packages/core/src/index.js` | Public exports for core domain modules. |
 | `apps/api/src/file-store.js` | Local JSON state load/save helpers. |
@@ -73,6 +73,7 @@ npm run dev:api
 | `POST /complaints/:id/rbi-cms-escalation` | Records RBI CMS escalation reference and reason. |
 | `GET /ai/models` | Returns model registry and kill-switch state. |
 | `POST /ai/models` | Registers or updates a model in inventory. |
+| `POST /ai/models/:id/transitions` | Moves a model through its governed lifecycle (submit, approve validation, activate, suspend, reinstate, retire). |
 | `POST /ai/kill-switch` | Triggers global or model-level kill switch. |
 | `POST /ai/kill-switch/clear` | Clears global kill switch with approval reference. |
 | `GET /workflow/tasks` | Lists active LWS tasks derived from application and loan-account state. |
@@ -167,6 +168,7 @@ npm run dev:api
 | Penal charges | Blocks penal interest and capitalization of penal charges. |
 | Fund flow | Blocks LSP, DLA, pass-through, and pool account fund control. |
 | Disbursement | Requires approved loan, valid KFS, delivered document packet, and borrower/end-beneficiary account. |
+| Model lifecycle | Governed transitions (draft → validation_pending → approved → active, plus suspend/reinstate/retire) with legal state guards. Approving validation requires independent validation evidence, an approver independent of the owner, and — for high-risk models — fairness, explainability, and monitoring evidence; a model reaches `active` only through this path. |
 | AI model inventory | Blocks model use if missing from inventory. |
 | AI model validation | Blocks active use without approved validation. |
 | AI kill switch | Blocks model use when global switch is active or model is suspended. |
@@ -196,6 +198,7 @@ Current tests prove:
 - Invalid KFS cooling-off and penal-charge design are blocked.
 - KFS acceptance and delivery evidence gate sanction readiness.
 - AI model kill switch blocks model-assisted underwriting.
+- Model lifecycle blocks illegal transitions and un-validated approval, and only a validated, activated model can be used; API drives draft → active.
 - API stores blocked compliance applications and supports lookup.
 - Regulated entity and product policy registries resolve an application.
 - Unsafe product penal-charge design is rejected.
