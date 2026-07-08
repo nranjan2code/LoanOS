@@ -608,6 +608,160 @@ export function postCashRecoveryToLoanAccount(account, input, now = new Date()) 
   };
 }
 
+// Foreclosure lets a borrower settle early by paying outstanding principal plus
+// interest and charges already due as of the foreclosure date. Future interest
+// is not owed. Any foreclosure charge must be disclosed in the KFS to be
+// applied, mirroring the KFS charge-disclosure control on ordinary charges.
+export function quoteForeclosure(account, input = {}, now = new Date()) {
+  const findings = [];
+  const asOf = input.asOf ? new Date(input.asOf) : now;
+
+  if (!account) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Loan account is required.", "loanAccount"));
+  }
+  if (account && account.status !== ACTIVE_STATUS) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Only an active loan account can be foreclosed.", "status"));
+  }
+
+  let foreclosureCharge = 0;
+  let disclosedChargeRef = null;
+  if (input.foreclosureChargeName) {
+    const disclosed = findDisclosedCharge(account?.disclosedChargeCatalog ?? [], input.foreclosureChargeName);
+    if (!disclosed) {
+      findings.push(createFinding("error", "RBI-KFS-2024", "Foreclosure charge must be disclosed in KFS.", "foreclosureChargeName"));
+    } else {
+      foreclosureCharge = roundMoney(disclosed.amount ?? input.foreclosureChargeAmount ?? 0);
+      disclosedChargeRef = disclosed.name;
+    }
+  }
+
+  const summary = summarizeFindings(findings);
+  if (summary.status === "blocked" || !account) {
+    return { quote: null, findings, summary };
+  }
+
+  const balance = summarizeLoanAccount(account, asOf);
+  return {
+    quote: {
+      asOf: asOf.toISOString(),
+      principalOutstanding: balance.principalOutstanding,
+      interestOutstanding: balance.interestOutstanding,
+      chargesOutstanding: balance.chargesOutstanding,
+      foreclosureCharge,
+      disclosedChargeRef,
+      payoffAmount: roundMoney(
+        balance.principalOutstanding + balance.interestOutstanding + balance.chargesOutstanding + foreclosureCharge
+      )
+    },
+    findings,
+    summary
+  };
+}
+
+export function forecloseLoanAccount(account, input = {}, now = new Date()) {
+  const foreclosedAt = input.foreclosedAt ? new Date(input.foreclosedAt) : now;
+  const quoteResult = quoteForeclosure(
+    account,
+    {
+      asOf: foreclosedAt.toISOString(),
+      foreclosureChargeName: input.foreclosureChargeName,
+      foreclosureChargeAmount: input.foreclosureChargeAmount
+    },
+    now
+  );
+  const findings = [...quoteResult.findings];
+
+  if (!input.paymentRef) {
+    findings.push(createFinding("error", "RBI-IT-GRC", "Foreclosure requires paymentRef.", "paymentRef"));
+  }
+  if (!Number.isFinite(input.amount) || input.amount <= 0) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Foreclosure amount must be positive.", "amount"));
+  }
+  if (quoteResult.quote && Number.isFinite(input.amount) && roundMoney(input.amount) < quoteResult.quote.payoffAmount) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Foreclosure amount must cover the full payoff.", "amount"));
+  }
+
+  const summary = summarizeFindings(findings);
+  if (summary.status === "blocked" || !quoteResult.quote) {
+    return { loanAccount: account, foreclosure: null, quote: quoteResult.quote, events: [], findings, summary };
+  }
+
+  const quote = quoteResult.quote;
+  let working = account;
+  const events = [];
+
+  if (quote.foreclosureCharge > 0) {
+    const chargeResult = assessChargeToLoanAccount(
+      working,
+      {
+        name: input.foreclosureChargeName,
+        reason: "Foreclosure charge disclosed in KFS",
+        amount: quote.foreclosureCharge,
+        assessedAt: foreclosedAt.toISOString(),
+        actor: input.actor ?? "system"
+      },
+      now
+    );
+    if (chargeResult.summary.status === "blocked") {
+      return { loanAccount: account, foreclosure: null, quote, events: [], findings: chargeResult.findings, summary: chargeResult.summary };
+    }
+    working = chargeResult.loanAccount;
+    events.push(chargeResult.chargeEvent);
+  }
+
+  const paymentResult = postPaymentToLoanAccount(
+    working,
+    {
+      amount: quote.payoffAmount,
+      receivedAt: foreclosedAt.toISOString(),
+      paymentRef: input.paymentRef,
+      channel: input.channel ?? "foreclosure",
+      actor: input.actor ?? "system"
+    },
+    now
+  );
+  if (paymentResult.summary.status === "blocked") {
+    return { loanAccount: account, foreclosure: null, quote, events, findings: paymentResult.findings, summary: paymentResult.summary };
+  }
+  events.push(paymentResult.paymentEvent);
+
+  const foreclosure = {
+    foreclosureId: input.foreclosureId ?? createLoanId("foreclosure"),
+    foreclosedAt: foreclosedAt.toISOString(),
+    payoffAmount: quote.payoffAmount,
+    principalSettled: quote.principalOutstanding,
+    interestSettled: quote.interestOutstanding,
+    chargesSettled: quote.chargesOutstanding,
+    foreclosureCharge: quote.foreclosureCharge,
+    paymentRef: input.paymentRef,
+    actor: input.actor ?? "system"
+  };
+  const updated = {
+    ...paymentResult.loanAccount,
+    status: CLOSED_STATUS,
+    closedAt: paymentResult.loanAccount.closedAt ?? foreclosedAt.toISOString(),
+    foreclosure,
+    servicingEvents: [
+      ...(paymentResult.loanAccount.servicingEvents ?? []),
+      {
+        type: "loan_account.foreclosed",
+        foreclosureId: foreclosure.foreclosureId,
+        at: foreclosedAt.toISOString(),
+        actor: foreclosure.actor
+      }
+    ]
+  };
+
+  return {
+    loanAccount: updated,
+    foreclosure,
+    quote,
+    events,
+    findings: [],
+    summary: summarizeFindings([])
+  };
+}
+
 export function assessChargeToLoanAccount(account, input, now = new Date()) {
   const findings = [];
 

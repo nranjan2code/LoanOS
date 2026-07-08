@@ -18,6 +18,7 @@ import {
   createComplaint,
   DECLINE_REASON_CODES,
   deriveWorkflowTasks,
+  forecloseLoanAccount,
   enrichComplaint,
   escalateComplaintToRbiCms,
   evaluateEligibility,
@@ -43,6 +44,7 @@ import {
   postCashRecoveryToLoanAccount,
   postPaymentToLoanAccount,
   proposeDecision,
+  quoteForeclosure,
   reverseLoanAccountEvent,
   summarizeLoanAccount,
   startComplaintReview,
@@ -1543,6 +1545,75 @@ async function route(req, res, dataDir) {
       loanAccount: stored,
       accrualEvents: result.accrualEvents,
       summary: summarizeLoanAccount(stored, body.asOf ? new Date(body.asOf) : new Date())
+    });
+    return;
+  }
+
+  const foreclosureQuoteMatch = path.match(/^\/loan-accounts\/([^/]+)\/foreclosure-quote$/);
+  if (method === "GET" && foreclosureQuoteMatch) {
+    const state = await loadState(dataDir);
+    const loanAccount = state.loanAccounts[decodeURIComponent(foreclosureQuoteMatch[1])];
+    if (!loanAccount) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Loan account not found." } });
+      return;
+    }
+    const result = quoteForeclosure(loanAccount, {
+      asOf: url.searchParams.get("asOf") ?? undefined,
+      foreclosureChargeName: url.searchParams.get("foreclosureChargeName") ?? undefined
+    });
+    if (result.summary.status === "blocked") {
+      sendJson(res, 422, {
+        error: { code: "foreclosure_quote_blocked", message: "Foreclosure quote is blocked by LMS findings." },
+        findings: result.findings
+      });
+      return;
+    }
+    sendJson(res, 200, result.quote);
+    return;
+  }
+
+  const foreclosureMatch = path.match(/^\/loan-accounts\/([^/]+)\/foreclosure$/);
+  if (method === "POST" && foreclosureMatch) {
+    const body = await readJson(req);
+    const state = await loadState(dataDir);
+    const loanAccountId = decodeURIComponent(foreclosureMatch[1]);
+    const loanAccount = state.loanAccounts[loanAccountId];
+    if (!loanAccount) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Loan account not found." } });
+      return;
+    }
+
+    const result = forecloseLoanAccount(loanAccount, body);
+    if (result.summary.status === "blocked") {
+      sendJson(res, 422, {
+        error: { code: "foreclosure_blocked", message: "Foreclosure is blocked by LMS findings." },
+        findings: result.findings
+      });
+      return;
+    }
+
+    const stored = result.loanAccount;
+    const nextState = appendEvent(
+      {
+        ...state,
+        loanAccounts: {
+          ...state.loanAccounts,
+          [stored.loanAccountId]: stored
+        }
+      },
+      {
+        type: "loan_account.foreclosed",
+        loanAccountId: stored.loanAccountId,
+        foreclosureId: result.foreclosure.foreclosureId,
+        payoffAmount: result.foreclosure.payoffAmount
+      }
+    );
+    await saveState(nextState, dataDir);
+    sendJson(res, 200, {
+      loanAccount: stored,
+      foreclosure: result.foreclosure,
+      quote: result.quote,
+      summary: summarizeLoanAccount(stored, new Date(result.foreclosure.foreclosedAt))
     });
     return;
   }

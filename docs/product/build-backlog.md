@@ -115,7 +115,7 @@ Tasks:
 - Payment allocation. First slice done.
 - Charges, waivers, reversals. First slice done.
 - SMA/NPA asset classification. Done.
-- Part prepayment and foreclosure.
+- Part prepayment and foreclosure. Foreclosure first slice done: payoff quote (principal + due interest + charges + KFS-disclosed foreclosure charge), full-payoff settlement, and account closure. Part-prepayment re-amortization still planned.
 - Closure and NOC.
 - Borrower statements. First slice done.
 - CIC-ready reporting snapshot. First slice done.

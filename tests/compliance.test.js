@@ -846,6 +846,63 @@ test("API accrues scheduled interest into the ledger and reconciles with the sch
   assert.equal(rerun.body.summary.interestAccrued, expectedInterest);
 });
 
+test("API quotes and executes foreclosure, closing the loan account", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+  const application = await approveAndDisburseApplication(base);
+  const account = await (await fetch(`${base}/loan-accounts/${application.loanAccountId}`)).json();
+
+  // Foreclose before the first installment falls due: only principal is owed.
+  const asOf = `${addDays(account.schedule[0].dueDate, -1)}T12:00:00.000Z`;
+
+  const quoteResponse = await fetch(`${base}/loan-accounts/${account.loanAccountId}/foreclosure-quote?asOf=${asOf}`);
+  assert.equal(quoteResponse.status, 200);
+  const quote = await quoteResponse.json();
+  assert.equal(quote.interestOutstanding, 0);
+  assert.equal(quote.payoffAmount, account.principalAmount);
+
+  const underpay = await postJson(`${base}/loan-accounts/${account.loanAccountId}/foreclosure`, {
+    amount: quote.payoffAmount - 1,
+    paymentRef: "fc_ref_low",
+    foreclosedAt: asOf
+  });
+  assert.equal(underpay.status, 422);
+  assert.equal(underpay.body.error.code, "foreclosure_blocked");
+  assert(underpay.body.findings.some((finding) => finding.path === "amount"));
+
+  const foreclosure = await postJson(`${base}/loan-accounts/${account.loanAccountId}/foreclosure`, {
+    amount: quote.payoffAmount,
+    paymentRef: "fc_ref_full",
+    foreclosedAt: asOf
+  });
+  assert.equal(foreclosure.status, 200);
+  assert.equal(foreclosure.body.loanAccount.status, "closed");
+  assert.equal(foreclosure.body.foreclosure.payoffAmount, account.principalAmount);
+  assert.equal(foreclosure.body.summary.principalOutstanding, 0);
+  assert.equal(foreclosure.body.summary.totalOutstanding, 0);
+
+  // A closed account cannot be foreclosed again.
+  const repeat = await postJson(`${base}/loan-accounts/${account.loanAccountId}/foreclosure`, {
+    amount: quote.payoffAmount,
+    paymentRef: "fc_ref_repeat",
+    foreclosedAt: asOf
+  });
+  assert.equal(repeat.status, 422);
+  assert.equal(repeat.body.error.code, "foreclosure_blocked");
+  assert(repeat.body.findings.some((finding) => finding.path === "status"));
+});
+
 test("API enforces recovery-agent notice and same-day cash recovery posting", async (t) => {
   const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
   t.after(async () => {
