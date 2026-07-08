@@ -1098,6 +1098,13 @@ test("API carries manual underwriting override into the approved decision", asyn
   });
   assert.equal(decision.status, 202);
 
+  const approvalTasksResponse = await fetch(`${base}/workflow/tasks?type=application.decision_approval`);
+  const approvalTasks = await approvalTasksResponse.json();
+  assert.equal(approvalTasks.count, 1);
+  assert.equal(approvalTasks.tasks[0].context.requiresManualUnderwritingReview, true);
+  assert.equal(approvalTasks.tasks[0].context.manualUnderwriting.underwriterId, "credit-maker-1");
+  assert.equal(approvalTasks.tasks[0].context.manualUnderwriting.policyReference, "board_underwriting_policy_v1");
+
   const approval = await postJson(`${base}/loans/applications/${application.applicationId}/approvals`, {
     outcome: "approved",
     approvedBy: "credit-checker-1",

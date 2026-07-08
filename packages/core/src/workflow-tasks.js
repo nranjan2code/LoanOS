@@ -282,11 +282,15 @@ function deriveApplicationTasks(applications, asOf) {
     }
 
     if (application.status === APPLICATION_STATUSES.PENDING_DECISION_APPROVAL) {
+      const pendingDecision = application.pendingDecision ?? null;
+      const manualUnderwriting = pendingDecision?.manualUnderwriting ?? null;
       return [
         applicationTask(application, {
           type: "application.decision_approval",
           title: "Checker approval for credit decision",
-          description: "A checker must approve or reject the pending credit decision before disbursement.",
+          description: manualUnderwriting
+            ? "A checker must approve or reject the pending credit decision before disbursement. This referred application carries a manual underwriting override: review the underwriter's rationale and policy reference, and note that the checker cannot be the underwriter."
+            : "A checker must approve or reject the pending credit decision before disbursement.",
           queue: "credit_checker",
           role: "credit_checker",
           priority: "high",
@@ -297,7 +301,9 @@ function deriveApplicationTasks(applications, asOf) {
             description: "Approve or reject the decision proposal."
           },
           context: {
-            pendingDecision: application.pendingDecision ?? null
+            pendingDecision,
+            manualUnderwriting,
+            requiresManualUnderwritingReview: Boolean(manualUnderwriting)
           }
         })
       ];

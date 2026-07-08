@@ -131,7 +131,7 @@ npm run dev:api
 | Complaint workflow | Tracks received, assigned, under-review, resolved, escalation-due, and RBI CMS escalation states with acknowledgement, closure, and CMS references. |
 | 30-day grievance clock | Computes due date, breach status, and escalation-due state from complaint received time. |
 | Execution document packet | Renders borrower-facing HTML/text KFS, sanction letter, agreement summary, and privacy notice with SHA-256 checksums and delivery evidence. |
-| LWS task queues | Derives active tasks for blocked compliance, KFS acceptance, credit decision, manual underwriting review for eligibility-referred applications, AI human review, checker approval, document packet delivery, disbursement, recovery assignment, NPA review, complaint assignment, complaint resolution, and RBI CMS escalation. Each task includes SLA target, due time, and breach status. |
+| LWS task queues | Derives active tasks for blocked compliance, KFS acceptance, credit decision, manual underwriting review for eligibility-referred applications, AI human review, checker approval (surfacing any manual underwriting override for the checker to review), document packet delivery, disbursement, recovery assignment, NPA review, complaint assignment, complaint resolution, and RBI CMS escalation. Each task includes SLA target, due time, and breach status. |
 | LWS task audit | Persists assignment, start, release, and comment events while the domain state remains the source of truth for task resolution. |
 | Loan account opening | Disbursement opens an LMS loan account and creates a disbursement ledger event. |
 | Repayment schedule | Generates monthly reducing-balance amortization schedule from KFS/product terms. |
@@ -195,6 +195,7 @@ Current tests prove:
 - API blocks approval of a refer-band application until a manual underwriting override is recorded and carries that override into the final approved decision.
 - API blocks a manual underwriting override whose named underwriter is not a registered, active credit officer.
 - API blocks a decision checker who is also the manual underwriting underwriter, preserving four-eyes separation on referred approvals.
+- The checker's decision-approval task surfaces the manual underwriting override rationale and policy reference for review.
 - API requires maker-checker approval before disbursement.
 - API blocks disbursement until the execution document packet is generated and delivered.
 - API routes material AI decisions to human review before decision proposal.
