@@ -1175,6 +1175,78 @@ test("API requires the manual underwriting override actor to be a credit officer
   assert.equal(valid.body.status, "pending_decision_approval");
 });
 
+test("API blocks a checker who is also the manual underwriting underwriter", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+  const application = await createRegistryBackedApplication(base, { requestedAmount: 360000 });
+
+  // A dual-role actor could both underwrite and check; four-eyes must still hold.
+  assert.equal(
+    (
+      await postJson(`${base}/staff/actors`, {
+        actorId: "credit-dual-1",
+        displayName: "Credit Dual Role",
+        roles: ["credit_officer", "credit_checker"],
+        queues: ["credit_ops", "credit_checker"]
+      })
+    ).status,
+    201
+  );
+
+  assert.equal(
+    (
+      await postJson(`${base}/loans/applications/${application.applicationId}/kfs`, {
+        acceptance: {
+          acceptedAt: "2026-07-08T07:00:00.000Z",
+          deliveryChannel: "email",
+          deliveryRef: "email_msg_123"
+        }
+      })
+    ).status,
+    201
+  );
+
+  const decision = await postJson(`${base}/loans/applications/${application.applicationId}/decision`, {
+    status: "approved",
+    proposedBy: "credit-maker-1",
+    reason: "Review-band affordability cleared on manual assessment",
+    manualUnderwriting: {
+      underwriterId: "credit-dual-1",
+      reason: "Compensating savings balance supports the review-band FOIR.",
+      policyReference: "board_underwriting_policy_v1"
+    }
+  });
+  assert.equal(decision.status, 202);
+
+  const sameActor = await postJson(`${base}/loans/applications/${application.applicationId}/approvals`, {
+    outcome: "approved",
+    approvedBy: "credit-dual-1",
+    approvalRef: "approval_ref_dual"
+  });
+  assert.equal(sameActor.status, 422);
+  assert.equal(sameActor.body.error.code, "approval_blocked");
+  assert(sameActor.body.findings.some((finding) => finding.path === "approvedBy"));
+
+  const distinctChecker = await postJson(`${base}/loans/applications/${application.applicationId}/approvals`, {
+    outcome: "approved",
+    approvedBy: "credit-checker-1",
+    approvalRef: "approval_ref_ok"
+  });
+  assert.equal(distinctChecker.status, 200);
+  assert.equal(distinctChecker.body.status, "approved");
+});
+
 test("API exposes LWS decision approval task with assignment lifecycle", async (t) => {
   const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
   t.after(async () => {

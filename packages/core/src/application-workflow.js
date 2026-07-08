@@ -247,6 +247,16 @@ export function applyDecisionApproval(application, input, now = new Date()) {
   if (input?.approvedBy && application.pendingDecision?.proposedBy === input.approvedBy) {
     findings.push(createFinding("error", "RBI-IT-GRC", "Maker-checker approval must be by a different actor.", "approvedBy"));
   }
+  if (input?.approvedBy && application.pendingDecision?.manualUnderwriting?.underwriterId === input.approvedBy) {
+    findings.push(
+      createFinding(
+        "error",
+        "RBI-IT-GRC",
+        "Decision approver must be different from the manual underwriting underwriter.",
+        "approvedBy"
+      )
+    );
+  }
 
   const summary = summarizeFindings(findings);
   if (summary.status === "blocked") {

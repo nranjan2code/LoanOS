@@ -125,7 +125,7 @@ npm run dev:api
 | Eligibility rules engine | Computes reducing-balance EMI, FOIR against product ceiling, age at maturity, and amount/tenor bounds; returns eligible, refer, or ineligible with evidence, and blocks approval of ineligible borrowers while allowing declines. |
 | Manual underwriting referral | A `refer` eligibility outcome routes the ready-for-decision application to a dedicated manual underwriting LWS task instead of the straight-through credit-decision task. |
 | Manual underwriting override | Approving a `refer`-band application requires a manual underwriting override with underwriter, reason, and policy reference; the override is stored on the pending decision and carried into the final approved decision as evidence. The named underwriter must be a registered, active `credit_officer`. Declines are unaffected. |
-| Maker-checker decision approval | Decision submission creates a pending proposal; approval requires a registered `credit_checker` actor different from the maker before disbursement. |
+| Maker-checker decision approval | Decision submission creates a pending proposal; approval requires a registered `credit_checker` actor different from the maker, and — on referred applications — different from the manual underwriting underwriter, before disbursement. |
 | Human review hook | Material AI/model decisions without human review are routed to `human_review_required`; human-review recording requires a registered `human_reviewer`. |
 | Regulated-action RBAC | Credit proposal, manual underwriting override, checker approval, human review, recovery assignment, and LWS task actions validate actor role and queue policy. |
 | Complaint workflow | Tracks received, assigned, under-review, resolved, escalation-due, and RBI CMS escalation states with acknowledgement, closure, and CMS references. |
@@ -194,6 +194,7 @@ Current tests prove:
 - API routes a refer-band application to a manual underwriting task instead of the straight-through credit-decision task.
 - API blocks approval of a refer-band application until a manual underwriting override is recorded and carries that override into the final approved decision.
 - API blocks a manual underwriting override whose named underwriter is not a registered, active credit officer.
+- API blocks a decision checker who is also the manual underwriting underwriter, preserving four-eyes separation on referred approvals.
 - API requires maker-checker approval before disbursement.
 - API blocks disbursement until the execution document packet is generated and delivered.
 - API routes material AI decisions to human review before decision proposal.

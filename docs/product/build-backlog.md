@@ -162,7 +162,7 @@ Tasks:
 - Maker-checker approvals. First slice done for credit decision approval task with `credit_checker` enforcement.
 - Collections workflow queue. First slice done for delinquent recovery-assignment task.
 - NPA review queue. First slice done from asset classification.
-- Override approval with reason and evidence. First slice done: manual underwriting override on a refer-band approval captures underwriter, reason, and policy reference, and flows into the final decision evidence.
+- Override approval with reason and evidence. First slice done: manual underwriting override on a refer-band approval captures underwriter, reason, and policy reference, flows into the final decision evidence, and enforces four-eyes separation (the checker cannot be the underwriter).
 - Grievance module and 30-day RBI CMS escalation clock. First slice done.
 - Fraud case module.
 - Natural justice notice and response workflow.
