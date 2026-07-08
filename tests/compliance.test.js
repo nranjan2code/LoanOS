@@ -24,6 +24,7 @@ import {
   resolveLoanApplicationReferences,
   triggerKillSwitch,
   upsertDigitalLendingApp,
+  upsertLendingServiceProvider,
   upsertBorrowerProfile,
   upsertConsentRecord,
   upsertKycRecord,
@@ -537,9 +538,90 @@ test("product policy rejects unsafe penal charge design", () => {
   assert(productResult.findings.some((finding) => finding.controlId === "RBI-FPC-PENAL"));
 });
 
+test("LSP registry enforces agreement, due diligence, review, data, and fee controls", () => {
+  const reResult = upsertRegulatedEntity({}, validRegulatedEntity());
+  assert.equal(reResult.summary.status, "ready");
+
+  const missingDiligence = upsertLendingServiceProvider(
+    {},
+    merge(validLendingServiceProvider(), {
+      dueDiligence: {
+        approvalRef: null
+      }
+    }),
+    reResult.registry
+  );
+  assert.equal(missingDiligence.summary.status, "blocked");
+  assert(missingDiligence.findings.some((finding) => finding.path === "dueDiligence.approvalRef"));
+
+  const badFeeDesign = upsertLendingServiceProvider(
+    {},
+    merge(validLendingServiceProvider(), {
+      feeControls: {
+        paidByRegulatedEntity: false,
+        borrowerChargedSeparately: true
+      }
+    }),
+    reResult.registry
+  );
+  assert.equal(badFeeDesign.summary.status, "blocked");
+  assert(badFeeDesign.findings.some((finding) => finding.path === "feeControls.paidByRegulatedEntity"));
+  assert(badFeeDesign.findings.some((finding) => finding.path === "feeControls.borrowerChargedSeparately"));
+
+  const lspResult = upsertLendingServiceProvider({}, validLendingServiceProvider(), reResult.registry);
+  assert.equal(lspResult.summary.status, "ready");
+  assert.equal(lspResult.lendingServiceProvider.status, "active");
+
+  const lspDla = upsertDigitalLendingApp(
+    {},
+    validDigitalLendingApp({
+      digitalLendingAppId: "dla_partner_mobile",
+      name: "Partner Loan Marketplace",
+      ownerType: "lsp_owned",
+      lspId: "lsp_example_001",
+      ownerName: null,
+      availability: [
+        {
+          channel: "app_store",
+          availableOn: "Google Play Store",
+          link: "https://play.google.com/store/apps/details?id=in.example.partner"
+        }
+      ],
+      grievanceOfficer: {
+        name: "Partner Nodal Officer",
+        email: "grievance@partner.example.in",
+        telephone: "+91-80-40000000",
+        mobile: "+919888888888"
+      },
+      privacyPolicyUrl: "https://partner.example.in/privacy",
+      publicDisclosureUrl: "https://example.in/digital-lending-apps"
+    }),
+    reResult.registry,
+    lspResult.registry
+  );
+  assert.equal(lspDla.summary.status, "ready");
+  assert.equal(lspDla.digitalLendingApp.ownerName, "Example LSP Services Pvt Ltd");
+
+  const unknownLspDla = upsertDigitalLendingApp(
+    {},
+    validDigitalLendingApp({
+      digitalLendingAppId: "dla_unknown_lsp",
+      ownerType: "lsp_owned",
+      lspId: "missing_lsp",
+      ownerName: "Missing LSP"
+    }),
+    reResult.registry,
+    lspResult.registry
+  );
+  assert.equal(unknownLspDla.summary.status, "blocked");
+  assert(unknownLspDla.findings.some((finding) => finding.path === "lspId"));
+});
+
 test("DLA registry exports own and LSP apps in CIMS-ready shape", () => {
   const reResult = upsertRegulatedEntity({}, validRegulatedEntity());
   assert.equal(reResult.summary.status, "ready");
+  const lspResult = upsertLendingServiceProvider({}, validLendingServiceProvider(), reResult.registry);
+  assert.equal(lspResult.summary.status, "ready");
 
   const ownDla = upsertDigitalLendingApp({}, validDigitalLendingApp(), reResult.registry);
   assert.equal(ownDla.summary.status, "ready");
@@ -550,7 +632,6 @@ test("DLA registry exports own and LSP apps in CIMS-ready shape", () => {
       digitalLendingAppId: "dla_partner_mobile",
       name: "Partner Loan Marketplace",
       ownerType: "lsp_owned",
-      ownerName: "Example LSP Services Pvt Ltd",
       lspId: "lsp_example_001",
       availability: [
         {
@@ -576,11 +657,13 @@ test("DLA registry exports own and LSP apps in CIMS-ready shape", () => {
         lspGrievanceOfficerDisplayed: true
       }
     }),
-    reResult.registry
+    reResult.registry,
+    lspResult.registry
   );
   assert.equal(lspDla.summary.status, "ready");
 
   const exportResult = generateDlaCimsExport(lspDla.registry, reResult.registry, {
+    lendingServiceProviders: lspResult.registry,
     asOf: "2026-07-08T00:00:00.000Z"
   });
   assert.equal(exportResult.summary.status, "ready");
@@ -771,6 +854,21 @@ test("API stores DLAs and exposes CIMS-ready DLA reporting export", async (t) =>
 
   assert.equal((await postJson(`${base}/regulated-entities`, validRegulatedEntity())).status, 201);
 
+  const invalidLsp = await postJson(
+    `${base}/lending-service-providers`,
+    merge(validLendingServiceProvider(), {
+      agreement: {
+        agreementRef: null
+      }
+    })
+  );
+  assert.equal(invalidLsp.status, 422);
+  assert(invalidLsp.body.findings.some((finding) => finding.path === "agreement.agreementRef"));
+
+  const lsp = await postJson(`${base}/lending-service-providers`, validLendingServiceProvider());
+  assert.equal(lsp.status, 201);
+  assert.equal(lsp.body.lendingServiceProvider.legalName, "Example LSP Services Pvt Ltd");
+
   const blocked = await postJson(
     `${base}/digital-lending-apps`,
     validDigitalLendingApp({
@@ -783,10 +881,50 @@ test("API stores DLAs and exposes CIMS-ready DLA reporting export", async (t) =>
   assert.equal(blocked.status, 422);
   assert(blocked.body.findings.some((finding) => finding.path === "complianceAttestation.dataCollectionAndStorageCompliant"));
 
+  const unknownLsp = await postJson(
+    `${base}/digital-lending-apps`,
+    validDigitalLendingApp({
+      digitalLendingAppId: "dla_unknown_lsp",
+      ownerType: "lsp_owned",
+      ownerName: "Unknown LSP",
+      lspId: "missing_lsp"
+    })
+  );
+  assert.equal(unknownLsp.status, 422);
+  assert(unknownLsp.body.findings.some((finding) => finding.path === "lspId"));
+
   const created = await postJson(`${base}/digital-lending-apps`, validDigitalLendingApp());
   assert.equal(created.status, 201);
   assert.equal(created.body.digitalLendingApp.status, "active");
   assert.equal(created.body.digitalLendingApp.grievanceOfficer.email, "grievance@example.in");
+
+  const partnerDla = await postJson(
+    `${base}/digital-lending-apps`,
+    validDigitalLendingApp({
+      digitalLendingAppId: "dla_partner_mobile",
+      name: "Partner Loan Marketplace",
+      ownerType: "lsp_owned",
+      ownerName: null,
+      lspId: "lsp_example_001",
+      availability: [
+        {
+          channel: "app_store",
+          availableOn: "Google Play Store",
+          link: "https://play.google.com/store/apps/details?id=in.example.partner"
+        }
+      ],
+      grievanceOfficer: {
+        name: "Partner Nodal Officer",
+        email: "grievance@partner.example.in",
+        telephone: "+91-80-40000000",
+        mobile: "+919888888888"
+      },
+      privacyPolicyUrl: "https://partner.example.in/privacy",
+      publicDisclosureUrl: "https://example.in/digital-lending-apps"
+    })
+  );
+  assert.equal(partnerDla.status, 201);
+  assert.equal(partnerDla.body.digitalLendingApp.ownerName, "Example LSP Services Pvt Ltd");
 
   const lookup = await fetch(`${base}/digital-lending-apps/dla_example_web`);
   assert.equal(lookup.status, 200);
@@ -796,10 +934,11 @@ test("API stores DLAs and exposes CIMS-ready DLA reporting export", async (t) =>
   assert.equal(cimsResponse.status, 200);
   const cims = await cimsResponse.json();
   assert.equal(cims.reportType, "rbi_dla_cims");
-  assert.equal(cims.count, 1);
+  assert.equal(cims.count, 2);
   assert.equal(cims.rows[0].dlaName, "Example Loan Web");
   assert.equal(cims.rows[0].ownerName, "Self-owned");
   assert.equal(cims.rows[0].reWebsite, "https://example.in");
+  assert.equal(cims.rows[1].ownerName, "Example LSP Services Pvt Ltd");
 });
 
 test("API supports borrower-backed applications without embedded borrower KYC consent blobs", async (t) => {
@@ -2545,6 +2684,71 @@ function validRegulatedEntity() {
       grievancePolicyRef: "board_grievance_policy_v1"
     }
   };
+}
+
+function validLendingServiceProvider(overrides = {}) {
+  const base = {
+    lspId: "lsp_example_001",
+    regulatedEntityId: "re_example_nbfc",
+    legalName: "Example LSP Services Pvt Ltd",
+    tradeName: "Example LSP",
+    country: "IN",
+    status: "active",
+    services: ["customer_acquisition", "servicing", "recovery", "dla_operations"],
+    interfaceWithBorrower: true,
+    websiteUrl: "https://partner.example.in",
+    privacyPolicyUrl: "https://partner.example.in/privacy",
+    publicDisclosureUrl: "https://example.in/partners/example-lsp",
+    grievanceOfficer: {
+      name: "Partner Nodal Officer",
+      email: "grievance@partner.example.in",
+      phone: "+91-80-40000000",
+      mobile: "+919888888888"
+    },
+    agreement: {
+      agreementRef: "lsp_agreement_001",
+      effectiveFrom: "2026-07-08",
+      rolesAndObligationsRef: "lsp_roles_obligations_001",
+      rightsAndObligationsRef: "lsp_rights_obligations_001",
+      scopeOfWorkRef: "lsp_scope_001"
+    },
+    dueDiligence: {
+      completedAt: "2026-07-07T10:00:00.000Z",
+      approvedBy: "cco-1",
+      approvalRef: "lsp_due_diligence_approval_001",
+      technicalCapabilityReviewRef: "tech_review_001",
+      dataPrivacyReviewRef: "privacy_review_001",
+      fairConductReviewRef: "conduct_review_001",
+      pastConductReviewRef: "past_conduct_review_001",
+      regulatoryComplianceReviewRef: "reg_compliance_review_001"
+    },
+    periodicReview: {
+      lastReviewedAt: "2026-07-07T12:00:00.000Z",
+      nextReviewDueAt: "2026-10-07T12:00:00.000Z",
+      reviewedBy: "cco-1",
+      reviewRef: "lsp_periodic_review_001",
+      outcome: "satisfactory"
+    },
+    monitoring: {
+      portfolioMonitoringPolicyRef: "portfolio_monitoring_policy_001",
+      reportingCadence: "monthly",
+      metrics: ["approval_rate", "complaint_rate", "collection_contact_exceptions"]
+    },
+    dataControls: {
+      primaryStorageCountry: "IN",
+      processedOutsideIndia: false,
+      storesOnlyMinimalBorrowerData: true,
+      prohibitedBorrowerDataStored: false
+    },
+    feeControls: {
+      paidByRegulatedEntity: true,
+      borrowerChargedSeparately: false
+    },
+    recoveryControls: {
+      recoveryAgentGuidanceRef: "recovery_agent_guidance_001"
+    }
+  };
+  return merge(base, overrides);
 }
 
 function validDigitalLendingApp(overrides = {}) {

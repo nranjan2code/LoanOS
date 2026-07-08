@@ -4,7 +4,7 @@ This backlog turns the roadmap into implementation work. It is ordered for a com
 
 ## Epic 1: Tenant and Regulated Entity Setup
 
-Status: first executable slice complete; DLA CIMS reporting first slice complete.
+Status: first executable slice complete; LSP and DLA CIMS reporting first slices complete.
 
 Goal: every loan runs under a clearly identified regulated entity.
 
@@ -15,6 +15,7 @@ Tasks:
 - Add RE public website disclosure fields. Done.
 - Add grievance officer registry. Done.
 - Add board-approved policy references. Done.
+- Add LSP registry with RE agreement, due diligence, periodic review, data, recovery, and fee-control evidence. Done.
 - Add DLA registry for own and LSP apps/websites. Done.
 - Add CIMS export shape for DLA reporting. Done.
 - Add tests for missing RE, missing grievance officer, and unsupported RE type. Partial.

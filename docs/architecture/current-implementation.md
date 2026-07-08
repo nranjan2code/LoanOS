@@ -28,7 +28,7 @@ npm run dev:api
 | `packages/core/src/access-control.js` | Staff actor registry, role checks, queue assignment authority, and regulated-action actor validation. |
 | `packages/core/src/grievance.js` | Complaint registry, grievance lifecycle, 30-day RBI Ombudsman clock, and RBI CMS escalation evidence. |
 | `packages/core/src/document-packet.js` | KFS, sanction letter, loan agreement summary, and privacy notice rendering, rendered borrower loan-statement document, plus delivery evidence controls. |
-| `packages/core/src/registries.js` | Regulated-entity, DLA, and product-policy registries, DLA CIMS export shape, plus application reference resolution. |
+| `packages/core/src/registries.js` | Regulated-entity, LSP, DLA, and product-policy registries, DLA CIMS export shape, plus application reference resolution. |
 | `packages/core/src/borrower-onboarding.js` | Borrower profile, consent ledger, KYC records, and borrower reference resolution. |
 | `packages/core/src/eligibility.js` | Policy-driven creditworthiness/affordability engine: EMI/FOIR computation, age-at-maturity, amount/tenor bounds, and eligible/refer/ineligible decision. |
 | `packages/core/src/application-workflow.js` | LOS application state machine, KFS workflow, human review, decision proposal, manual underwriting override gate for referred applications, coded decline-reason taxonomy, maker-checker approval, disbursement transition. |
@@ -51,6 +51,9 @@ npm run dev:api
 | `GET /regulated-entities` | Lists regulated entities. |
 | `POST /regulated-entities` | Creates or updates a regulated entity after compliance validation. |
 | `GET /regulated-entities/:id` | Reads one regulated entity. |
+| `GET /lending-service-providers` | Lists LSPs governed by regulated entities. |
+| `POST /lending-service-providers` | Creates or updates an LSP after agreement, due-diligence, review, data, recovery, and fee-control validation. |
+| `GET /lending-service-providers/:id` | Reads one LSP record. |
 | `GET /digital-lending-apps` | Lists registered digital lending apps and web surfaces. |
 | `POST /digital-lending-apps` | Creates or updates an own or LSP-operated DLA after CIMS/data-control validation. |
 | `GET /digital-lending-apps/:id` | Reads one digital lending app record. |
@@ -128,7 +131,8 @@ npm run dev:api
 | India-only lending | Blocks non-IN borrower residency/address, non-INR currency, non-IN data storage. |
 | Regulated entity | Requires supported RE type and grievance officer. |
 | Regulated entity registry | Requires active India RE, website, privacy policy, grievance officer, data-residency posture, and board policy references. |
-| DLA registry and CIMS export | Requires active own/LSP DLA records to reference an active RE, expose availability/link, grievance contact, privacy/disclosure URLs, India data controls, RE website linkage, and CCO/compliance attestation; active records export to RBI CIMS-ready rows. |
+| LSP registry | Requires active LSPs to reference an active RE, carry a clear agreement/scope, enhanced due-diligence evidence, periodic review evidence, portfolio monitoring, borrower-facing grievance/privacy disclosures, India data controls, RE-paid fee controls, and recovery-agent guidance where applicable. |
+| DLA registry and CIMS export | Requires active own/LSP DLA records to reference an active RE; LSP-owned DLAs must also reference an active LSP governed by the same RE. Active records must expose availability/link, grievance contact, privacy/disclosure URLs, India data controls, RE website linkage, and CCO/compliance attestation; active records export to RBI CIMS-ready rows. |
 | Product policy registry | Requires active product linked to an active RE, INR, amount/tenor bounds, APR, cooling-off, recovery mechanism, eligibility, board approval, and safe charge design. |
 | Registry-backed applications | Application can reference `regulatedEntityId` and `productId`/`productCode`; policy facts are resolved before preflight. |
 | Borrower profile registry | Requires active India borrower profile, contact channel, and economic profile for active borrowers. |
@@ -210,6 +214,7 @@ Current tests prove:
 - API stores blocked compliance applications and supports lookup.
 - Regulated entity and product policy registries resolve an application.
 - Unsafe product penal-charge design is rejected.
+- LSP registry blocks missing agreement/due-diligence/review evidence, unsafe fee design, and supports active LSP references from LSP-owned DLAs.
 - DLA registry validates own/LSP active apps and exports RBI CIMS-ready rows, including one row per availability surface.
 - API stores validated DLA records and exposes the CIMS-ready DLA export.
 - API supports registry-backed loan applications.

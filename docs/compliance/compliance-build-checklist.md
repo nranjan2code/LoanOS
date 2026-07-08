@@ -13,9 +13,9 @@ Legend:
 
 | Requirement | Platform behavior | Status |
 | --- | --- | --- |
-| RE remains responsible for LSP/DLA actions | Tenant model requires RE; LSP registry planned. | Partial |
+| RE remains responsible for LSP/DLA actions | Tenant model requires RE; LSP registry links each LSP to an active RE and blocks active LSPs without agreement, oversight, data, fee, and review evidence. | Done |
 | Active RE setup before origination | Regulated entity registry validates RE type, India country, website, privacy policy, grievance officer, board policies, and data residency. | Done |
-| LSP agreement and due diligence | LSP registry, due diligence workflow, periodic review. | Planned |
+| LSP agreement and due diligence | LSP registry validates agreement/scope, enhanced due diligence, periodic review, portfolio monitoring, borrower-facing grievance/privacy disclosure, and recovery guidance where applicable. | Done |
 | Multiple-lender LSP offer neutrality | Offer marketplace with ranking disclosure and dark-pattern checks. | Planned |
 | Borrower economic profile | Age, occupation, income required in preflight. | Done |
 | Creditworthiness assessment before sanction | Eligibility engine computes EMI/FOIR affordability, age-at-maturity, and amount/tenor bounds; ineligible borrowers cannot be approved. | Done |
@@ -24,7 +24,7 @@ Legend:
 | Digitally delivered KFS/documents | KFS delivery evidence gates decision; execution document packet delivery gates disbursement. | Done |
 | Direct disbursement to borrower/end-beneficiary | LSP/pass-through disbursement blocked. | Done |
 | Direct repayment to RE account | LSP/pass-through repayment blocked. | Done |
-| LSP fees paid by RE, not borrower | Fee registry and vendor settlement module. | Planned |
+| LSP fees paid by RE, not borrower | LSP registry requires RE-paid fee controls and blocks separate borrower-charged LSP fees; vendor settlement module planned. | Partial |
 | Recovery-agent notice before contact | Recovery assignment requires borrower notice evidence before a recovery agent can contact the borrower. | Done |
 | Grievance officer and 30-day escalation path | Staff actor role, complaint registry, 30-day SLA, LWS grievance queue, and RBI CMS escalation evidence. | Done |
 | Data minimization and explicit consent | Consent evidence required; detailed consent ledger planned. | Partial |

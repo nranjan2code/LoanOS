@@ -134,6 +134,7 @@ The current codebase contains Phase 0 executable controls:
 
 - Compliance control catalog.
 - Regulated entity registry with India, RE type, public disclosure, grievance officer, board policy, and data-residency validation.
+- LSP registry with RE agreement, enhanced due diligence, periodic review, portfolio monitoring, borrower-facing grievance/privacy disclosure, India data controls, recovery guidance, and RE-paid fee controls.
 - DLA registry for RE-owned and LSP-owned app/web surfaces, with CIMS-ready export rows, grievance contact, RE website linkage, India data controls, and CCO/compliance attestation.
 - Product policy registry with RE linkage, INR, APR, amount/tenor limits, cooling-off, recovery mechanism, eligibility, and charge validation.
 - Registry-backed applications that can inherit approved RE/product facts by reference.
@@ -166,12 +167,12 @@ The current codebase contains Phase 0 executable controls:
 
 Immediate next build:
 
-1. LSP registry, due diligence, agreement lifecycle, and periodic review evidence.
-2. Product policy versioning with effective dates and explicit prepayment/foreclosure policy rules.
-3. CKYC adapter boundary and fuller V-CIP evidence vault.
-4. Data-retention, deletion-request, and third-party sharing consent workflows.
-5. Offer generation and borrower-facing execution upgrades such as PDF/eSign delivery.
-6. Recovery contact logging, hardship/restructure workflow, settlement, and write-off approval.
+1. Product policy versioning with effective dates and explicit prepayment/foreclosure policy rules.
+2. CKYC adapter boundary and fuller V-CIP evidence vault.
+3. Data-retention, deletion-request, and third-party sharing consent workflows.
+4. Offer generation and borrower-facing execution upgrades such as PDF/eSign delivery.
+5. Recovery contact logging, hardship/restructure workflow, settlement, and write-off approval.
+6. LSP/vendor incident workflows, exit controls, and deeper vendor periodic review packs.
 7. Drift monitoring, recurring fairness evidence, and model incident pack generation.
 
 ## Non-Goals for Now

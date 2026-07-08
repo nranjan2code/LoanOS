@@ -31,6 +31,9 @@ Useful endpoints:
 - `GET /regulated-entities`
 - `POST /regulated-entities`
 - `GET /regulated-entities/:id`
+- `GET /lending-service-providers`
+- `POST /lending-service-providers`
+- `GET /lending-service-providers/:id`
 - `GET /digital-lending-apps`
 - `POST /digital-lending-apps`
 - `GET /digital-lending-apps/:id`
@@ -115,6 +118,7 @@ Phase 0 has a working executable foundation:
 
 - Compliance control catalog.
 - Regulated entity registry with board-policy and grievance-officer gates.
+- LSP registry with RE agreement, enhanced due diligence, periodic review, borrower-facing grievance, data, recovery, and fee-control gates.
 - DLA registry for own and LSP app/web surfaces, with CIMS-ready export rows and compliance attestation gates.
 - Product policy registry with pricing, KFS, eligibility, cooling-off, and penal-charge gates.
 - Registry-backed loan application resolution through `regulatedEntityId` and `productId`/`productCode`.

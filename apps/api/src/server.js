@@ -57,6 +57,7 @@ import {
   transitionModel,
   triggerKillSwitch,
   upsertDigitalLendingApp,
+  upsertLendingServiceProvider,
   upsertBorrowerProfile,
   upsertConsentRecord,
   upsertKycRecord,
@@ -418,6 +419,50 @@ async function route(req, res, dataDir) {
     return;
   }
 
+  if (method === "GET" && path === "/lending-service-providers") {
+    const state = await loadState(dataDir);
+    sendJson(res, 200, {
+      lendingServiceProviders: Object.values(state.lendingServiceProviders)
+    });
+    return;
+  }
+
+  if (method === "POST" && path === "/lending-service-providers") {
+    const body = await readJson(req);
+    const state = await loadState(dataDir);
+    const result = upsertLendingServiceProvider(state.lendingServiceProviders, body, state.regulatedEntities);
+    const nextState =
+      result.summary.status === "blocked"
+        ? state
+        : appendEvent(
+            {
+              ...state,
+              lendingServiceProviders: result.registry
+            },
+            {
+              type: "lending_service_provider.upserted",
+              lspId: result.lendingServiceProvider.lspId,
+              regulatedEntityId: result.lendingServiceProvider.regulatedEntityId,
+              status: result.lendingServiceProvider.status
+            }
+          );
+    await saveState(nextState, dataDir);
+    sendJson(res, result.summary.status === "blocked" ? 422 : 201, result);
+    return;
+  }
+
+  const lendingServiceProviderMatch = path.match(/^\/lending-service-providers\/([^/]+)$/);
+  if (method === "GET" && lendingServiceProviderMatch) {
+    const state = await loadState(dataDir);
+    const lsp = state.lendingServiceProviders[decodeURIComponent(lendingServiceProviderMatch[1])];
+    if (!lsp) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Lending service provider not found." } });
+      return;
+    }
+    sendJson(res, 200, lsp);
+    return;
+  }
+
   if (method === "GET" && path === "/digital-lending-apps") {
     const state = await loadState(dataDir);
     sendJson(res, 200, {
@@ -429,7 +474,12 @@ async function route(req, res, dataDir) {
   if (method === "POST" && path === "/digital-lending-apps") {
     const body = await readJson(req);
     const state = await loadState(dataDir);
-    const result = upsertDigitalLendingApp(state.digitalLendingApps, body, state.regulatedEntities);
+    const result = upsertDigitalLendingApp(
+      state.digitalLendingApps,
+      body,
+      state.regulatedEntities,
+      state.lendingServiceProviders
+    );
     const nextState =
       result.summary.status === "blocked"
         ? state
@@ -465,6 +515,7 @@ async function route(req, res, dataDir) {
   if (method === "GET" && path === "/reporting/dla/cims") {
     const state = await loadState(dataDir);
     const result = generateDlaCimsExport(state.digitalLendingApps, state.regulatedEntities, {
+      lendingServiceProviders: state.lendingServiceProviders,
       regulatedEntityId: url.searchParams.get("regulatedEntityId") ?? undefined,
       asOf: url.searchParams.get("asOf") ?? undefined
     });

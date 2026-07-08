@@ -13,6 +13,28 @@ const ALLOWED_PRODUCT_TYPES = new Set([
   "gold_loan",
   "loan_against_property"
 ]);
+const ALLOWED_LSP_STATUSES = new Set(["draft", "active", "suspended", "terminated"]);
+const ALLOWED_LSP_SERVICES = new Set([
+  "customer_acquisition",
+  "underwriting_support",
+  "servicing",
+  "monitoring",
+  "recovery",
+  "collections",
+  "customer_service",
+  "dla_operations",
+  "technology_provider"
+]);
+const BORROWER_FACING_LSP_SERVICES = new Set([
+  "customer_acquisition",
+  "servicing",
+  "recovery",
+  "collections",
+  "customer_service",
+  "dla_operations"
+]);
+const RECOVERY_LSP_SERVICES = new Set(["recovery", "collections"]);
+const ALLOWED_LSP_REVIEW_OUTCOMES = new Set(["satisfactory", "deviation_found", "remediation_required"]);
 const ALLOWED_DLA_OWNER_TYPES = new Set(["self_owned", "lsp_owned"]);
 const ALLOWED_DLA_STATUSES = new Set(["draft", "active", "ceased"]);
 const DLA_CIMS_COLUMNS = [
@@ -142,9 +164,169 @@ export function upsertRegulatedEntity(registry, input, now = new Date()) {
   };
 }
 
-export function validateDigitalLendingApp(app, regulatedEntities = {}) {
+export function validateLendingServiceProvider(lsp, regulatedEntities = {}) {
+  const findings = [];
+  const entity = lsp?.regulatedEntityId ? regulatedEntities[lsp.regulatedEntityId] : null;
+  const status = lsp?.status ?? ACTIVE_STATUS;
+  const services = Array.isArray(lsp?.services) ? lsp.services : [];
+
+  if (!lsp?.lspId) {
+    findings.push(createFinding("error", "RBI-DL-2025", "lspId is required.", "lspId"));
+  }
+  if (!lsp?.regulatedEntityId) {
+    findings.push(createFinding("error", "RBI-DL-2025", "regulatedEntityId is required for LSP oversight.", "regulatedEntityId"));
+  } else if (!entity) {
+    findings.push(createFinding("error", "RBI-DL-2025", "LSP must reference an existing regulated entity.", "regulatedEntityId"));
+  } else if (entity.status !== ACTIVE_STATUS) {
+    findings.push(createFinding("error", "RBI-DL-2025", "LSP regulated entity must be active.", "regulatedEntityId"));
+  }
+  if (!lsp?.legalName) {
+    findings.push(createFinding("error", "RBI-DL-2025", "LSP legalName is required.", "legalName"));
+  }
+  if ((lsp?.country ?? "IN") !== "IN") {
+    findings.push(createFinding("error", "RBI-DL-2025", "LSP country must be IN for this India-only operating model.", "country"));
+  }
+  if (!ALLOWED_LSP_STATUSES.has(status)) {
+    findings.push(createFinding("error", "RBI-DL-2025", "LSP status is invalid.", "status"));
+  }
+  if (services.length === 0) {
+    findings.push(createFinding("error", "RBI-DL-2025", "At least one LSP service is required.", "services"));
+  }
+  services.forEach((service, index) => {
+    if (!ALLOWED_LSP_SERVICES.has(service)) {
+      findings.push(createFinding("error", "RBI-DL-2025", "LSP service is not recognized.", `services.${index}`));
+    }
+  });
+
+  if (status === ACTIVE_STATUS) {
+    validateActiveLspAgreement(lsp, findings);
+    validateActiveLspDueDiligence(lsp, findings);
+    validateActiveLspPeriodicReview(lsp, findings);
+    validateActiveLspDataControls(lsp, findings);
+    validateActiveLspFeeControls(lsp, findings);
+
+    if (!lsp?.monitoring?.portfolioMonitoringPolicyRef) {
+      findings.push(
+        createFinding("error", "RBI-DL-2025", "Portfolio monitoring policy reference is required.", "monitoring.portfolioMonitoringPolicyRef")
+      );
+    }
+    if (!lsp?.monitoring?.reportingCadence) {
+      findings.push(createFinding("error", "RBI-DL-2025", "LSP reporting cadence is required.", "monitoring.reportingCadence"));
+    }
+    if (lspHasBorrowerInterface(lsp)) {
+      validateBorrowerFacingLsp(lsp, findings);
+    }
+    if (lspProvidesRecovery(lsp) && !lsp?.recoveryControls?.recoveryAgentGuidanceRef) {
+      findings.push(
+        createFinding("error", "RBI-DL-2025", "Recovery LSPs require responsible recovery-agent guidance evidence.", "recoveryControls.recoveryAgentGuidanceRef")
+      );
+    }
+  }
+
+  return {
+    findings,
+    summary: summarizeFindings(findings)
+  };
+}
+
+export function normalizeLendingServiceProvider(input, regulatedEntities = {}, now = new Date()) {
+  const services = Array.isArray(input.services) ? input.services : [];
+  const interfaceWithBorrower =
+    input.interfaceWithBorrower ?? services.some((service) => BORROWER_FACING_LSP_SERVICES.has(service));
+  const entity = regulatedEntities?.[input.regulatedEntityId] ?? null;
+
+  return {
+    lspId: input.lspId,
+    regulatedEntityId: input.regulatedEntityId,
+    legalName: input.legalName,
+    tradeName: input.tradeName ?? input.legalName,
+    country: input.country ?? "IN",
+    status: input.status ?? ACTIVE_STATUS,
+    services,
+    interfaceWithBorrower,
+    websiteUrl: input.websiteUrl ?? null,
+    privacyPolicyUrl: input.privacyPolicyUrl ?? null,
+    publicDisclosureUrl: input.publicDisclosureUrl ?? entity?.websiteUrl ?? null,
+    grievanceOfficer: {
+      name: input.grievanceOfficer?.name ?? null,
+      email: input.grievanceOfficer?.email ?? null,
+      phone: input.grievanceOfficer?.phone ?? input.grievanceOfficer?.telephone ?? null,
+      mobile: input.grievanceOfficer?.mobile ?? null
+    },
+    agreement: {
+      agreementRef: input.agreement?.agreementRef ?? null,
+      effectiveFrom: input.agreement?.effectiveFrom ?? null,
+      effectiveTo: input.agreement?.effectiveTo ?? null,
+      rolesAndObligationsRef: input.agreement?.rolesAndObligationsRef ?? null,
+      rightsAndObligationsRef: input.agreement?.rightsAndObligationsRef ?? null,
+      scopeOfWorkRef: input.agreement?.scopeOfWorkRef ?? null
+    },
+    dueDiligence: {
+      completedAt: input.dueDiligence?.completedAt ?? null,
+      approvedBy: input.dueDiligence?.approvedBy ?? null,
+      approvalRef: input.dueDiligence?.approvalRef ?? null,
+      technicalCapabilityReviewRef: input.dueDiligence?.technicalCapabilityReviewRef ?? null,
+      dataPrivacyReviewRef: input.dueDiligence?.dataPrivacyReviewRef ?? null,
+      fairConductReviewRef: input.dueDiligence?.fairConductReviewRef ?? null,
+      pastConductReviewRef: input.dueDiligence?.pastConductReviewRef ?? null,
+      regulatoryComplianceReviewRef: input.dueDiligence?.regulatoryComplianceReviewRef ?? null
+    },
+    periodicReview: {
+      lastReviewedAt: input.periodicReview?.lastReviewedAt ?? null,
+      nextReviewDueAt: input.periodicReview?.nextReviewDueAt ?? null,
+      reviewedBy: input.periodicReview?.reviewedBy ?? null,
+      reviewRef: input.periodicReview?.reviewRef ?? null,
+      outcome: input.periodicReview?.outcome ?? null,
+      deviationActionRef: input.periodicReview?.deviationActionRef ?? null
+    },
+    monitoring: {
+      portfolioMonitoringPolicyRef: input.monitoring?.portfolioMonitoringPolicyRef ?? null,
+      reportingCadence: input.monitoring?.reportingCadence ?? null,
+      metrics: Array.isArray(input.monitoring?.metrics) ? input.monitoring.metrics : []
+    },
+    dataControls: {
+      primaryStorageCountry: input.dataControls?.primaryStorageCountry ?? "IN",
+      processedOutsideIndia: Boolean(input.dataControls?.processedOutsideIndia),
+      returnedAndDeletedOutsideIndiaWithinHours:
+        input.dataControls?.returnedAndDeletedOutsideIndiaWithinHours ?? null,
+      storesOnlyMinimalBorrowerData: Boolean(input.dataControls?.storesOnlyMinimalBorrowerData),
+      prohibitedBorrowerDataStored: Boolean(input.dataControls?.prohibitedBorrowerDataStored)
+    },
+    feeControls: {
+      paidByRegulatedEntity: Boolean(input.feeControls?.paidByRegulatedEntity),
+      borrowerChargedSeparately: Boolean(input.feeControls?.borrowerChargedSeparately)
+    },
+    recoveryControls: {
+      recoveryAgentGuidanceRef: input.recoveryControls?.recoveryAgentGuidanceRef ?? null
+    },
+    createdAt: input.createdAt ?? now.toISOString(),
+    updatedAt: now.toISOString()
+  };
+}
+
+export function upsertLendingServiceProvider(registry, input, regulatedEntities = {}, now = new Date()) {
+  const lsp = normalizeLendingServiceProvider(input, regulatedEntities, now);
+  const validation = validateLendingServiceProvider(lsp, regulatedEntities);
+  const nextRegistry =
+    validation.summary.status === "blocked"
+      ? registry ?? {}
+      : {
+          ...(registry ?? {}),
+          [lsp.lspId]: lsp
+        };
+
+  return {
+    registry: nextRegistry,
+    lendingServiceProvider: lsp,
+    findings: validation.findings,
+    summary: validation.summary
+  };
+}
+
+export function validateDigitalLendingApp(app, regulatedEntities = {}, lendingServiceProviders = {}) {
   const findings = [];
   const entity = app?.regulatedEntityId ? regulatedEntities[app.regulatedEntityId] : null;
+  const lsp = app?.lspId ? lendingServiceProviders[app.lspId] : null;
   const status = app?.status ?? ACTIVE_STATUS;
   const ownerType = app?.ownerType;
 
@@ -172,6 +354,12 @@ export function validateDigitalLendingApp(app, regulatedEntities = {}) {
   }
   if (ownerType === "lsp_owned" && !app?.lspId) {
     findings.push(createFinding("error", "RBI-DLA-CIMS", "lspId is required for an LSP-owned DLA.", "lspId"));
+  } else if (ownerType === "lsp_owned" && !lsp) {
+    findings.push(createFinding("error", "RBI-DLA-CIMS", "LSP-owned DLA must reference a registered LSP.", "lspId"));
+  } else if (ownerType === "lsp_owned" && lsp.status !== ACTIVE_STATUS) {
+    findings.push(createFinding("error", "RBI-DLA-CIMS", "LSP-owned DLA must reference an active LSP.", "lspId"));
+  } else if (ownerType === "lsp_owned" && lsp.regulatedEntityId !== app.regulatedEntityId) {
+    findings.push(createFinding("error", "RBI-DLA-CIMS", "LSP-owned DLA must use an LSP governed by the same RE.", "lspId"));
   }
 
   if (!Array.isArray(app?.availability) || app.availability.length === 0) {
@@ -224,9 +412,10 @@ export function validateDigitalLendingApp(app, regulatedEntities = {}) {
   };
 }
 
-export function normalizeDigitalLendingApp(input, regulatedEntities = {}, now = new Date()) {
+export function normalizeDigitalLendingApp(input, regulatedEntities = {}, lendingServiceProviders = {}, now = new Date()) {
   const entity = regulatedEntities?.[input.regulatedEntityId] ?? null;
   const ownerType = input.ownerType ?? (input.lspId || input.lspName ? "lsp_owned" : "self_owned");
+  const lsp = input.lspId ? lendingServiceProviders?.[input.lspId] : null;
   const availabilityInput = Array.isArray(input.availability)
     ? input.availability
     : [
@@ -243,7 +432,7 @@ export function normalizeDigitalLendingApp(input, regulatedEntities = {}, now = 
     regulatedEntityId: input.regulatedEntityId,
     name: input.name,
     ownerType,
-    ownerName: ownerType === "self_owned" ? (input.ownerName ?? "Self-owned") : input.ownerName ?? input.lspName,
+    ownerName: ownerType === "self_owned" ? (input.ownerName ?? "Self-owned") : input.ownerName ?? input.lspName ?? lsp?.legalName,
     lspId: ownerType === "lsp_owned" ? input.lspId ?? null : null,
     status: input.status ?? ACTIVE_STATUS,
     availability: availabilityInput.map((availability) => ({
@@ -284,9 +473,9 @@ export function normalizeDigitalLendingApp(input, regulatedEntities = {}, now = 
   };
 }
 
-export function upsertDigitalLendingApp(registry, input, regulatedEntities = {}, now = new Date()) {
-  const app = normalizeDigitalLendingApp(input, regulatedEntities, now);
-  const validation = validateDigitalLendingApp(app, regulatedEntities);
+export function upsertDigitalLendingApp(registry, input, regulatedEntities = {}, lendingServiceProviders = {}, now = new Date()) {
+  const app = normalizeDigitalLendingApp(input, regulatedEntities, lendingServiceProviders, now);
+  const validation = validateDigitalLendingApp(app, regulatedEntities, lendingServiceProviders);
   const nextRegistry =
     validation.summary.status === "blocked"
       ? registry ?? {}
@@ -307,13 +496,14 @@ export function generateDlaCimsExport(digitalLendingApps = {}, regulatedEntities
   const findings = [];
   const rows = [];
   const asOf = options.asOf ? new Date(options.asOf) : new Date();
+  const lendingServiceProviders = options.lendingServiceProviders ?? {};
   const apps = Object.values(digitalLendingApps)
     .filter((app) => app.status === ACTIVE_STATUS)
     .filter((app) => !options.regulatedEntityId || app.regulatedEntityId === options.regulatedEntityId)
     .sort((left, right) => left.digitalLendingAppId.localeCompare(right.digitalLendingAppId));
 
   for (const app of apps) {
-    const validation = validateDigitalLendingApp(app, regulatedEntities);
+    const validation = validateDigitalLendingApp(app, regulatedEntities, lendingServiceProviders);
     findings.push(...validation.findings.map((finding) => ({ ...finding, digitalLendingAppId: app.digitalLendingAppId })));
     if (validation.summary.status === "blocked") {
       continue;
@@ -564,6 +754,145 @@ function findProductPolicy(application, productPolicies, regulatedEntityId) {
       return true;
     }) ?? null
   );
+}
+
+function validateActiveLspAgreement(lsp, findings) {
+  const agreement = lsp?.agreement ?? {};
+  if (!agreement.agreementRef) {
+    findings.push(createFinding("error", "RBI-DL-2025", "LSP agreement reference is required.", "agreement.agreementRef"));
+  }
+  if (!agreement.effectiveFrom) {
+    findings.push(createFinding("error", "RBI-DL-2025", "LSP agreement effectiveFrom is required.", "agreement.effectiveFrom"));
+  }
+  if (!agreement.rolesAndObligationsRef) {
+    findings.push(
+      createFinding("error", "RBI-DL-2025", "LSP contract must evidence defined roles and obligations.", "agreement.rolesAndObligationsRef")
+    );
+  }
+  if (!agreement.rightsAndObligationsRef) {
+    findings.push(
+      createFinding("error", "RBI-DL-2025", "LSP contract must evidence rights and obligations.", "agreement.rightsAndObligationsRef")
+    );
+  }
+  if (!agreement.scopeOfWorkRef) {
+    findings.push(createFinding("error", "RBI-DL-2025", "LSP scope of work reference is required.", "agreement.scopeOfWorkRef"));
+  }
+}
+
+function validateActiveLspDueDiligence(lsp, findings) {
+  const dueDiligence = lsp?.dueDiligence ?? {};
+  const required = [
+    ["completedAt", "Enhanced due diligence completion timestamp is required."],
+    ["approvedBy", "Enhanced due diligence approver is required."],
+    ["approvalRef", "Enhanced due diligence approval reference is required."],
+    ["technicalCapabilityReviewRef", "Technical capability review evidence is required."],
+    ["dataPrivacyReviewRef", "Data privacy and storage review evidence is required."],
+    ["fairConductReviewRef", "Fair borrower conduct review evidence is required."],
+    ["pastConductReviewRef", "Past conduct review evidence is required."],
+    ["regulatoryComplianceReviewRef", "Regulatory compliance review evidence is required."]
+  ];
+  for (const [key, message] of required) {
+    if (!dueDiligence[key]) {
+      findings.push(createFinding("error", "RBI-DL-2025", message, `dueDiligence.${key}`));
+    }
+  }
+}
+
+function validateActiveLspPeriodicReview(lsp, findings) {
+  const periodicReview = lsp?.periodicReview ?? {};
+  if (!periodicReview.lastReviewedAt) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Periodic LSP review timestamp is required.", "periodicReview.lastReviewedAt"));
+  }
+  if (!periodicReview.nextReviewDueAt) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Next periodic LSP review due date is required.", "periodicReview.nextReviewDueAt"));
+  }
+  if (
+    periodicReview.lastReviewedAt &&
+    periodicReview.nextReviewDueAt &&
+    new Date(periodicReview.nextReviewDueAt).getTime() <= new Date(periodicReview.lastReviewedAt).getTime()
+  ) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Next LSP review must be after the last review.", "periodicReview.nextReviewDueAt"));
+  }
+  if (!periodicReview.reviewedBy) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Periodic LSP reviewer is required.", "periodicReview.reviewedBy"));
+  }
+  if (!periodicReview.reviewRef) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Periodic LSP review evidence reference is required.", "periodicReview.reviewRef"));
+  }
+  if (!periodicReview.outcome || !ALLOWED_LSP_REVIEW_OUTCOMES.has(periodicReview.outcome)) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Periodic LSP review outcome is invalid.", "periodicReview.outcome"));
+  }
+  if (periodicReview.outcome && periodicReview.outcome !== "satisfactory" && !periodicReview.deviationActionRef) {
+    findings.push(createFinding("error", "RBI-DL-2025", "LSP review deviations require action evidence.", "periodicReview.deviationActionRef"));
+  }
+}
+
+function validateActiveLspDataControls(lsp, findings) {
+  const dataControls = lsp?.dataControls ?? {};
+  if (dataControls.primaryStorageCountry !== "IN") {
+    findings.push(createFinding("error", "RBI-DATA-RESIDENCY", "LSP primary data storage must be in India.", "dataControls.primaryStorageCountry"));
+  }
+  if (
+    dataControls.processedOutsideIndia === true &&
+    (!Number.isFinite(dataControls.returnedAndDeletedOutsideIndiaWithinHours) ||
+      dataControls.returnedAndDeletedOutsideIndiaWithinHours > 24)
+  ) {
+    findings.push(
+      createFinding(
+        "error",
+        "RBI-DATA-RESIDENCY",
+        "LSP data processed outside India must return to India and be deleted outside India within 24 hours.",
+        "dataControls.returnedAndDeletedOutsideIndiaWithinHours"
+      )
+    );
+  }
+  if (dataControls.storesOnlyMinimalBorrowerData !== true) {
+    findings.push(
+      createFinding("error", "RBI-DL-2025", "LSP may store only minimal borrower data required for its contracted scope.", "dataControls.storesOnlyMinimalBorrowerData")
+    );
+  }
+  if (dataControls.prohibitedBorrowerDataStored === true) {
+    findings.push(createFinding("error", "RBI-DL-2025", "LSP must not store prohibited borrower data.", "dataControls.prohibitedBorrowerDataStored"));
+  }
+}
+
+function validateActiveLspFeeControls(lsp, findings) {
+  const feeControls = lsp?.feeControls ?? {};
+  if (feeControls.paidByRegulatedEntity !== true) {
+    findings.push(createFinding("error", "RBI-FUND-FLOW", "LSP fees must be paid by the RE.", "feeControls.paidByRegulatedEntity"));
+  }
+  if (feeControls.borrowerChargedSeparately === true) {
+    findings.push(createFinding("error", "RBI-FUND-FLOW", "LSP fees must not be charged separately to the borrower.", "feeControls.borrowerChargedSeparately"));
+  }
+}
+
+function validateBorrowerFacingLsp(lsp, findings) {
+  if (!isHttpUrl(lsp?.websiteUrl)) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Borrower-facing LSP websiteUrl is required.", "websiteUrl"));
+  }
+  if (!isHttpUrl(lsp?.privacyPolicyUrl)) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Borrower-facing LSP privacyPolicyUrl is required.", "privacyPolicyUrl"));
+  }
+  if (!isHttpUrl(lsp?.publicDisclosureUrl)) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Borrower-facing LSP public disclosure URL is required.", "publicDisclosureUrl"));
+  }
+  if (!lsp?.grievanceOfficer?.name) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Borrower-facing LSP grievance officer name is required.", "grievanceOfficer.name"));
+  }
+  if (!lsp?.grievanceOfficer?.email) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Borrower-facing LSP grievance officer email is required.", "grievanceOfficer.email"));
+  }
+  if (!lsp?.grievanceOfficer?.phone && !lsp?.grievanceOfficer?.mobile) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Borrower-facing LSP grievance officer phone or mobile is required.", "grievanceOfficer.phone"));
+  }
+}
+
+function lspHasBorrowerInterface(lsp) {
+  return Boolean(lsp?.interfaceWithBorrower) || (lsp?.services ?? []).some((service) => BORROWER_FACING_LSP_SERVICES.has(service));
+}
+
+function lspProvidesRecovery(lsp) {
+  return (lsp?.services ?? []).some((service) => RECOVERY_LSP_SERVICES.has(service));
 }
 
 function validateActiveDlaAttestation(app, findings) {

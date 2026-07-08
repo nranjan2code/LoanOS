@@ -50,13 +50,16 @@ export {
 export {
   generateDlaCimsExport,
   normalizeDigitalLendingApp,
+  normalizeLendingServiceProvider,
   normalizeProductPolicy,
   normalizeRegulatedEntity,
   resolveLoanApplicationReferences,
   upsertDigitalLendingApp,
+  upsertLendingServiceProvider,
   upsertProductPolicy,
   upsertRegulatedEntity,
   validateDigitalLendingApp,
+  validateLendingServiceProvider,
   validateProductPolicy,
   validateRegulatedEntity
 } from "./registries.js";
