@@ -155,6 +155,7 @@ The current codebase contains Phase 0 executable controls:
 - Direct fund-flow checks.
 - KFS generator and validator.
 - Sanction readiness gate requiring KFS acceptance and digital delivery evidence.
+- Execution document packet renderer for KFS, sanction letter, agreement summary, privacy notice, checksums, and delivery evidence.
 - AI model registry.
 - Model-level and global kill switch.
 - API endpoints backed by local JSON state.

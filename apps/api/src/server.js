@@ -19,6 +19,7 @@ import {
   enrichComplaint,
   escalateComplaintToRbiCms,
   evaluateLoanApplication,
+  generateDocumentPacket,
   generateCicSnapshot,
   generateLoanStatement,
   initializeApplicationWorkflow,
@@ -27,6 +28,9 @@ import {
   listRegulatoryControls,
   registerModel,
   recordHumanReview,
+  recordDocumentPacketDelivered,
+  recordDocumentPacketDelivery,
+  recordDocumentPacketGenerated,
   releaseWorkflowTask,
   resolveComplaint,
   resolveBorrowerApplicationReferences,
@@ -50,6 +54,8 @@ import {
   validateDisbursement,
   validateDecisionApprovalAccess,
   validateDecisionProposalAccess,
+  validateDocumentPacketAccess,
+  validateDocumentPacketBeforeDisbursement,
   validateGrievanceOfficerAccess,
   validateHumanReviewAccess,
   validateKfsBeforeDecision,
@@ -905,6 +911,131 @@ async function route(req, res, dataDir) {
     return;
   }
 
+  const documentPacketMatch = path.match(/^\/loans\/applications\/([^/]+)\/document-packet$/);
+  if (documentPacketMatch) {
+    const applicationId = decodeURIComponent(documentPacketMatch[1]);
+    const state = await loadState(dataDir);
+    const application = state.loanApplications[applicationId];
+    if (!application) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Loan application not found." } });
+      return;
+    }
+
+    if (method === "GET") {
+      if (!application.documentPacket) {
+        sendJson(res, 404, { error: { code: "not_found", message: "Document packet not found." } });
+        return;
+      }
+      sendJson(res, 200, application.documentPacket);
+      return;
+    }
+
+    if (method === "POST") {
+      const body = await readJson(req);
+      const actorId = body.actor ?? body.generatedBy;
+      const accessFindings = validateDocumentPacketAccess(state.staffActors, actorId, "actor");
+      const accessSummary = summarizeFindings(accessFindings);
+      if (accessSummary.status === "blocked") {
+        sendJson(res, 422, {
+          error: {
+            code: "document_packet_access_blocked",
+            message: "Document packet generation is blocked by actor role policy."
+          },
+          findings: accessFindings
+        });
+        return;
+      }
+
+      const packetResult = generateDocumentPacket(application, body);
+      if (packetResult.summary.status === "blocked") {
+        sendJson(res, 422, {
+          error: {
+            code: "document_packet_blocked",
+            message: "Document packet generation is blocked by workflow findings."
+          },
+          findings: packetResult.findings
+        });
+        return;
+      }
+
+      const stored = recordDocumentPacketGenerated(application, packetResult.packet);
+      const nextState = appendEvent(
+        {
+          ...state,
+          loanApplications: {
+            ...state.loanApplications,
+            [stored.applicationId]: stored
+          }
+        },
+        {
+          type: "loan.document_packet.generated",
+          applicationId: stored.applicationId,
+          packetId: packetResult.packet.packetId
+        }
+      );
+      await saveState(nextState, dataDir);
+      sendJson(res, 201, stored.documentPacket);
+      return;
+    }
+  }
+
+  const documentPacketDeliveryMatch = path.match(/^\/loans\/applications\/([^/]+)\/document-packet\/delivery$/);
+  if (method === "POST" && documentPacketDeliveryMatch) {
+    const body = await readJson(req);
+    const state = await loadState(dataDir);
+    const application = state.loanApplications[decodeURIComponent(documentPacketDeliveryMatch[1])];
+    if (!application) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Loan application not found." } });
+      return;
+    }
+
+    const actorId = body.actor ?? body.deliveredBy;
+    const accessFindings = validateDocumentPacketAccess(state.staffActors, actorId, "actor");
+    const accessSummary = summarizeFindings(accessFindings);
+    if (accessSummary.status === "blocked") {
+      sendJson(res, 422, {
+        error: {
+          code: "document_packet_access_blocked",
+          message: "Document packet delivery is blocked by actor role policy."
+        },
+        findings: accessFindings
+      });
+      return;
+    }
+
+    const deliveryResult = recordDocumentPacketDelivery(application, body);
+    if (deliveryResult.summary.status === "blocked") {
+      sendJson(res, 422, {
+        error: {
+          code: "document_packet_delivery_blocked",
+          message: "Document packet delivery is blocked by workflow findings."
+        },
+        findings: deliveryResult.findings
+      });
+      return;
+    }
+
+    const stored = recordDocumentPacketDelivered(application, deliveryResult.packet);
+    const nextState = appendEvent(
+      {
+        ...state,
+        loanApplications: {
+          ...state.loanApplications,
+          [stored.applicationId]: stored
+        }
+      },
+      {
+        type: "loan.document_packet.delivered",
+        applicationId: stored.applicationId,
+        packetId: deliveryResult.packet.packetId,
+        deliveryRef: deliveryResult.packet.delivery.deliveryRef
+      }
+    );
+    await saveState(nextState, dataDir);
+    sendJson(res, 200, stored.documentPacket);
+    return;
+  }
+
   if (method === "GET" && path === "/loan-accounts") {
     const state = await loadState(dataDir);
     sendJson(res, 200, {
@@ -1322,13 +1453,16 @@ async function route(req, res, dataDir) {
     }
 
     const result = validateDisbursement(application, body);
-    if (result.summary.status === "blocked") {
+    const documentPacketCheck = validateDocumentPacketBeforeDisbursement(application);
+    const findings = [...result.findings, ...documentPacketCheck.findings];
+    const summary = summarizeFindings(findings);
+    if (summary.status === "blocked") {
       sendJson(res, 422, {
         error: {
           code: "disbursement_blocked",
           message: "Disbursement is blocked by compliance findings."
         },
-        findings: result.findings
+        findings
       });
       return;
     }

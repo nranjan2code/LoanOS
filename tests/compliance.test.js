@@ -548,6 +548,116 @@ test("API requires maker-checker approval before disbursement", async (t) => {
   const disbursementResponse = await postJson(`${base}/loans/applications/${application.applicationId}/disbursement`, {
     destinationAccount: validApplication().disbursement.destinationAccount
   });
+  assert.equal(disbursementResponse.status, 422);
+  assert(disbursementResponse.body.findings.some((finding) => finding.path === "documentPacket"));
+
+  const packet = await generateAndDeliverDocumentPacket(base, application.applicationId);
+  assert.equal(packet.status, "delivered");
+
+  const readyDisbursementResponse = await postJson(`${base}/loans/applications/${application.applicationId}/disbursement`, {
+    destinationAccount: validApplication().disbursement.destinationAccount
+  });
+  assert.equal(readyDisbursementResponse.status, 200);
+  assert.equal(readyDisbursementResponse.body.status, "disbursed");
+  assert(readyDisbursementResponse.body.loanAccountId);
+});
+
+test("API generates and delivers execution document packet before disbursement", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+  const application = await createRegistryBackedApplication(base);
+  assert.equal(
+    (
+      await postJson(`${base}/loans/applications/${application.applicationId}/kfs`, {
+        acceptance: {
+          acceptedAt: "2026-07-08T07:00:00.000Z",
+          deliveryChannel: "email",
+          deliveryRef: "email_msg_123"
+        }
+      })
+    ).status,
+    201
+  );
+  assert.equal(
+    (
+      await postJson(`${base}/loans/applications/${application.applicationId}/decision`, {
+        status: "approved",
+        proposedBy: "credit-maker-1",
+        reason: "Policy checks passed"
+      })
+    ).status,
+    202
+  );
+  assert.equal(
+    (
+      await postJson(`${base}/loans/applications/${application.applicationId}/approvals`, {
+        outcome: "approved",
+        approvedBy: "credit-checker-1",
+        approvalRef: "approval_004"
+      })
+    ).status,
+    200
+  );
+
+  const taskResponse = await fetch(`${base}/workflow/tasks?type=application.document_packet_delivery`);
+  assert.equal(taskResponse.status, 200);
+  const tasks = await taskResponse.json();
+  assert.equal(tasks.count, 1);
+  assert.equal(tasks.tasks[0].queue, "loan_ops");
+
+  const wrongActor = await postJson(`${base}/loans/applications/${application.applicationId}/document-packet`, {
+    actor: "credit-maker-1"
+  });
+  assert.equal(wrongActor.status, 422);
+
+  const generated = await postJson(`${base}/loans/applications/${application.applicationId}/document-packet`, {
+    actor: "loan-officer-1"
+  });
+  assert.equal(generated.status, 201);
+  assert.equal(generated.body.status, "generated");
+  assert.equal(generated.body.documents.length, 4);
+  assert(generated.body.documents.every((document) => document.checksumSha256.length === 64));
+  assert(generated.body.documents.some((document) => document.type === "key_fact_statement"));
+  assert(generated.body.documents.some((document) => document.type === "sanction_letter"));
+
+  const fetched = await fetch(`${base}/loans/applications/${application.applicationId}/document-packet`);
+  assert.equal(fetched.status, 200);
+  const fetchedPacket = await fetched.json();
+  assert.equal(fetchedPacket.packetId, generated.body.packetId);
+
+  const delivery = await postJson(`${base}/loans/applications/${application.applicationId}/document-packet/delivery`, {
+    actor: "loan-officer-1",
+    deliveryChannel: "email",
+    deliveryRef: "doc_email_001",
+    deliveredTo: "asha@example.in"
+  });
+  assert.equal(delivery.status, 200);
+  assert.equal(delivery.body.status, "delivered");
+
+  const taskAfterDeliveryResponse = await fetch(`${base}/workflow/tasks?type=application.document_packet_delivery`);
+  assert.equal(taskAfterDeliveryResponse.status, 200);
+  const taskAfterDelivery = await taskAfterDeliveryResponse.json();
+  assert.equal(taskAfterDelivery.count, 0);
+
+  const disbursementTaskResponse = await fetch(`${base}/workflow/tasks?type=application.disbursement`);
+  assert.equal(disbursementTaskResponse.status, 200);
+  const disbursementTasks = await disbursementTaskResponse.json();
+  assert.equal(disbursementTasks.count, 1);
+
+  const disbursementResponse = await postJson(`${base}/loans/applications/${application.applicationId}/disbursement`, {
+    destinationAccount: validApplication().disbursement.destinationAccount
+  });
   assert.equal(disbursementResponse.status, 200);
   assert.equal(disbursementResponse.body.status, "disbursed");
   assert(disbursementResponse.body.loanAccountId);
@@ -1491,6 +1601,12 @@ function operationalActors() {
       queues: ["model_risk"]
     },
     {
+      actorId: "loan-officer-1",
+      displayName: "Loan Officer",
+      roles: ["loan_officer"],
+      queues: ["loan_ops"]
+    },
+    {
       actorId: "collections-manager-1",
       displayName: "Collections Manager",
       roles: ["collections_manager"],
@@ -1565,10 +1681,26 @@ async function approveAndDisburseApplication(base) {
     ).status,
     200
   );
+  await generateAndDeliverDocumentPacket(base, application.applicationId);
   const disbursement = await postJson(`${base}/loans/applications/${application.applicationId}/disbursement`, {
     destinationAccount: validApplication().disbursement.destinationAccount
   });
   assert.equal(disbursement.status, 200);
   assert.equal(disbursement.body.status, "disbursed");
   return disbursement.body;
+}
+
+async function generateAndDeliverDocumentPacket(base, applicationId) {
+  const generated = await postJson(`${base}/loans/applications/${applicationId}/document-packet`, {
+    actor: "loan-officer-1"
+  });
+  assert.equal(generated.status, 201);
+  const delivered = await postJson(`${base}/loans/applications/${applicationId}/document-packet/delivery`, {
+    actor: "loan-officer-1",
+    deliveryChannel: "email",
+    deliveryRef: `doc_delivery_${applicationId}`,
+    deliveredTo: "asha@example.in"
+  });
+  assert.equal(delivered.status, 200);
+  return delivered.body;
 }

@@ -17,6 +17,7 @@ const TASK_SLA_HOURS = {
   "application.credit_decision": 8,
   "application.ai_human_review": 4,
   "application.decision_approval": 4,
+  "application.document_packet_delivery": 4,
   "application.disbursement": 4,
   "loan_account.recovery_assignment": 24,
   "loan_account.npa_review": 24,
@@ -274,7 +275,27 @@ function deriveApplicationTasks(applications, asOf) {
       ];
     }
 
-    if (application.status === APPLICATION_STATUSES.APPROVED && !application.disbursement) {
+    if (application.status === APPLICATION_STATUSES.APPROVED && !application.documentPacket?.delivery?.deliveryRef) {
+      return [
+        applicationTask(application, {
+          type: "application.document_packet_delivery",
+          title: "Generate and deliver execution document packet",
+          description: "Approved application needs KFS, sanction letter, agreement summary, and privacy notice delivery before disbursement.",
+          queue: "loan_ops",
+          role: "loan_officer",
+          priority: "high",
+          regulatoryRefs: ["RBI-KFS-2024", "RBI-DL-2025", "DPDP-RULES-2025"],
+          openedAt: findApplicationWorkflowAt(application, ["application.decision.approved"]) ?? application.updatedAt,
+          action: {
+            method: "POST",
+            path: `/loans/applications/${application.applicationId}/document-packet`,
+            description: "Generate and deliver document packet."
+          }
+        })
+      ];
+    }
+
+    if (application.status === APPLICATION_STATUSES.APPROVED && !application.disbursement?.disbursementId) {
       return [
         applicationTask(application, {
           type: "application.disbursement",

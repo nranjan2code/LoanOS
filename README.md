@@ -66,6 +66,9 @@ Useful endpoints:
 - `POST /loans/applications/:id/decision`
 - `POST /loans/applications/:id/human-reviews`
 - `POST /loans/applications/:id/approvals`
+- `GET /loans/applications/:id/document-packet`
+- `POST /loans/applications/:id/document-packet`
+- `POST /loans/applications/:id/document-packet/delivery`
 - `POST /loans/applications/:id/disbursement`
 - `GET /loan-accounts`
 - `GET /loan-accounts/:id`
@@ -117,6 +120,7 @@ Phase 0 has a working executable foundation:
 - Complaint registry and grievance workflow with 30-day RBI Ombudsman clock and RBI CMS escalation evidence.
 - Borrower-backed application resolution through `borrowerId`.
 - LOS application workflow state machine for preflight, KFS, decision proposal, human review, maker-checker approval, and disbursement.
+- LOS execution document packet with rendered KFS, sanction letter, loan agreement summary, privacy notice, checksums, and delivery evidence.
 - LWS task queues derived from LOS/LMS state, with SLA metadata, role checks, assignment, start, release, and comment audit.
 - LMS loan account creation on disbursement with repayment schedule, ledger, balance summary, and payment posting.
 - LMS borrower statement generation plus disclosed-charge, waiver, and reversal ledger controls.

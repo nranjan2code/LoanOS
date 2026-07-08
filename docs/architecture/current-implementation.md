@@ -27,6 +27,7 @@ npm run dev:api
 | `packages/core/src/compliance-controls.js` | Regulatory control catalog and finding helpers. |
 | `packages/core/src/access-control.js` | Staff actor registry, role checks, queue assignment authority, and regulated-action actor validation. |
 | `packages/core/src/grievance.js` | Complaint registry, grievance lifecycle, 30-day RBI Ombudsman clock, and RBI CMS escalation evidence. |
+| `packages/core/src/document-packet.js` | KFS, sanction letter, loan agreement summary, and privacy notice rendering plus delivery evidence controls. |
 | `packages/core/src/registries.js` | Regulated-entity and product-policy registries plus application reference resolution. |
 | `packages/core/src/borrower-onboarding.js` | Borrower profile, consent ledger, KYC records, and borrower reference resolution. |
 | `packages/core/src/application-workflow.js` | LOS application state machine, KFS workflow, human review, decision proposal, maker-checker approval, disbursement transition. |
@@ -84,6 +85,9 @@ npm run dev:api
 | `POST /loans/applications/:id/decision` | Proposes approve/decline decision after compliance gates. |
 | `POST /loans/applications/:id/human-reviews` | Records human review for material AI/model-assisted decisions. |
 | `POST /loans/applications/:id/approvals` | Applies maker-checker approval/rejection for a pending decision proposal. |
+| `GET /loans/applications/:id/document-packet` | Reads generated execution document packet. |
+| `POST /loans/applications/:id/document-packet` | Generates rendered KFS, sanction letter, agreement summary, and privacy notice documents. |
+| `POST /loans/applications/:id/document-packet/delivery` | Records document packet digital delivery evidence. |
 | `POST /loans/applications/:id/disbursement` | Records disbursement after fund-flow and KFS checks. |
 | `GET /loan-accounts` | Lists loan accounts. |
 | `GET /loan-accounts/:id` | Reads a loan account with balance summary. |
@@ -120,7 +124,8 @@ npm run dev:api
 | Regulated-action RBAC | Credit proposal, checker approval, human review, recovery assignment, and LWS task actions validate actor role and queue policy. |
 | Complaint workflow | Tracks received, assigned, under-review, resolved, escalation-due, and RBI CMS escalation states with acknowledgement, closure, and CMS references. |
 | 30-day grievance clock | Computes due date, breach status, and escalation-due state from complaint received time. |
-| LWS task queues | Derives active tasks for blocked compliance, KFS acceptance, credit decision, AI human review, checker approval, disbursement, recovery assignment, NPA review, complaint assignment, complaint resolution, and RBI CMS escalation. Each task includes SLA target, due time, and breach status. |
+| Execution document packet | Renders borrower-facing HTML/text KFS, sanction letter, agreement summary, and privacy notice with SHA-256 checksums and delivery evidence. |
+| LWS task queues | Derives active tasks for blocked compliance, KFS acceptance, credit decision, AI human review, checker approval, document packet delivery, disbursement, recovery assignment, NPA review, complaint assignment, complaint resolution, and RBI CMS escalation. Each task includes SLA target, due time, and breach status. |
 | LWS task audit | Persists assignment, start, release, and comment events while the domain state remains the source of truth for task resolution. |
 | Loan account opening | Disbursement opens an LMS loan account and creates a disbursement ledger event. |
 | Repayment schedule | Generates monthly reducing-balance amortization schedule from KFS/product terms. |
@@ -141,7 +146,7 @@ npm run dev:api
 | KFS | Requires APR, amount, tenor, cooling-off, recovery mechanism, grievance details, charge structure. |
 | Penal charges | Blocks penal interest and capitalization of penal charges. |
 | Fund flow | Blocks LSP, DLA, pass-through, and pool account fund control. |
-| Disbursement | Requires approved loan, valid KFS, and borrower/end-beneficiary account. |
+| Disbursement | Requires approved loan, valid KFS, delivered document packet, and borrower/end-beneficiary account. |
 | AI model inventory | Blocks model use if missing from inventory. |
 | AI model validation | Blocks active use without approved validation. |
 | AI kill switch | Blocks model use when global switch is active or model is suspended. |
@@ -155,7 +160,7 @@ npm run dev:api
 - Borrower/consent/KYC records are file-backed and do not yet integrate CKYC, V-CIP providers, consent managers, or document stores.
 - Workflow is file-backed and does not yet include dashboard UI, notification dispatch, or outbound RBI CMS API integration.
 - LMS is early-stage: no NACH files, refunds, foreclosure, restructure, external CIC file/API submission, rendered statement documents, or full recovery contact logging yet.
-- KFS is data-only, not rendered to PDF/HTML yet.
+- Document packet renders HTML/text but does not yet create PDFs or eSign envelopes.
 - No UI yet.
 - AI governance is a runtime guard but does not yet include validation workflow, drift monitoring, fairness reports, or incident pack generation.
 - Compliance docs are source-grounded but still require counsel/compliance review before production.
@@ -179,6 +184,7 @@ Current tests prove:
 - Revoked consent and expired KYC block borrower resolution.
 - API supports borrower-backed applications without embedded borrower/KYC/consent blobs.
 - API requires maker-checker approval before disbursement.
+- API blocks disbursement until the execution document packet is generated and delivered.
 - API routes material AI decisions to human review before decision proposal.
 - API stores staff actors and enforces role/queue checks on regulated workflow actions.
 - API exposes LWS task queues with SLA status and persists task assignment/start audit.
@@ -191,3 +197,4 @@ Current tests prove:
 - API generates account-level and portfolio-level CIC-ready reporting snapshots.
 - API exposes collections workflow tasks until recovery-agent notice assignment is recorded.
 - API manages complaint lifecycle, 30-day grievance SLA, and RBI CMS escalation tasks.
+- API generates rendered document packets and transitions LWS from document delivery to disbursement readiness.

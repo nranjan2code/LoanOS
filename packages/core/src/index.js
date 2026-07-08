@@ -13,6 +13,7 @@ export {
   upsertStaffActor,
   validateDecisionApprovalAccess,
   validateDecisionProposalAccess,
+  validateDocumentPacketAccess,
   validateGrievanceOfficerAccess,
   validateHumanReviewAccess,
   validateRecoveryAssignmentAccess,
@@ -74,6 +75,8 @@ export {
   initializeApplicationWorkflow,
   markDisbursed,
   proposeDecision,
+  recordDocumentPacketDelivered,
+  recordDocumentPacketGenerated,
   recordHumanReview
 } from "./application-workflow.js";
 
@@ -105,6 +108,13 @@ export {
   resolveComplaint,
   startComplaintReview
 } from "./grievance.js";
+
+export {
+  generateDocumentPacket,
+  recordDocumentPacketDelivery,
+  validateDocumentPacketBeforeDisbursement,
+  validateDocumentPacketGeneration
+} from "./document-packet.js";
 
 export {
   WORKFLOW_TASK_STATUSES,

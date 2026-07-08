@@ -320,6 +320,39 @@ export function markDisbursed(application, disbursement, now = new Date()) {
   );
 }
 
+export function recordDocumentPacketGenerated(application, packet, now = new Date()) {
+  return withWorkflowEvent(
+    {
+      ...application,
+      documentPacket: packet
+    },
+    {
+      type: "application.document_packet.generated",
+      status: application.status,
+      packetId: packet.packetId,
+      actor: packet.generatedBy ?? null
+    },
+    now
+  );
+}
+
+export function recordDocumentPacketDelivered(application, packet, now = new Date()) {
+  return withWorkflowEvent(
+    {
+      ...application,
+      documentPacket: packet
+    },
+    {
+      type: "application.document_packet.delivered",
+      status: application.status,
+      packetId: packet.packetId,
+      deliveryRef: packet.delivery?.deliveryRef ?? null,
+      actor: packet.delivery?.deliveredBy ?? null
+    },
+    now
+  );
+}
+
 function withWorkflowEvent(application, event, now = new Date()) {
   const workflow = application.workflow ?? {
     events: []
@@ -341,4 +374,3 @@ function withWorkflowEvent(application, event, now = new Date()) {
     }
   };
 }
-

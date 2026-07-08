@@ -87,8 +87,9 @@ Tasks:
 - AI model-use evidence on decision. Partial.
 - Offer generation.
 - KFS generation from product policy. Done.
-- Document packet model: KFS, sanction letter, agreement, privacy policy, statement.
-- Digital delivery evidence. Partial.
+- Document packet model: KFS, sanction letter, agreement summary, privacy policy. First execution packet slice done.
+- Rendered LMS statement document packet. Planned.
+- Digital delivery evidence. First execution packet slice done.
 - Sanction readiness gate. Done.
 - Disbursement readiness gate. Done.
 - Tests for each state transition and blocked unsafe transition.

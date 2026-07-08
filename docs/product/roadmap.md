@@ -33,8 +33,8 @@ Deliverables:
 - KYC state machine with CKYC/V-CIP placeholders. First slice done.
 - Underwriting workflow with human review.
 - Decision proposal and maker-checker approval. First slice done.
-- KFS generation and digitally delivered document packet.
-- Sanction and disbursement readiness checks.
+- KFS generation and digitally delivered document packet. First slice done.
+- Sanction and disbursement readiness checks. First slice done.
 
 Exit criteria:
 

@@ -20,7 +20,7 @@ Legend:
 | Borrower economic profile | Age, occupation, income required in preflight. | Done |
 | KFS before execution | KFS validation and acceptance gate. | Done |
 | Product policy before origination | Product registry validates active RE link, board approval, INR, amount/tenor bounds, APR, cooling-off, recovery mechanism, eligibility, and charges. | Done |
-| Digitally delivered KFS/documents | KFS delivery reference required before decision. | Partial |
+| Digitally delivered KFS/documents | KFS delivery evidence gates decision; execution document packet delivery gates disbursement. | Done |
 | Direct disbursement to borrower/end-beneficiary | LSP/pass-through disbursement blocked. | Done |
 | Direct repayment to RE account | LSP/pass-through repayment blocked. | Done |
 | LSP fees paid by RE, not borrower | Fee registry and vendor settlement module. | Planned |
@@ -44,7 +44,7 @@ Legend:
 | Recovery mechanism | KFS requires recovery mechanism. | Done |
 | Grievance officer | KFS requires name and email. | Done |
 | Undisclosed fees cannot be charged later | Fee-posting module must enforce KFS fee registry. | Planned |
-| Digitally signed/rendered KFS | Document renderer/eSign delivery. | Planned |
+| Digitally signed/rendered KFS | HTML/text document packet renderer with checksum and delivery evidence; eSign/PDF planned. | Partial |
 | KFS workflow state | KFS route separates issued KFS from decision-ready KFS based on acceptance and delivery evidence. | Done |
 
 ## Fair Lending and Penal Charges
