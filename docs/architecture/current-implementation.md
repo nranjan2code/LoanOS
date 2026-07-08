@@ -32,7 +32,7 @@ npm run dev:api
 | `packages/core/src/borrower-onboarding.js` | Borrower profile, consent ledger, KYC records, and borrower reference resolution. |
 | `packages/core/src/eligibility.js` | Policy-driven creditworthiness/affordability engine: EMI/FOIR computation, age-at-maturity, amount/tenor bounds, and eligible/refer/ineligible decision. |
 | `packages/core/src/application-workflow.js` | LOS application state machine, KFS workflow, human review, decision proposal, manual underwriting override gate for referred applications, coded decline-reason taxonomy, maker-checker approval, disbursement transition. |
-| `packages/core/src/loan-account.js` | LMS loan account creation, amortization schedule, ledger balance reconstruction, interest accrual, payment posting, foreclosure quote and payoff, closure No-Objection Certificate, statements, charges, waivers, reversals, delinquency, recovery controls, asset classification, and CIC snapshots. |
+| `packages/core/src/loan-account.js` | LMS loan account creation, amortization schedule, ledger balance reconstruction, interest accrual, payment posting, part-prepayment re-amortization, foreclosure quote and payoff, closure No-Objection Certificate, statements, charges, waivers, reversals, delinquency, recovery controls, asset classification, and CIC snapshots. |
 | `packages/core/src/loan-policy.js` | India-only loan validation, KFS validation, sanction readiness, disbursement checks. |
 | `packages/core/src/model-governance.js` | AI/model inventory, model status, global/model kill switch, runtime model-use evaluation. |
 | `packages/core/src/workflow-tasks.js` | LWS task derivation from LOS/LMS state plus task assignment, start, release, and comment lifecycle. |
@@ -109,6 +109,7 @@ npm run dev:api
 | `GET /loan-accounts/:id/closure-certificate` | Reads the issued No-Objection closure certificate. |
 | `POST /loan-accounts/:id/closure-certificate` | Issues a No-Objection closure certificate for a settled account (idempotent re-issue). |
 | `POST /loan-accounts/:id/payments` | Posts payment ledger event and returns updated balance summary. |
+| `POST /loan-accounts/:id/prepayments` | Posts a part-prepayment and re-amortizes the remaining schedule (`reduce_emi` or `reduce_tenure`). |
 | `POST /loan-accounts/:id/cash-recoveries` | Posts noticed-agent cash recovery with same-day reflection control. |
 | `POST /loan-accounts/:id/waivers` | Posts approved charge waiver. |
 | `POST /loan-accounts/:id/reversals` | Posts approved reversal of a ledger event. |
@@ -147,6 +148,7 @@ npm run dev:api
 | Foreclosure | Quotes a payoff of outstanding principal plus interest and charges already due (no future interest); any foreclosure charge must be KFS-disclosed. Execution requires the amount to cover the payoff, settles it through the ledger, and closes the account. |
 | Closure NOC | A settled (closed, zero-dues) account can issue a checksum-sealed No-Objection Certificate declaring no dues remain and no objection to releasing securities; re-issue returns the same certificate. |
 | Payment posting | Posts payment events, allocates to due interest first and principal next, and updates account status. |
+| Part-prepayment | Clears dues then reduces principal, requiring a real principal reduction, and rebuilds the future schedule either to lower each EMI over the same term (`reduce_emi`) or keep the EMI and shorten the tenure (`reduce_tenure`). |
 | Borrower statements | Generates period statement from schedule and ledger transactions. |
 | Charge controls | Blocks undisclosed charges and penal-interest/capitalizing charge designs. |
 | Waivers and reversals | Requires approval evidence for waivers and reversals, and prevents duplicate reversal of the same event. |
@@ -216,6 +218,7 @@ Current tests prove:
 - API opens a loan account on disbursement and posts ledger payments.
 - API generates borrower statements from schedule and ledger.
 - API accrues scheduled interest into immutable ledger events, reconciles accrued interest with the schedule, and is idempotent on re-run.
+- API re-amortizes the remaining schedule on a part-prepayment in both reduce-EMI and reduce-tenure modes and blocks an unknown mode.
 - API quotes a foreclosure payoff, blocks an underpayment, settles the payoff, closes the account, and blocks re-foreclosure of a closed account.
 - API issues a No-Objection closure certificate only for a settled account, blocks it while active, and returns the same certificate on re-issue.
 - API controls disclosed charges, waivers, and reversals.

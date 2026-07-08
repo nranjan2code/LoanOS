@@ -44,6 +44,7 @@ import {
   markDisbursed,
   postCashRecoveryToLoanAccount,
   postPaymentToLoanAccount,
+  prepayLoanAccount,
   proposeDecision,
   quoteForeclosure,
   reverseLoanAccountEvent,
@@ -1546,6 +1547,54 @@ async function route(req, res, dataDir) {
       loanAccount: stored,
       accrualEvents: result.accrualEvents,
       summary: summarizeLoanAccount(stored, body.asOf ? new Date(body.asOf) : new Date())
+    });
+    return;
+  }
+
+  const loanAccountPrepaymentMatch = path.match(/^\/loan-accounts\/([^/]+)\/prepayments$/);
+  if (method === "POST" && loanAccountPrepaymentMatch) {
+    const body = await readJson(req);
+    const state = await loadState(dataDir);
+    const loanAccountId = decodeURIComponent(loanAccountPrepaymentMatch[1]);
+    const loanAccount = state.loanAccounts[loanAccountId];
+    if (!loanAccount) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Loan account not found." } });
+      return;
+    }
+
+    const result = prepayLoanAccount(loanAccount, body);
+    if (result.summary.status === "blocked") {
+      sendJson(res, 422, {
+        error: { code: "prepayment_blocked", message: "Part-prepayment is blocked by LMS findings." },
+        findings: result.findings
+      });
+      return;
+    }
+
+    const stored = result.loanAccount;
+    const nextState = appendEvent(
+      {
+        ...state,
+        loanAccounts: {
+          ...state.loanAccounts,
+          [stored.loanAccountId]: stored
+        }
+      },
+      {
+        type: "loan_account.part_prepaid",
+        loanAccountId: stored.loanAccountId,
+        prepaymentId: result.prepayment.prepaymentId,
+        mode: result.prepayment.mode,
+        principalReduced: result.prepayment.principalReduced
+      }
+    );
+    await saveState(nextState, dataDir);
+    sendJson(res, 200, {
+      loanAccount: stored,
+      paymentEvent: result.paymentEvent,
+      prepayment: result.prepayment,
+      schedule: result.schedule,
+      summary: summarizeLoanAccount(stored, new Date(result.paymentEvent.eventDate))
     });
     return;
   }

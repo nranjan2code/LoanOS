@@ -50,7 +50,7 @@ Deliverables:
 
 - Loan account ledger. First slice done.
 - Repayment schedule and amortization. First slice done.
-- EMI, floating-rate reset, statements, part-prepayment, foreclosure. Statement data and foreclosure payoff/closure first slices done.
+- EMI, floating-rate reset, statements, part-prepayment, foreclosure. Statement data, part-prepayment re-amortization, and foreclosure payoff/closure first slices done.
 - Penal-charge policy, waivers, reversals, and audit. First slice done.
 - Delinquency, recovery assignment, and same-day cash recovery posting. First slice done.
 - SMA/NPA asset classification. First slice done.

@@ -846,6 +846,79 @@ test("API accrues scheduled interest into the ledger and reconciles with the sch
   assert.equal(rerun.body.summary.interestAccrued, expectedInterest);
 });
 
+test("API part-prepayment re-amortizes the remaining schedule", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+  const round2 = (value) => Math.round((value + Number.EPSILON) * 100) / 100;
+
+  // Account A exercises reduce_emi; Account B exercises reduce_tenure.
+  const applicationA = await approveAndDisburseApplication(base);
+  const accountA = await (await fetch(`${base}/loan-accounts/${applicationA.loanAccountId}`)).json();
+  const applicationB = await approveAndDisburseApplication(base);
+  const accountB = await (await fetch(`${base}/loan-accounts/${applicationB.loanAccountId}`)).json();
+
+  const originalEmi = accountA.schedule[0].totalDue;
+  const originalCount = accountA.schedule.length;
+  const prepaidAt = `${addDays(accountA.schedule[0].dueDate, -1)}T12:00:00.000Z`;
+  const expectedRemaining = round2(accountA.principalAmount - 25000);
+
+  const badMode = await postJson(`${base}/loan-accounts/${accountA.loanAccountId}/prepayments`, {
+    amount: 25000,
+    paymentRef: "pp_bad",
+    mode: "magic",
+    receivedAt: prepaidAt
+  });
+  assert.equal(badMode.status, 422);
+  assert.equal(badMode.body.error.code, "prepayment_blocked");
+  assert(badMode.body.findings.some((finding) => finding.path === "mode"));
+
+  const reduceEmi = await postJson(`${base}/loan-accounts/${accountA.loanAccountId}/prepayments`, {
+    amount: 25000,
+    paymentRef: "pp_emi",
+    mode: "reduce_emi",
+    receivedAt: prepaidAt
+  });
+  assert.equal(reduceEmi.status, 200);
+  assert.equal(reduceEmi.body.prepayment.principalReduced, 25000);
+  assert.equal(reduceEmi.body.summary.principalOutstanding, expectedRemaining);
+  // Same remaining term (all installments were still in the future), lower EMI.
+  assert.equal(reduceEmi.body.schedule.length, originalCount);
+  assert(reduceEmi.body.schedule[0].totalDue < originalEmi);
+  assert.equal(
+    round2(reduceEmi.body.schedule.reduce((sum, installment) => sum + installment.principalDue, 0)),
+    expectedRemaining
+  );
+  assert.equal(reduceEmi.body.schedule[reduceEmi.body.schedule.length - 1].closingPrincipal, 0);
+
+  const reduceTenure = await postJson(`${base}/loan-accounts/${accountB.loanAccountId}/prepayments`, {
+    amount: 25000,
+    paymentRef: "pp_tenure",
+    mode: "reduce_tenure",
+    receivedAt: prepaidAt
+  });
+  assert.equal(reduceTenure.status, 200);
+  // Fewer installments, EMI retained (within rounding).
+  assert(reduceTenure.body.schedule.length < originalCount);
+  assert(reduceTenure.body.schedule.length > 0);
+  assert(Math.abs(reduceTenure.body.schedule[0].totalDue - originalEmi) <= 1);
+  assert.equal(reduceTenure.body.schedule[reduceTenure.body.schedule.length - 1].closingPrincipal, 0);
+  assert.equal(
+    round2(reduceTenure.body.schedule.reduce((sum, installment) => sum + installment.principalDue, 0)),
+    expectedRemaining
+  );
+});
+
 test("API quotes and executes foreclosure, closing the loan account", async (t) => {
   const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
   t.after(async () => {

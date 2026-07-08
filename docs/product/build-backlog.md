@@ -115,7 +115,7 @@ Tasks:
 - Payment allocation. First slice done.
 - Charges, waivers, reversals. First slice done.
 - SMA/NPA asset classification. Done.
-- Part prepayment and foreclosure. Foreclosure first slice done: payoff quote (principal + due interest + charges + KFS-disclosed foreclosure charge), full-payoff settlement, and account closure. Part-prepayment re-amortization still planned.
+- Part prepayment and foreclosure. Foreclosure first slice done: payoff quote (principal + due interest + charges + KFS-disclosed foreclosure charge), full-payoff settlement, and account closure. Part-prepayment first slice done: over-EMI payment reduces principal and re-amortizes the remaining schedule in reduce-EMI or reduce-tenure mode.
 - Closure and NOC. First slice done: a settled account issues a checksum-sealed No-Objection Certificate (no dues, security release), gated on closed status and zero outstanding, with idempotent re-issue.
 - Borrower statements. First slice done.
 - CIC-ready reporting snapshot. First slice done.

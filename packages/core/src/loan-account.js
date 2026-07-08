@@ -32,9 +32,7 @@ export function generateRepaymentSchedule(input) {
   }
 
   const monthlyRate = annualInterestRateBps / 10000 / 12;
-  const emi = monthlyRate === 0
-    ? roundMoney(principalAmount / tenorMonths)
-    : roundMoney((principalAmount * monthlyRate * (1 + monthlyRate) ** tenorMonths) / ((1 + monthlyRate) ** tenorMonths - 1));
+  const emi = computeEmi(principalAmount, monthlyRate, tenorMonths);
   const schedule = [];
   let openingPrincipal = principalAmount;
 
@@ -845,6 +843,105 @@ export function generateClosureCertificate(account, input = {}, now = new Date()
   return { loanAccount: updated, closureCertificate, reissued: false, findings: [], summary };
 }
 
+// Part-prepayment lets a borrower pay down principal ahead of schedule. The
+// payment clears any dues first, then reduces principal; the remaining schedule
+// is rebuilt either to lower each EMI over the same remaining term
+// (`reduce_emi`) or to keep the EMI and shorten the term (`reduce_tenure`).
+export function prepayLoanAccount(account, input = {}, now = new Date()) {
+  const findings = [];
+  const mode = input.mode ?? "reduce_emi";
+  const receivedAt = input.receivedAt ? new Date(input.receivedAt) : now;
+
+  if (!account) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Loan account is required.", "loanAccount"));
+  }
+  if (account && account.status !== ACTIVE_STATUS) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Part-prepayment requires an active loan account.", "status"));
+  }
+  if (!Number.isFinite(input.amount) || input.amount <= 0) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Prepayment amount must be positive.", "amount"));
+  }
+  if (!input.paymentRef) {
+    findings.push(createFinding("error", "RBI-IT-GRC", "Prepayment requires paymentRef.", "paymentRef"));
+  }
+  if (!["reduce_emi", "reduce_tenure"].includes(mode)) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Prepayment mode must be reduce_emi or reduce_tenure.", "mode"));
+  }
+
+  const preSummary = summarizeFindings(findings);
+  if (preSummary.status === "blocked") {
+    return { loanAccount: account, paymentEvent: null, prepayment: null, schedule: account?.schedule ?? [], findings, summary: preSummary };
+  }
+
+  const paymentResult = postPaymentToLoanAccount(
+    account,
+    {
+      amount: input.amount,
+      receivedAt: receivedAt.toISOString(),
+      paymentRef: input.paymentRef,
+      channel: input.channel ?? "part_prepayment",
+      actor: input.actor ?? "system"
+    },
+    now
+  );
+  if (paymentResult.summary.status === "blocked") {
+    return { loanAccount: account, paymentEvent: null, prepayment: null, schedule: account.schedule ?? [], findings: paymentResult.findings, summary: paymentResult.summary };
+  }
+
+  const paymentEvent = paymentResult.paymentEvent;
+  if (paymentEvent.principalCredit <= 0) {
+    const blocked = [createFinding("error", "RBI-DL-2025", "Prepayment must reduce outstanding principal after clearing dues.", "amount")];
+    return { loanAccount: account, paymentEvent: null, prepayment: null, schedule: account.schedule ?? [], findings: blocked, summary: summarizeFindings(blocked) };
+  }
+
+  const paidAccount = paymentResult.loanAccount;
+  const monthlyRate = (paidAccount.annualInterestRateBps ?? 0) / 10000 / 12;
+  const balance = summarizeLoanAccount(paidAccount, receivedAt);
+  const remainingPrincipal = balance.principalOutstanding;
+  const receivedTime = receivedAt.getTime();
+  const pastInstallments = (account.schedule ?? []).filter((installment) => dueTime(installment.dueDate) <= receivedTime);
+  const futureDueDates = (account.schedule ?? [])
+    .filter((installment) => dueTime(installment.dueDate) > receivedTime)
+    .map((installment) => installment.dueDate);
+
+  // Original contractual EMI, retained when shortening the tenure.
+  const originalEmi = computeEmi(account.principalAmount, monthlyRate, account.tenorMonths);
+  const rebuiltFuture =
+    paidAccount.status === CLOSED_STATUS || remainingPrincipal <= 0 || futureDueDates.length === 0
+      ? []
+      : reamortizeInstallments(remainingPrincipal, monthlyRate, mode, futureDueDates, originalEmi, pastInstallments.length + 1);
+  const schedule = [...pastInstallments, ...rebuiltFuture];
+
+  const prepayment = {
+    prepaymentId: input.prepaymentId ?? createLoanId("prepay"),
+    mode,
+    amount: paymentEvent.amount,
+    principalReduced: paymentEvent.principalCredit,
+    prepaidAt: receivedAt.toISOString(),
+    principalOutstandingAfter: remainingPrincipal,
+    remainingInstallments: rebuiltFuture.length,
+    paymentRef: input.paymentRef,
+    actor: input.actor ?? "system"
+  };
+  const updated = {
+    ...paidAccount,
+    schedule,
+    prepayments: [...(paidAccount.prepayments ?? []), prepayment],
+    servicingEvents: [
+      ...(paidAccount.servicingEvents ?? []),
+      {
+        type: "loan_account.part_prepaid",
+        prepaymentId: prepayment.prepaymentId,
+        mode,
+        at: receivedAt.toISOString(),
+        actor: prepayment.actor
+      }
+    ]
+  };
+
+  return { loanAccount: updated, paymentEvent, prepayment, schedule, findings: [], summary: summarizeFindings([]) };
+}
+
 export function assessChargeToLoanAccount(account, input, now = new Date()) {
   const findings = [];
 
@@ -1091,6 +1188,56 @@ export function generateLoanStatement(account, input = {}, now = new Date()) {
       )
     }
   };
+}
+
+function computeEmi(principalAmount, monthlyRate, tenorMonths) {
+  if (monthlyRate === 0) {
+    return roundMoney(principalAmount / tenorMonths);
+  }
+  const factor = (1 + monthlyRate) ** tenorMonths;
+  return roundMoney((principalAmount * monthlyRate * factor) / (factor - 1));
+}
+
+function dueTime(dueDate) {
+  return new Date(`${dueDate}T00:00:00.000Z`).getTime();
+}
+
+// Rebuild the future portion of a schedule from a reduced principal. In
+// reduce_emi mode the remaining term is fixed and the EMI is recomputed; in
+// reduce_tenure mode the EMI is fixed and the loan amortizes over however many
+// installments that takes.
+function reamortizeInstallments(remainingPrincipal, monthlyRate, mode, futureDueDates, originalEmi, startNumber) {
+  const emi = mode === "reduce_emi" ? computeEmi(remainingPrincipal, monthlyRate, futureDueDates.length) : originalEmi;
+  const maxTerm = mode === "reduce_emi" ? futureDueDates.length : futureDueDates.length + 600;
+  const installments = [];
+  let openingPrincipal = roundMoney(remainingPrincipal);
+
+  for (let index = 0; index < maxTerm && openingPrincipal > 0.005; index += 1) {
+    const interestDue = roundMoney(openingPrincipal * monthlyRate);
+    const scheduledPrincipal = roundMoney(Math.max(0, emi - interestDue));
+    const isFinal = mode === "reduce_emi" ? index === futureDueDates.length - 1 : scheduledPrincipal >= openingPrincipal;
+    const principalDue = isFinal ? openingPrincipal : roundMoney(Math.min(openingPrincipal, scheduledPrincipal));
+    const closingPrincipal = roundMoney(Math.max(0, openingPrincipal - principalDue));
+    const dueDate =
+      futureDueDates[index] ??
+      addMonthsUtc(new Date(`${futureDueDates[futureDueDates.length - 1]}T00:00:00.000Z`), index - futureDueDates.length + 1)
+        .toISOString()
+        .slice(0, 10);
+
+    installments.push({
+      installmentNumber: startNumber + index,
+      dueDate,
+      openingPrincipal,
+      principalDue,
+      interestDue,
+      totalDue: roundMoney(principalDue + interestDue),
+      closingPrincipal,
+      status: "scheduled"
+    });
+    openingPrincipal = closingPrincipal;
+  }
+
+  return installments;
 }
 
 function addMonthsUtc(date, months) {
