@@ -24,7 +24,15 @@ npm run dev:api
 
 The API uses a local JSON store under `.loanos-data/` by default. Set `LOANOS_DATA_DIR` to use another location.
 
-Useful endpoints:
+The API is multi-tenant. Every route except `GET /health`, `GET /compliance/controls`, `GET /reference/decline-reasons`, and the `/platform/*` control plane requires a tenant api key sent as `x-api-key: <key>` (or `Authorization: Bearer <key>`); calls without a valid key return 401. Tenants are minted through the platform control plane behind `LOANOS_PLATFORM_ADMIN_KEY`. For local dev, set `LOANOS_DEV_TENANT_KEY` to boot a ready-to-use `dev` tenant.
+
+Control-plane endpoints (platform admin key via `x-platform-admin-key`):
+
+- `POST /platform/tenants` — mint a tenant, returns a one-time api key
+- `GET /platform/tenants`
+- `GET /platform/tenants/:id`
+
+Useful data-plane endpoints (tenant api key required):
 
 - `GET /health`
 - `GET /compliance/controls`
@@ -100,6 +108,7 @@ Useful endpoints:
 - KFS before contract: fees, APR, penal charges, cooling-off and grievance details must be disclosed before execution.
 - Human command over AI: every credit-impacting model must be inventoried, validated, monitored, reviewable, and kill-switchable.
 - Evidence by design: every decision, consent, model use, override, document, and exception must leave an audit trail.
+- SaaS with hard tenant isolation: one tenant per regulated entity, cross-tenant access impossible by construction, and the platform itself built to satisfy RE outsourcing obligations (RBI IT-Outsourcing MD 2023, CERT-In, DPDP processor duties).
 
 ## Design Docs
 
@@ -109,6 +118,7 @@ Useful endpoints:
 - [India regulatory register](/Users/nisheethranjan/Projects/AIBank/docs/compliance/india-regulatory-register.md)
 - [Compliance build checklist](/Users/nisheethranjan/Projects/AIBank/docs/compliance/compliance-build-checklist.md)
 - [LoanOS architecture blueprint](/Users/nisheethranjan/Projects/AIBank/docs/architecture/loanos-india-blueprint.md)
+- [SaaS tenancy and operating model](/Users/nisheethranjan/Projects/AIBank/docs/architecture/saas-tenancy-and-operating-model.md)
 - [Current implementation map](/Users/nisheethranjan/Projects/AIBank/docs/architecture/current-implementation.md)
 - [Product roadmap](/Users/nisheethranjan/Projects/AIBank/docs/product/roadmap.md)
 
@@ -116,6 +126,7 @@ Useful endpoints:
 
 Phase 0 has a working executable foundation:
 
+- Multi-tenant SaaS foundation: state partitioned per tenant, tenant-scoped api-key authentication with 401 on missing/invalid keys, a platform control plane that mints tenants behind an admin key, and a cross-tenant isolation regression suite.
 - Compliance control catalog.
 - Regulated entity registry with board-policy and grievance-officer gates.
 - LSP registry with RE agreement, enhanced due diligence, periodic review, borrower-facing grievance, data, recovery, and fee-control gates.

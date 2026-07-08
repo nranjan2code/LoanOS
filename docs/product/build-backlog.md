@@ -244,3 +244,30 @@ Tasks:
 Done when:
 
 - Production readiness gate can be reviewed by security, compliance, and risk.
+
+## Epic 11: SaaS Tenancy and Platform Isolation
+
+Status: S1–S3 first slice complete (tenant partitioning, tenant-scoped auth, isolation suite); remaining tasks planned.
+
+Goal: LoanOS runs as a multi-tenant SaaS where cross-tenant access is impossible by construction and the platform satisfies RE outsourcing obligations.
+
+Tasks:
+
+- State partitioned into a control plane (tenant registry) and per-tenant data planes. Done.
+- Tenant-scoped storage accessor; endpoint code cannot express a cross-tenant query. Done: handlers receive only their tenant's partition through a scoped store.
+- Tenant registry in the control plane with isolation-tier and contract facts. First slice done (tenantId, name, isolation tier, status, hashed api key).
+- Tenant-scoped API credentials and tenant-context middleware on every route. Done: `x-api-key`/bearer resolves the tenant, 401 otherwise.
+- Platform control plane to mint tenants. Done: `POST /platform/tenants` behind a platform admin key returns a one-time api key stored only as a hash.
+- Cross-tenant isolation regression suite covering every resource type. Done.
+- Platform-staff break-glass access with audit and tenant reporting. Planned.
+- Hash-chained, tenant-scoped audit event module; migrate module event emission onto it. Planned.
+- Evidence export pack generated from the audit spine. Planned.
+- Tenant onboarding/offboarding workflow with exit/portability export and evidenced deletion. Planned.
+- Incident notification workflow supporting RE 6-hour RBI reporting and CERT-In duties. Planned.
+- Sub-processor register. Planned.
+
+Done when:
+
+- No API call executes without an authenticated tenant context. Done.
+- The isolation suite proves two provisioned tenants cannot touch each other's data. Done.
+- A full tenant export is reproducible from source-of-truth records. Planned.

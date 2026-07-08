@@ -8,7 +8,8 @@ The current implementation is intentionally small:
 
 - No external npm dependencies.
 - Node.js built-in HTTP server.
-- File-backed JSON state under `.loanos-data/state.json`.
+- File-backed JSON state under `.loanos-data/state.json`, partitioned into a control plane (tenant registry) and one data plane per tenant.
+- Multi-tenant: every data-plane request runs inside exactly one tenant, resolved from an `x-api-key`/bearer token; cross-tenant access is impossible by construction because each request only ever receives its own tenant's partition.
 - Core domain logic in `packages/core/src`.
 - API wrapper in `apps/api/src`.
 - Automated tests in `tests/`.
@@ -37,17 +38,20 @@ npm run dev:api
 | `packages/core/src/model-governance.js` | AI/model inventory, model status, governed lifecycle transitions with a validation gate, global/model kill switch, kill-switch incident and post-incident review workflow, runtime model-use evaluation. |
 | `packages/core/src/workflow-tasks.js` | LWS task derivation from LOS/LMS state plus task assignment, start, release, and comment lifecycle. |
 | `packages/core/src/index.js` | Public exports for core domain modules. |
-| `apps/api/src/file-store.js` | Local JSON state load/save helpers. |
-| `apps/api/src/server.js` | HTTP API endpoints for compliance controls, AI models, kill switch, workflow tasks, applications, and loan accounts. |
+| `apps/api/src/file-store.js` | Local JSON state load/save helpers, tenant control-plane registry (api-key hashing, tenant resolution), per-tenant data partitions, and tenant-scoped accessors. |
+| `apps/api/src/server.js` | HTTP API: platform control plane (tenant minting), tenant-context resolution and 401 gate, tenant-scoped store, plus endpoints for compliance controls, AI models, kill switch, workflow tasks, applications, and loan accounts. |
 | `tests/compliance.test.js` | Regression tests for the first compliance gates. |
 
 ## Implemented API Endpoints
 
 | Endpoint | Purpose |
 | --- | --- |
-| `GET /health` | Service health. |
-| `GET /compliance/controls` | Returns regulatory control catalog. |
-| `GET /reference/decline-reasons` | Returns the coded decline-reason taxonomy. |
+| `GET /health` | Service health. Open route, no tenant context. |
+| `GET /compliance/controls` | Returns regulatory control catalog. Open route. |
+| `GET /reference/decline-reasons` | Returns the coded decline-reason taxonomy. Open route. |
+| `POST /platform/tenants` | Mints a tenant and returns a one-time api key; requires the platform admin key. |
+| `GET /platform/tenants` | Lists tenants (no secrets); requires the platform admin key. |
+| `GET /platform/tenants/:id` | Reads one tenant record; requires the platform admin key. |
 | `GET /regulated-entities` | Lists regulated entities. |
 | `POST /regulated-entities` | Creates or updates a regulated entity after compliance validation. |
 | `GET /regulated-entities/:id` | Reads one regulated entity. |
@@ -128,6 +132,9 @@ npm run dev:api
 
 | Control | Current behavior |
 | --- | --- |
+| Tenant isolation | State is partitioned per tenant; each data-plane request receives only its own tenant's partition, so a handler has no code path to another tenant's records. |
+| Tenant authentication | Data-plane routes require a valid `x-api-key`/bearer token mapping to an active tenant; missing or invalid keys return 401. Only health and static reference routes are open. |
+| Tenant provisioning | The platform control plane mints tenants behind an admin key and returns a one-time api key stored only as a SHA-256 hash. |
 | India-only lending | Blocks non-IN borrower residency/address, non-INR currency, non-IN data storage. |
 | Regulated entity | Requires supported RE type and grievance officer. |
 | Regulated entity registry | Requires active India RE, website, privacy policy, grievance officer, data-residency posture, and board policy references. |
@@ -186,8 +193,9 @@ npm run dev:api
 
 ## Known Limitations
 
-- Persistence is local JSON only.
-- No login/session authentication yet; actor authorization is API-level registry validation.
+- Persistence is local JSON only (now tenant-partitioned), not a production database.
+- Tenant authentication is a static api key per tenant (hashed at rest); there is no human login/session, key rotation, or external IAM yet. Actor-level authorization remains API-level registry validation within a tenant.
+- The platform admin key is a single shared secret from env/option; no platform-staff identities, roles, or break-glass audit yet.
 - No real KYC, CKYC, bureau, payment, eSign, SMS, email, or CERSAI integrations yet.
 - Registries are file-backed and lack external IAM, maker-checker administration workflow, and periodic access review.
 - Borrower/consent/KYC records are file-backed and do not yet integrate CKYC, V-CIP providers, consent managers, or document stores.
@@ -202,6 +210,9 @@ npm run dev:api
 
 Current tests prove:
 
+- Data-plane routes reject a missing or invalid tenant api key with 401, while health and compliance-controls stay open.
+- The platform admin can mint a tenant, receives a one-time api key, and that key immediately authenticates data-plane calls; duplicate tenant ids are rejected.
+- Two provisioned tenants are isolated: tenant B sees none of tenant A's records across resource types, by-id reads return 404, a re-used id writes only into B's own partition, and tenant A's data is unchanged.
 - Valid India-only loan application passes preflight.
 - Non-India borrower/currency/storage are blocked.
 - LSP/pass-through fund flow is blocked.

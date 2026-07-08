@@ -159,6 +159,29 @@ Legend:
 | CIC-ready snapshots | Internal account-level and portfolio-level CIC reporting snapshots are generated from account lifecycle state. | Done |
 | External CIC submission | Provider-specific CIC file/API integration and acknowledgement handling. | Planned |
 
+## SaaS Vendor Posture and Tenant Isolation
+
+LoanOS is delivered as SaaS, so the platform itself has compliance obligations as the RE's IT service provider (RBI IT-Outsourcing MD 2023, CERT-In 2022, DPDP processor role). See ADR 0002 and the SaaS tenancy and operating model document.
+
+| Requirement | Platform behavior | Status |
+| --- | --- | --- |
+| Tenant = contracting RE, tenant context on every record | State is partitioned per tenant; all domain collections live inside a tenant's data plane, minted through the control-plane tenant registry. | Done |
+| Cross-tenant isolation by construction | The store hands each request only its tenant's partition; no handler has a code path to another tenant's data. | Done |
+| Tenant-scoped API authentication | Every data-plane route resolves a tenant from the `x-api-key`/bearer token and returns 401 without a valid key; open routes are limited to health and static reference. | Done |
+| Cross-tenant isolation regression tests | Two-tenant suite proves tenant B cannot read or mutate tenant A's records across resource types, plus 401 on missing/invalid key. | Done |
+| Platform control plane mints tenants | `POST /platform/tenants` behind a platform admin key issues a one-time api key stored only as a hash. | Done |
+| Append-only hash-chained audit spine | Per-tenant `events` array plus per-module evidence exists; no unified hash-chained stream yet. | Partial |
+| Per-tenant encryption keys and key destruction on exit | Key management design. | Planned |
+| RE due-diligence pack (ownership, security, subcontractors) | Standing vendor-assessment pack. | External |
+| RE audit and inspection rights support | Contract terms plus evidence-export tooling. | Planned |
+| Incident notification supporting RE 6-hour RBI window | Incident workflow with tenant notification. | Planned |
+| CERT-In 6-hour reporting, 180-day India log retention, NTP sync | Platform incident-response and logging controls. | Planned |
+| BCP/DR with RTO/RPO commitments | Production infrastructure design. | Planned |
+| Exit plan: portability export and evidenced deletion | Documented, re-loadable full-tenant export. | Planned |
+| Sub-processor register and flow-down obligations | Vendor management module and contract terms. | External |
+| ISO 27001 / SOC 2 Type II roadmap | Certification program. | External |
+| DPDP processor terms per tenant | Contract templates backed by retention/deletion/breach tooling. | External |
+
 ## Production Readiness Gates
 
 Before production, the platform needs:
@@ -173,3 +196,4 @@ Before production, the platform needs:
 8. Penetration testing and vulnerability management.
 9. Privacy impact assessment and DPDP operating model.
 10. Integration certification where required by external providers.
+11. Tenant isolation proven by tests, tenant-scoped authentication, and the SaaS vendor-posture pack (due diligence, audit rights, incident notification, exit plan).

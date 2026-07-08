@@ -17,6 +17,8 @@ Date of research baseline: 2026-07-08.
 | RBI-DLA-CIMS | Digital lending app reporting | REs must report own and LSP DLAs on RBI CIMS and maintain public disclosures. | DLA registry, CIMS export, CCO certification workflow |
 | RBI-LSP-DLG | LSP and default loss guarantee | LSP due diligence, multiple-lender offer neutrality, DLG eligibility, caps, invocation, disclosure, and portfolio freezing. | LSP registry, offer marketplace policy, DLG module |
 | RBI-OUTSOURCE | Outsourcing of financial services | Outsourcing does not dilute RE responsibility. Certain core management and decision functions cannot be outsourced. | Vendor contracts, risk review, audit rights, exit plan |
+| RBI-IT-OUTSOURCE-2023 | Outsourcing of IT services | LoanOS delivered as SaaS makes us the RE's IT service provider: REs must obtain due diligence, audit/inspection rights (including RBI access), incident notification supporting the RE's 6-hour RBI reporting window, BCP/DR assurance, sub-outsourcing control, and a documented exit plan. | SaaS tenancy and operating model, due-diligence pack, incident notification workflow, exit/portability export |
+| CERT-IN-2022 | CERT-In cyber incident directions | As an Indian service provider, LoanOS itself must report qualifying cyber incidents to CERT-In within 6 hours, retain logs for 180 days in India, and synchronize clocks to NIC/NPL NTP. | Incident response workflow, log retention policy, infrastructure time sync |
 | RBI-IT-GRC | IT governance, risk, controls, assurance | Requires IT governance, straight-through processing controls, access controls, audit trails, security, DC/DR controls. | IAM, STP event checks, audit log, BCP/DR module |
 | RBI-FRAUD-2024 | Fraud risk management | Requires fraud governance, reporting, LEA workflows, natural justice in fraud classification. | Fraud case workflow, committee pack, FMR/LEA evidence |
 | RBI-MRM-DRAFT-2026 | Model risk management and AI kill switch | Draft guidance indicates broad model inventory, validation, human oversight, customer-facing AI safeguards, and kill-switch/override controls. | AI model registry, kill switch, model use guard |
@@ -37,6 +39,8 @@ Date of research baseline: 2026-07-08.
 - RBI, `Reset of Floating Interest Rate on Equated Monthly Instalments (EMI) based Personal Loans` FAQ, updated October 1, 2025: https://www.rbi.org.in/commonman/english/scripts/FAQs.aspx?Id=3687
 - RBI, `Master Direction on Information Technology Governance, Risk, Controls and Assurance Practices`, 2023: https://www.rbi.org.in/Scripts/BS_ViewMasDirections.aspx?id=12562
 - RBI, `Directions on Managing Risks and Code of Conduct in Outsourcing of Financial Services by NBFCs`, November 9, 2017: https://www.rbi.org.in/commonman/english/scripts/Notification.aspx?Id=2646
+- RBI, `Master Direction on Outsourcing of Information Technology Services` (RBI/2023-24/102), April 10, 2023: https://www.rbi.org.in/Scripts/BS_ViewMasDirections.aspx?id=12486
+- CERT-In, `Directions under sub-section (6) of section 70B of the Information Technology Act, 2000 relating to information security practices`, April 28, 2022: https://www.cert-in.org.in/Directions70B.jsp
 - RBI, `FAQs on Master Directions on Fraud Risk Management in Regulated Entities, 2024`, April 22, 2025: https://www.rbi.org.in/commonman/english/scripts/FAQs.aspx?Id=3763
 - RBI, `Storage of Payment System Data` FAQ, June 26, 2019: https://www.rbi.org.in/commonperson/english/scripts/FAQs.aspx?Id=2995
 - RBI official PDF URL found for draft `Guidance on Regulatory Principles for Model Risk Management`, June 24, 2026, public consultation: https://rbidocs.rbi.org.in/rdocs/Content/PDFs/DRAFTGUIDANCE24062026FF12A4FF7BC84E8887009D5C5365F8BF.PDF
@@ -59,4 +63,6 @@ Date of research baseline: 2026-07-08.
 8. Offer marketplaces for multiple lenders must be neutral, explain ranking, expose unmatched lenders where required, and avoid dark patterns.
 9. LMS events must produce statements and borrower communications for rate resets, charges, recovery-agent assignment, and grievance escalation.
 10. LWS must preserve approvals, exceptions, committee decisions, audit evidence, and customer notices.
+11. LoanOS as a SaaS vendor is itself inside the regulatory perimeter: RE customers can only buy the platform if it satisfies their IT-outsourcing obligations (due diligence, audit rights, incident notification, BCP/DR, exit plan), and LoanOS carries direct CERT-In and DPDP-processor duties. See the SaaS tenancy and operating model document.
+12. Tenant isolation is a compliance control, not only an engineering concern: a cross-tenant data leak between two REs is a reportable event for both customers.
 

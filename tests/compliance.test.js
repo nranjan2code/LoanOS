@@ -35,6 +35,25 @@ import {
 } from "../packages/core/src/index.js";
 import { createLoanOsServer } from "../apps/api/src/server.js";
 
+// Every data-plane request runs inside a tenant. Tests bootstrap a primary
+// tenant (A) and inject its api key by default; the isolation suite adds a
+// second tenant (B) to prove cross-tenant access is impossible.
+const TENANT_A = { tenantId: "tnt_test_a", name: "Test RE A", apiKey: "test-key-a" };
+const TENANT_B = { tenantId: "tnt_test_b", name: "Test RE B", apiKey: "test-key-b" };
+const DEFAULT_TEST_KEY = TENANT_A.apiKey;
+
+function apiFetch(url, init = {}, apiKey = DEFAULT_TEST_KEY) {
+  const headers = { ...(init.headers ?? {}) };
+  if (apiKey) {
+    headers["x-api-key"] = apiKey;
+  }
+  return globalThis.fetch(url, { ...init, headers });
+}
+
+function rawFetch(url, init = {}) {
+  return globalThis.fetch(url, init);
+}
+
 test("valid India-only loan application passes preflight", () => {
   const result = evaluateLoanApplication(validApplication());
 
@@ -174,7 +193,7 @@ test("delinquency computation buckets unpaid installments", async (t) => {
     await rm(dataDir, { recursive: true, force: true });
   });
 
-  const server = createLoanOsServer({ dataDir });
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
   await listen(server);
   t.after(async () => {
     await close(server);
@@ -183,7 +202,7 @@ test("delinquency computation buckets unpaid installments", async (t) => {
   const port = server.address().port;
   const base = `http://127.0.0.1:${port}`;
   const application = await approveAndDisburseApplication(base);
-  const account = await (await fetch(`${base}/loan-accounts/${application.loanAccountId}`)).json();
+  const account = await (await apiFetch(`${base}/loan-accounts/${application.loanAccountId}`)).json();
   const asOf = `${addDays(account.schedule[0].dueDate, 10)}T00:00:00.000Z`;
   const delinquency = computeDelinquency(account, new Date(asOf));
 
@@ -199,7 +218,7 @@ test("asset classification promotes overdue accounts through SMA to NPA", async 
     await rm(dataDir, { recursive: true, force: true });
   });
 
-  const server = createLoanOsServer({ dataDir });
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
   await listen(server);
   t.after(async () => {
     await close(server);
@@ -208,7 +227,7 @@ test("asset classification promotes overdue accounts through SMA to NPA", async 
   const port = server.address().port;
   const base = `http://127.0.0.1:${port}`;
   const application = await approveAndDisburseApplication(base);
-  const account = await (await fetch(`${base}/loan-accounts/${application.loanAccountId}`)).json();
+  const account = await (await apiFetch(`${base}/loan-accounts/${application.loanAccountId}`)).json();
   const firstDueDate = account.schedule[0].dueDate;
 
   assert.equal(classifyLoanAsset(account, new Date(`${firstDueDate}T00:00:00.000Z`)).assetClass, "standard");
@@ -348,7 +367,7 @@ test("API drives the model lifecycle from draft to active", async (t) => {
     await rm(dataDir, { recursive: true, force: true });
   });
 
-  const server = createLoanOsServer({ dataDir });
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
   await listen(server);
   t.after(async () => {
     await close(server);
@@ -385,7 +404,7 @@ test("API drives the model lifecycle from draft to active", async (t) => {
   assert.equal(activate.status, 200);
   assert.equal(activate.body.model.status, "active");
 
-  const models = await (await fetch(`${base}/ai/models`)).json();
+  const models = await (await apiFetch(`${base}/ai/models`)).json();
   assert.equal(models.models.col_llm_v1.status, "active");
 
   // A transition from the wrong state surfaces a 422.
@@ -445,7 +464,7 @@ test("API clears the global kill switch only after a post-incident review", asyn
     await rm(dataDir, { recursive: true, force: true });
   });
 
-  const server = createLoanOsServer({ dataDir });
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
   await listen(server);
   t.after(async () => {
     await close(server);
@@ -764,7 +783,7 @@ test("API stores blocked compliance applications", async (t) => {
     await rm(dataDir, { recursive: true, force: true });
   });
 
-  const server = createLoanOsServer({ dataDir });
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
   await listen(server);
   t.after(async () => {
     await close(server);
@@ -772,7 +791,7 @@ test("API stores blocked compliance applications", async (t) => {
 
   const port = server.address().port;
   const base = `http://127.0.0.1:${port}`;
-  const response = await fetch(`${base}/loans/applications`, {
+  const response = await apiFetch(`${base}/loans/applications`, {
     method: "POST",
     headers: {
       "content-type": "application/json"
@@ -791,7 +810,7 @@ test("API stores blocked compliance applications", async (t) => {
   assert.equal(body.status, "blocked_compliance");
   assert.equal(body.compliance.summary.status, "blocked");
 
-  const lookup = await fetch(`${base}/loans/applications/${body.applicationId}`);
+  const lookup = await apiFetch(`${base}/loans/applications/${body.applicationId}`);
   assert.equal(lookup.status, 200);
 });
 
@@ -801,7 +820,7 @@ test("API supports RE and product policy backed loan applications", async (t) =>
     await rm(dataDir, { recursive: true, force: true });
   });
 
-  const server = createLoanOsServer({ dataDir });
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
   await listen(server);
   t.after(async () => {
     await close(server);
@@ -843,7 +862,7 @@ test("API stores DLAs and exposes CIMS-ready DLA reporting export", async (t) =>
     await rm(dataDir, { recursive: true, force: true });
   });
 
-  const server = createLoanOsServer({ dataDir });
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
   await listen(server);
   t.after(async () => {
     await close(server);
@@ -926,11 +945,11 @@ test("API stores DLAs and exposes CIMS-ready DLA reporting export", async (t) =>
   assert.equal(partnerDla.status, 201);
   assert.equal(partnerDla.body.digitalLendingApp.ownerName, "Example LSP Services Pvt Ltd");
 
-  const lookup = await fetch(`${base}/digital-lending-apps/dla_example_web`);
+  const lookup = await apiFetch(`${base}/digital-lending-apps/dla_example_web`);
   assert.equal(lookup.status, 200);
   assert.equal((await lookup.json()).name, "Example Loan Web");
 
-  const cimsResponse = await fetch(`${base}/reporting/dla/cims?regulatedEntityId=re_example_nbfc&asOf=2026-07-08T00:00:00.000Z`);
+  const cimsResponse = await apiFetch(`${base}/reporting/dla/cims?regulatedEntityId=re_example_nbfc&asOf=2026-07-08T00:00:00.000Z`);
   assert.equal(cimsResponse.status, 200);
   const cims = await cimsResponse.json();
   assert.equal(cims.reportType, "rbi_dla_cims");
@@ -947,7 +966,7 @@ test("API supports borrower-backed applications without embedded borrower KYC co
     await rm(dataDir, { recursive: true, force: true });
   });
 
-  const server = createLoanOsServer({ dataDir });
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
   await listen(server);
   t.after(async () => {
     await close(server);
@@ -987,7 +1006,7 @@ test("API requires maker-checker approval before disbursement", async (t) => {
     await rm(dataDir, { recursive: true, force: true });
   });
 
-  const server = createLoanOsServer({ dataDir });
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
   await listen(server);
   t.after(async () => {
     await close(server);
@@ -1059,7 +1078,7 @@ test("API generates and delivers execution document packet before disbursement",
     await rm(dataDir, { recursive: true, force: true });
   });
 
-  const server = createLoanOsServer({ dataDir });
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
   await listen(server);
   t.after(async () => {
     await close(server);
@@ -1101,7 +1120,7 @@ test("API generates and delivers execution document packet before disbursement",
     200
   );
 
-  const taskResponse = await fetch(`${base}/workflow/tasks?type=application.document_packet_delivery`);
+  const taskResponse = await apiFetch(`${base}/workflow/tasks?type=application.document_packet_delivery`);
   assert.equal(taskResponse.status, 200);
   const tasks = await taskResponse.json();
   assert.equal(tasks.count, 1);
@@ -1122,7 +1141,7 @@ test("API generates and delivers execution document packet before disbursement",
   assert(generated.body.documents.some((document) => document.type === "key_fact_statement"));
   assert(generated.body.documents.some((document) => document.type === "sanction_letter"));
 
-  const fetched = await fetch(`${base}/loans/applications/${application.applicationId}/document-packet`);
+  const fetched = await apiFetch(`${base}/loans/applications/${application.applicationId}/document-packet`);
   assert.equal(fetched.status, 200);
   const fetchedPacket = await fetched.json();
   assert.equal(fetchedPacket.packetId, generated.body.packetId);
@@ -1136,12 +1155,12 @@ test("API generates and delivers execution document packet before disbursement",
   assert.equal(delivery.status, 200);
   assert.equal(delivery.body.status, "delivered");
 
-  const taskAfterDeliveryResponse = await fetch(`${base}/workflow/tasks?type=application.document_packet_delivery`);
+  const taskAfterDeliveryResponse = await apiFetch(`${base}/workflow/tasks?type=application.document_packet_delivery`);
   assert.equal(taskAfterDeliveryResponse.status, 200);
   const taskAfterDelivery = await taskAfterDeliveryResponse.json();
   assert.equal(taskAfterDelivery.count, 0);
 
-  const disbursementTaskResponse = await fetch(`${base}/workflow/tasks?type=application.disbursement`);
+  const disbursementTaskResponse = await apiFetch(`${base}/workflow/tasks?type=application.disbursement`);
   assert.equal(disbursementTaskResponse.status, 200);
   const disbursementTasks = await disbursementTaskResponse.json();
   assert.equal(disbursementTasks.count, 1);
@@ -1160,7 +1179,7 @@ test("API opens loan account on disbursement and posts ledger payment", async (t
     await rm(dataDir, { recursive: true, force: true });
   });
 
-  const server = createLoanOsServer({ dataDir });
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
   await listen(server);
   t.after(async () => {
     await close(server);
@@ -1170,7 +1189,7 @@ test("API opens loan account on disbursement and posts ledger payment", async (t
   const base = `http://127.0.0.1:${port}`;
   const application = await approveAndDisburseApplication(base);
 
-  const accountResponse = await fetch(`${base}/loan-accounts/${application.loanAccountId}`);
+  const accountResponse = await apiFetch(`${base}/loan-accounts/${application.loanAccountId}`);
   assert.equal(accountResponse.status, 200);
   const account = await accountResponse.json();
 
@@ -1194,7 +1213,7 @@ test("API opens loan account on disbursement and posts ledger payment", async (t
   assert(paymentResponse.body.paymentEvent.principalCredit > 0);
   assert(paymentResponse.body.summary.principalOutstanding < 125000);
 
-  const scheduleResponse = await fetch(`${base}/loan-accounts/${account.loanAccountId}/schedule`);
+  const scheduleResponse = await apiFetch(`${base}/loan-accounts/${account.loanAccountId}/schedule`);
   assert.equal(scheduleResponse.status, 200);
   const scheduleBody = await scheduleResponse.json();
   assert.equal(scheduleBody.schedule.length, 12);
@@ -1206,7 +1225,7 @@ test("API generates borrower statement from schedule and ledger", async (t) => {
     await rm(dataDir, { recursive: true, force: true });
   });
 
-  const server = createLoanOsServer({ dataDir });
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
   await listen(server);
   t.after(async () => {
     await close(server);
@@ -1215,7 +1234,7 @@ test("API generates borrower statement from schedule and ledger", async (t) => {
   const port = server.address().port;
   const base = `http://127.0.0.1:${port}`;
   const application = await approveAndDisburseApplication(base);
-  const account = await (await fetch(`${base}/loan-accounts/${application.loanAccountId}`)).json();
+  const account = await (await apiFetch(`${base}/loan-accounts/${application.loanAccountId}`)).json();
   const firstInstallment = account.schedule[0];
   await postJson(`${base}/loan-accounts/${account.loanAccountId}/payments`, {
     amount: firstInstallment.totalDue,
@@ -1224,7 +1243,7 @@ test("API generates borrower statement from schedule and ledger", async (t) => {
     channel: "nach"
   });
 
-  const statementResponse = await fetch(
+  const statementResponse = await apiFetch(
     `${base}/loan-accounts/${account.loanAccountId}/statement?from=${firstInstallment.dueDate}&to=${firstInstallment.dueDate}`
   );
   assert.equal(statementResponse.status, 200);
@@ -1243,7 +1262,7 @@ test("API renders a borrower-facing loan statement document", async (t) => {
     await rm(dataDir, { recursive: true, force: true });
   });
 
-  const server = createLoanOsServer({ dataDir });
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
   await listen(server);
   t.after(async () => {
     await close(server);
@@ -1252,13 +1271,13 @@ test("API renders a borrower-facing loan statement document", async (t) => {
   const port = server.address().port;
   const base = `http://127.0.0.1:${port}`;
   const application = await approveAndDisburseApplication(base);
-  const account = await (await fetch(`${base}/loan-accounts/${application.loanAccountId}`)).json();
+  const account = await (await apiFetch(`${base}/loan-accounts/${application.loanAccountId}`)).json();
 
   // Span the disbursement and the first two installment due dates.
   const from = addDays(account.schedule[0].dueDate, -40);
   const to = account.schedule[1].dueDate;
 
-  const response = await fetch(
+  const response = await apiFetch(
     `${base}/loan-accounts/${account.loanAccountId}/statement/document?from=${from}&to=${to}`
   );
   assert.equal(response.status, 200);
@@ -1282,7 +1301,7 @@ test("API controls disclosed charges, waivers, and reversals", async (t) => {
     await rm(dataDir, { recursive: true, force: true });
   });
 
-  const server = createLoanOsServer({ dataDir });
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
   await listen(server);
   t.after(async () => {
     await close(server);
@@ -1291,7 +1310,7 @@ test("API controls disclosed charges, waivers, and reversals", async (t) => {
   const port = server.address().port;
   const base = `http://127.0.0.1:${port}`;
   const application = await approveAndDisburseApplication(base);
-  const account = await (await fetch(`${base}/loan-accounts/${application.loanAccountId}`)).json();
+  const account = await (await apiFetch(`${base}/loan-accounts/${application.loanAccountId}`)).json();
 
   const undisclosed = await postJson(`${base}/loan-accounts/${account.loanAccountId}/charges`, {
     name: "Mystery fee",
@@ -1337,7 +1356,7 @@ test("API accrues scheduled interest into the ledger and reconciles with the sch
     await rm(dataDir, { recursive: true, force: true });
   });
 
-  const server = createLoanOsServer({ dataDir });
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
   await listen(server);
   t.after(async () => {
     await close(server);
@@ -1346,7 +1365,7 @@ test("API accrues scheduled interest into the ledger and reconciles with the sch
   const port = server.address().port;
   const base = `http://127.0.0.1:${port}`;
   const application = await approveAndDisburseApplication(base);
-  const account = await (await fetch(`${base}/loan-accounts/${application.loanAccountId}`)).json();
+  const account = await (await apiFetch(`${base}/loan-accounts/${application.loanAccountId}`)).json();
 
   const round2 = (value) => Math.round((value + Number.EPSILON) * 100) / 100;
   const asOf = `${account.schedule[2].dueDate}T12:00:00.000Z`;
@@ -1379,7 +1398,7 @@ test("API part-prepayment re-amortizes the remaining schedule", async (t) => {
     await rm(dataDir, { recursive: true, force: true });
   });
 
-  const server = createLoanOsServer({ dataDir });
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
   await listen(server);
   t.after(async () => {
     await close(server);
@@ -1391,9 +1410,9 @@ test("API part-prepayment re-amortizes the remaining schedule", async (t) => {
 
   // Account A exercises reduce_emi; Account B exercises reduce_tenure.
   const applicationA = await approveAndDisburseApplication(base);
-  const accountA = await (await fetch(`${base}/loan-accounts/${applicationA.loanAccountId}`)).json();
+  const accountA = await (await apiFetch(`${base}/loan-accounts/${applicationA.loanAccountId}`)).json();
   const applicationB = await approveAndDisburseApplication(base);
-  const accountB = await (await fetch(`${base}/loan-accounts/${applicationB.loanAccountId}`)).json();
+  const accountB = await (await apiFetch(`${base}/loan-accounts/${applicationB.loanAccountId}`)).json();
 
   const originalEmi = accountA.schedule[0].totalDue;
   const originalCount = accountA.schedule.length;
@@ -1452,7 +1471,7 @@ test("API quotes and executes foreclosure, closing the loan account", async (t) 
     await rm(dataDir, { recursive: true, force: true });
   });
 
-  const server = createLoanOsServer({ dataDir });
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
   await listen(server);
   t.after(async () => {
     await close(server);
@@ -1461,12 +1480,12 @@ test("API quotes and executes foreclosure, closing the loan account", async (t) 
   const port = server.address().port;
   const base = `http://127.0.0.1:${port}`;
   const application = await approveAndDisburseApplication(base);
-  const account = await (await fetch(`${base}/loan-accounts/${application.loanAccountId}`)).json();
+  const account = await (await apiFetch(`${base}/loan-accounts/${application.loanAccountId}`)).json();
 
   // Foreclose before the first installment falls due: only principal is owed.
   const asOf = `${addDays(account.schedule[0].dueDate, -1)}T12:00:00.000Z`;
 
-  const quoteResponse = await fetch(`${base}/loan-accounts/${account.loanAccountId}/foreclosure-quote?asOf=${asOf}`);
+  const quoteResponse = await apiFetch(`${base}/loan-accounts/${account.loanAccountId}/foreclosure-quote?asOf=${asOf}`);
   assert.equal(quoteResponse.status, 200);
   const quote = await quoteResponse.json();
   assert.equal(quote.interestOutstanding, 0);
@@ -1509,7 +1528,7 @@ test("API issues a No-Objection closure certificate for a settled loan", async (
     await rm(dataDir, { recursive: true, force: true });
   });
 
-  const server = createLoanOsServer({ dataDir });
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
   await listen(server);
   t.after(async () => {
     await close(server);
@@ -1518,7 +1537,7 @@ test("API issues a No-Objection closure certificate for a settled loan", async (
   const port = server.address().port;
   const base = `http://127.0.0.1:${port}`;
   const application = await approveAndDisburseApplication(base);
-  const account = await (await fetch(`${base}/loan-accounts/${application.loanAccountId}`)).json();
+  const account = await (await apiFetch(`${base}/loan-accounts/${application.loanAccountId}`)).json();
 
   // An active account cannot yet receive a No-Objection Certificate.
   const early = await postJson(`${base}/loan-accounts/${account.loanAccountId}/closure-certificate`, {
@@ -1549,7 +1568,7 @@ test("API issues a No-Objection closure certificate for a settled loan", async (
   assert(certificate.body.closureCertificate.checksumSha256);
   assert(certificate.body.closureCertificate.declarations.length >= 1);
 
-  const read = await fetch(`${base}/loan-accounts/${account.loanAccountId}/closure-certificate`);
+  const read = await apiFetch(`${base}/loan-accounts/${account.loanAccountId}/closure-certificate`);
   assert.equal(read.status, 200);
   const readBody = await read.json();
   assert.equal(readBody.certificateId, certificate.body.closureCertificate.certificateId);
@@ -1569,7 +1588,7 @@ test("API enforces recovery-agent notice and same-day cash recovery posting", as
     await rm(dataDir, { recursive: true, force: true });
   });
 
-  const server = createLoanOsServer({ dataDir });
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
   await listen(server);
   t.after(async () => {
     await close(server);
@@ -1578,11 +1597,11 @@ test("API enforces recovery-agent notice and same-day cash recovery posting", as
   const port = server.address().port;
   const base = `http://127.0.0.1:${port}`;
   const application = await approveAndDisburseApplication(base);
-  const account = await (await fetch(`${base}/loan-accounts/${application.loanAccountId}`)).json();
+  const account = await (await apiFetch(`${base}/loan-accounts/${application.loanAccountId}`)).json();
   const firstInstallment = account.schedule[0];
   const overdueDate = addDays(firstInstallment.dueDate, 7);
 
-  const delinquencyResponse = await fetch(`${base}/loan-accounts/${account.loanAccountId}/delinquency?asOf=${overdueDate}T00:00:00.000Z`);
+  const delinquencyResponse = await apiFetch(`${base}/loan-accounts/${account.loanAccountId}/delinquency?asOf=${overdueDate}T00:00:00.000Z`);
   assert.equal(delinquencyResponse.status, 200);
   const delinquency = await delinquencyResponse.json();
   assert.equal(delinquency.bucket, "dpd_1_30");
@@ -1637,7 +1656,7 @@ test("API generates CIC-ready snapshots with asset classification", async (t) =>
     await rm(dataDir, { recursive: true, force: true });
   });
 
-  const server = createLoanOsServer({ dataDir });
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
   await listen(server);
   t.after(async () => {
     await close(server);
@@ -1646,16 +1665,16 @@ test("API generates CIC-ready snapshots with asset classification", async (t) =>
   const port = server.address().port;
   const base = `http://127.0.0.1:${port}`;
   const application = await approveAndDisburseApplication(base);
-  const account = await (await fetch(`${base}/loan-accounts/${application.loanAccountId}`)).json();
+  const account = await (await apiFetch(`${base}/loan-accounts/${application.loanAccountId}`)).json();
   const asOf = `${addDays(account.schedule[0].dueDate, 91)}T00:00:00.000Z`;
 
-  const classificationResponse = await fetch(`${base}/loan-accounts/${account.loanAccountId}/asset-classification?asOf=${asOf}`);
+  const classificationResponse = await apiFetch(`${base}/loan-accounts/${account.loanAccountId}/asset-classification?asOf=${asOf}`);
   assert.equal(classificationResponse.status, 200);
   const classification = await classificationResponse.json();
   assert.equal(classification.assetClass, "npa");
   assert.equal(classification.isNpa, true);
 
-  const snapshotResponse = await fetch(`${base}/loan-accounts/${account.loanAccountId}/cic-snapshot?asOf=${asOf}`);
+  const snapshotResponse = await apiFetch(`${base}/loan-accounts/${account.loanAccountId}/cic-snapshot?asOf=${asOf}`);
   assert.equal(snapshotResponse.status, 200);
   const snapshot = await snapshotResponse.json();
   assert.equal(snapshot.loanAccountId, account.loanAccountId);
@@ -1664,7 +1683,7 @@ test("API generates CIC-ready snapshots with asset classification", async (t) =>
   assert(snapshot.amountOverdue > 0);
   assert(snapshot.currentBalance > 0);
 
-  const allSnapshotsResponse = await fetch(`${base}/reporting/cic/snapshots?asOf=${asOf}`);
+  const allSnapshotsResponse = await apiFetch(`${base}/reporting/cic/snapshots?asOf=${asOf}`);
   assert.equal(allSnapshotsResponse.status, 200);
   const allSnapshots = await allSnapshotsResponse.json();
   assert.equal(allSnapshots.snapshots.length, 1);
@@ -1677,7 +1696,7 @@ test("API routes material AI decisions to human review before proposal", async (
     await rm(dataDir, { recursive: true, force: true });
   });
 
-  const server = createLoanOsServer({ dataDir });
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
   await listen(server);
   t.after(async () => {
     await close(server);
@@ -1752,7 +1771,7 @@ test("API routes a referred application to a manual underwriting task", async (t
     await rm(dataDir, { recursive: true, force: true });
   });
 
-  const server = createLoanOsServer({ dataDir });
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
   await listen(server);
   t.after(async () => {
     await close(server);
@@ -1775,10 +1794,10 @@ test("API routes a referred application to a manual underwriting task", async (t
     201
   );
 
-  const storedEligibility = await fetch(`${base}/loans/applications/${application.applicationId}/eligibility`);
+  const storedEligibility = await apiFetch(`${base}/loans/applications/${application.applicationId}/eligibility`);
   assert.equal((await storedEligibility.json()).decision, "refer");
 
-  const referralTasksResponse = await fetch(`${base}/workflow/tasks?type=application.manual_underwriting`);
+  const referralTasksResponse = await apiFetch(`${base}/workflow/tasks?type=application.manual_underwriting`);
   assert.equal(referralTasksResponse.status, 200);
   const referralTasks = await referralTasksResponse.json();
   assert.equal(referralTasks.count, 1);
@@ -1787,7 +1806,7 @@ test("API routes a referred application to a manual underwriting task", async (t
   assert.equal(referralTasks.tasks[0].sla.targetHours, 8);
   assert.equal(referralTasks.tasks[0].context.eligibility.decision, "refer");
 
-  const creditDecisionTasksResponse = await fetch(`${base}/workflow/tasks?type=application.credit_decision`);
+  const creditDecisionTasksResponse = await apiFetch(`${base}/workflow/tasks?type=application.credit_decision`);
   assert.equal((await creditDecisionTasksResponse.json()).count, 0);
 
   const withoutOverride = await postJson(`${base}/loans/applications/${application.applicationId}/decision`, {
@@ -1821,7 +1840,7 @@ test("API carries manual underwriting override into the approved decision", asyn
     await rm(dataDir, { recursive: true, force: true });
   });
 
-  const server = createLoanOsServer({ dataDir });
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
   await listen(server);
   t.after(async () => {
     await close(server);
@@ -1857,7 +1876,7 @@ test("API carries manual underwriting override into the approved decision", asyn
   });
   assert.equal(decision.status, 202);
 
-  const approvalTasksResponse = await fetch(`${base}/workflow/tasks?type=application.decision_approval`);
+  const approvalTasksResponse = await apiFetch(`${base}/workflow/tasks?type=application.decision_approval`);
   const approvalTasks = await approvalTasksResponse.json();
   assert.equal(approvalTasks.count, 1);
   assert.equal(approvalTasks.tasks[0].context.requiresManualUnderwritingReview, true);
@@ -1885,7 +1904,7 @@ test("API requires the manual underwriting override actor to be a credit officer
     await rm(dataDir, { recursive: true, force: true });
   });
 
-  const server = createLoanOsServer({ dataDir });
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
   await listen(server);
   t.after(async () => {
     await close(server);
@@ -1947,7 +1966,7 @@ test("API blocks a checker who is also the manual underwriting underwriter", asy
     await rm(dataDir, { recursive: true, force: true });
   });
 
-  const server = createLoanOsServer({ dataDir });
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
   await listen(server);
   t.after(async () => {
     await close(server);
@@ -2019,7 +2038,7 @@ test("API requires a coded decline reason and carries it into the decision", asy
     await rm(dataDir, { recursive: true, force: true });
   });
 
-  const server = createLoanOsServer({ dataDir });
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
   await listen(server);
   t.after(async () => {
     await close(server);
@@ -2028,7 +2047,7 @@ test("API requires a coded decline reason and carries it into the decision", asy
   const port = server.address().port;
   const base = `http://127.0.0.1:${port}`;
 
-  const referenceResponse = await fetch(`${base}/reference/decline-reasons`);
+  const referenceResponse = await apiFetch(`${base}/reference/decline-reasons`);
   assert.equal(referenceResponse.status, 200);
   const reference = await referenceResponse.json();
   assert(reference.declineReasons.some((entry) => entry.code === "affordability"));
@@ -2104,7 +2123,7 @@ test("API exposes LWS decision approval task with assignment lifecycle", async (
     await rm(dataDir, { recursive: true, force: true });
   });
 
-  const server = createLoanOsServer({ dataDir });
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
   await listen(server);
   t.after(async () => {
     await close(server);
@@ -2133,7 +2152,7 @@ test("API exposes LWS decision approval task with assignment lifecycle", async (
   assert.equal(decision.status, 202);
   assert.equal(decision.body.status, "pending_decision_approval");
 
-  const taskListResponse = await fetch(`${base}/workflow/tasks?type=application.decision_approval`);
+  const taskListResponse = await apiFetch(`${base}/workflow/tasks?type=application.decision_approval`);
   assert.equal(taskListResponse.status, 200);
   const taskList = await taskListResponse.json();
   assert.equal(taskList.count, 1);
@@ -2171,7 +2190,7 @@ test("API exposes LWS decision approval task with assignment lifecycle", async (
   assert.equal(start.status, 200);
   assert.equal(start.body.task.status, "in_progress");
 
-  const taskAfterStartResponse = await fetch(`${base}/workflow/tasks/${taskId}`);
+  const taskAfterStartResponse = await apiFetch(`${base}/workflow/tasks/${taskId}`);
   assert.equal(taskAfterStartResponse.status, 200);
   const taskAfterStart = await taskAfterStartResponse.json();
   assert.equal(taskAfterStart.status, "in_progress");
@@ -2184,7 +2203,7 @@ test("API exposes LWS decision approval task with assignment lifecycle", async (
   assert.equal(approval.status, 200);
   assert.equal(approval.body.status, "approved");
 
-  const taskAfterApprovalResponse = await fetch(`${base}/workflow/tasks?type=application.decision_approval`);
+  const taskAfterApprovalResponse = await apiFetch(`${base}/workflow/tasks?type=application.decision_approval`);
   assert.equal(taskAfterApprovalResponse.status, 200);
   const taskAfterApproval = await taskAfterApprovalResponse.json();
   assert.equal(taskAfterApproval.count, 0);
@@ -2196,7 +2215,7 @@ test("API exposes LWS recovery task until noticed recovery assignment is recorde
     await rm(dataDir, { recursive: true, force: true });
   });
 
-  const server = createLoanOsServer({ dataDir });
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
   await listen(server);
   t.after(async () => {
     await close(server);
@@ -2205,11 +2224,11 @@ test("API exposes LWS recovery task until noticed recovery assignment is recorde
   const port = server.address().port;
   const base = `http://127.0.0.1:${port}`;
   const application = await approveAndDisburseApplication(base);
-  const account = await (await fetch(`${base}/loan-accounts/${application.loanAccountId}`)).json();
+  const account = await (await apiFetch(`${base}/loan-accounts/${application.loanAccountId}`)).json();
   const overdueDate = addDays(account.schedule[0].dueDate, 10);
   const asOf = `${overdueDate}T00:00:00.000Z`;
 
-  const tasksResponse = await fetch(`${base}/workflow/tasks?type=loan_account.recovery_assignment&asOf=${asOf}`);
+  const tasksResponse = await apiFetch(`${base}/workflow/tasks?type=loan_account.recovery_assignment&asOf=${asOf}`);
   assert.equal(tasksResponse.status, 200);
   const tasks = await tasksResponse.json();
   assert.equal(tasks.count, 1);
@@ -2244,7 +2263,7 @@ test("API exposes LWS recovery task until noticed recovery assignment is recorde
   });
   assert.equal(recoveryAssignment.status, 201);
 
-  const tasksAfterDomainActionResponse = await fetch(`${base}/workflow/tasks?type=loan_account.recovery_assignment&asOf=${asOf}`);
+  const tasksAfterDomainActionResponse = await apiFetch(`${base}/workflow/tasks?type=loan_account.recovery_assignment&asOf=${asOf}`);
   assert.equal(tasksAfterDomainActionResponse.status, 200);
   const tasksAfterDomainAction = await tasksAfterDomainActionResponse.json();
   assert.equal(tasksAfterDomainAction.count, 0);
@@ -2256,7 +2275,7 @@ test("API manages grievance complaint lifecycle with LWS tasks", async (t) => {
     await rm(dataDir, { recursive: true, force: true });
   });
 
-  const server = createLoanOsServer({ dataDir });
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
   await listen(server);
   t.after(async () => {
     await close(server);
@@ -2285,7 +2304,7 @@ test("API manages grievance complaint lifecycle with LWS tasks", async (t) => {
   assert.equal(complaintResponse.body.complaint.status, "received");
   assert.equal(complaintResponse.body.complaint.sla.targetDays, 30);
 
-  const assignmentTasksResponse = await fetch(`${base}/workflow/tasks?type=complaint.assignment&asOf=2026-07-09T11:00:00.000Z`);
+  const assignmentTasksResponse = await apiFetch(`${base}/workflow/tasks?type=complaint.assignment&asOf=2026-07-09T11:00:00.000Z`);
   assert.equal(assignmentTasksResponse.status, 200);
   const assignmentTasks = await assignmentTasksResponse.json();
   assert.equal(assignmentTasks.count, 1);
@@ -2306,7 +2325,7 @@ test("API manages grievance complaint lifecycle with LWS tasks", async (t) => {
   assert.equal(assignment.status, 201);
   assert.equal(assignment.body.complaint.status, "assigned");
 
-  const resolutionTasksResponse = await fetch(`${base}/workflow/tasks?type=complaint.resolution&asOf=2026-07-10T10:00:00.000Z`);
+  const resolutionTasksResponse = await apiFetch(`${base}/workflow/tasks?type=complaint.resolution&asOf=2026-07-10T10:00:00.000Z`);
   assert.equal(resolutionTasksResponse.status, 200);
   const resolutionTasks = await resolutionTasksResponse.json();
   assert.equal(resolutionTasks.count, 1);
@@ -2330,7 +2349,7 @@ test("API manages grievance complaint lifecycle with LWS tasks", async (t) => {
   assert.equal(resolution.body.complaint.status, "resolved");
   assert.equal(resolution.body.complaint.sla.status, "closed_in_time");
 
-  const tasksAfterResolutionResponse = await fetch(`${base}/workflow/tasks?entityType=complaint`);
+  const tasksAfterResolutionResponse = await apiFetch(`${base}/workflow/tasks?entityType=complaint`);
   assert.equal(tasksAfterResolutionResponse.status, 200);
   const tasksAfterResolution = await tasksAfterResolutionResponse.json();
   assert.equal(tasksAfterResolution.count, 0);
@@ -2342,7 +2361,7 @@ test("API raises RBI CMS escalation task for 30-day grievance breach", async (t)
     await rm(dataDir, { recursive: true, force: true });
   });
 
-  const server = createLoanOsServer({ dataDir });
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
   await listen(server);
   t.after(async () => {
     await close(server);
@@ -2366,13 +2385,13 @@ test("API raises RBI CMS escalation task for 30-day grievance breach", async (t)
   });
   assert.equal(complaintResponse.status, 201);
 
-  const overdueComplaintResponse = await fetch(`${base}/complaints/${complaintResponse.body.complaint.complaintId}?asOf=2026-08-02T09:00:00.000Z`);
+  const overdueComplaintResponse = await apiFetch(`${base}/complaints/${complaintResponse.body.complaint.complaintId}?asOf=2026-08-02T09:00:00.000Z`);
   assert.equal(overdueComplaintResponse.status, 200);
   const overdueComplaint = await overdueComplaintResponse.json();
   assert.equal(overdueComplaint.effectiveStatus, "escalation_due");
   assert.equal(overdueComplaint.sla.status, "breached");
 
-  const escalationTasksResponse = await fetch(`${base}/workflow/tasks?type=complaint.rbi_cms_escalation&asOf=2026-08-02T09:00:00.000Z`);
+  const escalationTasksResponse = await apiFetch(`${base}/workflow/tasks?type=complaint.rbi_cms_escalation&asOf=2026-08-02T09:00:00.000Z`);
   assert.equal(escalationTasksResponse.status, 200);
   const escalationTasks = await escalationTasksResponse.json();
   assert.equal(escalationTasks.count, 1);
@@ -2438,7 +2457,7 @@ test("API assesses eligibility and blocks approval of an ineligible borrower", a
     await rm(dataDir, { recursive: true, force: true });
   });
 
-  const server = createLoanOsServer({ dataDir });
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
   await listen(server);
   t.after(async () => {
     await close(server);
@@ -2453,7 +2472,7 @@ test("API assesses eligibility and blocks approval of an ineligible borrower", a
   assert.equal(eligibilityResponse.body.assessment.decision, "ineligible");
   assert(eligibilityResponse.body.assessment.metrics.foir > 0.5);
 
-  const storedEligibility = await fetch(`${base}/loans/applications/${application.applicationId}/eligibility`);
+  const storedEligibility = await apiFetch(`${base}/loans/applications/${application.applicationId}/eligibility`);
   assert.equal(storedEligibility.status, 200);
   assert.equal((await storedEligibility.json()).decision, "ineligible");
 
@@ -2488,6 +2507,160 @@ test("API assesses eligibility and blocks approval of an ineligible borrower", a
   assert.equal(decline.status, 202);
   assert.equal(decline.body.status, "pending_decision_approval");
   assert.equal(decline.body.pendingDecision.declineReason.code, "affordability");
+});
+
+test("data-plane rejects a missing or invalid tenant api key", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+
+  // No key at all.
+  const noKey = await rawFetch(`${base}/regulated-entities`);
+  assert.equal(noKey.status, 401);
+  assert.equal((await noKey.json()).error.code, "tenant_auth_required");
+
+  // A key that maps to no tenant.
+  const badKey = await apiFetch(`${base}/regulated-entities`, {}, "not-a-real-key");
+  assert.equal(badKey.status, 401);
+
+  // Writes are rejected too, so an unauthenticated caller cannot seed data.
+  const blockedWrite = await postJson(`${base}/regulated-entities`, validRegulatedEntity(), "not-a-real-key");
+  assert.equal(blockedWrite.status, 401);
+
+  // Open routes stay reachable without a tenant.
+  assert.equal((await rawFetch(`${base}/health`)).status, 200);
+  assert.equal((await rawFetch(`${base}/compliance/controls`)).status, 200);
+
+  // The valid tenant key works.
+  const ok = await apiFetch(`${base}/regulated-entities`);
+  assert.equal(ok.status, 200);
+});
+
+test("platform admin can mint a tenant and its api key", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const adminKey = "platform-admin-secret";
+  const server = createLoanOsServer({ dataDir, platformAdminKey: adminKey });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+
+  // Minting requires the platform admin key, not a tenant key.
+  const forbidden = await rawFetch(`${base}/platform/tenants`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ tenantId: "tnt_minted" })
+  });
+  assert.equal(forbidden.status, 403);
+
+  const created = await rawFetch(`${base}/platform/tenants`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-platform-admin-key": adminKey },
+    body: JSON.stringify({ tenantId: "tnt_minted", name: "Minted RE" })
+  });
+  assert.equal(created.status, 201);
+  const createdBody = await created.json();
+  assert.equal(createdBody.tenant.tenantId, "tnt_minted");
+  assert.equal(createdBody.tenant.isolationTier, "pooled");
+  assert.ok(createdBody.apiKey, "a one-time api key is returned");
+  // The secret is never persisted in listable form.
+  assert.equal(createdBody.tenant.apiKeyHash, undefined);
+
+  // The minted key immediately authenticates data-plane calls.
+  const asMinted = await apiFetch(`${base}/regulated-entities`, {}, createdBody.apiKey);
+  assert.equal(asMinted.status, 200);
+
+  // Duplicate tenant ids are rejected.
+  const dup = await rawFetch(`${base}/platform/tenants`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-platform-admin-key": adminKey },
+    body: JSON.stringify({ tenantId: "tnt_minted" })
+  });
+  assert.equal(dup.status, 409);
+});
+
+test("tenants are isolated: one tenant cannot read or mutate another's data", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A, TENANT_B] });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+
+  // Tenant A seeds a full set of records across resource types.
+  assert.equal((await postJson(`${base}/regulated-entities`, validRegulatedEntity(), TENANT_A.apiKey)).status, 201);
+  assert.equal((await postJson(`${base}/products`, validProductPolicy(), TENANT_A.apiKey)).status, 201);
+  assert.equal((await postJson(`${base}/borrowers`, validBorrowerProfile(), TENANT_A.apiKey)).status, 201);
+  assert.equal(
+    (await postJson(`${base}/borrowers/bor_001/consents`, validConsentRecord(), TENANT_A.apiKey)).status,
+    201
+  );
+  assert.equal(
+    (await postJson(`${base}/staff/actors`, {
+      actorId: "credit-maker-1",
+      displayName: "Credit Maker",
+      roles: ["credit_officer"],
+      queues: ["credit_ops"]
+    }, TENANT_A.apiKey)).status,
+    201
+  );
+
+  // Tenant B sees none of tenant A's records across every collection.
+  const listChecks = [
+    ["regulated-entities", "regulatedEntities"],
+    ["products", "products"],
+    ["borrowers", "borrowers"],
+    ["staff/actors", "actors"],
+    ["loan-accounts", "loanAccounts"]
+  ];
+  for (const [path, key] of listChecks) {
+    const asB = await apiFetch(`${base}/${path}`, {}, TENANT_B.apiKey);
+    assert.equal(asB.status, 200);
+    const body = await asB.json();
+    assert.equal(body[key].length, 0, `tenant B must not see tenant A ${path}`);
+  }
+
+  // Direct-by-id reads from tenant B 404, even though the record exists for A.
+  assert.equal((await apiFetch(`${base}/regulated-entities/re_example_nbfc`, {}, TENANT_B.apiKey)).status, 404);
+  assert.equal((await apiFetch(`${base}/borrowers/bor_001`, {}, TENANT_B.apiKey)).status, 404);
+  assert.equal((await apiFetch(`${base}/staff/actors/credit-maker-1`, {}, TENANT_B.apiKey)).status, 404);
+
+  // Tenant B cannot mutate tenant A's borrower by re-using the id: the write
+  // lands in tenant B's own partition and never touches tenant A.
+  assert.equal(
+    (await postJson(`${base}/borrowers/bor_001/consents`, validConsentRecord(), TENANT_B.apiKey)).status,
+    404
+  );
+
+  // Tenant A still sees exactly its own data, unchanged.
+  const aEntities = await (await apiFetch(`${base}/regulated-entities`, {}, TENANT_A.apiKey)).json();
+  assert.equal(aEntities.regulatedEntities.length, 1);
+  const aBorrower = await apiFetch(`${base}/borrowers/bor_001`, {}, TENANT_A.apiKey);
+  assert.equal(aBorrower.status, 200);
 });
 
 function eligibilityApplication(overrides = {}) {
@@ -2882,14 +3055,18 @@ function close(server) {
   });
 }
 
-async function postJson(url, payload) {
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json"
+async function postJson(url, payload, apiKey) {
+  const response = await apiFetch(
+    url,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify(payload)
     },
-    body: JSON.stringify(payload)
-  });
+    apiKey
+  );
   const body = await response.json();
   return {
     status: response.status,

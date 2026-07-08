@@ -78,14 +78,33 @@ import {
   validateWorkflowAssignmentAccess,
   waiveLoanAccountCharge
 } from "../../../packages/core/src/index.js";
-import { appendEvent, loadState, saveState } from "./file-store.js";
+import {
+  appendEvent,
+  createEmptyTenantData,
+  ensureBootstrapTenants,
+  generateApiKey,
+  getTenantData,
+  listTenants,
+  loadState as loadWholeState,
+  publicTenant,
+  registerTenant,
+  resolveTenantByApiKey,
+  saveState as saveWholeState,
+  setTenantData
+} from "./file-store.js";
 
 const DEFAULT_PORT = Number(process.env.PORT || 3040);
 
-export function createLoanOsServer({ dataDir } = {}) {
+export function createLoanOsServer({ dataDir, bootstrapTenants = [], platformAdminKey } = {}) {
+  const adminKey = platformAdminKey ?? process.env.LOANOS_PLATFORM_ADMIN_KEY ?? null;
+  let bootstrapPromise = null;
   return createServer(async (req, res) => {
     try {
-      await route(req, res, dataDir);
+      if (!bootstrapPromise) {
+        bootstrapPromise = ensureBootstrapTenants(dataDir, bootstrapTenants);
+      }
+      await bootstrapPromise;
+      await route(req, res, dataDir, adminKey);
     } catch (error) {
       sendJson(res, 500, {
         error: {
@@ -97,11 +116,12 @@ export function createLoanOsServer({ dataDir } = {}) {
   });
 }
 
-async function route(req, res, dataDir) {
+async function route(req, res, dataDir, platformAdminKey) {
   const method = req.method ?? "GET";
   const url = new URL(req.url ?? "/", "http://localhost");
   const path = url.pathname;
 
+  // --- Open routes: no tenant context required. ---
   if (method === "GET" && path === "/health") {
     sendJson(res, 200, {
       status: "ok",
@@ -124,8 +144,40 @@ async function route(req, res, dataDir) {
     return;
   }
 
+  // --- Platform control plane: mints and lists tenants, gated on the platform
+  // admin key (never a tenant api key). ---
+  if (path === "/platform/tenants" || path.startsWith("/platform/tenants/")) {
+    await routePlatform(req, res, { dataDir, platformAdminKey, method, path, url });
+    return;
+  }
+
+  // --- Tenant context: every data-plane route runs inside exactly one tenant. ---
+  const wholeState = await loadWholeState(dataDir);
+  const apiKey = tenantApiKeyFromRequest(req);
+  const tenant = resolveTenantByApiKey(wholeState, apiKey);
+  if (!tenant) {
+    sendJson(res, 401, {
+      error: {
+        code: "tenant_auth_required",
+        message: "A valid tenant API key is required for this route."
+      }
+    });
+    return;
+  }
+
+  // The store hands each handler ONLY this tenant's partition. There is no code
+  // path from a handler back to another tenant's data.
+  let scopedWholeState = wholeState;
+  const store = {
+    load: async () => getTenantData(scopedWholeState, tenant.tenantId) ?? createEmptyTenantData(),
+    save: async (tenantData) => {
+      scopedWholeState = setTenantData(scopedWholeState, tenant.tenantId, tenantData);
+      await saveWholeState(scopedWholeState, dataDir);
+    }
+  };
+
   if (method === "GET" && path === "/staff/actors") {
-    const state = await loadState(dataDir);
+    const state = await store.load();
     sendJson(res, 200, {
       actors: Object.values(state.staffActors)
     });
@@ -133,7 +185,7 @@ async function route(req, res, dataDir) {
   }
 
   if (method === "GET" && path === "/complaints") {
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const asOf = url.searchParams.get("asOf") ? new Date(url.searchParams.get("asOf")) : new Date();
     const complaints = Object.values(state.complaints)
       .map((complaint) => enrichComplaint(complaint, asOf))
@@ -148,7 +200,7 @@ async function route(req, res, dataDir) {
 
   if (method === "POST" && path === "/complaints") {
     const body = await readJson(req);
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const result = createComplaint(state.complaints, body, state);
     const nextState =
       result.summary.status === "blocked"
@@ -164,14 +216,14 @@ async function route(req, res, dataDir) {
               category: result.complaint.category
             }
           );
-    await saveState(nextState, dataDir);
+    await store.save(nextState);
     sendJson(res, result.summary.status === "blocked" ? 422 : 201, result);
     return;
   }
 
   const complaintMatch = path.match(/^\/complaints\/([^/]+)$/);
   if (method === "GET" && complaintMatch) {
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const complaint = state.complaints[decodeURIComponent(complaintMatch[1])];
     if (!complaint) {
       sendJson(res, 404, { error: { code: "not_found", message: "Complaint not found." } });
@@ -185,7 +237,7 @@ async function route(req, res, dataDir) {
   const complaintActionMatch = path.match(/^\/complaints\/([^/]+)\/(assignments|reviews|resolution|rbi-cms-escalation)$/);
   if (method === "POST" && complaintActionMatch) {
     const body = await readJson(req);
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const complaintId = decodeURIComponent(complaintActionMatch[1]);
     const action = complaintActionMatch[2];
     const complaint = state.complaints[complaintId];
@@ -243,7 +295,7 @@ async function route(req, res, dataDir) {
         actor: body.actor ?? body.assignedTo ?? null
       }
     );
-    await saveState(nextState, dataDir);
+    await store.save(nextState);
     sendJson(res, action === "assignments" ? 201 : 200, {
       complaint: stored,
       event: actionResult.event
@@ -253,7 +305,7 @@ async function route(req, res, dataDir) {
 
   if (method === "POST" && path === "/staff/actors") {
     const body = await readJson(req);
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const result = upsertStaffActor(state.staffActors, body);
     const nextState =
       result.summary.status === "blocked"
@@ -269,14 +321,14 @@ async function route(req, res, dataDir) {
               roles: result.actor.roles
             }
           );
-    await saveState(nextState, dataDir);
+    await store.save(nextState);
     sendJson(res, result.summary.status === "blocked" ? 422 : 201, result);
     return;
   }
 
   const staffActorMatch = path.match(/^\/staff\/actors\/([^/]+)$/);
   if (method === "GET" && staffActorMatch) {
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const actor = state.staffActors[decodeURIComponent(staffActorMatch[1])];
     if (!actor) {
       sendJson(res, 404, { error: { code: "not_found", message: "Staff actor not found." } });
@@ -287,7 +339,7 @@ async function route(req, res, dataDir) {
   }
 
   if (method === "GET" && path === "/workflow/tasks") {
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const asOf = url.searchParams.get("asOf") ? new Date(url.searchParams.get("asOf")) : new Date();
     const filters = taskFiltersFromUrl(url);
     const tasks = deriveWorkflowTasks(state, { asOf, filters });
@@ -301,7 +353,7 @@ async function route(req, res, dataDir) {
 
   const workflowTaskMatch = path.match(/^\/workflow\/tasks\/([^/]+)$/);
   if (method === "GET" && workflowTaskMatch) {
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const taskId = decodeURIComponent(workflowTaskMatch[1]);
     const asOf = url.searchParams.get("asOf") ? new Date(url.searchParams.get("asOf")) : new Date();
     const task = deriveWorkflowTasks(state, { asOf }).find((candidate) => candidate.taskId === taskId);
@@ -316,7 +368,7 @@ async function route(req, res, dataDir) {
   const workflowTaskActionMatch = path.match(/^\/workflow\/tasks\/([^/]+)\/(assignments|start|release|comments)$/);
   if (method === "POST" && workflowTaskActionMatch) {
     const body = await readJson(req);
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const taskId = decodeURIComponent(workflowTaskActionMatch[1]);
     const action = workflowTaskActionMatch[2];
     const asOf = body.asOf ? new Date(body.asOf) : new Date();
@@ -368,7 +420,7 @@ async function route(req, res, dataDir) {
         actor: body.actor ?? body.assignedBy ?? null
       }
     );
-    await saveState(nextState, dataDir);
+    await store.save(nextState);
     sendJson(res, action === "assignments" ? 201 : 200, {
       task: result.task,
       event: result.event
@@ -377,7 +429,7 @@ async function route(req, res, dataDir) {
   }
 
   if (method === "GET" && path === "/regulated-entities") {
-    const state = await loadState(dataDir);
+    const state = await store.load();
     sendJson(res, 200, {
       regulatedEntities: Object.values(state.regulatedEntities)
     });
@@ -386,7 +438,7 @@ async function route(req, res, dataDir) {
 
   if (method === "POST" && path === "/regulated-entities") {
     const body = await readJson(req);
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const result = upsertRegulatedEntity(state.regulatedEntities, body);
     const nextState =
       result.summary.status === "blocked"
@@ -402,14 +454,14 @@ async function route(req, res, dataDir) {
               status: result.entity.status
             }
           );
-    await saveState(nextState, dataDir);
+    await store.save(nextState);
     sendJson(res, result.summary.status === "blocked" ? 422 : 201, result);
     return;
   }
 
   const regulatedEntityMatch = path.match(/^\/regulated-entities\/([^/]+)$/);
   if (method === "GET" && regulatedEntityMatch) {
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const entity = state.regulatedEntities[decodeURIComponent(regulatedEntityMatch[1])];
     if (!entity) {
       sendJson(res, 404, { error: { code: "not_found", message: "Regulated entity not found." } });
@@ -420,7 +472,7 @@ async function route(req, res, dataDir) {
   }
 
   if (method === "GET" && path === "/lending-service-providers") {
-    const state = await loadState(dataDir);
+    const state = await store.load();
     sendJson(res, 200, {
       lendingServiceProviders: Object.values(state.lendingServiceProviders)
     });
@@ -429,7 +481,7 @@ async function route(req, res, dataDir) {
 
   if (method === "POST" && path === "/lending-service-providers") {
     const body = await readJson(req);
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const result = upsertLendingServiceProvider(state.lendingServiceProviders, body, state.regulatedEntities);
     const nextState =
       result.summary.status === "blocked"
@@ -446,14 +498,14 @@ async function route(req, res, dataDir) {
               status: result.lendingServiceProvider.status
             }
           );
-    await saveState(nextState, dataDir);
+    await store.save(nextState);
     sendJson(res, result.summary.status === "blocked" ? 422 : 201, result);
     return;
   }
 
   const lendingServiceProviderMatch = path.match(/^\/lending-service-providers\/([^/]+)$/);
   if (method === "GET" && lendingServiceProviderMatch) {
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const lsp = state.lendingServiceProviders[decodeURIComponent(lendingServiceProviderMatch[1])];
     if (!lsp) {
       sendJson(res, 404, { error: { code: "not_found", message: "Lending service provider not found." } });
@@ -464,7 +516,7 @@ async function route(req, res, dataDir) {
   }
 
   if (method === "GET" && path === "/digital-lending-apps") {
-    const state = await loadState(dataDir);
+    const state = await store.load();
     sendJson(res, 200, {
       digitalLendingApps: Object.values(state.digitalLendingApps)
     });
@@ -473,7 +525,7 @@ async function route(req, res, dataDir) {
 
   if (method === "POST" && path === "/digital-lending-apps") {
     const body = await readJson(req);
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const result = upsertDigitalLendingApp(
       state.digitalLendingApps,
       body,
@@ -495,14 +547,14 @@ async function route(req, res, dataDir) {
               status: result.digitalLendingApp.status
             }
           );
-    await saveState(nextState, dataDir);
+    await store.save(nextState);
     sendJson(res, result.summary.status === "blocked" ? 422 : 201, result);
     return;
   }
 
   const digitalLendingAppMatch = path.match(/^\/digital-lending-apps\/([^/]+)$/);
   if (method === "GET" && digitalLendingAppMatch) {
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const app = state.digitalLendingApps[decodeURIComponent(digitalLendingAppMatch[1])];
     if (!app) {
       sendJson(res, 404, { error: { code: "not_found", message: "Digital lending app not found." } });
@@ -513,7 +565,7 @@ async function route(req, res, dataDir) {
   }
 
   if (method === "GET" && path === "/reporting/dla/cims") {
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const result = generateDlaCimsExport(state.digitalLendingApps, state.regulatedEntities, {
       lendingServiceProviders: state.lendingServiceProviders,
       regulatedEntityId: url.searchParams.get("regulatedEntityId") ?? undefined,
@@ -524,7 +576,7 @@ async function route(req, res, dataDir) {
   }
 
   if (method === "GET" && path === "/products") {
-    const state = await loadState(dataDir);
+    const state = await store.load();
     sendJson(res, 200, {
       products: Object.values(state.productPolicies)
     });
@@ -533,7 +585,7 @@ async function route(req, res, dataDir) {
 
   if (method === "POST" && path === "/products") {
     const body = await readJson(req);
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const result = upsertProductPolicy(state.productPolicies, body, state.regulatedEntities);
     const nextState =
       result.summary.status === "blocked"
@@ -550,14 +602,14 @@ async function route(req, res, dataDir) {
               regulatedEntityId: result.product.regulatedEntityId
             }
           );
-    await saveState(nextState, dataDir);
+    await store.save(nextState);
     sendJson(res, result.summary.status === "blocked" ? 422 : 201, result);
     return;
   }
 
   const productMatch = path.match(/^\/products\/([^/]+)$/);
   if (method === "GET" && productMatch) {
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const product = state.productPolicies[decodeURIComponent(productMatch[1])];
     if (!product) {
       sendJson(res, 404, { error: { code: "not_found", message: "Product policy not found." } });
@@ -568,20 +620,20 @@ async function route(req, res, dataDir) {
   }
 
   if (method === "GET" && path === "/ai/models") {
-    const state = await loadState(dataDir);
+    const state = await store.load();
     sendJson(res, 200, state.modelRegistry);
     return;
   }
 
   if (method === "POST" && path === "/ai/models") {
     const body = await readJson(req);
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const result = registerModel(state.modelRegistry, body);
     const nextState = {
       ...state,
       modelRegistry: result.registry
     };
-    await saveState(nextState, dataDir);
+    await store.save(nextState);
     sendJson(res, result.summary.status === "blocked" ? 422 : 201, result);
     return;
   }
@@ -589,7 +641,7 @@ async function route(req, res, dataDir) {
   const modelTransitionMatch = path.match(/^\/ai\/models\/([^/]+)\/transitions$/);
   if (method === "POST" && modelTransitionMatch) {
     const body = await readJson(req);
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const modelId = decodeURIComponent(modelTransitionMatch[1]);
     const result = transitionModel(state.modelRegistry, { ...body, modelId });
     if (result.summary.status === "blocked") {
@@ -611,14 +663,14 @@ async function route(req, res, dataDir) {
         actor: body.actor ?? null
       }
     );
-    await saveState(nextState, dataDir);
+    await store.save(nextState);
     sendJson(res, 200, result);
     return;
   }
 
   if (method === "POST" && path === "/ai/kill-switch") {
     const body = await readJson(req);
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const result = triggerKillSwitch(state.modelRegistry, body);
     const nextState = appendEvent(
       {
@@ -632,7 +684,7 @@ async function route(req, res, dataDir) {
         modelId: body.modelId ?? null
       }
     );
-    await saveState(nextState, dataDir);
+    await store.save(nextState);
     sendJson(res, result.summary.status === "blocked" ? 422 : 200, result);
     return;
   }
@@ -640,7 +692,7 @@ async function route(req, res, dataDir) {
   const incidentReviewMatch = path.match(/^\/ai\/incidents\/([^/]+)\/post-incident-review$/);
   if (method === "POST" && incidentReviewMatch) {
     const body = await readJson(req);
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const incidentId = decodeURIComponent(incidentReviewMatch[1]);
     const result = recordPostIncidentReview(state.modelRegistry, { ...body, incidentId });
     if (result.summary.status === "blocked") {
@@ -661,14 +713,14 @@ async function route(req, res, dataDir) {
         actor: body.reviewedBy ?? null
       }
     );
-    await saveState(nextState, dataDir);
+    await store.save(nextState);
     sendJson(res, 200, result);
     return;
   }
 
   if (method === "POST" && path === "/ai/kill-switch/clear") {
     const body = await readJson(req);
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const result = clearGlobalKillSwitch(state.modelRegistry, body);
     const nextState = appendEvent(
       {
@@ -681,13 +733,13 @@ async function route(req, res, dataDir) {
         approvalRef: body.approvalRef ?? null
       }
     );
-    await saveState(nextState, dataDir);
+    await store.save(nextState);
     sendJson(res, result.summary.status === "blocked" ? 422 : 200, result);
     return;
   }
 
   if (method === "GET" && path === "/borrowers") {
-    const state = await loadState(dataDir);
+    const state = await store.load();
     sendJson(res, 200, {
       borrowers: Object.values(state.borrowerProfiles)
     });
@@ -696,7 +748,7 @@ async function route(req, res, dataDir) {
 
   if (method === "POST" && path === "/borrowers") {
     const body = await readJson(req);
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const result = upsertBorrowerProfile(state.borrowerProfiles, body);
     const nextState =
       result.summary.status === "blocked"
@@ -712,14 +764,14 @@ async function route(req, res, dataDir) {
               status: result.borrower.status
             }
           );
-    await saveState(nextState, dataDir);
+    await store.save(nextState);
     sendJson(res, result.summary.status === "blocked" ? 422 : 201, result);
     return;
   }
 
   const borrowerMatch = path.match(/^\/borrowers\/([^/]+)$/);
   if (method === "GET" && borrowerMatch) {
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const borrower = state.borrowerProfiles[decodeURIComponent(borrowerMatch[1])];
     if (!borrower) {
       sendJson(res, 404, { error: { code: "not_found", message: "Borrower not found." } });
@@ -732,7 +784,7 @@ async function route(req, res, dataDir) {
   const borrowerConsentsMatch = path.match(/^\/borrowers\/([^/]+)\/consents$/);
   if (borrowerConsentsMatch) {
     const borrowerId = decodeURIComponent(borrowerConsentsMatch[1]);
-    const state = await loadState(dataDir);
+    const state = await store.load();
     if (!state.borrowerProfiles[borrowerId]) {
       sendJson(res, 404, { error: { code: "not_found", message: "Borrower not found." } });
       return;
@@ -771,7 +823,7 @@ async function route(req, res, dataDir) {
                 status: result.consent.status
               }
             );
-      await saveState(nextState, dataDir);
+      await store.save(nextState);
       sendJson(res, result.summary.status === "blocked" ? 422 : 201, result);
       return;
     }
@@ -780,7 +832,7 @@ async function route(req, res, dataDir) {
   const borrowerKycMatch = path.match(/^\/borrowers\/([^/]+)\/kyc-records$/);
   if (borrowerKycMatch) {
     const borrowerId = decodeURIComponent(borrowerKycMatch[1]);
-    const state = await loadState(dataDir);
+    const state = await store.load();
     if (!state.borrowerProfiles[borrowerId]) {
       sendJson(res, 404, { error: { code: "not_found", message: "Borrower not found." } });
       return;
@@ -818,7 +870,7 @@ async function route(req, res, dataDir) {
                 status: result.kycRecord.status
               }
             );
-      await saveState(nextState, dataDir);
+      await store.save(nextState);
       sendJson(res, result.summary.status === "blocked" ? 422 : 201, result);
       return;
     }
@@ -826,7 +878,7 @@ async function route(req, res, dataDir) {
 
   if (method === "POST" && path === "/loans/applications") {
     const body = await readJson(req);
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const application = {
       ...body,
       applicationId: body.applicationId ?? createLoanId("app"),
@@ -864,14 +916,14 @@ async function route(req, res, dataDir) {
         status: stored.status
       }
     );
-    await saveState(nextState, dataDir);
+    await store.save(nextState);
     sendJson(res, combined.summary.status === "blocked" ? 422 : 201, stored);
     return;
   }
 
   const applicationMatch = path.match(/^\/loans\/applications\/([^/]+)$/);
   if (method === "GET" && applicationMatch) {
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const application = state.loanApplications[applicationMatch[1]];
     if (!application) {
       sendJson(res, 404, { error: { code: "not_found", message: "Loan application not found." } });
@@ -883,7 +935,7 @@ async function route(req, res, dataDir) {
 
   const eligibilityMatch = path.match(/^\/loans\/applications\/([^/]+)\/eligibility$/);
   if (method === "GET" && eligibilityMatch) {
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const application = state.loanApplications[eligibilityMatch[1]];
     if (!application) {
       sendJson(res, 404, { error: { code: "not_found", message: "Loan application not found." } });
@@ -893,7 +945,7 @@ async function route(req, res, dataDir) {
     return;
   }
   if (method === "POST" && eligibilityMatch) {
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const application = state.loanApplications[eligibilityMatch[1]];
     if (!application) {
       sendJson(res, 404, { error: { code: "not_found", message: "Loan application not found." } });
@@ -918,7 +970,7 @@ async function route(req, res, dataDir) {
         decision: eligibility.assessment.decision
       }
     );
-    await saveState(nextState, dataDir);
+    await store.save(nextState);
     sendJson(res, 200, eligibility);
     return;
   }
@@ -926,7 +978,7 @@ async function route(req, res, dataDir) {
   const kfsMatch = path.match(/^\/loans\/applications\/([^/]+)\/kfs$/);
   if (method === "POST" && kfsMatch) {
     const body = await readJson(req);
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const application = state.loanApplications[kfsMatch[1]];
     if (!application) {
       sendJson(res, 404, { error: { code: "not_found", message: "Loan application not found." } });
@@ -958,7 +1010,7 @@ async function route(req, res, dataDir) {
         kfsId: kfs.kfsId
       }
     );
-    await saveState(nextState, dataDir);
+    await store.save(nextState);
     sendJson(res, evaluation.summary.status === "blocked" ? 422 : 201, stored);
     return;
   }
@@ -966,7 +1018,7 @@ async function route(req, res, dataDir) {
   const decisionMatch = path.match(/^\/loans\/applications\/([^/]+)\/decision$/);
   if (method === "POST" && decisionMatch) {
     const body = await readJson(req);
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const application = state.loanApplications[decisionMatch[1]];
     if (!application) {
       sendJson(res, 404, { error: { code: "not_found", message: "Loan application not found." } });
@@ -1040,7 +1092,7 @@ async function route(req, res, dataDir) {
         proposalId: proposal.proposal?.proposalId ?? null
       }
     );
-    await saveState(nextState, dataDir);
+    await store.save(nextState);
     sendJson(res, 202, stored);
     return;
   }
@@ -1048,7 +1100,7 @@ async function route(req, res, dataDir) {
   const humanReviewMatch = path.match(/^\/loans\/applications\/([^/]+)\/human-reviews$/);
   if (method === "POST" && humanReviewMatch) {
     const body = await readJson(req);
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const application = state.loanApplications[humanReviewMatch[1]];
     if (!application) {
       sendJson(res, 404, { error: { code: "not_found", message: "Loan application not found." } });
@@ -1096,7 +1148,7 @@ async function route(req, res, dataDir) {
         outcome: result.humanReview.outcome
       }
     );
-    await saveState(nextState, dataDir);
+    await store.save(nextState);
     sendJson(res, 200, stored);
     return;
   }
@@ -1104,7 +1156,7 @@ async function route(req, res, dataDir) {
   const approvalMatch = path.match(/^\/loans\/applications\/([^/]+)\/approvals$/);
   if (method === "POST" && approvalMatch) {
     const body = await readJson(req);
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const application = state.loanApplications[approvalMatch[1]];
     if (!application) {
       sendJson(res, 404, { error: { code: "not_found", message: "Loan application not found." } });
@@ -1152,7 +1204,7 @@ async function route(req, res, dataDir) {
         status: stored.status
       }
     );
-    await saveState(nextState, dataDir);
+    await store.save(nextState);
     sendJson(res, 200, stored);
     return;
   }
@@ -1160,7 +1212,7 @@ async function route(req, res, dataDir) {
   const documentPacketMatch = path.match(/^\/loans\/applications\/([^/]+)\/document-packet$/);
   if (documentPacketMatch) {
     const applicationId = decodeURIComponent(documentPacketMatch[1]);
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const application = state.loanApplications[applicationId];
     if (!application) {
       sendJson(res, 404, { error: { code: "not_found", message: "Loan application not found." } });
@@ -1219,7 +1271,7 @@ async function route(req, res, dataDir) {
           packetId: packetResult.packet.packetId
         }
       );
-      await saveState(nextState, dataDir);
+      await store.save(nextState);
       sendJson(res, 201, stored.documentPacket);
       return;
     }
@@ -1228,7 +1280,7 @@ async function route(req, res, dataDir) {
   const documentPacketDeliveryMatch = path.match(/^\/loans\/applications\/([^/]+)\/document-packet\/delivery$/);
   if (method === "POST" && documentPacketDeliveryMatch) {
     const body = await readJson(req);
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const application = state.loanApplications[decodeURIComponent(documentPacketDeliveryMatch[1])];
     if (!application) {
       sendJson(res, 404, { error: { code: "not_found", message: "Loan application not found." } });
@@ -1277,13 +1329,13 @@ async function route(req, res, dataDir) {
         deliveryRef: deliveryResult.packet.delivery.deliveryRef
       }
     );
-    await saveState(nextState, dataDir);
+    await store.save(nextState);
     sendJson(res, 200, stored.documentPacket);
     return;
   }
 
   if (method === "GET" && path === "/loan-accounts") {
-    const state = await loadState(dataDir);
+    const state = await store.load();
     sendJson(res, 200, {
       loanAccounts: Object.values(state.loanAccounts)
     });
@@ -1291,7 +1343,7 @@ async function route(req, res, dataDir) {
   }
 
   if (method === "GET" && path === "/reporting/cic/snapshots") {
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const asOf = url.searchParams.get("asOf") ? new Date(url.searchParams.get("asOf")) : new Date();
     sendJson(res, 200, {
       asOf: asOf.toISOString(),
@@ -1302,7 +1354,7 @@ async function route(req, res, dataDir) {
 
   const loanAccountScheduleMatch = path.match(/^\/loan-accounts\/([^/]+)\/schedule$/);
   if (method === "GET" && loanAccountScheduleMatch) {
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const loanAccount = state.loanAccounts[decodeURIComponent(loanAccountScheduleMatch[1])];
     if (!loanAccount) {
       sendJson(res, 404, { error: { code: "not_found", message: "Loan account not found." } });
@@ -1317,7 +1369,7 @@ async function route(req, res, dataDir) {
 
   const loanAccountStatementMatch = path.match(/^\/loan-accounts\/([^/]+)\/statement$/);
   if (method === "GET" && loanAccountStatementMatch) {
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const loanAccount = state.loanAccounts[decodeURIComponent(loanAccountStatementMatch[1])];
     if (!loanAccount) {
       sendJson(res, 404, { error: { code: "not_found", message: "Loan account not found." } });
@@ -1332,7 +1384,7 @@ async function route(req, res, dataDir) {
 
   const loanAccountStatementDocumentMatch = path.match(/^\/loan-accounts\/([^/]+)\/statement\/document$/);
   if (method === "GET" && loanAccountStatementDocumentMatch) {
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const loanAccount = state.loanAccounts[decodeURIComponent(loanAccountStatementDocumentMatch[1])];
     if (!loanAccount) {
       sendJson(res, 404, { error: { code: "not_found", message: "Loan account not found." } });
@@ -1351,7 +1403,7 @@ async function route(req, res, dataDir) {
 
   const loanAccountDelinquencyMatch = path.match(/^\/loan-accounts\/([^/]+)\/delinquency$/);
   if (method === "GET" && loanAccountDelinquencyMatch) {
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const loanAccount = state.loanAccounts[decodeURIComponent(loanAccountDelinquencyMatch[1])];
     if (!loanAccount) {
       sendJson(res, 404, { error: { code: "not_found", message: "Loan account not found." } });
@@ -1364,7 +1416,7 @@ async function route(req, res, dataDir) {
 
   const loanAccountAssetClassMatch = path.match(/^\/loan-accounts\/([^/]+)\/asset-classification$/);
   if (method === "GET" && loanAccountAssetClassMatch) {
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const loanAccount = state.loanAccounts[decodeURIComponent(loanAccountAssetClassMatch[1])];
     if (!loanAccount) {
       sendJson(res, 404, { error: { code: "not_found", message: "Loan account not found." } });
@@ -1377,7 +1429,7 @@ async function route(req, res, dataDir) {
 
   const loanAccountCicSnapshotMatch = path.match(/^\/loan-accounts\/([^/]+)\/cic-snapshot$/);
   if (method === "GET" && loanAccountCicSnapshotMatch) {
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const loanAccount = state.loanAccounts[decodeURIComponent(loanAccountCicSnapshotMatch[1])];
     if (!loanAccount) {
       sendJson(res, 404, { error: { code: "not_found", message: "Loan account not found." } });
@@ -1391,7 +1443,7 @@ async function route(req, res, dataDir) {
   const loanAccountRecoveryAssignmentMatch = path.match(/^\/loan-accounts\/([^/]+)\/recovery-assignments$/);
   if (method === "POST" && loanAccountRecoveryAssignmentMatch) {
     const body = await readJson(req);
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const loanAccountId = decodeURIComponent(loanAccountRecoveryAssignmentMatch[1]);
     const loanAccount = state.loanAccounts[loanAccountId];
     if (!loanAccount) {
@@ -1440,7 +1492,7 @@ async function route(req, res, dataDir) {
         recoveryAgentId: result.assignment.recoveryAgentId
       }
     );
-    await saveState(nextState, dataDir);
+    await store.save(nextState);
     sendJson(res, 201, {
       loanAccount: stored,
       assignment: result.assignment,
@@ -1452,7 +1504,7 @@ async function route(req, res, dataDir) {
   const loanAccountCashRecoveryMatch = path.match(/^\/loan-accounts\/([^/]+)\/cash-recoveries$/);
   if (method === "POST" && loanAccountCashRecoveryMatch) {
     const body = await readJson(req);
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const loanAccountId = decodeURIComponent(loanAccountCashRecoveryMatch[1]);
     const loanAccount = state.loanAccounts[loanAccountId];
     if (!loanAccount) {
@@ -1489,7 +1541,7 @@ async function route(req, res, dataDir) {
         receiptRef: result.paymentEvent.receiptRef
       }
     );
-    await saveState(nextState, dataDir);
+    await store.save(nextState);
     sendJson(res, 200, {
       loanAccount: stored,
       paymentEvent: result.paymentEvent,
@@ -1502,7 +1554,7 @@ async function route(req, res, dataDir) {
   const loanAccountChargeMatch = path.match(/^\/loan-accounts\/([^/]+)\/charges$/);
   if (method === "POST" && loanAccountChargeMatch) {
     const body = await readJson(req);
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const loanAccountId = decodeURIComponent(loanAccountChargeMatch[1]);
     const loanAccount = state.loanAccounts[loanAccountId];
     if (!loanAccount) {
@@ -1538,7 +1590,7 @@ async function route(req, res, dataDir) {
         amount: result.chargeEvent.amount
       }
     );
-    await saveState(nextState, dataDir);
+    await store.save(nextState);
     sendJson(res, 201, {
       loanAccount: stored,
       chargeEvent: result.chargeEvent,
@@ -1550,7 +1602,7 @@ async function route(req, res, dataDir) {
   const loanAccountWaiverMatch = path.match(/^\/loan-accounts\/([^/]+)\/waivers$/);
   if (method === "POST" && loanAccountWaiverMatch) {
     const body = await readJson(req);
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const loanAccountId = decodeURIComponent(loanAccountWaiverMatch[1]);
     const loanAccount = state.loanAccounts[loanAccountId];
     if (!loanAccount) {
@@ -1586,7 +1638,7 @@ async function route(req, res, dataDir) {
         amount: result.waiverEvent.amount
       }
     );
-    await saveState(nextState, dataDir);
+    await store.save(nextState);
     sendJson(res, 200, {
       loanAccount: stored,
       waiverEvent: result.waiverEvent,
@@ -1598,7 +1650,7 @@ async function route(req, res, dataDir) {
   const loanAccountReversalMatch = path.match(/^\/loan-accounts\/([^/]+)\/reversals$/);
   if (method === "POST" && loanAccountReversalMatch) {
     const body = await readJson(req);
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const loanAccountId = decodeURIComponent(loanAccountReversalMatch[1]);
     const loanAccount = state.loanAccounts[loanAccountId];
     if (!loanAccount) {
@@ -1634,7 +1686,7 @@ async function route(req, res, dataDir) {
         reversalOfEventId: result.reversalEvent.reversalOfEventId
       }
     );
-    await saveState(nextState, dataDir);
+    await store.save(nextState);
     sendJson(res, 200, {
       loanAccount: stored,
       reversalEvent: result.reversalEvent,
@@ -1646,7 +1698,7 @@ async function route(req, res, dataDir) {
   const loanAccountPaymentMatch = path.match(/^\/loan-accounts\/([^/]+)\/payments$/);
   if (method === "POST" && loanAccountPaymentMatch) {
     const body = await readJson(req);
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const loanAccountId = decodeURIComponent(loanAccountPaymentMatch[1]);
     const loanAccount = state.loanAccounts[loanAccountId];
     if (!loanAccount) {
@@ -1683,7 +1735,7 @@ async function route(req, res, dataDir) {
         amount: result.paymentEvent.amount
       }
     );
-    await saveState(nextState, dataDir);
+    await store.save(nextState);
     sendJson(res, 200, {
       loanAccount: stored,
       paymentEvent: result.paymentEvent,
@@ -1695,7 +1747,7 @@ async function route(req, res, dataDir) {
   const loanAccountAccrualMatch = path.match(/^\/loan-accounts\/([^/]+)\/accruals$/);
   if (method === "POST" && loanAccountAccrualMatch) {
     const body = await readJson(req);
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const loanAccountId = decodeURIComponent(loanAccountAccrualMatch[1]);
     const loanAccount = state.loanAccounts[loanAccountId];
     if (!loanAccount) {
@@ -1730,7 +1782,7 @@ async function route(req, res, dataDir) {
         accruedCount: result.accrualEvents.length
       }
     );
-    await saveState(nextState, dataDir);
+    await store.save(nextState);
     sendJson(res, 200, {
       loanAccount: stored,
       accrualEvents: result.accrualEvents,
@@ -1742,7 +1794,7 @@ async function route(req, res, dataDir) {
   const loanAccountPrepaymentMatch = path.match(/^\/loan-accounts\/([^/]+)\/prepayments$/);
   if (method === "POST" && loanAccountPrepaymentMatch) {
     const body = await readJson(req);
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const loanAccountId = decodeURIComponent(loanAccountPrepaymentMatch[1]);
     const loanAccount = state.loanAccounts[loanAccountId];
     if (!loanAccount) {
@@ -1776,7 +1828,7 @@ async function route(req, res, dataDir) {
         principalReduced: result.prepayment.principalReduced
       }
     );
-    await saveState(nextState, dataDir);
+    await store.save(nextState);
     sendJson(res, 200, {
       loanAccount: stored,
       paymentEvent: result.paymentEvent,
@@ -1789,7 +1841,7 @@ async function route(req, res, dataDir) {
 
   const foreclosureQuoteMatch = path.match(/^\/loan-accounts\/([^/]+)\/foreclosure-quote$/);
   if (method === "GET" && foreclosureQuoteMatch) {
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const loanAccount = state.loanAccounts[decodeURIComponent(foreclosureQuoteMatch[1])];
     if (!loanAccount) {
       sendJson(res, 404, { error: { code: "not_found", message: "Loan account not found." } });
@@ -1813,7 +1865,7 @@ async function route(req, res, dataDir) {
   const foreclosureMatch = path.match(/^\/loan-accounts\/([^/]+)\/foreclosure$/);
   if (method === "POST" && foreclosureMatch) {
     const body = await readJson(req);
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const loanAccountId = decodeURIComponent(foreclosureMatch[1]);
     const loanAccount = state.loanAccounts[loanAccountId];
     if (!loanAccount) {
@@ -1846,7 +1898,7 @@ async function route(req, res, dataDir) {
         payoffAmount: result.foreclosure.payoffAmount
       }
     );
-    await saveState(nextState, dataDir);
+    await store.save(nextState);
     sendJson(res, 200, {
       loanAccount: stored,
       foreclosure: result.foreclosure,
@@ -1859,7 +1911,7 @@ async function route(req, res, dataDir) {
   const closureCertificateMatch = path.match(/^\/loan-accounts\/([^/]+)\/closure-certificate$/);
   if (method === "POST" && closureCertificateMatch) {
     const body = await readJson(req);
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const loanAccountId = decodeURIComponent(closureCertificateMatch[1]);
     const loanAccount = state.loanAccounts[loanAccountId];
     if (!loanAccount) {
@@ -1892,7 +1944,7 @@ async function route(req, res, dataDir) {
           certificateId: result.closureCertificate.certificateId
         }
       );
-      await saveState(nextState, dataDir);
+      await store.save(nextState);
     }
     sendJson(res, result.reissued ? 200 : 201, {
       loanAccount: stored,
@@ -1903,7 +1955,7 @@ async function route(req, res, dataDir) {
   }
 
   if (method === "GET" && closureCertificateMatch) {
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const loanAccount = state.loanAccounts[decodeURIComponent(closureCertificateMatch[1])];
     if (!loanAccount) {
       sendJson(res, 404, { error: { code: "not_found", message: "Loan account not found." } });
@@ -1919,7 +1971,7 @@ async function route(req, res, dataDir) {
 
   const loanAccountMatch = path.match(/^\/loan-accounts\/([^/]+)$/);
   if (method === "GET" && loanAccountMatch) {
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const loanAccount = state.loanAccounts[decodeURIComponent(loanAccountMatch[1])];
     if (!loanAccount) {
       sendJson(res, 404, { error: { code: "not_found", message: "Loan account not found." } });
@@ -1935,7 +1987,7 @@ async function route(req, res, dataDir) {
   const disbursementMatch = path.match(/^\/loans\/applications\/([^/]+)\/disbursement$/);
   if (method === "POST" && disbursementMatch) {
     const body = await readJson(req);
-    const state = await loadState(dataDir);
+    const state = await store.load();
     const application = state.loanApplications[disbursementMatch[1]];
     if (!application) {
       sendJson(res, 404, { error: { code: "not_found", message: "Loan application not found." } });
@@ -1998,7 +2050,7 @@ async function route(req, res, dataDir) {
         loanAccountId: accountResult.loanAccount.loanAccountId
       }
     );
-    await saveState(nextState, dataDir);
+    await store.save(nextState);
     sendJson(res, 200, stored);
     return;
   }
@@ -2009,6 +2061,96 @@ async function route(req, res, dataDir) {
       message: "Route not found."
     }
   });
+}
+
+function tenantApiKeyFromRequest(req) {
+  const headerKey = req.headers["x-api-key"];
+  if (headerKey) {
+    return Array.isArray(headerKey) ? headerKey[0] : headerKey;
+  }
+  const authorization = req.headers["authorization"];
+  if (typeof authorization === "string" && authorization.toLowerCase().startsWith("bearer ")) {
+    return authorization.slice(7).trim();
+  }
+  return null;
+}
+
+function platformAdminKeyFromRequest(req) {
+  const key = req.headers["x-platform-admin-key"];
+  return Array.isArray(key) ? key[0] : key ?? null;
+}
+
+async function routePlatform(req, res, { dataDir, platformAdminKey, method, path }) {
+  if (!platformAdminKey) {
+    sendJson(res, 403, {
+      error: {
+        code: "platform_admin_disabled",
+        message: "No platform admin key is configured; tenant administration is disabled."
+      }
+    });
+    return;
+  }
+  if (platformAdminKeyFromRequest(req) !== platformAdminKey) {
+    sendJson(res, 403, {
+      error: {
+        code: "platform_admin_forbidden",
+        message: "A valid platform admin key is required for tenant administration."
+      }
+    });
+    return;
+  }
+
+  if (method === "GET" && path === "/platform/tenants") {
+    const state = await loadWholeState(dataDir);
+    sendJson(res, 200, { tenants: listTenants(state) });
+    return;
+  }
+
+  if (method === "POST" && path === "/platform/tenants") {
+    const body = await readJson(req);
+    if (!body.tenantId) {
+      sendJson(res, 422, {
+        error: { code: "tenant_invalid", message: "tenantId is required to create a tenant." }
+      });
+      return;
+    }
+    const state = await loadWholeState(dataDir);
+    if (state.controlPlane.tenants[body.tenantId]) {
+      sendJson(res, 409, {
+        error: { code: "tenant_exists", message: "A tenant with this tenantId already exists." }
+      });
+      return;
+    }
+    // The api key is returned once here and only ever stored as a hash.
+    const apiKey = body.apiKey ?? generateApiKey();
+    const nextState = registerTenant(state, {
+      tenantId: body.tenantId,
+      name: body.name,
+      apiKey,
+      isolationTier: body.isolationTier,
+      status: body.status
+    });
+    await saveWholeState(nextState, dataDir);
+    sendJson(res, 201, {
+      tenant: publicTenant(nextState.controlPlane.tenants[body.tenantId]),
+      apiKey
+    });
+    return;
+  }
+
+  const tenantMatch = path.match(/^\/platform\/tenants\/([^/]+)$/);
+  if (method === "GET" && tenantMatch) {
+    const state = await loadWholeState(dataDir);
+    const record = state.controlPlane.tenants[decodeURIComponent(tenantMatch[1])];
+    if (!record) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Tenant not found." } });
+      return;
+    }
+    sendJson(res, 200, publicTenant(record));
+    return;
+  }
+
+  sendJson(res, 404, { error: { code: "not_found", message: "Platform route not found." } });
 }
 
 async function readJson(req) {
@@ -2077,8 +2219,22 @@ function combineComplianceResults(...results) {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const server = createLoanOsServer();
+  // Local dev bootstrap: set LOANOS_DEV_TENANT_KEY to get a ready-to-use tenant
+  // ("dev") without going through the platform admin flow. Never enable this in
+  // production; there, tenants are minted only through /platform/tenants.
+  const devTenantKey = process.env.LOANOS_DEV_TENANT_KEY;
+  const bootstrapTenants = devTenantKey
+    ? [{ tenantId: "dev", name: "Local Dev RE", apiKey: devTenantKey }]
+    : [];
+  const server = createLoanOsServer({ bootstrapTenants });
   server.listen(DEFAULT_PORT, () => {
     console.log(`LoanOS India API listening on http://localhost:${DEFAULT_PORT}`);
+    if (devTenantKey) {
+      console.log(`Dev tenant "dev" ready. Send header: x-api-key: ${devTenantKey}`);
+    } else {
+      console.log(
+        "No tenant configured. Set LOANOS_DEV_TENANT_KEY for a dev tenant, or LOANOS_PLATFORM_ADMIN_KEY to mint tenants via POST /platform/tenants."
+      );
+    }
   });
 }

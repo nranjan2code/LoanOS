@@ -1,5 +1,24 @@
 # Product Roadmap
 
+## Cross-Cutting Workstream: SaaS Tenancy and Vendor Posture
+
+Status: S1–S3 implemented (tenant partitioning, tenant-scoped auth, isolation suite); S4–S6 planned.
+
+LoanOS is delivered as a multi-tenant SaaS to regulated entities, which makes tenancy and our own vendor compliance a workstream that runs alongside the phases rather than after them. Sequenced stages:
+
+- S1. Tenant context groundwork: state partitioned per tenant, tenant-scoped storage accessor. Done: the API store holds a control plane (tenant registry) and per-tenant data planes; handlers only ever see one tenant's partition.
+- S2. Tenant-scoped API authentication and tenant-context middleware. Done: every data-plane route resolves a tenant from `x-api-key`/bearer and 401s without a valid key; `POST /platform/tenants` mints tenants behind a platform admin key with hashed api keys.
+- S3. Cross-tenant isolation regression suite (two tenants, every resource type) running in CI. Done: the suite proves tenant B cannot read or mutate tenant A's records and that missing/invalid keys are rejected.
+- S4. Append-only hash-chained audit spine replacing the flat event array; first evidence export pack. Planned.
+- S5. Tenant lifecycle: onboarding, sandbox environments, exit/portability export. Planned.
+- S6. Vendor posture pack: due-diligence pack, incident notification (RE 6-hour RBI window, CERT-In), BCP/DR, sub-processor register, ISO 27001 / SOC 2 roadmap. Planned.
+
+Exit criteria:
+
+- No API call executes without an authenticated tenant context. Done for the data plane.
+- Isolation suite proves tenant A cannot read or mutate tenant B, for every resource type. Done.
+- A full tenant export can be produced in a documented, re-loadable format. Planned (S5).
+
 ## Phase 0: Compliance Foundation
 
 Status: first executable slice complete.

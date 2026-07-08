@@ -128,6 +128,18 @@ The platform is built for lending by or on behalf of RBI-regulated entities:
 
 The platform can support LSP/DLA models, but the regulated entity remains accountable.
 
+## Delivery Model: SaaS
+
+LoanOS India is delivered as an India-hosted multi-tenant SaaS (ADR 0002):
+
+- A tenant is one contracting regulated entity. All borrower, loan, workflow, and model data lives inside the tenant boundary. Implemented: state is partitioned per tenant, and each request is scoped to one tenant resolved from its api key.
+- Default tier is pooled compute with logically isolated, per-tenant-encrypted data; a dedicated data plane is available for REs that require it.
+- Cross-tenant access is impossible by construction and proven by a regression suite. Implemented in the current slice.
+- As the RE's IT service provider, LoanOS itself must satisfy RBI IT-outsourcing obligations (due diligence, audit rights, incident notification, BCP/DR, exit plan), CERT-In incident and log-retention duties, and DPDP data-processor duties.
+- Exit is a feature: a tenant can leave with a documented, re-loadable export of records, audit evidence, and rendered documents.
+
+Details live in the SaaS tenancy and operating model document under `docs/architecture/`.
+
 ## What Is Already Built
 
 The current codebase contains Phase 0 executable controls:
@@ -165,15 +177,18 @@ The current codebase contains Phase 0 executable controls:
 
 ## What We Build Next
 
+Recently completed: SaaS tenancy groundwork — per-tenant state partitioning, tenant-scoped API authentication, a platform control plane for minting tenants, and a cross-tenant isolation suite (Epic 11, stages S1–S3).
+
 Immediate next build:
 
-1. Product policy versioning with effective dates and explicit prepayment/foreclosure policy rules.
-2. CKYC adapter boundary and fuller V-CIP evidence vault.
-3. Data-retention, deletion-request, and third-party sharing consent workflows.
-4. Offer generation and borrower-facing execution upgrades such as PDF/eSign delivery.
-5. Recovery contact logging, hardship/restructure workflow, settlement, and write-off approval.
-6. LSP/vendor incident workflows, exit controls, and deeper vendor periodic review packs.
-7. Drift monitoring, recurring fairness evidence, and model incident pack generation.
+1. Tenant-scoped, hash-chained audit spine and the first evidence export pack (Epic 11, stage S4).
+2. Product policy versioning with effective dates and explicit prepayment/foreclosure policy rules.
+3. CKYC adapter boundary and fuller V-CIP evidence vault.
+4. Data-retention, deletion-request, and third-party sharing consent workflows.
+5. Offer generation and borrower-facing execution upgrades such as PDF/eSign delivery.
+6. Recovery contact logging, hardship/restructure workflow, settlement, and write-off approval.
+7. LSP/vendor incident workflows, exit controls, and deeper vendor periodic review packs.
+8. Drift monitoring, recurring fairness evidence, and model incident pack generation.
 
 ## Non-Goals for Now
 
