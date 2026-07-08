@@ -88,7 +88,7 @@ Tasks:
 - Offer generation.
 - KFS generation from product policy. Done.
 - Document packet model: KFS, sanction letter, agreement summary, privacy policy. First execution packet slice done.
-- Rendered LMS statement document packet. Planned.
+- Rendered LMS statement document packet. First slice done: the period statement renders as a checksum-sealed HTML/text borrower document.
 - Digital delivery evidence. First execution packet slice done.
 - Sanction readiness gate. Done.
 - Disbursement readiness gate. Done.

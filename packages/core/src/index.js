@@ -119,6 +119,7 @@ export {
 export {
   generateDocumentPacket,
   recordDocumentPacketDelivery,
+  renderLoanStatementDocument,
   validateDocumentPacketBeforeDisbursement,
   validateDocumentPacketGeneration
 } from "./document-packet.js";

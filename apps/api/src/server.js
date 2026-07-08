@@ -37,6 +37,7 @@ import {
   recordDocumentPacketDelivery,
   recordDocumentPacketGenerated,
   releaseWorkflowTask,
+  renderLoanStatementDocument,
   resolveComplaint,
   resolveBorrowerApplicationReferences,
   resolveLoanApplicationReferences,
@@ -1158,6 +1159,25 @@ async function route(req, res, dataDir) {
       periodStart: url.searchParams.get("from"),
       periodEnd: url.searchParams.get("to")
     }));
+    return;
+  }
+
+  const loanAccountStatementDocumentMatch = path.match(/^\/loan-accounts\/([^/]+)\/statement\/document$/);
+  if (method === "GET" && loanAccountStatementDocumentMatch) {
+    const state = await loadState(dataDir);
+    const loanAccount = state.loanAccounts[decodeURIComponent(loanAccountStatementDocumentMatch[1])];
+    if (!loanAccount) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Loan account not found." } });
+      return;
+    }
+    const result = renderLoanStatementDocument(loanAccount, {
+      periodStart: url.searchParams.get("from"),
+      periodEnd: url.searchParams.get("to")
+    });
+    sendJson(res, 200, {
+      document: result.document,
+      statement: result.statement
+    });
     return;
   }
 

@@ -27,7 +27,7 @@ npm run dev:api
 | `packages/core/src/compliance-controls.js` | Regulatory control catalog and finding helpers. |
 | `packages/core/src/access-control.js` | Staff actor registry, role checks, queue assignment authority, and regulated-action actor validation. |
 | `packages/core/src/grievance.js` | Complaint registry, grievance lifecycle, 30-day RBI Ombudsman clock, and RBI CMS escalation evidence. |
-| `packages/core/src/document-packet.js` | KFS, sanction letter, loan agreement summary, and privacy notice rendering plus delivery evidence controls. |
+| `packages/core/src/document-packet.js` | KFS, sanction letter, loan agreement summary, and privacy notice rendering, rendered borrower loan-statement document, plus delivery evidence controls. |
 | `packages/core/src/registries.js` | Regulated-entity and product-policy registries plus application reference resolution. |
 | `packages/core/src/borrower-onboarding.js` | Borrower profile, consent ledger, KYC records, and borrower reference resolution. |
 | `packages/core/src/eligibility.js` | Policy-driven creditworthiness/affordability engine: EMI/FOIR computation, age-at-maturity, amount/tenor bounds, and eligible/refer/ineligible decision. |
@@ -97,6 +97,7 @@ npm run dev:api
 | `GET /loan-accounts/:id` | Reads a loan account with balance summary. |
 | `GET /loan-accounts/:id/schedule` | Reads repayment schedule. |
 | `GET /loan-accounts/:id/statement` | Generates borrower statement for a `from`/`to` period. |
+| `GET /loan-accounts/:id/statement/document` | Renders the period statement as a checksum-sealed borrower-facing document. |
 | `GET /loan-accounts/:id/delinquency` | Computes DPD, bucket, overdue amounts, and earliest unpaid due. |
 | `GET /loan-accounts/:id/asset-classification` | Computes standard, SMA, or NPA asset class from DPD. |
 | `GET /loan-accounts/:id/cic-snapshot` | Generates a CIC-ready internal reporting snapshot for one account. |
@@ -150,6 +151,7 @@ npm run dev:api
 | Payment posting | Posts payment events, allocates to due interest first and principal next, and updates account status. |
 | Part-prepayment | Clears dues then reduces principal, requiring a real principal reduction, and rebuilds the future schedule either to lower each EMI over the same term (`reduce_emi`) or keep the EMI and shorten the tenure (`reduce_tenure`). |
 | Borrower statements | Generates period statement from schedule and ledger transactions. |
+| Rendered statement document | Renders the period statement into a checksum-sealed HTML/text borrower document (opening/closing balances, dues, transactions, totals) in the same shape as the execution packet. |
 | Charge controls | Blocks undisclosed charges and penal-interest/capitalizing charge designs. |
 | Waivers and reversals | Requires approval evidence for waivers and reversals, and prevents duplicate reversal of the same event. |
 | Delinquency buckets | Computes DPD bucket, earliest unpaid installment, and overdue amounts from schedule plus ledger. |
@@ -217,6 +219,7 @@ Current tests prove:
 - Repayment schedule amortizes principal over tenor.
 - API opens a loan account on disbursement and posts ledger payments.
 - API generates borrower statements from schedule and ledger.
+- API renders a checksum-sealed borrower-facing loan statement document.
 - API accrues scheduled interest into immutable ledger events, reconciles accrued interest with the schedule, and is idempotent on re-run.
 - API re-amortizes the remaining schedule on a part-prepayment in both reduce-EMI and reduce-tenure modes and blocks an unknown mode.
 - API quotes a foreclosure payoff, blocks an underpayment, settles the payoff, closes the account, and blocks re-foreclosure of a closed account.

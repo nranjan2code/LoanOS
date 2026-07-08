@@ -749,6 +749,45 @@ test("API generates borrower statement from schedule and ledger", async (t) => {
   assert(statement.closingSummary.principalOutstanding < statement.openingSummary.principalOutstanding);
 });
 
+test("API renders a borrower-facing loan statement document", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+  const application = await approveAndDisburseApplication(base);
+  const account = await (await fetch(`${base}/loan-accounts/${application.loanAccountId}`)).json();
+
+  // Span the disbursement and the first two installment due dates.
+  const from = addDays(account.schedule[0].dueDate, -40);
+  const to = account.schedule[1].dueDate;
+
+  const response = await fetch(
+    `${base}/loan-accounts/${account.loanAccountId}/statement/document?from=${from}&to=${to}`
+  );
+  assert.equal(response.status, 200);
+  const body = await response.json();
+
+  assert.equal(body.document.type, "loan_statement");
+  assert.equal(body.document.format, "html");
+  assert.equal(body.document.mimeType, "text/html");
+  assert(body.document.checksumSha256);
+  assert(body.document.html.includes("Loan Account Statement"));
+  assert(body.document.html.includes("Opening Balance"));
+  assert(body.document.html.includes("Closing Balance"));
+  assert(body.document.html.includes("disbursement"));
+  assert(body.document.text.includes("Loan Account Statement"));
+  assert.equal(body.statement.loanAccountId, account.loanAccountId);
+});
+
 test("API controls disclosed charges, waivers, and reversals", async (t) => {
   const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
   t.after(async () => {

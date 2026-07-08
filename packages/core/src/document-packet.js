@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { createFinding, summarizeFindings } from "./compliance-controls.js";
+import { generateLoanStatement } from "./loan-account.js";
 import { createLoanId, validateKfsBeforeDecision } from "./loan-policy.js";
 
 const DOCUMENT_TYPES = [
@@ -104,6 +105,66 @@ export function recordDocumentPacketDelivery(application, input = {}, now = new 
     findings: [],
     summary: summarizeFindings([])
   };
+}
+
+// Renders the LMS statement data into a borrower-facing, checksum-sealed
+// document in the same shape as the execution packet documents, so a periodic
+// account statement can be delivered and evidenced.
+export function renderLoanStatementDocument(account, input = {}, now = new Date()) {
+  if (!account) {
+    const findings = [createFinding("error", "RBI-DL-2025", "Loan account is required.", "loanAccount")];
+    return { document: null, statement: null, findings, summary: summarizeFindings(findings) };
+  }
+
+  const statement = generateLoanStatement(account, input, now);
+  const currency = statement.currency;
+  const summaryRows = [
+    ["Statement ID", statement.statementId],
+    ["Loan account", statement.loanAccountId],
+    ["Borrower ID", statement.borrowerId],
+    ["Period", `${statement.periodStart} to ${statement.periodEnd}`],
+    ["Currency", currency]
+  ];
+  const dueRows = statement.scheduledDues.map((installment) => [
+    `#${installment.installmentNumber} due ${installment.dueDate}`,
+    `${money(installment.principalDue, currency)} principal + ${money(installment.interestDue, currency)} interest = ${money(installment.totalDue, currency)}`
+  ]);
+  const transactionRows = statement.transactions.map((event) => [
+    `${String(event.eventDate).slice(0, 10)} ${event.type}`,
+    money(event.amount, currency)
+  ]);
+  const totalsRows = [
+    ["Principal due", money(statement.totals.principalDue, currency)],
+    ["Interest due", money(statement.totals.interestDue, currency)],
+    ["Charges assessed", money(statement.totals.chargesAssessed, currency)],
+    ["Charges waived", money(statement.totals.chargesWaived, currency)],
+    ["Payments received", money(statement.totals.payments, currency)]
+  ];
+  const body = [
+    tableHtml(summaryRows),
+    heading("Opening Balance"),
+    tableHtml(balanceRows(statement.openingSummary, currency)),
+    heading("Scheduled Dues"),
+    dueRows.length ? tableHtml(dueRows) : paragraph("No installments fell due in this period."),
+    heading("Transactions"),
+    transactionRows.length ? tableHtml(transactionRows) : paragraph("No transactions in this period."),
+    heading("Period Totals"),
+    tableHtml(totalsRows),
+    heading("Closing Balance"),
+    tableHtml(balanceRows(statement.closingSummary, currency))
+  ].join("\n");
+
+  const rendered = document("loan_statement", "Loan Account Statement", body, statement.generatedAt, ["RBI-DL-2025"]);
+  return { document: rendered, statement, findings: [], summary: summarizeFindings([]) };
+}
+
+function balanceRows(summary, currency) {
+  return [
+    ["Principal outstanding", money(summary.principalOutstanding, currency)],
+    ["Interest outstanding", money(summary.interestOutstanding, currency)],
+    ["Charges outstanding", money(summary.chargesOutstanding, currency)],
+    ["Total outstanding", money(summary.totalOutstanding, currency)]
+  ];
 }
 
 export function validateDocumentPacketGeneration(application) {
