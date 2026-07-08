@@ -80,7 +80,7 @@ Goal: complete origination from application to sanction and disbursement readine
 Tasks:
 
 - Application state machine. Done.
-- Eligibility rules engine.
+- Eligibility rules engine. First slice done: EMI/FOIR affordability, age-at-maturity, and amount/tenor bounds gate approval.
 - Underwriting policy rules.
 - Manual review queue. Partial.
 - Maker-checker decision approval. Done.

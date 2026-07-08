@@ -18,6 +18,7 @@ import {
   deriveWorkflowTasks,
   enrichComplaint,
   escalateComplaintToRbiCms,
+  evaluateEligibility,
   evaluateLoanApplication,
   generateDocumentPacket,
   generateCicSnapshot,
@@ -697,6 +698,48 @@ async function route(req, res, dataDir) {
     return;
   }
 
+  const eligibilityMatch = path.match(/^\/loans\/applications\/([^/]+)\/eligibility$/);
+  if (method === "GET" && eligibilityMatch) {
+    const state = await loadState(dataDir);
+    const application = state.loanApplications[eligibilityMatch[1]];
+    if (!application) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Loan application not found." } });
+      return;
+    }
+    sendJson(res, 200, application.eligibility ?? null);
+    return;
+  }
+  if (method === "POST" && eligibilityMatch) {
+    const state = await loadState(dataDir);
+    const application = state.loanApplications[eligibilityMatch[1]];
+    if (!application) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Loan application not found." } });
+      return;
+    }
+    const eligibility = evaluateEligibility(application);
+    const stored = {
+      ...application,
+      eligibility: eligibility.assessment
+    };
+    const nextState = appendEvent(
+      {
+        ...state,
+        loanApplications: {
+          ...state.loanApplications,
+          [stored.applicationId]: stored
+        }
+      },
+      {
+        type: "loan.eligibility.assessed",
+        applicationId: stored.applicationId,
+        decision: eligibility.assessment.decision
+      }
+    );
+    await saveState(nextState, dataDir);
+    sendJson(res, 200, eligibility);
+    return;
+  }
+
   const kfsMatch = path.match(/^\/loans\/applications\/([^/]+)\/kfs$/);
   if (method === "POST" && kfsMatch) {
     const body = await readJson(req);
@@ -745,9 +788,14 @@ async function route(req, res, dataDir) {
       return;
     }
 
-    const decisionApplication = {
+    const eligibility = evaluateEligibility({
       ...application,
       aiDecision: body.aiDecision ?? application.aiDecision
+    });
+    const decisionApplication = {
+      ...application,
+      aiDecision: body.aiDecision ?? application.aiDecision,
+      eligibility: eligibility.assessment
     };
     const preDecision = evaluateLoanApplication(decisionApplication, {
       modelRegistry: state.modelRegistry
@@ -765,7 +813,10 @@ async function route(req, res, dataDir) {
       return;
     }
     const kfsCheck = validateKfsBeforeDecision(application);
-    const findings = [...preDecision.findings, ...kfsCheck.findings];
+    // An ineligible borrower cannot be approved; declines still proceed with the
+    // assessment stored as evidence.
+    const eligibilityFindings = body.status === "approved" ? eligibility.findings : [];
+    const findings = [...preDecision.findings, ...kfsCheck.findings, ...eligibilityFindings];
     const proposal = proposeDecision(decisionApplication, body, findings);
     if (proposal.summary.status === "blocked" && !proposal.requiresHumanReview) {
       sendJson(res, 422, {

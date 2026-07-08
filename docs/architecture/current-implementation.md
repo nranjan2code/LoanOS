@@ -30,6 +30,7 @@ npm run dev:api
 | `packages/core/src/document-packet.js` | KFS, sanction letter, loan agreement summary, and privacy notice rendering plus delivery evidence controls. |
 | `packages/core/src/registries.js` | Regulated-entity and product-policy registries plus application reference resolution. |
 | `packages/core/src/borrower-onboarding.js` | Borrower profile, consent ledger, KYC records, and borrower reference resolution. |
+| `packages/core/src/eligibility.js` | Policy-driven creditworthiness/affordability engine: EMI/FOIR computation, age-at-maturity, amount/tenor bounds, and eligible/refer/ineligible decision. |
 | `packages/core/src/application-workflow.js` | LOS application state machine, KFS workflow, human review, decision proposal, maker-checker approval, disbursement transition. |
 | `packages/core/src/loan-account.js` | LMS loan account creation, amortization schedule, ledger balance reconstruction, payment posting, statements, charges, waivers, reversals, delinquency, recovery controls, asset classification, and CIC snapshots. |
 | `packages/core/src/loan-policy.js` | India-only loan validation, KFS validation, sanction readiness, disbursement checks. |
@@ -81,6 +82,8 @@ npm run dev:api
 | `POST /workflow/tasks/:id/comments` | Adds an audit comment to an active task. |
 | `POST /loans/applications` | Creates application and runs compliance preflight. |
 | `GET /loans/applications/:id` | Reads stored loan application. |
+| `GET /loans/applications/:id/eligibility` | Reads the stored eligibility assessment. |
+| `POST /loans/applications/:id/eligibility` | Runs the eligibility engine and stores the affordability/creditworthiness assessment. |
 | `POST /loans/applications/:id/kfs` | Generates KFS and attaches delivery/acceptance evidence. |
 | `POST /loans/applications/:id/decision` | Proposes approve/decline decision after compliance gates. |
 | `POST /loans/applications/:id/human-reviews` | Records human review for material AI/model-assisted decisions. |
@@ -119,6 +122,7 @@ npm run dev:api
 | Staff actor registry | Requires India-operational actors, active status, and recognized roles. |
 | Borrower-backed applications | Application can reference `borrowerId`; borrower, consent, KYC, and economic profile are resolved before preflight. |
 | LOS state machine | Tracks preflight, KFS issued/accepted, ready for decision, human review required, pending decision approval, approved/declined, and disbursed states. |
+| Eligibility rules engine | Computes reducing-balance EMI, FOIR against product ceiling, age at maturity, and amount/tenor bounds; returns eligible, refer, or ineligible with evidence, and blocks approval of ineligible borrowers while allowing declines. |
 | Maker-checker decision approval | Decision submission creates a pending proposal; approval requires a registered `credit_checker` actor different from the maker before disbursement. |
 | Human review hook | Material AI/model decisions without human review are routed to `human_review_required`; human-review recording requires a registered `human_reviewer`. |
 | Regulated-action RBAC | Credit proposal, checker approval, human review, recovery assignment, and LWS task actions validate actor role and queue policy. |
@@ -183,6 +187,8 @@ Current tests prove:
 - Borrower profile, consent, and KYC records resolve an application.
 - Revoked consent and expired KYC block borrower resolution.
 - API supports borrower-backed applications without embedded borrower/KYC/consent blobs.
+- Eligibility engine computes affordability and returns eligible, refer, and ineligible outcomes.
+- API assesses eligibility and blocks approval of an ineligible borrower while allowing a decline.
 - API requires maker-checker approval before disbursement.
 - API blocks disbursement until the execution document packet is generated and delivered.
 - API routes material AI decisions to human review before decision proposal.

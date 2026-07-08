@@ -117,6 +117,12 @@ export {
 } from "./document-packet.js";
 
 export {
+  ELIGIBILITY_DECISIONS,
+  estimateEmi,
+  evaluateEligibility
+} from "./eligibility.js";
+
+export {
   WORKFLOW_TASK_STATUSES,
   assignWorkflowTask,
   commentOnWorkflowTask,

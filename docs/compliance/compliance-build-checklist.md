@@ -18,6 +18,7 @@ Legend:
 | LSP agreement and due diligence | LSP registry, due diligence workflow, periodic review. | Planned |
 | Multiple-lender LSP offer neutrality | Offer marketplace with ranking disclosure and dark-pattern checks. | Planned |
 | Borrower economic profile | Age, occupation, income required in preflight. | Done |
+| Creditworthiness assessment before sanction | Eligibility engine computes EMI/FOIR affordability, age-at-maturity, and amount/tenor bounds; ineligible borrowers cannot be approved. | Done |
 | KFS before execution | KFS validation and acceptance gate. | Done |
 | Product policy before origination | Product registry validates active RE link, board approval, INR, amount/tenor bounds, APR, cooling-off, recovery mechanism, eligibility, and charges. | Done |
 | Digitally delivered KFS/documents | KFS delivery evidence gates decision; execution document packet delivery gates disbursement. | Done |

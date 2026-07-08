@@ -9,6 +9,9 @@ import {
   classifyLoanAsset,
   computeDelinquency,
   createModelRegistryState,
+  ELIGIBILITY_DECISIONS,
+  estimateEmi,
+  evaluateEligibility,
   evaluateLoanApplication,
   generateRepaymentSchedule,
   registerModel,
@@ -1282,6 +1285,137 @@ test("API raises RBI CMS escalation task for 30-day grievance breach", async (t)
   assert.equal(escalation.body.complaint.escalations[0].rbiCmsRef, "CMS-2026-0001");
 });
 
+test("eligibility engine assesses affordability and product bounds", () => {
+  const affordable = evaluateEligibility(eligibilityApplication(), { now: new Date("2026-07-08T00:00:00.000Z") });
+  assert.equal(affordable.assessment.decision, ELIGIBILITY_DECISIONS.ELIGIBLE);
+  assert.equal(affordable.summary.status, "ready");
+  assert(Number.isFinite(affordable.assessment.metrics.estimatedEmi));
+  assert.equal(affordable.assessment.metrics.estimatedEmi, estimateEmi(125000, 1800, 12));
+
+  const foirBreach = evaluateEligibility(
+    eligibilityApplication({
+      economicProfile: { occupation: "salaried", monthlyIncome: 75000 },
+      product: { requestedAmount: 450000, requestedTenorMonths: 12 }
+    }),
+    { now: new Date("2026-07-08T00:00:00.000Z") }
+  );
+  assert.equal(foirBreach.assessment.decision, ELIGIBILITY_DECISIONS.INELIGIBLE);
+  assert(foirBreach.assessment.metrics.foir > 0.5);
+  assert(foirBreach.findings.some((finding) => finding.path === "economicProfile.monthlyIncome"));
+
+  const overMax = evaluateEligibility(
+    eligibilityApplication({ product: { requestedAmount: 600000, requestedTenorMonths: 12 } }),
+    { now: new Date("2026-07-08T00:00:00.000Z") }
+  );
+  assert.equal(overMax.assessment.decision, ELIGIBILITY_DECISIONS.INELIGIBLE);
+  assert(overMax.findings.some((finding) => finding.path === "product.requestedAmount"));
+
+  const refer = evaluateEligibility(
+    eligibilityApplication({
+      economicProfile: { occupation: "salaried", monthlyIncome: 30000 },
+      product: { requestedAmount: 140000, requestedTenorMonths: 12 }
+    }),
+    { now: new Date("2026-07-08T00:00:00.000Z") }
+  );
+  assert.equal(refer.assessment.decision, ELIGIBILITY_DECISIONS.REFER);
+  assert.equal(refer.summary.status, "review");
+});
+
+test("API assesses eligibility and blocks approval of an ineligible borrower", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+  const application = await createRegistryBackedApplication(base, { requestedAmount: 450000 });
+
+  const eligibilityResponse = await postJson(`${base}/loans/applications/${application.applicationId}/eligibility`, {});
+  assert.equal(eligibilityResponse.status, 200);
+  assert.equal(eligibilityResponse.body.assessment.decision, "ineligible");
+  assert(eligibilityResponse.body.assessment.metrics.foir > 0.5);
+
+  const storedEligibility = await fetch(`${base}/loans/applications/${application.applicationId}/eligibility`);
+  assert.equal(storedEligibility.status, 200);
+  assert.equal((await storedEligibility.json()).decision, "ineligible");
+
+  assert.equal(
+    (
+      await postJson(`${base}/loans/applications/${application.applicationId}/kfs`, {
+        acceptance: {
+          acceptedAt: "2026-07-08T07:00:00.000Z",
+          deliveryChannel: "email",
+          deliveryRef: "email_msg_123"
+        }
+      })
+    ).status,
+    201
+  );
+
+  const approval = await postJson(`${base}/loans/applications/${application.applicationId}/decision`, {
+    status: "approved",
+    proposedBy: "credit-maker-1",
+    reason: "Override attempt"
+  });
+  assert.equal(approval.status, 422);
+  assert.equal(approval.body.error.code, "decision_blocked");
+  assert(approval.body.findings.some((finding) => finding.path === "economicProfile.monthlyIncome"));
+
+  const decline = await postJson(`${base}/loans/applications/${application.applicationId}/decision`, {
+    status: "declined",
+    proposedBy: "credit-maker-1",
+    reason: "Affordability not met"
+  });
+  assert.equal(decline.status, 202);
+  assert.equal(decline.body.status, "pending_decision_approval");
+});
+
+function eligibilityApplication(overrides = {}) {
+  const base = {
+    borrower: {
+      borrowerId: "bor_001",
+      residencyCountry: "IN",
+      primaryAddressCountry: "IN",
+      dateOfBirth: "1990-01-01"
+    },
+    economicProfile: {
+      occupation: "salaried",
+      monthlyIncome: 75000
+    },
+    product: {
+      productCode: "PL_IN_DIGITAL",
+      currency: "INR",
+      requestedAmount: 125000,
+      requestedTenorMonths: 12,
+      annualInterestRateBps: 1800,
+      aprBps: 2100,
+      minAmount: 10000,
+      maxAmount: 500000,
+      minTenorMonths: 3,
+      maxTenorMonths: 36,
+      eligibility: {
+        minAgeYears: 21,
+        maxAgeYears: 65,
+        minMonthlyIncome: 25000
+      }
+    }
+  };
+  return {
+    ...base,
+    ...overrides,
+    borrower: { ...base.borrower, ...(overrides.borrower ?? {}) },
+    economicProfile: { ...base.economicProfile, ...(overrides.economicProfile ?? {}) },
+    product: { ...base.product, ...(overrides.product ?? {}) }
+  };
+}
+
 function validApplication() {
   return {
     tenant: {
@@ -1544,7 +1678,7 @@ async function postJson(url, payload) {
   };
 }
 
-async function createRegistryBackedApplication(base) {
+async function createRegistryBackedApplication(base, overrides = {}) {
   await seedOperationalActors(base);
   assert.equal((await postJson(`${base}/regulated-entities`, validRegulatedEntity())).status, 201);
   assert.equal((await postJson(`${base}/products`, validProductPolicy())).status, 201);
@@ -1556,8 +1690,8 @@ async function createRegistryBackedApplication(base) {
     regulatedEntityId: "re_example_nbfc",
     productId: "prod_personal_loan",
     borrowerId: "bor_001",
-    requestedAmount: 125000,
-    requestedTenorMonths: 12,
+    requestedAmount: overrides.requestedAmount ?? 125000,
+    requestedTenorMonths: overrides.requestedTenorMonths ?? 12,
     disbursement: validApplication().disbursement,
     repayment: validApplication().repayment
   });
