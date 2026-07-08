@@ -31,7 +31,7 @@ Deliverables:
 - Product registry and policy versioning. First slice done.
 - Borrower onboarding and consent ledger. First slice done.
 - KYC state machine with CKYC/V-CIP placeholders. First slice done.
-- Underwriting workflow with human review. Eligibility/affordability engine first slice done; refer-band applications route to a manual underwriting queue.
+- Underwriting workflow with human review. Eligibility/affordability engine first slice done; refer-band applications route to a manual underwriting queue, and approving a referred application requires a recorded manual underwriting override (underwriter, reason, policy reference).
 - Decision proposal and maker-checker approval. First slice done.
 - KFS generation and digitally delivered document packet. First slice done.
 - Sanction and disbursement readiness checks. First slice done.
@@ -65,7 +65,7 @@ Exit criteria:
 
 ## Phase 3: LWS and Compliance Operations
 
-Status: started. Current slices derive workflow tasks from LOS/LMS/grievance state, attach SLA clocks, persist assignment/start/release/comment audit, enforce staff actor roles for regulated workflow actions, and manage the 30-day complaint escalation clock.
+Status: started. Current slices derive workflow tasks from LOS/LMS/grievance state, attach SLA clocks, persist assignment/start/release/comment audit, enforce staff actor roles for regulated workflow actions, capture manual underwriting override evidence on referred-application approvals, and manage the 30-day complaint escalation clock.
 
 Deliverables:
 

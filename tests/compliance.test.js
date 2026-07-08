@@ -1031,13 +1031,86 @@ test("API routes a referred application to a manual underwriting task", async (t
   const creditDecisionTasksResponse = await fetch(`${base}/workflow/tasks?type=application.credit_decision`);
   assert.equal((await creditDecisionTasksResponse.json()).count, 0);
 
-  const decision = await postJson(`${base}/loans/applications/${application.applicationId}/decision`, {
+  const withoutOverride = await postJson(`${base}/loans/applications/${application.applicationId}/decision`, {
     status: "approved",
     proposedBy: "credit-maker-1",
     reason: "Manual underwriting cleared affordability"
   });
+  assert.equal(withoutOverride.status, 422);
+  assert.equal(withoutOverride.body.error.code, "decision_blocked");
+  assert(withoutOverride.body.findings.some((finding) => finding.path === "manualUnderwriting"));
+
+  const decision = await postJson(`${base}/loans/applications/${application.applicationId}/decision`, {
+    status: "approved",
+    proposedBy: "credit-maker-1",
+    reason: "Manual underwriting cleared affordability",
+    manualUnderwriting: {
+      underwriterId: "credit-maker-1",
+      reason: "Stable salaried income and 9-month bank statements support the review-band FOIR.",
+      policyReference: "board_underwriting_policy_v1"
+    }
+  });
   assert.equal(decision.status, 202);
   assert.equal(decision.body.status, "pending_decision_approval");
+  assert.equal(decision.body.pendingDecision.manualUnderwriting.underwriterId, "credit-maker-1");
+  assert.equal(decision.body.pendingDecision.manualUnderwriting.policyReference, "board_underwriting_policy_v1");
+});
+
+test("API carries manual underwriting override into the approved decision", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+  const application = await createRegistryBackedApplication(base, { requestedAmount: 360000 });
+
+  assert.equal(
+    (
+      await postJson(`${base}/loans/applications/${application.applicationId}/kfs`, {
+        acceptance: {
+          acceptedAt: "2026-07-08T07:00:00.000Z",
+          deliveryChannel: "email",
+          deliveryRef: "email_msg_123"
+        }
+      })
+    ).status,
+    201
+  );
+
+  const decision = await postJson(`${base}/loans/applications/${application.applicationId}/decision`, {
+    status: "approved",
+    proposedBy: "credit-maker-1",
+    reason: "Review-band affordability cleared on manual assessment",
+    manualUnderwriting: {
+      underwriterId: "credit-maker-1",
+      reason: "Compensating savings balance and clean bureau support the review-band FOIR.",
+      policyReference: "board_underwriting_policy_v1",
+      compensatingFactors: ["savings_balance", "clean_bureau"]
+    }
+  });
+  assert.equal(decision.status, 202);
+
+  const approval = await postJson(`${base}/loans/applications/${application.applicationId}/approvals`, {
+    outcome: "approved",
+    approvedBy: "credit-checker-1",
+    approvalRef: "approval_ref_refer_1"
+  });
+  assert.equal(approval.status, 200);
+  assert.equal(approval.body.status, "approved");
+  assert.equal(approval.body.decision.manualUnderwriting.underwriterId, "credit-maker-1");
+  assert.equal(approval.body.decision.manualUnderwriting.policyReference, "board_underwriting_policy_v1");
+  assert.deepEqual(approval.body.decision.manualUnderwriting.compensatingFactors, [
+    "savings_balance",
+    "clean_bureau"
+  ]);
 });
 
 test("API exposes LWS decision approval task with assignment lifecycle", async (t) => {

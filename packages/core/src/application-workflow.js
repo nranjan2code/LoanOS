@@ -151,6 +151,7 @@ export function proposeDecision(application, input, findings = [], now = new Dat
   if (!["approved", "declined"].includes(input?.status)) {
     allFindings.push(createFinding("error", "RBI-DL-2025", "Decision status must be approved or declined.", "status"));
   }
+  allFindings.push(...manualUnderwritingFindings(application, input));
 
   const hasHumanReviewWarning = allFindings.some((finding) => finding.path === "aiDecision.humanReviewRef");
   if (hasHumanReviewWarning) {
@@ -194,6 +195,7 @@ export function proposeDecision(application, input, findings = [], now = new Dat
     proposedBy: input.proposedBy ?? input.decidedBy,
     proposedAt: now.toISOString(),
     reason: input.reason ?? null,
+    manualUnderwriting: manualUnderwritingEvidence(application, input, now),
     aiDecision: input.aiDecision ?? application.aiDecision ?? null
   };
 
@@ -275,6 +277,7 @@ export function applyDecisionApproval(application, input, now = new Date()) {
           approvalRef: approval.approvalRef,
           decidedAt: approval.approvedAt,
           reason: application.pendingDecision.reason,
+          manualUnderwriting: application.pendingDecision.manualUnderwriting ?? null,
           aiDecision: application.pendingDecision.aiDecision
         }
       : null;
@@ -351,6 +354,60 @@ export function recordDocumentPacketDelivered(application, packet, now = new Dat
     },
     now
   );
+}
+
+// A `refer`-band eligibility outcome means the affordability engine could not
+// clear the borrower straight through. RBI Digital Lending requires a
+// documented creditworthiness judgement, so an approval of a referred
+// application must carry an explicit manual underwriting override.
+function requiresManualUnderwriting(application, input) {
+  return application.eligibility?.decision === "refer" && input?.status === "approved";
+}
+
+function manualUnderwritingFindings(application, input) {
+  if (!requiresManualUnderwriting(application, input)) {
+    return [];
+  }
+
+  const override = input.manualUnderwriting;
+  if (!override || typeof override !== "object") {
+    return [
+      createFinding(
+        "error",
+        "RBI-DL-2025",
+        "Referred application requires a manual underwriting override before approval.",
+        "manualUnderwriting"
+      )
+    ];
+  }
+
+  const findings = [];
+  if (!override.underwriterId) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Manual underwriting override requires underwriterId.", "manualUnderwriting.underwriterId"));
+  }
+  if (!override.reason) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Manual underwriting override requires a documented reason.", "manualUnderwriting.reason"));
+  }
+  if (!override.policyReference) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Manual underwriting override requires a policyReference.", "manualUnderwriting.policyReference"));
+  }
+  return findings;
+}
+
+function manualUnderwritingEvidence(application, input, now) {
+  if (!requiresManualUnderwriting(application, input) || !input.manualUnderwriting) {
+    return null;
+  }
+
+  const override = input.manualUnderwriting;
+  return {
+    underwriterId: override.underwriterId,
+    reason: override.reason,
+    policyReference: override.policyReference,
+    compensatingFactors: Array.isArray(override.compensatingFactors) ? override.compensatingFactors : [],
+    eligibilityId: application.eligibility?.eligibilityId ?? null,
+    recordedAt: now.toISOString()
+  };
 }
 
 function withWorkflowEvent(application, event, now = new Date()) {

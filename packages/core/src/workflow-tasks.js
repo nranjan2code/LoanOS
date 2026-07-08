@@ -219,7 +219,7 @@ function deriveApplicationTasks(applications, asOf) {
           applicationTask(application, {
             type: "application.manual_underwriting",
             title: "Manual underwriting review for referred application",
-            description: "Eligibility engine referred this application for manual affordability judgement before a credit decision.",
+            description: "Eligibility engine referred this application for manual affordability judgement. Approval requires a manual underwriting override with underwriter, reason, and policy reference.",
             queue: "credit_ops",
             role: "credit_officer",
             priority: "high",
@@ -228,10 +228,11 @@ function deriveApplicationTasks(applications, asOf) {
             action: {
               method: "POST",
               path: `/loans/applications/${application.applicationId}/decision`,
-              description: "Record manual underwriting judgement as an approve or decline decision."
+              description: "Approve with a manual underwriting override (underwriterId, reason, policyReference) or record a decline."
             },
             context: {
-              eligibility: application.eligibility
+              eligibility: application.eligibility,
+              requiresManualUnderwritingOverride: true
             }
           })
         ];

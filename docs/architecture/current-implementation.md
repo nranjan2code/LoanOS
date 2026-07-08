@@ -31,7 +31,7 @@ npm run dev:api
 | `packages/core/src/registries.js` | Regulated-entity and product-policy registries plus application reference resolution. |
 | `packages/core/src/borrower-onboarding.js` | Borrower profile, consent ledger, KYC records, and borrower reference resolution. |
 | `packages/core/src/eligibility.js` | Policy-driven creditworthiness/affordability engine: EMI/FOIR computation, age-at-maturity, amount/tenor bounds, and eligible/refer/ineligible decision. |
-| `packages/core/src/application-workflow.js` | LOS application state machine, KFS workflow, human review, decision proposal, maker-checker approval, disbursement transition. |
+| `packages/core/src/application-workflow.js` | LOS application state machine, KFS workflow, human review, decision proposal, manual underwriting override gate for referred applications, maker-checker approval, disbursement transition. |
 | `packages/core/src/loan-account.js` | LMS loan account creation, amortization schedule, ledger balance reconstruction, payment posting, statements, charges, waivers, reversals, delinquency, recovery controls, asset classification, and CIC snapshots. |
 | `packages/core/src/loan-policy.js` | India-only loan validation, KFS validation, sanction readiness, disbursement checks. |
 | `packages/core/src/model-governance.js` | AI/model inventory, model status, global/model kill switch, runtime model-use evaluation. |
@@ -124,6 +124,7 @@ npm run dev:api
 | LOS state machine | Tracks preflight, KFS issued/accepted, ready for decision, human review required, pending decision approval, approved/declined, and disbursed states. |
 | Eligibility rules engine | Computes reducing-balance EMI, FOIR against product ceiling, age at maturity, and amount/tenor bounds; returns eligible, refer, or ineligible with evidence, and blocks approval of ineligible borrowers while allowing declines. |
 | Manual underwriting referral | A `refer` eligibility outcome routes the ready-for-decision application to a dedicated manual underwriting LWS task instead of the straight-through credit-decision task. |
+| Manual underwriting override | Approving a `refer`-band application requires a manual underwriting override with underwriter, reason, and policy reference; the override is stored on the pending decision and carried into the final approved decision as evidence. Declines are unaffected. |
 | Maker-checker decision approval | Decision submission creates a pending proposal; approval requires a registered `credit_checker` actor different from the maker before disbursement. |
 | Human review hook | Material AI/model decisions without human review are routed to `human_review_required`; human-review recording requires a registered `human_reviewer`. |
 | Regulated-action RBAC | Credit proposal, checker approval, human review, recovery assignment, and LWS task actions validate actor role and queue policy. |
@@ -191,6 +192,7 @@ Current tests prove:
 - Eligibility engine computes affordability and returns eligible, refer, and ineligible outcomes.
 - API assesses eligibility and blocks approval of an ineligible borrower while allowing a decline.
 - API routes a refer-band application to a manual underwriting task instead of the straight-through credit-decision task.
+- API blocks approval of a refer-band application until a manual underwriting override is recorded and carries that override into the final approved decision.
 - API requires maker-checker approval before disbursement.
 - API blocks disbursement until the execution document packet is generated and delivered.
 - API routes material AI decisions to human review before decision proposal.
