@@ -1,0 +1,16 @@
+{
+  "name": "loanos-india",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "India-only LoanOS foundation covering LOS, LMS, LWS, and compliance-first AI governance.",
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "dev:api": "node apps/api/src/server.js",
+    "start": "node apps/api/src/server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
+

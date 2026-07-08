@@ -1,0 +1,193 @@
+# Current Implementation Map
+
+This document describes what exists in the repository today.
+
+## Runtime Shape
+
+The current implementation is intentionally small:
+
+- No external npm dependencies.
+- Node.js built-in HTTP server.
+- File-backed JSON state under `.loanos-data/state.json`.
+- Core domain logic in `packages/core/src`.
+- API wrapper in `apps/api/src`.
+- Automated tests in `tests/`.
+
+Run it:
+
+```bash
+npm test
+npm run dev:api
+```
+
+## File Map
+
+| Path | Role |
+| --- | --- |
+| `packages/core/src/compliance-controls.js` | Regulatory control catalog and finding helpers. |
+| `packages/core/src/access-control.js` | Staff actor registry, role checks, queue assignment authority, and regulated-action actor validation. |
+| `packages/core/src/grievance.js` | Complaint registry, grievance lifecycle, 30-day RBI Ombudsman clock, and RBI CMS escalation evidence. |
+| `packages/core/src/registries.js` | Regulated-entity and product-policy registries plus application reference resolution. |
+| `packages/core/src/borrower-onboarding.js` | Borrower profile, consent ledger, KYC records, and borrower reference resolution. |
+| `packages/core/src/application-workflow.js` | LOS application state machine, KFS workflow, human review, decision proposal, maker-checker approval, disbursement transition. |
+| `packages/core/src/loan-account.js` | LMS loan account creation, amortization schedule, ledger balance reconstruction, payment posting, statements, charges, waivers, reversals, delinquency, recovery controls, asset classification, and CIC snapshots. |
+| `packages/core/src/loan-policy.js` | India-only loan validation, KFS validation, sanction readiness, disbursement checks. |
+| `packages/core/src/model-governance.js` | AI/model inventory, model status, global/model kill switch, runtime model-use evaluation. |
+| `packages/core/src/workflow-tasks.js` | LWS task derivation from LOS/LMS state plus task assignment, start, release, and comment lifecycle. |
+| `packages/core/src/index.js` | Public exports for core domain modules. |
+| `apps/api/src/file-store.js` | Local JSON state load/save helpers. |
+| `apps/api/src/server.js` | HTTP API endpoints for compliance controls, AI models, kill switch, workflow tasks, applications, and loan accounts. |
+| `tests/compliance.test.js` | Regression tests for the first compliance gates. |
+
+## Implemented API Endpoints
+
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /health` | Service health. |
+| `GET /compliance/controls` | Returns regulatory control catalog. |
+| `GET /regulated-entities` | Lists regulated entities. |
+| `POST /regulated-entities` | Creates or updates a regulated entity after compliance validation. |
+| `GET /regulated-entities/:id` | Reads one regulated entity. |
+| `GET /products` | Lists product policies. |
+| `POST /products` | Creates or updates a product policy after compliance validation. |
+| `GET /products/:id` | Reads one product policy. |
+| `GET /borrowers` | Lists borrower profiles. |
+| `POST /borrowers` | Creates or updates a borrower profile after India/KYC/economic-profile validation. |
+| `GET /borrowers/:id` | Reads one borrower profile. |
+| `GET /borrowers/:id/consents` | Lists borrower consent records. |
+| `POST /borrowers/:id/consents` | Creates or updates a borrower consent record. |
+| `GET /borrowers/:id/kyc-records` | Lists borrower KYC records. |
+| `POST /borrowers/:id/kyc-records` | Creates or updates a borrower KYC record. |
+| `GET /staff/actors` | Lists operational staff actors. |
+| `POST /staff/actors` | Creates or updates an operational actor with roles, queues, and assignment authority. |
+| `GET /staff/actors/:id` | Reads one operational staff actor. |
+| `GET /complaints` | Lists complaints with computed SLA and effective status. |
+| `POST /complaints` | Creates a borrower complaint with acknowledgement evidence. |
+| `GET /complaints/:id` | Reads one complaint with computed SLA and effective status. |
+| `POST /complaints/:id/assignments` | Assigns a complaint to a grievance officer. |
+| `POST /complaints/:id/reviews` | Starts grievance-officer review. |
+| `POST /complaints/:id/resolution` | Records complaint resolution and closure evidence. |
+| `POST /complaints/:id/rbi-cms-escalation` | Records RBI CMS escalation reference and reason. |
+| `GET /ai/models` | Returns model registry and kill-switch state. |
+| `POST /ai/models` | Registers or updates a model in inventory. |
+| `POST /ai/kill-switch` | Triggers global or model-level kill switch. |
+| `POST /ai/kill-switch/clear` | Clears global kill switch with approval reference. |
+| `GET /workflow/tasks` | Lists active LWS tasks derived from application and loan-account state. |
+| `GET /workflow/tasks/:id` | Reads one active LWS task. |
+| `POST /workflow/tasks/:id/assignments` | Assigns an active task and stores assignment audit. |
+| `POST /workflow/tasks/:id/start` | Starts an assigned task and stores actor audit. |
+| `POST /workflow/tasks/:id/release` | Releases a task back to open queue with reason. |
+| `POST /workflow/tasks/:id/comments` | Adds an audit comment to an active task. |
+| `POST /loans/applications` | Creates application and runs compliance preflight. |
+| `GET /loans/applications/:id` | Reads stored loan application. |
+| `POST /loans/applications/:id/kfs` | Generates KFS and attaches delivery/acceptance evidence. |
+| `POST /loans/applications/:id/decision` | Proposes approve/decline decision after compliance gates. |
+| `POST /loans/applications/:id/human-reviews` | Records human review for material AI/model-assisted decisions. |
+| `POST /loans/applications/:id/approvals` | Applies maker-checker approval/rejection for a pending decision proposal. |
+| `POST /loans/applications/:id/disbursement` | Records disbursement after fund-flow and KFS checks. |
+| `GET /loan-accounts` | Lists loan accounts. |
+| `GET /loan-accounts/:id` | Reads a loan account with balance summary. |
+| `GET /loan-accounts/:id/schedule` | Reads repayment schedule. |
+| `GET /loan-accounts/:id/statement` | Generates borrower statement for a `from`/`to` period. |
+| `GET /loan-accounts/:id/delinquency` | Computes DPD, bucket, overdue amounts, and earliest unpaid due. |
+| `GET /loan-accounts/:id/asset-classification` | Computes standard, SMA, or NPA asset class from DPD. |
+| `GET /loan-accounts/:id/cic-snapshot` | Generates a CIC-ready internal reporting snapshot for one account. |
+| `GET /reporting/cic/snapshots` | Generates CIC-ready internal reporting snapshots for the portfolio. |
+| `POST /loan-accounts/:id/recovery-assignments` | Assigns a recovery agent only with borrower notice evidence. |
+| `POST /loan-accounts/:id/charges` | Assesses a KFS-disclosed charge. |
+| `POST /loan-accounts/:id/payments` | Posts payment ledger event and returns updated balance summary. |
+| `POST /loan-accounts/:id/cash-recoveries` | Posts noticed-agent cash recovery with same-day reflection control. |
+| `POST /loan-accounts/:id/waivers` | Posts approved charge waiver. |
+| `POST /loan-accounts/:id/reversals` | Posts approved reversal of a ledger event. |
+
+## Current Control Coverage
+
+| Control | Current behavior |
+| --- | --- |
+| India-only lending | Blocks non-IN borrower residency/address, non-INR currency, non-IN data storage. |
+| Regulated entity | Requires supported RE type and grievance officer. |
+| Regulated entity registry | Requires active India RE, website, privacy policy, grievance officer, data-residency posture, and board policy references. |
+| Product policy registry | Requires active product linked to an active RE, INR, amount/tenor bounds, APR, cooling-off, recovery mechanism, eligibility, board approval, and safe charge design. |
+| Registry-backed applications | Application can reference `regulatedEntityId` and `productId`/`productCode`; policy facts are resolved before preflight. |
+| Borrower profile registry | Requires active India borrower profile, contact channel, and economic profile for active borrowers. |
+| Consent ledger | Requires borrower-linked purpose, notice version, granted/revoked status, and evidence timestamps. |
+| KYC record registry | Requires borrower-linked KYC status, risk category, verified timestamp, V-CIP India storage, and no Aadhaar biometric/OTP/PID persistence. |
+| Staff actor registry | Requires India-operational actors, active status, and recognized roles. |
+| Borrower-backed applications | Application can reference `borrowerId`; borrower, consent, KYC, and economic profile are resolved before preflight. |
+| LOS state machine | Tracks preflight, KFS issued/accepted, ready for decision, human review required, pending decision approval, approved/declined, and disbursed states. |
+| Maker-checker decision approval | Decision submission creates a pending proposal; approval requires a registered `credit_checker` actor different from the maker before disbursement. |
+| Human review hook | Material AI/model decisions without human review are routed to `human_review_required`; human-review recording requires a registered `human_reviewer`. |
+| Regulated-action RBAC | Credit proposal, checker approval, human review, recovery assignment, and LWS task actions validate actor role and queue policy. |
+| Complaint workflow | Tracks received, assigned, under-review, resolved, escalation-due, and RBI CMS escalation states with acknowledgement, closure, and CMS references. |
+| 30-day grievance clock | Computes due date, breach status, and escalation-due state from complaint received time. |
+| LWS task queues | Derives active tasks for blocked compliance, KFS acceptance, credit decision, AI human review, checker approval, disbursement, recovery assignment, NPA review, complaint assignment, complaint resolution, and RBI CMS escalation. Each task includes SLA target, due time, and breach status. |
+| LWS task audit | Persists assignment, start, release, and comment events while the domain state remains the source of truth for task resolution. |
+| Loan account opening | Disbursement opens an LMS loan account and creates a disbursement ledger event. |
+| Repayment schedule | Generates monthly reducing-balance amortization schedule from KFS/product terms. |
+| Loan ledger | Reconstructs principal, interest, paid amounts, outstanding balance, and next due from ledger and schedule. |
+| Payment posting | Posts payment events, allocates to due interest first and principal next, and updates account status. |
+| Borrower statements | Generates period statement from schedule and ledger transactions. |
+| Charge controls | Blocks undisclosed charges and penal-interest/capitalizing charge designs. |
+| Waivers and reversals | Requires approval evidence for waivers and reversals, and prevents duplicate reversal of the same event. |
+| Delinquency buckets | Computes DPD bucket, earliest unpaid installment, and overdue amounts from schedule plus ledger. |
+| Asset classification | Maps DPD to standard, SMA-0, SMA-1, SMA-2, and NPA classes. |
+| CIC snapshots | Produces account and portfolio reporting snapshots from schedule, ledger, borrower, RE, product, and asset-classification state. |
+| Recovery-agent notice | Recovery assignment requires delinquent account, agent details, borrower notice timestamp, and delivery reference. |
+| Cash recovery posting | Cash recovery requires active noticed assignment and same-India-day posting to borrower account. |
+| Consent | Requires data-processing evidence and notice version. |
+| KYC | Requires `verified` KYC state and risk category validation. |
+| Aadhaar | Blocks biometric, OTP, or PID persistence flags. |
+| Economic profile | Requires adult borrower, occupation, and monthly income. |
+| KFS | Requires APR, amount, tenor, cooling-off, recovery mechanism, grievance details, charge structure. |
+| Penal charges | Blocks penal interest and capitalization of penal charges. |
+| Fund flow | Blocks LSP, DLA, pass-through, and pool account fund control. |
+| Disbursement | Requires approved loan, valid KFS, and borrower/end-beneficiary account. |
+| AI model inventory | Blocks model use if missing from inventory. |
+| AI model validation | Blocks active use without approved validation. |
+| AI kill switch | Blocks model use when global switch is active or model is suspended. |
+
+## Known Limitations
+
+- Persistence is local JSON only.
+- No login/session authentication yet; actor authorization is API-level registry validation.
+- No real KYC, CKYC, bureau, payment, eSign, SMS, email, or CERSAI integrations yet.
+- Registries are file-backed and lack external IAM, maker-checker administration workflow, and periodic access review.
+- Borrower/consent/KYC records are file-backed and do not yet integrate CKYC, V-CIP providers, consent managers, or document stores.
+- Workflow is file-backed and does not yet include dashboard UI, notification dispatch, or outbound RBI CMS API integration.
+- LMS is early-stage: no NACH files, refunds, foreclosure, restructure, external CIC file/API submission, rendered statement documents, or full recovery contact logging yet.
+- KFS is data-only, not rendered to PDF/HTML yet.
+- No UI yet.
+- AI governance is a runtime guard but does not yet include validation workflow, drift monitoring, fairness reports, or incident pack generation.
+- Compliance docs are source-grounded but still require counsel/compliance review before production.
+
+## Test Coverage
+
+Current tests prove:
+
+- Valid India-only loan application passes preflight.
+- Non-India borrower/currency/storage are blocked.
+- LSP/pass-through fund flow is blocked.
+- Aadhaar biometric/OTP persistence is blocked.
+- Invalid KFS cooling-off and penal-charge design are blocked.
+- KFS acceptance and delivery evidence gate sanction readiness.
+- AI model kill switch blocks model-assisted underwriting.
+- API stores blocked compliance applications and supports lookup.
+- Regulated entity and product policy registries resolve an application.
+- Unsafe product penal-charge design is rejected.
+- API supports registry-backed loan applications.
+- Borrower profile, consent, and KYC records resolve an application.
+- Revoked consent and expired KYC block borrower resolution.
+- API supports borrower-backed applications without embedded borrower/KYC/consent blobs.
+- API requires maker-checker approval before disbursement.
+- API routes material AI decisions to human review before decision proposal.
+- API stores staff actors and enforces role/queue checks on regulated workflow actions.
+- API exposes LWS task queues with SLA status and persists task assignment/start audit.
+- Repayment schedule amortizes principal over tenor.
+- API opens a loan account on disbursement and posts ledger payments.
+- API generates borrower statements from schedule and ledger.
+- API controls disclosed charges, waivers, and reversals.
+- API computes delinquency buckets and enforces recovery-agent notice plus same-day cash recovery posting.
+- API classifies assets across standard, SMA, and NPA bands.
+- API generates account-level and portfolio-level CIC-ready reporting snapshots.
+- API exposes collections workflow tasks until recovery-agent notice assignment is recorded.
+- API manages complaint lifecycle, 30-day grievance SLA, and RBI CMS escalation tasks.

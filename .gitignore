@@ -1,0 +1,8 @@
+.DS_Store
+node_modules/
+.loanos-data/
+coverage/
+dist/
+*.log
+tmp/
+
