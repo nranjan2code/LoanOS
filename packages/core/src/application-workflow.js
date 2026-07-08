@@ -16,6 +16,24 @@ export const APPLICATION_STATUSES = {
 
 const DECISION_READY_STATUSES = new Set([APPLICATION_STATUSES.READY_FOR_DECISION, APPLICATION_STATUSES.HUMAN_REVIEW_REQUIRED]);
 
+// Coded decline reasons give adverse-action communication and CIC reporting a
+// consistent, queryable trail instead of free text. `other` still demands a
+// narrative so no decline is recorded without an explanation.
+export const DECLINE_REASON_CODES = {
+  affordability: "Repayment affordability outside policy (FOIR/EMI)",
+  insufficient_income: "Income below product eligibility",
+  age_eligibility: "Age or age at maturity outside policy",
+  adverse_credit_history: "Adverse credit bureau history",
+  incomplete_kyc: "KYC incomplete or unverified",
+  insufficient_documentation: "Supporting documentation insufficient",
+  policy_exclusion: "Borrower or purpose excluded by product policy",
+  suspected_fraud: "Suspected fraud or misrepresentation",
+  existing_delinquency: "Existing delinquency or default with the lender",
+  other: "Other (requires narrative)"
+};
+
+const DECLINE_REASON_CODE_VALUES = new Set(Object.keys(DECLINE_REASON_CODES));
+
 export function initializeApplicationWorkflow(application, compliance, now = new Date()) {
   const status = compliance?.summary?.status === "blocked" ? APPLICATION_STATUSES.BLOCKED_COMPLIANCE : APPLICATION_STATUSES.READY_FOR_KFS;
   return withWorkflowEvent(
@@ -152,6 +170,7 @@ export function proposeDecision(application, input, findings = [], now = new Dat
     allFindings.push(createFinding("error", "RBI-DL-2025", "Decision status must be approved or declined.", "status"));
   }
   allFindings.push(...manualUnderwritingFindings(application, input));
+  allFindings.push(...declineReasonFindings(input));
 
   const hasHumanReviewWarning = allFindings.some((finding) => finding.path === "aiDecision.humanReviewRef");
   if (hasHumanReviewWarning) {
@@ -196,6 +215,7 @@ export function proposeDecision(application, input, findings = [], now = new Dat
     proposedAt: now.toISOString(),
     reason: input.reason ?? null,
     manualUnderwriting: manualUnderwritingEvidence(application, input, now),
+    declineReason: declineReasonEvidence(input),
     aiDecision: input.aiDecision ?? application.aiDecision ?? null
   };
 
@@ -288,6 +308,7 @@ export function applyDecisionApproval(application, input, now = new Date()) {
           decidedAt: approval.approvedAt,
           reason: application.pendingDecision.reason,
           manualUnderwriting: application.pendingDecision.manualUnderwriting ?? null,
+          declineReason: application.pendingDecision.declineReason ?? null,
           aiDecision: application.pendingDecision.aiDecision
         }
       : null;
@@ -417,6 +438,36 @@ function manualUnderwritingEvidence(application, input, now) {
     compensatingFactors: Array.isArray(override.compensatingFactors) ? override.compensatingFactors : [],
     eligibilityId: application.eligibility?.eligibilityId ?? null,
     recordedAt: now.toISOString()
+  };
+}
+
+function declineReasonFindings(input) {
+  if (input?.status !== "declined") {
+    return [];
+  }
+
+  const code = input.declineReasonCode;
+  if (!code) {
+    return [createFinding("error", "RBI-DL-2025", "A declined decision requires a declineReasonCode.", "declineReasonCode")];
+  }
+  if (!DECLINE_REASON_CODE_VALUES.has(code)) {
+    return [createFinding("error", "RBI-DL-2025", `Decline reason code is not recognized: ${code}.`, "declineReasonCode")];
+  }
+  if (code === "other" && !(input.declineNarrative ?? input.reason)) {
+    return [createFinding("error", "RBI-DL-2025", "Decline reason code 'other' requires a narrative.", "declineReasonCode")];
+  }
+  return [];
+}
+
+function declineReasonEvidence(input) {
+  if (input?.status !== "declined" || !DECLINE_REASON_CODE_VALUES.has(input?.declineReasonCode)) {
+    return null;
+  }
+
+  return {
+    code: input.declineReasonCode,
+    label: DECLINE_REASON_CODES[input.declineReasonCode],
+    narrative: input.declineNarrative ?? input.reason ?? null
   };
 }
 

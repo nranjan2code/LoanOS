@@ -1254,6 +1254,91 @@ test("API blocks a checker who is also the manual underwriting underwriter", asy
   assert.equal(distinctChecker.body.status, "approved");
 });
 
+test("API requires a coded decline reason and carries it into the decision", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+
+  const referenceResponse = await fetch(`${base}/reference/decline-reasons`);
+  assert.equal(referenceResponse.status, 200);
+  const reference = await referenceResponse.json();
+  assert(reference.declineReasons.some((entry) => entry.code === "affordability"));
+
+  const application = await createRegistryBackedApplication(base);
+  assert.equal(
+    (
+      await postJson(`${base}/loans/applications/${application.applicationId}/kfs`, {
+        acceptance: {
+          acceptedAt: "2026-07-08T07:00:00.000Z",
+          deliveryChannel: "email",
+          deliveryRef: "email_msg_123"
+        }
+      })
+    ).status,
+    201
+  );
+
+  const decisionPath = `${base}/loans/applications/${application.applicationId}/decision`;
+
+  const missingCode = await postJson(decisionPath, {
+    status: "declined",
+    proposedBy: "credit-maker-1",
+    reason: "Not a fit"
+  });
+  assert.equal(missingCode.status, 422);
+  assert.equal(missingCode.body.error.code, "decision_blocked");
+  assert(missingCode.body.findings.some((finding) => finding.path === "declineReasonCode"));
+
+  const invalidCode = await postJson(decisionPath, {
+    status: "declined",
+    proposedBy: "credit-maker-1",
+    declineReasonCode: "vibes"
+  });
+  assert.equal(invalidCode.status, 422);
+  assert(invalidCode.body.findings.some((finding) => finding.path === "declineReasonCode"));
+
+  const otherWithoutNarrative = await postJson(decisionPath, {
+    status: "declined",
+    proposedBy: "credit-maker-1",
+    declineReasonCode: "other"
+  });
+  assert.equal(otherWithoutNarrative.status, 422);
+  assert(otherWithoutNarrative.body.findings.some((finding) => finding.path === "declineReasonCode"));
+
+  const decline = await postJson(decisionPath, {
+    status: "declined",
+    proposedBy: "credit-maker-1",
+    declineReasonCode: "adverse_credit_history",
+    declineNarrative: "Two active bureau defaults within the last 12 months."
+  });
+  assert.equal(decline.status, 202);
+  assert.equal(decline.body.pendingDecision.declineReason.code, "adverse_credit_history");
+  assert.equal(
+    decline.body.pendingDecision.declineReason.narrative,
+    "Two active bureau defaults within the last 12 months."
+  );
+
+  const approval = await postJson(`${base}/loans/applications/${application.applicationId}/approvals`, {
+    outcome: "approved",
+    approvedBy: "credit-checker-1",
+    approvalRef: "approval_ref_decline_1"
+  });
+  assert.equal(approval.status, 200);
+  assert.equal(approval.body.status, "declined");
+  assert.equal(approval.body.decision.declineReason.code, "adverse_credit_history");
+  assert.equal(approval.body.decision.declineReason.label, "Adverse credit bureau history");
+});
+
 test("API exposes LWS decision approval task with assignment lifecycle", async (t) => {
   const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
   t.after(async () => {
@@ -1638,10 +1723,12 @@ test("API assesses eligibility and blocks approval of an ineligible borrower", a
   const decline = await postJson(`${base}/loans/applications/${application.applicationId}/decision`, {
     status: "declined",
     proposedBy: "credit-maker-1",
-    reason: "Affordability not met"
+    reason: "Affordability not met",
+    declineReasonCode: "affordability"
   });
   assert.equal(decline.status, 202);
   assert.equal(decline.body.status, "pending_decision_approval");
+  assert.equal(decline.body.pendingDecision.declineReason.code, "affordability");
 });
 
 function eligibilityApplication(overrides = {}) {

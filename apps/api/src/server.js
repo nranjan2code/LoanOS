@@ -15,6 +15,7 @@ import {
   createLoanId,
   computeDelinquency,
   createComplaint,
+  DECLINE_REASON_CODES,
   deriveWorkflowTasks,
   enrichComplaint,
   escalateComplaintToRbiCms,
@@ -101,6 +102,13 @@ async function route(req, res, dataDir) {
   if (method === "GET" && path === "/compliance/controls") {
     sendJson(res, 200, {
       controls: listRegulatoryControls()
+    });
+    return;
+  }
+
+  if (method === "GET" && path === "/reference/decline-reasons") {
+    sendJson(res, 200, {
+      declineReasons: Object.entries(DECLINE_REASON_CODES).map(([code, label]) => ({ code, label }))
     });
     return;
   }
