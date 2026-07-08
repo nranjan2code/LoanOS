@@ -23,6 +23,7 @@ import {
   escalateComplaintToRbiCms,
   evaluateEligibility,
   evaluateLoanApplication,
+  generateClosureCertificate,
   generateDocumentPacket,
   generateCicSnapshot,
   generateLoanStatement,
@@ -1615,6 +1616,67 @@ async function route(req, res, dataDir) {
       quote: result.quote,
       summary: summarizeLoanAccount(stored, new Date(result.foreclosure.foreclosedAt))
     });
+    return;
+  }
+
+  const closureCertificateMatch = path.match(/^\/loan-accounts\/([^/]+)\/closure-certificate$/);
+  if (method === "POST" && closureCertificateMatch) {
+    const body = await readJson(req);
+    const state = await loadState(dataDir);
+    const loanAccountId = decodeURIComponent(closureCertificateMatch[1]);
+    const loanAccount = state.loanAccounts[loanAccountId];
+    if (!loanAccount) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Loan account not found." } });
+      return;
+    }
+
+    const result = generateClosureCertificate(loanAccount, body);
+    if (result.summary.status === "blocked") {
+      sendJson(res, 422, {
+        error: { code: "closure_certificate_blocked", message: "Closure certificate is blocked by LMS findings." },
+        findings: result.findings
+      });
+      return;
+    }
+
+    const stored = result.loanAccount;
+    if (!result.reissued) {
+      const nextState = appendEvent(
+        {
+          ...state,
+          loanAccounts: {
+            ...state.loanAccounts,
+            [stored.loanAccountId]: stored
+          }
+        },
+        {
+          type: "loan_account.closure_certificate.issued",
+          loanAccountId: stored.loanAccountId,
+          certificateId: result.closureCertificate.certificateId
+        }
+      );
+      await saveState(nextState, dataDir);
+    }
+    sendJson(res, result.reissued ? 200 : 201, {
+      loanAccount: stored,
+      closureCertificate: result.closureCertificate,
+      reissued: result.reissued
+    });
+    return;
+  }
+
+  if (method === "GET" && closureCertificateMatch) {
+    const state = await loadState(dataDir);
+    const loanAccount = state.loanAccounts[decodeURIComponent(closureCertificateMatch[1])];
+    if (!loanAccount) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Loan account not found." } });
+      return;
+    }
+    if (!loanAccount.closureCertificate) {
+      sendJson(res, 404, { error: { code: "not_found", message: "No closure certificate has been issued." } });
+      return;
+    }
+    sendJson(res, 200, loanAccount.closureCertificate);
     return;
   }
 

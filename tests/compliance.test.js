@@ -903,6 +903,66 @@ test("API quotes and executes foreclosure, closing the loan account", async (t) 
   assert(repeat.body.findings.some((finding) => finding.path === "status"));
 });
 
+test("API issues a No-Objection closure certificate for a settled loan", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+  const application = await approveAndDisburseApplication(base);
+  const account = await (await fetch(`${base}/loan-accounts/${application.loanAccountId}`)).json();
+
+  // An active account cannot yet receive a No-Objection Certificate.
+  const early = await postJson(`${base}/loan-accounts/${account.loanAccountId}/closure-certificate`, {
+    issuedBy: "loan-officer-1"
+  });
+  assert.equal(early.status, 422);
+  assert.equal(early.body.error.code, "closure_certificate_blocked");
+  assert(early.body.findings.some((finding) => finding.path === "status"));
+
+  // Settle the loan in full before the first installment falls due.
+  const settledAt = `${addDays(account.schedule[0].dueDate, -1)}T12:00:00.000Z`;
+  const payoff = await postJson(`${base}/loan-accounts/${account.loanAccountId}/payments`, {
+    amount: account.principalAmount,
+    paymentRef: "settle_full",
+    receivedAt: settledAt
+  });
+  assert.equal(payoff.status, 200);
+  assert.equal(payoff.body.loanAccount.status, "closed");
+
+  const certificate = await postJson(`${base}/loan-accounts/${account.loanAccountId}/closure-certificate`, {
+    issuedBy: "loan-officer-1"
+  });
+  assert.equal(certificate.status, 201);
+  assert.equal(certificate.body.reissued, false);
+  assert.equal(certificate.body.closureCertificate.documentType, "no_objection_certificate");
+  assert.equal(certificate.body.closureCertificate.closureType, "scheduled_closure");
+  assert.equal(certificate.body.closureCertificate.totalPaid, account.principalAmount);
+  assert(certificate.body.closureCertificate.checksumSha256);
+  assert(certificate.body.closureCertificate.declarations.length >= 1);
+
+  const read = await fetch(`${base}/loan-accounts/${account.loanAccountId}/closure-certificate`);
+  assert.equal(read.status, 200);
+  const readBody = await read.json();
+  assert.equal(readBody.certificateId, certificate.body.closureCertificate.certificateId);
+
+  // Re-issuing returns the same certificate rather than minting a duplicate.
+  const reissue = await postJson(`${base}/loan-accounts/${account.loanAccountId}/closure-certificate`, {
+    issuedBy: "loan-officer-1"
+  });
+  assert.equal(reissue.status, 200);
+  assert.equal(reissue.body.reissued, true);
+  assert.equal(reissue.body.closureCertificate.certificateId, certificate.body.closureCertificate.certificateId);
+});
+
 test("API enforces recovery-agent notice and same-day cash recovery posting", async (t) => {
   const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
   t.after(async () => {

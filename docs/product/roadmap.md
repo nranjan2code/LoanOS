@@ -44,7 +44,7 @@ Exit criteria:
 
 ## Phase 2: LMS MVP
 
-Status: started. Current LMS slices open loan accounts on disbursement, generate repayment schedules, reconstruct balances, accrue scheduled interest into immutable ledger events, post payments, generate statements, control charges/waivers/reversals, compute delinquency, classify assets, enforce noticed recovery plus same-day cash posting, and generate CIC-ready internal snapshots.
+Status: started. Current LMS slices open loan accounts on disbursement, generate repayment schedules, reconstruct balances, accrue scheduled interest into immutable ledger events, post payments, generate statements, control charges/waivers/reversals, compute delinquency, classify assets, enforce noticed recovery plus same-day cash posting, issue No-Objection closure certificates on full settlement, and generate CIC-ready internal snapshots.
 
 Deliverables:
 

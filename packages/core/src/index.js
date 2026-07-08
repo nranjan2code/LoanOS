@@ -90,6 +90,7 @@ export {
   computeDelinquency,
   createLoanAccountFromApplication,
   forecloseLoanAccount,
+  generateClosureCertificate,
   generateCicSnapshot,
   generateLoanStatement,
   generateRepaymentSchedule,

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { createFinding, summarizeFindings } from "./compliance-controls.js";
 import { createLoanId } from "./loan-policy.js";
 
@@ -760,6 +761,88 @@ export function forecloseLoanAccount(account, input = {}, now = new Date()) {
     findings: [],
     summary: summarizeFindings([])
   };
+}
+
+// On full repayment (scheduled or foreclosure) the borrower is entitled to a
+// No-Objection Certificate confirming no dues remain and that the regulated
+// entity has no objection to releasing any securities or documents held.
+// Idempotent: a re-issue returns the certificate already on the account.
+export function generateClosureCertificate(account, input = {}, now = new Date()) {
+  const findings = [];
+
+  if (!account) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Loan account is required.", "loanAccount"));
+  }
+  if (account && account.status !== CLOSED_STATUS) {
+    findings.push(createFinding("error", "RBI-DL-2025", "A closure certificate can only be issued for a closed loan account.", "status"));
+  }
+
+  const asOf = account?.closedAt ? new Date(account.closedAt) : now;
+  const balance = account ? summarizeLoanAccount(account, asOf) : null;
+  if (balance && balance.totalOutstanding > 0) {
+    findings.push(createFinding("error", "RBI-DL-2025", "A closure certificate requires zero outstanding dues.", "totalOutstanding"));
+  }
+
+  const summary = summarizeFindings(findings);
+  if (summary.status === "blocked") {
+    return { loanAccount: account, closureCertificate: null, reissued: false, findings, summary };
+  }
+
+  if (account.closureCertificate) {
+    return {
+      loanAccount: account,
+      closureCertificate: account.closureCertificate,
+      reissued: true,
+      findings: [],
+      summary: summarizeFindings([])
+    };
+  }
+
+  const certificate = {
+    certificateId: input.certificateId ?? createLoanId("noc"),
+    documentType: "no_objection_certificate",
+    loanAccountId: account.loanAccountId,
+    applicationId: account.applicationId,
+    borrowerId: account.borrowerId,
+    regulatedEntityId: account.regulatedEntityId,
+    productId: account.productId,
+    productCode: account.productCode,
+    currency: account.currency,
+    sanctionedAmount: account.principalAmount,
+    closureType: account.foreclosure ? "foreclosure" : "scheduled_closure",
+    closedAt: account.closedAt,
+    issuedAt: now.toISOString(),
+    issuedBy: input.issuedBy ?? "system",
+    principalRepaid: balance.principalPaid,
+    interestPaid: balance.interestPaid,
+    chargesPaid: balance.chargesPaid,
+    totalPaid: balance.totalPaid,
+    declarations: [
+      "The borrower has repaid all amounts due under this loan account in full.",
+      "No dues remain outstanding as of the closure date.",
+      "The regulated entity has no objection to the release of any securities, documents, or charges held for this loan."
+    ]
+  };
+  const closureCertificate = {
+    ...certificate,
+    checksumSha256: createHash("sha256").update(JSON.stringify(certificate)).digest("hex")
+  };
+  const updated = {
+    ...account,
+    closureCertificate,
+    servicingEvents: [
+      ...(account.servicingEvents ?? []),
+      {
+        type: "loan_account.closure_certificate_issued",
+        certificateId: closureCertificate.certificateId,
+        at: now.toISOString(),
+        actor: closureCertificate.issuedBy
+      }
+    ],
+    updatedAt: now.toISOString()
+  };
+
+  return { loanAccount: updated, closureCertificate, reissued: false, findings: [], summary };
 }
 
 export function assessChargeToLoanAccount(account, input, now = new Date()) {
