@@ -804,6 +804,48 @@ test("API controls disclosed charges, waivers, and reversals", async (t) => {
   assert.equal(reversal.body.summary.chargesOutstanding, 0);
 });
 
+test("API accrues scheduled interest into the ledger and reconciles with the schedule", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+  const application = await approveAndDisburseApplication(base);
+  const account = await (await fetch(`${base}/loan-accounts/${application.loanAccountId}`)).json();
+
+  const round2 = (value) => Math.round((value + Number.EPSILON) * 100) / 100;
+  const asOf = `${account.schedule[2].dueDate}T12:00:00.000Z`;
+  const expectedInterest = round2(
+    account.schedule[0].interestDue + account.schedule[1].interestDue + account.schedule[2].interestDue
+  );
+
+  const accrual = await postJson(`${base}/loan-accounts/${account.loanAccountId}/accruals`, { asOf });
+  assert.equal(accrual.status, 200);
+  assert.equal(accrual.body.accrualEvents.length, 3);
+  assert.equal(accrual.body.accrualEvents[0].type, "interest_accrual");
+  assert.equal(accrual.body.summary.interestAccrued, expectedInterest);
+  assert.equal(accrual.body.summary.interestAccrualReconciled, true);
+
+  // Interest income is reconstructable from immutable ledger events.
+  const accrualLedger = accrual.body.loanAccount.ledger.filter((event) => event.type === "interest_accrual");
+  assert.equal(accrualLedger.length, 3);
+  assert.equal(round2(accrualLedger.reduce((sum, event) => sum + event.interestDebit, 0)), expectedInterest);
+
+  // Re-running accrual to the same date is idempotent: no duplicate events.
+  const rerun = await postJson(`${base}/loan-accounts/${account.loanAccountId}/accruals`, { asOf });
+  assert.equal(rerun.status, 200);
+  assert.equal(rerun.body.accrualEvents.length, 0);
+  assert.equal(rerun.body.summary.interestAccrued, expectedInterest);
+});
+
 test("API enforces recovery-agent notice and same-day cash recovery posting", async (t) => {
   const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
   t.after(async () => {

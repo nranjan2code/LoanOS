@@ -83,6 +83,7 @@ export {
 } from "./application-workflow.js";
 
 export {
+  accrueInterest,
   assignRecoveryAgent,
   assessChargeToLoanAccount,
   classifyLoanAsset,

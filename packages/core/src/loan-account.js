@@ -143,6 +143,7 @@ export function summarizeLoanAccount(account, asOf = new Date()) {
   const principalDisbursed = roundMoney(ledger.reduce((sum, event) => sum + (event.principalDebit ?? 0), 0));
   const principalPaid = roundMoney(ledger.reduce((sum, event) => sum + (event.principalCredit ?? 0), 0));
   const interestPaid = roundMoney(ledger.reduce((sum, event) => sum + (event.interestCredit ?? 0), 0));
+  const interestAccrued = roundMoney(ledger.reduce((sum, event) => sum + (event.interestDebit ?? 0), 0));
   const chargesAssessed = roundMoney(ledger.reduce((sum, event) => sum + (event.chargesDebit ?? 0), 0));
   const chargesWaived = roundMoney(ledger.reduce((sum, event) => sum + (event.chargesWaiverCredit ?? 0), 0));
   const chargesPaid = roundMoney(ledger.reduce((sum, event) => sum + (event.chargesCredit ?? 0), 0));
@@ -169,6 +170,9 @@ export function summarizeLoanAccount(account, asOf = new Date()) {
     principalDisbursed,
     principalPaid,
     interestPaid,
+    interestAccrued,
+    interestDueAsOf,
+    interestAccrualReconciled: Math.abs(interestAccrued - interestDueAsOf) < 0.005,
     chargesAssessed,
     chargesWaived,
     chargesPaid,
@@ -186,6 +190,78 @@ export function summarizeLoanAccount(account, asOf = new Date()) {
           interestDue: nextInstallment.interestDue
         }
       : null
+  };
+}
+
+// Recognize scheduled interest income as immutable ledger events once each
+// installment period closes, so accrued interest can be reconstructed from the
+// ledger rather than only implied by the schedule. Idempotent: an installment
+// already carrying an accrual event is not accrued again, so it is safe to run
+// repeatedly (e.g. on a daily job) as due dates pass.
+export function accrueInterest(account, input = {}, now = new Date()) {
+  const findings = [];
+  const asOf = input.asOf ? new Date(input.asOf) : now;
+
+  if (!account) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Loan account is required.", "loanAccount"));
+  }
+  if (account && account.status !== ACTIVE_STATUS) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Interest accrual requires an active loan account.", "status"));
+  }
+
+  const summary = summarizeFindings(findings);
+  if (summary.status === "blocked") {
+    return {
+      loanAccount: account,
+      accrualEvents: [],
+      findings,
+      summary
+    };
+  }
+
+  const alreadyAccrued = new Set(
+    (account.ledger ?? [])
+      .filter((event) => event.type === "interest_accrual" && Number.isFinite(event.installmentNumber))
+      .map((event) => event.installmentNumber)
+  );
+
+  const accrualEvents = (account.schedule ?? [])
+    .filter(
+      (installment) =>
+        installment.interestDue > 0 &&
+        !alreadyAccrued.has(installment.installmentNumber) &&
+        new Date(`${installment.dueDate}T00:00:00.000Z`).getTime() <= asOf.getTime()
+    )
+    .map((installment) => ({
+      eventId: createLoanId("ledger"),
+      type: "interest_accrual",
+      eventDate: `${installment.dueDate}T00:00:00.000Z`,
+      amount: roundMoney(installment.interestDue),
+      principalDebit: 0,
+      principalCredit: 0,
+      interestDebit: roundMoney(installment.interestDue),
+      interestCredit: 0,
+      chargesDebit: 0,
+      chargesCredit: 0,
+      chargesWaiverCredit: 0,
+      installmentNumber: installment.installmentNumber,
+      accruedThrough: installment.dueDate,
+      actor: input.actor ?? "system"
+    }));
+
+  const updated = accrualEvents.length
+    ? {
+        ...account,
+        ledger: [...(account.ledger ?? []), ...accrualEvents],
+        updatedAt: now.toISOString()
+      }
+    : account;
+
+  return {
+    loanAccount: updated,
+    accrualEvents,
+    findings,
+    summary
   };
 }
 
@@ -714,6 +790,7 @@ export function reverseLoanAccountEvent(account, input, now = new Date()) {
     amount: -roundMoney(original.amount ?? 0),
     principalDebit: -roundMoney(original.principalDebit ?? 0),
     principalCredit: -roundMoney(original.principalCredit ?? 0),
+    interestDebit: -roundMoney(original.interestDebit ?? 0),
     interestCredit: -roundMoney(original.interestCredit ?? 0),
     chargesDebit: -roundMoney(original.chargesDebit ?? 0),
     chargesCredit: -roundMoney(original.chargesCredit ?? 0),

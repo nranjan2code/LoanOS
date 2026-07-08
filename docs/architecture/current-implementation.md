@@ -32,7 +32,7 @@ npm run dev:api
 | `packages/core/src/borrower-onboarding.js` | Borrower profile, consent ledger, KYC records, and borrower reference resolution. |
 | `packages/core/src/eligibility.js` | Policy-driven creditworthiness/affordability engine: EMI/FOIR computation, age-at-maturity, amount/tenor bounds, and eligible/refer/ineligible decision. |
 | `packages/core/src/application-workflow.js` | LOS application state machine, KFS workflow, human review, decision proposal, manual underwriting override gate for referred applications, coded decline-reason taxonomy, maker-checker approval, disbursement transition. |
-| `packages/core/src/loan-account.js` | LMS loan account creation, amortization schedule, ledger balance reconstruction, payment posting, statements, charges, waivers, reversals, delinquency, recovery controls, asset classification, and CIC snapshots. |
+| `packages/core/src/loan-account.js` | LMS loan account creation, amortization schedule, ledger balance reconstruction, interest accrual, payment posting, statements, charges, waivers, reversals, delinquency, recovery controls, asset classification, and CIC snapshots. |
 | `packages/core/src/loan-policy.js` | India-only loan validation, KFS validation, sanction readiness, disbursement checks. |
 | `packages/core/src/model-governance.js` | AI/model inventory, model status, global/model kill switch, runtime model-use evaluation. |
 | `packages/core/src/workflow-tasks.js` | LWS task derivation from LOS/LMS state plus task assignment, start, release, and comment lifecycle. |
@@ -103,6 +103,7 @@ npm run dev:api
 | `GET /reporting/cic/snapshots` | Generates CIC-ready internal reporting snapshots for the portfolio. |
 | `POST /loan-accounts/:id/recovery-assignments` | Assigns a recovery agent only with borrower notice evidence. |
 | `POST /loan-accounts/:id/charges` | Assesses a KFS-disclosed charge. |
+| `POST /loan-accounts/:id/accruals` | Posts interest-accrual ledger events for installments due as of a date and returns the reconciled balance summary. |
 | `POST /loan-accounts/:id/payments` | Posts payment ledger event and returns updated balance summary. |
 | `POST /loan-accounts/:id/cash-recoveries` | Posts noticed-agent cash recovery with same-day reflection control. |
 | `POST /loan-accounts/:id/waivers` | Posts approved charge waiver. |
@@ -138,6 +139,7 @@ npm run dev:api
 | Loan account opening | Disbursement opens an LMS loan account and creates a disbursement ledger event. |
 | Repayment schedule | Generates monthly reducing-balance amortization schedule from KFS/product terms. |
 | Loan ledger | Reconstructs principal, interest, paid amounts, outstanding balance, and next due from ledger and schedule. |
+| Interest accrual | Recognizes scheduled interest as immutable `interest_accrual` ledger events once each installment period closes; idempotent per installment, reconstructable from the ledger, and reconciled against the schedule in the balance summary. |
 | Payment posting | Posts payment events, allocates to due interest first and principal next, and updates account status. |
 | Borrower statements | Generates period statement from schedule and ledger transactions. |
 | Charge controls | Blocks undisclosed charges and penal-interest/capitalizing charge designs. |
@@ -207,6 +209,7 @@ Current tests prove:
 - Repayment schedule amortizes principal over tenor.
 - API opens a loan account on disbursement and posts ledger payments.
 - API generates borrower statements from schedule and ledger.
+- API accrues scheduled interest into immutable ledger events, reconciles accrued interest with the schedule, and is idempotent on re-run.
 - API controls disclosed charges, waivers, and reversals.
 - API computes delinquency buckets and enforces recovery-agent notice plus same-day cash recovery posting.
 - API classifies assets across standard, SMA, and NPA bands.

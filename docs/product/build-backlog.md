@@ -111,7 +111,7 @@ Tasks:
 - Immutable ledger events. First slices done.
 - Repayment schedule generator. Done.
 - EMI/amortization calculator. Done.
-- Interest accrual.
+- Interest accrual. First slice done: scheduled interest is recognized as immutable `interest_accrual` ledger events per installment, idempotent, reconstructable from the ledger, and reconciled against the schedule.
 - Payment allocation. First slice done.
 - Charges, waivers, reversals. First slice done.
 - SMA/NPA asset classification. Done.

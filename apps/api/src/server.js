@@ -1,5 +1,6 @@
 import { createServer } from "node:http";
 import {
+  accrueInterest,
   attachKfs,
   applyDecisionApproval,
   applyKfsWorkflow,
@@ -1495,6 +1496,53 @@ async function route(req, res, dataDir) {
       loanAccount: stored,
       paymentEvent: result.paymentEvent,
       summary: summarizeLoanAccount(stored, new Date(result.paymentEvent.eventDate))
+    });
+    return;
+  }
+
+  const loanAccountAccrualMatch = path.match(/^\/loan-accounts\/([^/]+)\/accruals$/);
+  if (method === "POST" && loanAccountAccrualMatch) {
+    const body = await readJson(req);
+    const state = await loadState(dataDir);
+    const loanAccountId = decodeURIComponent(loanAccountAccrualMatch[1]);
+    const loanAccount = state.loanAccounts[loanAccountId];
+    if (!loanAccount) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Loan account not found." } });
+      return;
+    }
+
+    const result = accrueInterest(loanAccount, body);
+    if (result.summary.status === "blocked") {
+      sendJson(res, 422, {
+        error: {
+          code: "accrual_blocked",
+          message: "Interest accrual is blocked by LMS findings."
+        },
+        findings: result.findings
+      });
+      return;
+    }
+
+    const stored = result.loanAccount;
+    const nextState = appendEvent(
+      {
+        ...state,
+        loanAccounts: {
+          ...state.loanAccounts,
+          [stored.loanAccountId]: stored
+        }
+      },
+      {
+        type: "loan_account.interest.accrued",
+        loanAccountId: stored.loanAccountId,
+        accruedCount: result.accrualEvents.length
+      }
+    );
+    await saveState(nextState, dataDir);
+    sendJson(res, 200, {
+      loanAccount: stored,
+      accrualEvents: result.accrualEvents,
+      summary: summarizeLoanAccount(stored, body.asOf ? new Date(body.asOf) : new Date())
     });
     return;
   }
