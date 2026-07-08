@@ -65,7 +65,7 @@ Exit criteria:
 
 ## Phase 3: LWS and Compliance Operations
 
-Status: started. Current slices derive workflow tasks from LOS/LMS/grievance state, attach SLA clocks, persist assignment/start/release/comment audit, enforce staff actor roles for regulated workflow actions, capture manual underwriting override evidence on referred-application approvals, and manage the 30-day complaint escalation clock.
+Status: started. Current slices derive workflow tasks from LOS/LMS/grievance state, attach SLA clocks, persist assignment/start/release/comment audit, enforce staff actor roles for regulated workflow actions, capture manual underwriting override evidence on referred-application approvals, manage the 30-day complaint escalation clock, and export active DLA records in RBI CIMS-ready shape.
 
 Deliverables:
 
@@ -74,12 +74,12 @@ Deliverables:
 - Grievance workflow with 30-day RBI CMS escalation clock. First slice done.
 - Fraud workflow and committee packs.
 - LSP/vendor periodic review and incident workflows.
-- DLA CIMS export and CCO certification pack.
+- DLA CIMS export and CCO certification pack. Export plus per-DLA compliance attestation first slice done; broader certification pack planned.
 
 Exit criteria:
 
 - Every manual override has actor, reason, policy, timestamp, and approver.
-- CCO can export DLA data and certify data-collection/storage compliance.
+- CCO can export DLA data and certify data-collection/storage compliance. First slice done for active DLA registry records.
 
 ## Phase 4: Production Integrations
 

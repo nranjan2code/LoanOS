@@ -29,6 +29,30 @@ export const REGULATORY_CONTROLS = [
     ]
   },
   {
+    id: "RBI-DLA-CIMS",
+    regulator: "RBI",
+    title: "Digital Lending App reporting to CIMS",
+    status: "final",
+    sourceUrl: "https://www.rbi.org.in/Scripts/NotificationUser.aspx?Id=12848&Mode=0",
+    obligations: [
+      "REs must report their own DLAs and LSP-operated DLAs through the RBI CIMS portal.",
+      "Reported DLA data must identify the DLA, owner, availability surface, link, grievance officer contact, and RE website.",
+      "The CCO or a designated compliance officer must certify DLA data and compliance with RBI digital lending directions."
+    ]
+  },
+  {
+    id: "RBI-DATA-RESIDENCY",
+    regulator: "RBI",
+    title: "Digital lending data residency",
+    status: "final",
+    sourceUrl: "https://www.rbi.org.in/Scripts/NotificationUser.aspx?Id=12848&Mode=0",
+    obligations: [
+      "Digital lending data must be stored on servers located in India.",
+      "Data processed outside India must be brought back to India and deleted outside India within 24 hours.",
+      "REs remain responsible for data privacy and security of borrower personal information."
+    ]
+  },
+  {
     id: "RBI-KYC-2016",
     regulator: "RBI",
     title: "Master Direction - Know Your Customer (KYC) Direction, 2016",
@@ -214,4 +238,3 @@ export function summarizeFindings(findings) {
     warningCount: 0
   };
 }
-

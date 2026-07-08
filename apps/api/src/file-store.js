@@ -18,6 +18,7 @@ export function createEmptyState() {
   return {
     version: 1,
     regulatedEntities: {},
+    digitalLendingApps: {},
     productPolicies: {},
     borrowerProfiles: {},
     consentRecords: {},
@@ -79,6 +80,7 @@ function normalizeState(state) {
   return {
     version: state?.version ?? empty.version,
     regulatedEntities: state?.regulatedEntities ?? {},
+    digitalLendingApps: state?.digitalLendingApps ?? {},
     productPolicies: state?.productPolicies ?? {},
     borrowerProfiles: state?.borrowerProfiles ?? {},
     consentRecords: state?.consentRecords ?? {},

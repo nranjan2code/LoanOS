@@ -134,6 +134,7 @@ The current codebase contains Phase 0 executable controls:
 
 - Compliance control catalog.
 - Regulated entity registry with India, RE type, public disclosure, grievance officer, board policy, and data-residency validation.
+- DLA registry for RE-owned and LSP-owned app/web surfaces, with CIMS-ready export rows, grievance contact, RE website linkage, India data controls, and CCO/compliance attestation.
 - Product policy registry with RE linkage, INR, APR, amount/tenor limits, cooling-off, recovery mechanism, eligibility, and charge validation.
 - Registry-backed applications that can inherit approved RE/product facts by reference.
 - Borrower profile registry with active India borrower and economic-profile checks.
@@ -144,7 +145,7 @@ The current codebase contains Phase 0 executable controls:
 - Borrower-backed applications that can inherit borrower/KYC/consent/economic facts by reference.
 - LOS workflow state machine with KFS readiness, material-AI human review, decision proposal, maker-checker approval, and disbursement transition.
 - LWS derived task queues for compliance exceptions, KFS evidence, credit decisions, AI human review, checker approval, disbursement, collections, NPA review, grievance resolution, and RBI CMS escalation, with SLA clocks, role checks, and assignment/start/release/comment audit.
-- LMS loan account model that opens on disbursement, generates a repayment schedule, records ledger events, reconstructs balance, posts payments, generates borrower statements, controls charges/waivers/reversals, computes delinquency, classifies assets, generates CIC-ready snapshots, and enforces noticed recovery plus same-day cash posting.
+- LMS loan account model that opens on disbursement, generates a repayment schedule, records ledger events, reconstructs balance, accrues interest, posts payments, supports part-prepayment, foreclosure, closure NOC, borrower statements and statement documents, controls charges/waivers/reversals, computes delinquency, classifies assets, generates CIC-ready snapshots, and enforces noticed recovery plus same-day cash posting.
 - India-only application checks.
 - Regulated entity type validation.
 - Consent and DPDP notice evidence checks.
@@ -165,13 +166,13 @@ The current codebase contains Phase 0 executable controls:
 
 Immediate next build:
 
-1. Tenant/regulated-entity registry.
-2. Product and policy registry.
-3. Borrower and consent ledger.
-4. KYC state machine.
-5. KFS document template and delivery evidence.
-6. Decision workflow with maker-checker and human review.
-7. Loan account ledger and repayment schedule.
+1. LSP registry, due diligence, agreement lifecycle, and periodic review evidence.
+2. Product policy versioning with effective dates and explicit prepayment/foreclosure policy rules.
+3. CKYC adapter boundary and fuller V-CIP evidence vault.
+4. Data-retention, deletion-request, and third-party sharing consent workflows.
+5. Offer generation and borrower-facing execution upgrades such as PDF/eSign delivery.
+6. Recovery contact logging, hardship/restructure workflow, settlement, and write-off approval.
+7. Drift monitoring, recurring fairness evidence, and model incident pack generation.
 
 ## Non-Goals for Now
 

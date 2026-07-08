@@ -23,6 +23,7 @@ import {
   escalateComplaintToRbiCms,
   evaluateEligibility,
   evaluateLoanApplication,
+  generateDlaCimsExport,
   generateClosureCertificate,
   generateDocumentPacket,
   generateCicSnapshot,
@@ -55,6 +56,7 @@ import {
   startWorkflowTask,
   transitionModel,
   triggerKillSwitch,
+  upsertDigitalLendingApp,
   upsertBorrowerProfile,
   upsertConsentRecord,
   upsertKycRecord,
@@ -413,6 +415,60 @@ async function route(req, res, dataDir) {
       return;
     }
     sendJson(res, 200, entity);
+    return;
+  }
+
+  if (method === "GET" && path === "/digital-lending-apps") {
+    const state = await loadState(dataDir);
+    sendJson(res, 200, {
+      digitalLendingApps: Object.values(state.digitalLendingApps)
+    });
+    return;
+  }
+
+  if (method === "POST" && path === "/digital-lending-apps") {
+    const body = await readJson(req);
+    const state = await loadState(dataDir);
+    const result = upsertDigitalLendingApp(state.digitalLendingApps, body, state.regulatedEntities);
+    const nextState =
+      result.summary.status === "blocked"
+        ? state
+        : appendEvent(
+            {
+              ...state,
+              digitalLendingApps: result.registry
+            },
+            {
+              type: "digital_lending_app.upserted",
+              digitalLendingAppId: result.digitalLendingApp.digitalLendingAppId,
+              regulatedEntityId: result.digitalLendingApp.regulatedEntityId,
+              status: result.digitalLendingApp.status
+            }
+          );
+    await saveState(nextState, dataDir);
+    sendJson(res, result.summary.status === "blocked" ? 422 : 201, result);
+    return;
+  }
+
+  const digitalLendingAppMatch = path.match(/^\/digital-lending-apps\/([^/]+)$/);
+  if (method === "GET" && digitalLendingAppMatch) {
+    const state = await loadState(dataDir);
+    const app = state.digitalLendingApps[decodeURIComponent(digitalLendingAppMatch[1])];
+    if (!app) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Digital lending app not found." } });
+      return;
+    }
+    sendJson(res, 200, app);
+    return;
+  }
+
+  if (method === "GET" && path === "/reporting/dla/cims") {
+    const state = await loadState(dataDir);
+    const result = generateDlaCimsExport(state.digitalLendingApps, state.regulatedEntities, {
+      regulatedEntityId: url.searchParams.get("regulatedEntityId") ?? undefined,
+      asOf: url.searchParams.get("asOf") ?? undefined
+    });
+    sendJson(res, result.summary.status === "blocked" ? 422 : 200, result);
     return;
   }
 

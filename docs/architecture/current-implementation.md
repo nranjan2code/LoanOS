@@ -28,7 +28,7 @@ npm run dev:api
 | `packages/core/src/access-control.js` | Staff actor registry, role checks, queue assignment authority, and regulated-action actor validation. |
 | `packages/core/src/grievance.js` | Complaint registry, grievance lifecycle, 30-day RBI Ombudsman clock, and RBI CMS escalation evidence. |
 | `packages/core/src/document-packet.js` | KFS, sanction letter, loan agreement summary, and privacy notice rendering, rendered borrower loan-statement document, plus delivery evidence controls. |
-| `packages/core/src/registries.js` | Regulated-entity and product-policy registries plus application reference resolution. |
+| `packages/core/src/registries.js` | Regulated-entity, DLA, and product-policy registries, DLA CIMS export shape, plus application reference resolution. |
 | `packages/core/src/borrower-onboarding.js` | Borrower profile, consent ledger, KYC records, and borrower reference resolution. |
 | `packages/core/src/eligibility.js` | Policy-driven creditworthiness/affordability engine: EMI/FOIR computation, age-at-maturity, amount/tenor bounds, and eligible/refer/ineligible decision. |
 | `packages/core/src/application-workflow.js` | LOS application state machine, KFS workflow, human review, decision proposal, manual underwriting override gate for referred applications, coded decline-reason taxonomy, maker-checker approval, disbursement transition. |
@@ -51,6 +51,10 @@ npm run dev:api
 | `GET /regulated-entities` | Lists regulated entities. |
 | `POST /regulated-entities` | Creates or updates a regulated entity after compliance validation. |
 | `GET /regulated-entities/:id` | Reads one regulated entity. |
+| `GET /digital-lending-apps` | Lists registered digital lending apps and web surfaces. |
+| `POST /digital-lending-apps` | Creates or updates an own or LSP-operated DLA after CIMS/data-control validation. |
+| `GET /digital-lending-apps/:id` | Reads one digital lending app record. |
+| `GET /reporting/dla/cims` | Generates active DLA rows in RBI CIMS-ready reporting shape, optionally filtered by `regulatedEntityId`. |
 | `GET /products` | Lists product policies. |
 | `POST /products` | Creates or updates a product policy after compliance validation. |
 | `GET /products/:id` | Reads one product policy. |
@@ -124,6 +128,7 @@ npm run dev:api
 | India-only lending | Blocks non-IN borrower residency/address, non-INR currency, non-IN data storage. |
 | Regulated entity | Requires supported RE type and grievance officer. |
 | Regulated entity registry | Requires active India RE, website, privacy policy, grievance officer, data-residency posture, and board policy references. |
+| DLA registry and CIMS export | Requires active own/LSP DLA records to reference an active RE, expose availability/link, grievance contact, privacy/disclosure URLs, India data controls, RE website linkage, and CCO/compliance attestation; active records export to RBI CIMS-ready rows. |
 | Product policy registry | Requires active product linked to an active RE, INR, amount/tenor bounds, APR, cooling-off, recovery mechanism, eligibility, board approval, and safe charge design. |
 | Registry-backed applications | Application can reference `regulatedEntityId` and `productId`/`productCode`; policy facts are resolved before preflight. |
 | Borrower profile registry | Requires active India borrower profile, contact channel, and economic profile for active borrowers. |
@@ -183,10 +188,10 @@ npm run dev:api
 - Registries are file-backed and lack external IAM, maker-checker administration workflow, and periodic access review.
 - Borrower/consent/KYC records are file-backed and do not yet integrate CKYC, V-CIP providers, consent managers, or document stores.
 - Workflow is file-backed and does not yet include dashboard UI, notification dispatch, or outbound RBI CMS API integration.
-- LMS is early-stage: no NACH files, refunds, foreclosure, restructure, external CIC file/API submission, rendered statement documents, or full recovery contact logging yet.
+- LMS is early-stage: no NACH files, refunds, restructure, external CIC file/API submission, or full recovery contact logging yet.
 - Document packet renders HTML/text but does not yet create PDFs or eSign envelopes.
 - No UI yet.
-- AI governance is a runtime guard but does not yet include validation workflow, drift monitoring, fairness reports, or incident pack generation.
+- AI governance is a runtime guard plus first lifecycle/incident slices, but does not yet include drift monitoring, recurring fairness reports, or sectoral incident pack generation.
 - Compliance docs are source-grounded but still require counsel/compliance review before production.
 
 ## Test Coverage
@@ -205,6 +210,8 @@ Current tests prove:
 - API stores blocked compliance applications and supports lookup.
 - Regulated entity and product policy registries resolve an application.
 - Unsafe product penal-charge design is rejected.
+- DLA registry validates own/LSP active apps and exports RBI CIMS-ready rows, including one row per availability surface.
+- API stores validated DLA records and exposes the CIMS-ready DLA export.
 - API supports registry-backed loan applications.
 - Borrower profile, consent, and KYC records resolve an application.
 - Revoked consent and expired KYC block borrower resolution.

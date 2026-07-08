@@ -25,14 +25,14 @@ Legend:
 | Direct disbursement to borrower/end-beneficiary | LSP/pass-through disbursement blocked. | Done |
 | Direct repayment to RE account | LSP/pass-through repayment blocked. | Done |
 | LSP fees paid by RE, not borrower | Fee registry and vendor settlement module. | Planned |
-| Recovery-agent notice before contact | Recovery workflow and notice generation. | Planned |
+| Recovery-agent notice before contact | Recovery assignment requires borrower notice evidence before a recovery agent can contact the borrower. | Done |
 | Grievance officer and 30-day escalation path | Staff actor role, complaint registry, 30-day SLA, LWS grievance queue, and RBI CMS escalation evidence. | Done |
 | Data minimization and explicit consent | Consent evidence required; detailed consent ledger planned. | Partial |
 | Purpose-specific consent ledger | Borrower-linked consent records track purpose, notice version, status, accepted/revoked timestamps, and evidence reference. | Done |
 | India data storage | Primary storage country required as IN. | Done |
 | Overseas processing return/delete within 24 hours | Processing duration check implemented. | Done |
-| DLA CIMS reporting | DLA registry and CIMS export. | Planned |
-| CIC reporting | CIC event feed. | Planned |
+| DLA CIMS reporting | Active DLA registry validates own/LSP app and web surfaces, CCO/compliance attestation, grievance contact, RE website linkage, India data controls, and exports CIMS-ready rows. | Done |
+| CIC reporting | Internal account-level and portfolio-level CIC-ready snapshots from ledger/schedule state; external CIC submission planned. | Partial |
 
 ## KFS for Loans and Advances
 
@@ -122,7 +122,7 @@ Legend:
 | Model-level kill switch | Implemented. | Done |
 | Red-teaming and adversarial tests | Evidence fields exist; workflow planned. | Partial |
 | Drift, bias, hallucination monitoring | Monitoring service planned. | Planned |
-| AI incident reporting | Incident workflow planned. | Planned |
+| AI incident reporting | Kill-switch incident record and post-incident review first slice implemented; sectoral incident pack planned. | Partial |
 
 ## Maker-Checker and Workflow
 

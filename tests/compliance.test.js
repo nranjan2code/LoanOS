@@ -16,12 +16,14 @@ import {
   evaluateEligibility,
   evaluateLoanApplication,
   evaluateModelUse,
+  generateDlaCimsExport,
   generateRepaymentSchedule,
   registerModel,
   transitionModel,
   resolveBorrowerApplicationReferences,
   resolveLoanApplicationReferences,
   triggerKillSwitch,
+  upsertDigitalLendingApp,
   upsertBorrowerProfile,
   upsertConsentRecord,
   upsertKycRecord,
@@ -535,6 +537,76 @@ test("product policy rejects unsafe penal charge design", () => {
   assert(productResult.findings.some((finding) => finding.controlId === "RBI-FPC-PENAL"));
 });
 
+test("DLA registry exports own and LSP apps in CIMS-ready shape", () => {
+  const reResult = upsertRegulatedEntity({}, validRegulatedEntity());
+  assert.equal(reResult.summary.status, "ready");
+
+  const ownDla = upsertDigitalLendingApp({}, validDigitalLendingApp(), reResult.registry);
+  assert.equal(ownDla.summary.status, "ready");
+
+  const lspDla = upsertDigitalLendingApp(
+    ownDla.registry,
+    validDigitalLendingApp({
+      digitalLendingAppId: "dla_partner_mobile",
+      name: "Partner Loan Marketplace",
+      ownerType: "lsp_owned",
+      ownerName: "Example LSP Services Pvt Ltd",
+      lspId: "lsp_example_001",
+      availability: [
+        {
+          channel: "app_store",
+          availableOn: "Google Play Store",
+          link: "https://play.google.com/store/apps/details?id=in.example.partner"
+        },
+        {
+          channel: "app_store",
+          availableOn: "Apple App Store",
+          link: "https://apps.apple.com/in/app/example-partner/id123456789"
+        }
+      ],
+      grievanceOfficer: {
+        name: "Partner Nodal Officer",
+        email: "grievance@partner.example.in",
+        telephone: "+91-80-40000000",
+        mobile: "+919888888888"
+      },
+      privacyPolicyUrl: "https://partner.example.in/privacy",
+      publicDisclosureUrl: "https://example.in/digital-lending-apps",
+      complianceAttestation: {
+        lspGrievanceOfficerDisplayed: true
+      }
+    }),
+    reResult.registry
+  );
+  assert.equal(lspDla.summary.status, "ready");
+
+  const exportResult = generateDlaCimsExport(lspDla.registry, reResult.registry, {
+    asOf: "2026-07-08T00:00:00.000Z"
+  });
+  assert.equal(exportResult.summary.status, "ready");
+  assert.equal(exportResult.count, 3);
+  assert(exportResult.columns.some((column) => column.key === "grievanceOfficerEmail"));
+  assert.deepEqual(
+    exportResult.rows.map((row) => row.ownerName),
+    ["Self-owned", "Example LSP Services Pvt Ltd", "Example LSP Services Pvt Ltd"]
+  );
+  assert.equal(exportResult.rows[1].availableOn, "Google Play Store");
+  assert.equal(exportResult.rows[2].availableOn, "Apple App Store");
+
+  const unsafeDla = upsertDigitalLendingApp(
+    lspDla.registry,
+    validDigitalLendingApp({
+      digitalLendingAppId: "dla_unsafe",
+      dataCollection: {
+        prohibitedMobileResourcesAccessed: true
+      }
+    }),
+    reResult.registry
+  );
+  assert.equal(unsafeDla.summary.status, "blocked");
+  assert(unsafeDla.findings.some((finding) => finding.path === "dataCollection.prohibitedMobileResourcesAccessed"));
+});
+
 test("borrower profile, consent, and KYC records resolve an application", () => {
   const borrowerResult = upsertBorrowerProfile({}, validBorrowerProfile());
   assert.equal(borrowerResult.summary.status, "ready");
@@ -680,6 +752,54 @@ test("API supports RE and product policy backed loan applications", async (t) =>
   assert.equal(application.tenant.regulatedEntityName, "Example India NBFC Ltd");
   assert.equal(application.product.productCode, "PL_IN_DIGITAL");
   assert.equal(application.product.requestedAmount, 200000);
+});
+
+test("API stores DLAs and exposes CIMS-ready DLA reporting export", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+
+  assert.equal((await postJson(`${base}/regulated-entities`, validRegulatedEntity())).status, 201);
+
+  const blocked = await postJson(
+    `${base}/digital-lending-apps`,
+    validDigitalLendingApp({
+      digitalLendingAppId: "dla_bad_mobile",
+      complianceAttestation: {
+        dataCollectionAndStorageCompliant: false
+      }
+    })
+  );
+  assert.equal(blocked.status, 422);
+  assert(blocked.body.findings.some((finding) => finding.path === "complianceAttestation.dataCollectionAndStorageCompliant"));
+
+  const created = await postJson(`${base}/digital-lending-apps`, validDigitalLendingApp());
+  assert.equal(created.status, 201);
+  assert.equal(created.body.digitalLendingApp.status, "active");
+  assert.equal(created.body.digitalLendingApp.grievanceOfficer.email, "grievance@example.in");
+
+  const lookup = await fetch(`${base}/digital-lending-apps/dla_example_web`);
+  assert.equal(lookup.status, 200);
+  assert.equal((await lookup.json()).name, "Example Loan Web");
+
+  const cimsResponse = await fetch(`${base}/reporting/dla/cims?regulatedEntityId=re_example_nbfc&asOf=2026-07-08T00:00:00.000Z`);
+  assert.equal(cimsResponse.status, 200);
+  const cims = await cimsResponse.json();
+  assert.equal(cims.reportType, "rbi_dla_cims");
+  assert.equal(cims.count, 1);
+  assert.equal(cims.rows[0].dlaName, "Example Loan Web");
+  assert.equal(cims.rows[0].ownerName, "Self-owned");
+  assert.equal(cims.rows[0].reWebsite, "https://example.in");
 });
 
 test("API supports borrower-backed applications without embedded borrower KYC consent blobs", async (t) => {
@@ -2425,6 +2545,47 @@ function validRegulatedEntity() {
       grievancePolicyRef: "board_grievance_policy_v1"
     }
   };
+}
+
+function validDigitalLendingApp(overrides = {}) {
+  const base = {
+    digitalLendingAppId: "dla_example_web",
+    regulatedEntityId: "re_example_nbfc",
+    name: "Example Loan Web",
+    ownerType: "self_owned",
+    status: "active",
+    availability: [
+      {
+        channel: "website",
+        availableOn: "Website",
+        link: "https://app.example.in"
+      }
+    ],
+    grievanceOfficer: {
+      name: "Nodal Officer",
+      email: "grievance@example.in",
+      telephone: "+91-80-40000000",
+      mobile: "+919999999999"
+    },
+    publicDisclosureUrl: "https://example.in/digital-lending-apps",
+    dataCollection: {
+      consentAuditTrail: true,
+      prohibitedMobileResourcesAccessed: false,
+      primaryStorageCountry: "IN",
+      processedOutsideIndia: false
+    },
+    complianceAttestation: {
+      certifiedBy: "cco-1",
+      certifiedAt: "2026-07-08T08:00:00.000Z",
+      certifierRole: "chief_compliance_officer",
+      boardDesignationRef: "board_cco_designation_v1",
+      reWebsiteLinked: true,
+      lspGrievanceOfficerDisplayed: true,
+      dataCollectionAndStorageCompliant: true,
+      disclosedOnReWebsite: true
+    }
+  };
+  return merge(base, overrides);
 }
 
 function validProductPolicy() {

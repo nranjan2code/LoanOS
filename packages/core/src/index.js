@@ -48,11 +48,15 @@ export {
 } from "./loan-policy.js";
 
 export {
+  generateDlaCimsExport,
+  normalizeDigitalLendingApp,
   normalizeProductPolicy,
   normalizeRegulatedEntity,
   resolveLoanApplicationReferences,
+  upsertDigitalLendingApp,
   upsertProductPolicy,
   upsertRegulatedEntity,
+  validateDigitalLendingApp,
   validateProductPolicy,
   validateRegulatedEntity
 } from "./registries.js";

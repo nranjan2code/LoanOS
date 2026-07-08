@@ -31,6 +31,10 @@ Useful endpoints:
 - `GET /regulated-entities`
 - `POST /regulated-entities`
 - `GET /regulated-entities/:id`
+- `GET /digital-lending-apps`
+- `POST /digital-lending-apps`
+- `GET /digital-lending-apps/:id`
+- `GET /reporting/dla/cims`
 - `GET /products`
 - `POST /products`
 - `GET /products/:id`
@@ -111,6 +115,7 @@ Phase 0 has a working executable foundation:
 
 - Compliance control catalog.
 - Regulated entity registry with board-policy and grievance-officer gates.
+- DLA registry for own and LSP app/web surfaces, with CIMS-ready export rows and compliance attestation gates.
 - Product policy registry with pricing, KFS, eligibility, cooling-off, and penal-charge gates.
 - Registry-backed loan application resolution through `regulatedEntityId` and `productId`/`productCode`.
 - Borrower profile registry with India-only and economic-profile checks.
@@ -122,8 +127,8 @@ Phase 0 has a working executable foundation:
 - LOS application workflow state machine for preflight, KFS, decision proposal, human review, maker-checker approval, and disbursement.
 - LOS execution document packet with rendered KFS, sanction letter, loan agreement summary, privacy notice, checksums, and delivery evidence.
 - LWS task queues derived from LOS/LMS state, with SLA metadata, role checks, assignment, start, release, and comment audit.
-- LMS loan account creation on disbursement with repayment schedule, ledger, balance summary, and payment posting.
-- LMS borrower statement generation plus disclosed-charge, waiver, and reversal ledger controls.
+- LMS loan account creation on disbursement with repayment schedule, ledger, balance summary, interest accrual, payment posting, part-prepayment, foreclosure, and closure NOC.
+- LMS borrower statement and rendered statement-document generation plus disclosed-charge, waiver, and reversal ledger controls.
 - LMS delinquency buckets, noticed recovery-agent assignment, and same-day cash recovery posting.
 - LMS SMA/NPA asset classification and CIC-ready reporting snapshots from account state.
 - India-only loan application preflight.
