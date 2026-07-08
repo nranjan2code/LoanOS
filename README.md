@@ -36,6 +36,8 @@ Useful data-plane endpoints (tenant api key required):
 
 - `GET /health`
 - `GET /compliance/controls`
+- `GET /audit/events`
+- `GET /audit/export`
 - `GET /regulated-entities`
 - `POST /regulated-entities`
 - `GET /regulated-entities/:id`
@@ -127,6 +129,7 @@ Useful data-plane endpoints (tenant api key required):
 Phase 0 has a working executable foundation:
 
 - Multi-tenant SaaS foundation: state partitioned per tenant, tenant-scoped api-key authentication with 401 on missing/invalid keys, a platform control plane that mints tenants behind an admin key, and a cross-tenant isolation regression suite.
+- Tamper-evident audit spine: every save seals the tenant's events into a per-tenant SHA-256 hash chain (tenant-bound genesis), with a chain-validity endpoint and an integrity-attested evidence export pack.
 - Compliance control catalog.
 - Regulated entity registry with board-policy and grievance-officer gates.
 - LSP registry with RE agreement, enhanced due diligence, periodic review, borrower-facing grievance, data, recovery, and fee-control gates.

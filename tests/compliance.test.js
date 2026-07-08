@@ -5,6 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 import {
   attachKfs,
+  buildAuditEvidencePack,
   buildKeyFactStatement,
   classifyLoanAsset,
   clearGlobalKillSwitch,
@@ -19,7 +20,9 @@ import {
   generateDlaCimsExport,
   generateRepaymentSchedule,
   registerModel,
+  sealAuditChain,
   transitionModel,
+  verifyAuditChain,
   resolveBorrowerApplicationReferences,
   resolveLoanApplicationReferences,
   triggerKillSwitch,
@@ -2661,6 +2664,98 @@ test("tenants are isolated: one tenant cannot read or mutate another's data", as
   assert.equal(aEntities.regulatedEntities.length, 1);
   const aBorrower = await apiFetch(`${base}/borrowers/bor_001`, {}, TENANT_A.apiKey);
   assert.equal(aBorrower.status, 200);
+});
+
+test("audit spine hash-chains events with a verifiable, tamper-evident chain", () => {
+  // Pure-function proof: sealing produces a linked chain, verification passes,
+  // and any edit, reorder, or genesis swap is detected.
+  const raw = [
+    { type: "loan.application.created", applicationId: "app_1", at: "2026-07-01T00:00:00.000Z" },
+    { type: "loan.kfs.generated", applicationId: "app_1", at: "2026-07-02T00:00:00.000Z" },
+    { type: "loan.decision.approved", applicationId: "app_1", at: "2026-07-03T00:00:00.000Z" }
+  ];
+  const sealed = sealAuditChain(raw, "tnt_x");
+
+  assert.deepEqual(sealed.map((event) => event.sequence), [0, 1, 2]);
+  assert.ok(sealed.every((event) => event.tenantId === "tnt_x" && event.hash && event.previousHash));
+  assert.equal(sealed[1].previousHash, sealed[0].hash);
+  assert.equal(sealed[2].previousHash, sealed[1].hash);
+  assert.equal(verifyAuditChain(sealed, "tnt_x").valid, true);
+
+  // A chain sealed for one tenant does not verify under another tenant's root.
+  assert.equal(verifyAuditChain(sealed, "tnt_other").valid, false);
+
+  // Editing a payload field breaks the chain at that event.
+  const edited = sealed.map((event, index) => (index === 1 ? { ...event, applicationId: "app_999" } : event));
+  const editedResult = verifyAuditChain(edited, "tnt_x");
+  assert.equal(editedResult.valid, false);
+  assert.equal(editedResult.brokenAt, 1);
+  assert.equal(editedResult.reason, "hash_mismatch");
+
+  // Dropping an event breaks the sequence/linkage.
+  const dropped = [sealed[0], sealed[2]];
+  assert.equal(verifyAuditChain(dropped, "tnt_x").valid, false);
+
+  // Re-sealing an already-sealed chain is a no-op (idempotent).
+  const reSealed = sealAuditChain(sealed, "tnt_x");
+  assert.deepEqual(reSealed.map((event) => event.hash), sealed.map((event) => event.hash));
+
+  // A filtered evidence pack still attests integrity over the whole chain.
+  const pack = buildAuditEvidencePack(sealed, "tnt_x", { filters: { type: "loan.kfs.generated" } });
+  assert.equal(pack.eventCount, 3);
+  assert.equal(pack.exportedCount, 1);
+  assert.equal(pack.integrity.valid, true);
+});
+
+test("API seals events into an audit chain and exports a verifiable evidence pack", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A, TENANT_B] });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+
+  // Drive a full origination under tenant A; this emits many audit events.
+  await approveAndDisburseApplication(base);
+
+  const events = await (await apiFetch(`${base}/audit/events`, {}, TENANT_A.apiKey)).json();
+  assert.ok(events.count > 3, "origination should emit several audit events");
+  assert.equal(events.chainValid, true);
+  assert.deepEqual(
+    events.events.map((event) => event.sequence),
+    events.events.map((_event, index) => index)
+  );
+  assert.ok(events.events.every((event) => event.tenantId === TENANT_A.tenantId && event.hash));
+  assert.ok(events.events.some((event) => event.type === "loan.disbursement.recorded"));
+
+  // The export pack verifies and carries genesis/head anchors.
+  const exportResponse = await apiFetch(`${base}/audit/export`, {}, TENANT_A.apiKey);
+  assert.equal(exportResponse.status, 200);
+  const pack = await exportResponse.json();
+  assert.equal(pack.tenantId, TENANT_A.tenantId);
+  assert.equal(pack.integrity.valid, true);
+  assert.equal(pack.eventCount, events.count);
+  assert.ok(pack.genesisHash && pack.headHash);
+
+  // Filtering narrows the exported events but keeps whole-chain integrity.
+  const filtered = await (
+    await apiFetch(`${base}/audit/export?type=loan.disbursement.recorded`, {}, TENANT_A.apiKey)
+  ).json();
+  assert.equal(filtered.exportedCount, 1);
+  assert.equal(filtered.eventCount, events.count);
+  assert.equal(filtered.integrity.valid, true);
+
+  // The audit spine is tenant-scoped: tenant B sees none of tenant A's events.
+  const bEvents = await (await apiFetch(`${base}/audit/events`, {}, TENANT_B.apiKey)).json();
+  assert.equal(bEvents.count, 0);
+  assert.equal(bEvents.chainValid, true);
 });
 
 function eligibilityApplication(overrides = {}) {

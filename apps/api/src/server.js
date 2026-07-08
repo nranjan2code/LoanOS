@@ -79,6 +79,10 @@ import {
   waiveLoanAccountCharge
 } from "../../../packages/core/src/index.js";
 import {
+  buildAuditEvidencePack,
+  sealAuditChain
+} from "../../../packages/core/src/index.js";
+import {
   appendEvent,
   createEmptyTenantData,
   ensureBootstrapTenants,
@@ -166,15 +170,45 @@ async function route(req, res, dataDir, platformAdminKey) {
   }
 
   // The store hands each handler ONLY this tenant's partition. There is no code
-  // path from a handler back to another tenant's data.
+  // path from a handler back to another tenant's data. On every save the tenant's
+  // audit events are sealed into an append-only hash chain, so the persisted
+  // record is tamper-evident by construction.
   let scopedWholeState = wholeState;
   const store = {
     load: async () => getTenantData(scopedWholeState, tenant.tenantId) ?? createEmptyTenantData(),
     save: async (tenantData) => {
-      scopedWholeState = setTenantData(scopedWholeState, tenant.tenantId, tenantData);
+      const sealed = {
+        ...tenantData,
+        events: sealAuditChain(tenantData.events, tenant.tenantId)
+      };
+      scopedWholeState = setTenantData(scopedWholeState, tenant.tenantId, sealed);
       await saveWholeState(scopedWholeState, dataDir);
     }
   };
+
+  if (method === "GET" && path === "/audit/events") {
+    const state = await store.load();
+    const filters = auditFiltersFromUrl(url);
+    const pack = buildAuditEvidencePack(state.events, tenant.tenantId, { filters });
+    sendJson(res, 200, {
+      tenantId: pack.tenantId,
+      count: pack.exportedCount,
+      chainValid: pack.integrity.valid,
+      integrity: pack.integrity,
+      events: pack.events
+    });
+    return;
+  }
+
+  if (method === "GET" && path === "/audit/export") {
+    const state = await store.load();
+    const filters = auditFiltersFromUrl(url);
+    const pack = buildAuditEvidencePack(state.events, tenant.tenantId, { filters });
+    // The evidence pack is only handed out when the chain verifies; a broken
+    // chain surfaces a 409 so an auditor never receives a silently-tampered pack.
+    sendJson(res, pack.integrity.valid ? 200 : 409, pack);
+    return;
+  }
 
   if (method === "GET" && path === "/staff/actors") {
     const state = await store.load();
@@ -2175,6 +2209,17 @@ function sendJson(res, statusCode, payload) {
     "content-length": Buffer.byteLength(body)
   });
   res.end(body);
+}
+
+function auditFiltersFromUrl(url) {
+  const filters = {};
+  for (const key of ["type", "subjectId", "from", "to"]) {
+    const value = url.searchParams.get(key);
+    if (value) {
+      filters[key] = value;
+    }
+  }
+  return filters;
 }
 
 function taskFiltersFromUrl(url) {

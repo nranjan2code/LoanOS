@@ -33,15 +33,14 @@ Both tiers are India-hosted. Tier choice is a tenant-contract fact recorded in t
 
 ## Audit Evidence Spine
 
-The current flat `events` array is replaced by one append-only, tenant-scoped audit stream that every module emits into. Each event carries:
+*Implemented (S4).* Every save seals the tenant's events into an append-only, tenant-scoped SHA-256 hash chain in `packages/core/src/audit.js`; `GET /audit/events` reports chain validity and `GET /audit/export` produces an integrity-attested evidence pack (which 409s rather than hand out a tampered pack). The chain root is bound to the tenant, so a chain cannot be transplanted between tenants. Each event carries:
 
-- `eventId`, `tenantId`, `occurredAt`
-- `actor` (human, service, or system) and acting role
-- `action` and `subject` references (application, account, complaint, model, task)
-- `dataClass`, `storageCountry`, `consentReference`, `policyVersion` where applicable
-- `previousEventHash` and `eventHash` (hash chain per tenant, so tampering and gaps are detectable)
+- `sequence`, `eventId`, `tenantId`, `occurredAt` — stamped by the spine today.
+- `previousHash` and `hash` — the per-tenant SHA-256 chain; stamped by the spine today.
+- `type` plus subject references (application, account, complaint, model, task) — carried from the emitting handler today.
+- `actor`/acting role, `dataClass`, `storageCountry`, `consentReference`, `policyVersion` — carried when the emitting handler includes them; a follow-on pass will make actor and data-class stamping uniform across every emission.
 
-Export packs for auditors, RE compliance teams, and supervisors are generated from this spine, never assembled by hand.
+Export packs for auditors, RE compliance teams, and supervisors are generated from this spine, never assembled by hand: `GET /audit/export` returns the sealed events (optionally filtered by `type`/`subjectId`/date) plus a whole-chain integrity verdict and genesis/head anchors.
 
 ## Data Residency, Privacy, and Keys
 

@@ -26,6 +26,7 @@ npm run dev:api
 | Path | Role |
 | --- | --- |
 | `packages/core/src/compliance-controls.js` | Regulatory control catalog and finding helpers. |
+| `packages/core/src/audit.js` | Tenant-scoped, append-only audit hash chain: tenant-bound genesis, canonical hashing, `sealAuditChain`, `verifyAuditChain`, and `buildAuditEvidencePack`. |
 | `packages/core/src/access-control.js` | Staff actor registry, role checks, queue assignment authority, and regulated-action actor validation. |
 | `packages/core/src/grievance.js` | Complaint registry, grievance lifecycle, 30-day RBI Ombudsman clock, and RBI CMS escalation evidence. |
 | `packages/core/src/document-packet.js` | KFS, sanction letter, loan agreement summary, and privacy notice rendering, rendered borrower loan-statement document, plus delivery evidence controls. |
@@ -52,6 +53,8 @@ npm run dev:api
 | `POST /platform/tenants` | Mints a tenant and returns a one-time api key; requires the platform admin key. |
 | `GET /platform/tenants` | Lists tenants (no secrets); requires the platform admin key. |
 | `GET /platform/tenants/:id` | Reads one tenant record; requires the platform admin key. |
+| `GET /audit/events` | Lists the tenant's sealed audit chain (filterable by `type`/`subjectId`/`from`/`to`) with a chain-validity verdict. |
+| `GET /audit/export` | Produces an integrity-attested evidence pack from the tenant's audit chain; 409 if the chain fails verification. |
 | `GET /regulated-entities` | Lists regulated entities. |
 | `POST /regulated-entities` | Creates or updates a regulated entity after compliance validation. |
 | `GET /regulated-entities/:id` | Reads one regulated entity. |
@@ -135,6 +138,8 @@ npm run dev:api
 | Tenant isolation | State is partitioned per tenant; each data-plane request receives only its own tenant's partition, so a handler has no code path to another tenant's records. |
 | Tenant authentication | Data-plane routes require a valid `x-api-key`/bearer token mapping to an active tenant; missing or invalid keys return 401. Only health and static reference routes are open. |
 | Tenant provisioning | The platform control plane mints tenants behind an admin key and returns a one-time api key stored only as a SHA-256 hash. |
+| Audit spine | Every save seals the tenant's events into an append-only SHA-256 hash chain with a tenant-bound genesis; `verifyAuditChain` detects any edit, drop, reorder, or genesis swap. |
+| Evidence export | `GET /audit/export` emits an auditor-ready pack (genesis/head anchors, whole-chain integrity verdict, optionally filtered events) and 409s rather than release a broken chain. |
 | India-only lending | Blocks non-IN borrower residency/address, non-INR currency, non-IN data storage. |
 | Regulated entity | Requires supported RE type and grievance officer. |
 | Regulated entity registry | Requires active India RE, website, privacy policy, grievance officer, data-residency posture, and board policy references. |
@@ -204,6 +209,7 @@ npm run dev:api
 - Document packet renders HTML/text but does not yet create PDFs or eSign envelopes.
 - No UI yet.
 - AI governance is a runtime guard plus first lifecycle/incident slices, but does not yet include drift monitoring, recurring fairness reports, or sectoral incident pack generation.
+- The audit spine seals structural fields (tenant, sequence, hashes, timestamp) plus each handler's payload; uniform actor and data-class/consent/policy-version stamping across every emission, plus signed external anchoring, are follow-ons.
 - Compliance docs are source-grounded but still require counsel/compliance review before production.
 
 ## Test Coverage
@@ -211,6 +217,8 @@ npm run dev:api
 Current tests prove:
 
 - Data-plane routes reject a missing or invalid tenant api key with 401, while health and compliance-controls stay open.
+- Sealing events produces a verifiable hash chain; editing, dropping, or reordering an event breaks verification, a chain does not verify under another tenant's genesis, and re-sealing is idempotent.
+- The API seals origination events into an audit chain, reports chain validity, exports an integrity-attested (and filterable) evidence pack, and keeps the audit spine tenant-scoped.
 - The platform admin can mint a tenant, receives a one-time api key, and that key immediately authenticates data-plane calls; duplicate tenant ids are rejected.
 - Two provisioned tenants are isolated: tenant B sees none of tenant A's records across resource types, by-id reads return 404, a re-used id writes only into B's own partition, and tenant A's data is unchanged.
 - Valid India-only loan application passes preflight.

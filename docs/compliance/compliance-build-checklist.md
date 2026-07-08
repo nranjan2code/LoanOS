@@ -170,7 +170,8 @@ LoanOS is delivered as SaaS, so the platform itself has compliance obligations a
 | Tenant-scoped API authentication | Every data-plane route resolves a tenant from the `x-api-key`/bearer token and returns 401 without a valid key; open routes are limited to health and static reference. | Done |
 | Cross-tenant isolation regression tests | Two-tenant suite proves tenant B cannot read or mutate tenant A's records across resource types, plus 401 on missing/invalid key. | Done |
 | Platform control plane mints tenants | `POST /platform/tenants` behind a platform admin key issues a one-time api key stored only as a hash. | Done |
-| Append-only hash-chained audit spine | Per-tenant `events` array plus per-module evidence exists; no unified hash-chained stream yet. | Partial |
+| Append-only hash-chained audit spine | Every save seals the tenant's events into a per-tenant SHA-256 hash chain (tenant-bound genesis, previous-hash linkage); `verifyAuditChain` detects any edit, drop, reorder, or genesis swap. | Done |
+| Evidence export pack | `GET /audit/export` produces an auditor-ready pack (genesis/head anchors, whole-chain integrity attestation, optionally filtered events); a broken chain returns 409 instead of a silently-tampered pack. `GET /audit/events` lists the chain with a validity verdict. | Done |
 | Per-tenant encryption keys and key destruction on exit | Key management design. | Planned |
 | RE due-diligence pack (ownership, security, subcontractors) | Standing vendor-assessment pack. | External |
 | RE audit and inspection rights support | Contract terms plus evidence-export tooling. | Planned |

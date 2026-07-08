@@ -247,7 +247,7 @@ Done when:
 
 ## Epic 11: SaaS Tenancy and Platform Isolation
 
-Status: S1–S3 first slice complete (tenant partitioning, tenant-scoped auth, isolation suite); remaining tasks planned.
+Status: S1–S4 first slice complete (tenant partitioning, tenant-scoped auth, isolation suite, hash-chained audit spine + evidence export); remaining tasks planned.
 
 Goal: LoanOS runs as a multi-tenant SaaS where cross-tenant access is impossible by construction and the platform satisfies RE outsourcing obligations.
 
@@ -260,8 +260,8 @@ Tasks:
 - Platform control plane to mint tenants. Done: `POST /platform/tenants` behind a platform admin key returns a one-time api key stored only as a hash.
 - Cross-tenant isolation regression suite covering every resource type. Done.
 - Platform-staff break-glass access with audit and tenant reporting. Planned.
-- Hash-chained, tenant-scoped audit event module; migrate module event emission onto it. Planned.
-- Evidence export pack generated from the audit spine. Planned.
+- Hash-chained, tenant-scoped audit event module; migrate module event emission onto it. Done: `packages/core/src/audit.js` seals each tenant's events into a tamper-evident SHA-256 chain on every save.
+- Evidence export pack generated from the audit spine. Done: `GET /audit/export` (integrity-attested, filterable) and `GET /audit/events` (chain + validity verdict).
 - Tenant onboarding/offboarding workflow with exit/portability export and evidenced deletion. Planned.
 - Incident notification workflow supporting RE 6-hour RBI reporting and CERT-In duties. Planned.
 - Sub-processor register. Planned.

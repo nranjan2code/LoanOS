@@ -7,6 +7,14 @@ export {
 } from "./compliance-controls.js";
 
 export {
+  auditGenesisHash,
+  buildAuditEvidencePack,
+  computeAuditHash,
+  sealAuditChain,
+  verifyAuditChain
+} from "./audit.js";
+
+export {
   STAFF_ACTOR_STATUSES,
   STAFF_ROLES,
   normalizeStaffActor,
