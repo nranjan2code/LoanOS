@@ -241,7 +241,7 @@ npm run dev:api
 | Part-prepayment | Enforces lock-in period and floating-rate individual retail fee prohibitions, clears dues then reduces principal, requiring a real principal reduction, and rebuilds the future schedule either to lower each EMI over the same term (`reduce_emi`) or keep the EMI and shorten the tenure (`reduce_tenure`). |
 | Borrower statements | Generates period statement from schedule and ledger transactions. |
 | Rendered statement document | Renders the period statement into a checksum-sealed HTML/text borrower document (opening/closing balances, dues, transactions, totals) in the same shape as the execution packet. |
-| Charge controls | Blocks undisclosed charges and penal-interest/capitalizing charge designs. |
+| Charge controls | Grounds KFS charges in Product Policy, validates KFS limits, and blocks ad-hoc ledger charge assessment, foreclosure charges, and prepayment charges exceeding KFS caps and policy ceilings. |
 | Waivers and reversals | Requires approval evidence for waivers and reversals, and prevents duplicate reversal of the same event. |
 | Delinquency buckets | Computes DPD bucket, earliest unpaid installment, and overdue amounts from schedule plus ledger. |
 | Collections reminder workflow | Logs each borrower reminder/notice (channel, stage, delinquency snapshot); voice-channel (call/IVR) contact outside the RBI FPC 08:00-19:00 IST window is blocked. |

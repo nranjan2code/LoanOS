@@ -5567,3 +5567,199 @@ test("API marketplace offers routes manage multi-lender offer evaluations and bl
   }
 });
 
+test("KFS grounding validation checks prevent undisclosed or exceeding charges", () => {
+  const product = validProductPolicy(); // has Processing fee (1000) and Late payment charge (500)
+  
+  // Compliant KFS
+  const validKfs = {
+    currency: "INR",
+    aprBps: 2100,
+    principalAmount: 125000,
+    tenorMonths: 12,
+    coolingOffDays: 1,
+    grievanceOfficer: { name: "Grievance Officer", email: "grievance@bank.com" },
+    recoveryMechanism: "NACH debit to RE account",
+    charges: [{ name: "Processing fee", reason: "One-time processing charge disclosed upfront", amount: 1000, type: "fixed" }],
+    penalCharges: [{ name: "Late payment charge", reason: "Repayment default", amount: 500, type: "penal_charge", capitalizes: false }],
+    prepaymentPolicy: { allowed: true, chargeBps: 0, lockInMonths: 0 },
+    foreclosurePolicy: { allowed: true, chargeBps: 0, lockInMonths: 0 },
+    acceptedAt: "2026-07-08T07:00:00.000Z",
+    deliveryRef: "delivery_ref_1"
+  };
+  
+  const appValid = { kfs: validKfs, product };
+  const checkValid = validateKfsBeforeDecision(appValid);
+  assert.equal(checkValid.summary.status, "ready");
+
+  // Undisclosed charge in KFS
+  const badKfs1 = {
+    ...validKfs,
+    charges: [...validKfs.charges, { name: "Ad-hoc fee", reason: "Mystery fee", amount: 200, type: "fixed" }]
+  };
+  const appBad1 = { kfs: badKfs1, product };
+  const checkBad1 = validateKfsBeforeDecision(appBad1);
+  assert.equal(checkBad1.summary.status, "blocked");
+  assert(checkBad1.findings.some(f => f.message.includes("is not disclosed in the product policy")));
+
+  // KFS charge exceeding product policy limit
+  const badKfs2 = {
+    ...validKfs,
+    charges: [{ name: "Processing fee", reason: "One-time processing charge disclosed upfront", amount: 1500, type: "fixed" }]
+  };
+  const appBad2 = { kfs: badKfs2, product };
+  const checkBad2 = validateKfsBeforeDecision(appBad2);
+  assert.equal(checkBad2.summary.status, "blocked");
+  assert(checkBad2.findings.some(f => f.message.includes("exceeds the product policy limit")));
+
+  // KFS prepayment fee rate exceeding product policy limit
+  const badKfs3 = {
+    ...validKfs,
+    prepaymentPolicy: { allowed: true, chargeBps: 300, lockInMonths: 0 }
+  };
+  const productWithPrepayLimit = {
+    ...product,
+    prepaymentPolicy: { allowed: true, chargeBps: 200, lockInMonths: 0 }
+  };
+  const appBad3 = { kfs: badKfs3, product: productWithPrepayLimit };
+  const checkBad3 = validateKfsBeforeDecision(appBad3);
+  assert.equal(checkBad3.summary.status, "blocked");
+  assert(checkBad3.findings.some(f => f.message.includes("KFS prepayment fee rate") && f.message.includes("exceeds the product policy limit")));
+});
+
+test("API controls undisclosed charge caps and enforces computed ceilings", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-charges-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+  
+  // Seed a fixed-rate product that allows foreclosure charges (e.g. 2% / 200 bps)
+  const seedProduct = {
+    ...validProductPolicy(),
+    interestRateType: "fixed",
+    prepaymentPolicy: { allowed: true, chargeBps: 200, lockInMonths: 0 },
+    foreclosurePolicy: { allowed: true, chargeBps: 200, lockInMonths: 0 },
+    charges: [
+      { name: "Processing fee", reason: "One-time processing charge disclosed upfront", amount: 1000, type: "fixed" },
+      { name: "Foreclosure fee", reason: "Early foreclosure fee", amount: 3000, type: "fixed" },
+      { name: "Prepayment fee", reason: "Part prepayment fee", amount: 2500, type: "fixed" }
+    ]
+  };
+
+  // Setup the application with custom product overrides
+  await seedOperationalActors(base);
+  assert.equal((await postJson(`${base}/regulated-entities`, validRegulatedEntity())).status, 201);
+  assert.equal((await postJson(`${base}/products`, seedProduct)).status, 201);
+  assert.equal((await postJson(`${base}/borrowers`, validBorrowerProfile())).status, 201);
+  assert.equal((await postJson(`${base}/borrowers/bor_001/consents`, validConsentRecord())).status, 201);
+  assert.equal((await postJson(`${base}/borrowers/bor_001/kyc-records`, validKycRecord())).status, 201);
+
+  const response = await postJson(`${base}/loans/applications`, {
+    regulatedEntityId: "re_example_nbfc",
+    productId: "prod_personal_loan",
+    borrowerId: "bor_001",
+    requestedAmount: 100000,
+    requestedTenorMonths: 12,
+    disbursement: validApplication().disbursement,
+    repayment: validApplication().repayment
+  });
+  assert.equal(response.status, 201);
+
+  // Generate KFS with seeded charges
+  const kfsRes = await postJson(`${base}/loans/applications/${response.body.applicationId}/kfs`, {
+    acceptance: {
+      acceptedAt: "2026-07-08T07:00:00.000Z",
+      deliveryChannel: "email",
+      deliveryRef: "email_msg_999"
+    }
+  });
+  assert.equal(kfsRes.status, 201);
+
+  // Approve and Checker approve
+  await postJson(`${base}/loans/applications/${response.body.applicationId}/decision`, {
+    status: "approved",
+    proposedBy: "credit-maker-1",
+    reason: "Seeded test PL"
+  });
+  await postJson(`${base}/loans/applications/${response.body.applicationId}/approvals`, {
+    outcome: "approved",
+    approvedBy: "credit-checker-1",
+    approvalRef: "checker_approval_999"
+  });
+
+  // Document packet and disburse
+  await generateAndDeliverDocumentPacket(base, response.body.applicationId);
+  const disburseRes = await postJson(`${base}/loans/applications/${response.body.applicationId}/disbursement`, {
+    destinationAccount: validApplication().disbursement.destinationAccount
+  });
+  assert.equal(disburseRes.status, 200);
+
+  const accountId = disburseRes.body.loanAccountId;
+
+  // 1. Post a charge exceeding the KFS amount cap
+  const badCharge = await postJson(`${base}/loan-accounts/${accountId}/charges`, {
+    name: "Processing fee",
+    reason: "Upfront processing",
+    amount: 1500 // Disclosed limit is 1000
+  });
+  assert.equal(badCharge.status, 422);
+  assert(badCharge.body.findings.some(f => f.message.includes("exceeds the disclosed KFS limit")));
+
+  // 2. Foreclosure quote with charge exceeding the KFS disclosed limit
+  const badForeclosureQuote = await apiFetch(`${base}/loan-accounts/${accountId}/foreclosure-quote?foreclosureChargeName=Foreclosure fee&foreclosureChargeAmount=4000`);
+  assert.equal(badForeclosureQuote.status, 422);
+  const badFqBody = await badForeclosureQuote.json();
+  assert(badFqBody.findings.some(f => f.message.includes("exceeds the disclosed KFS limit")));
+
+  // 3. Foreclosure quote with charge exceeding computed policy BPS ceiling
+  // principalOutstanding is 100000. 2% of 100000 is 2000. Foreclosure charge of 2500 exceeds policy ceiling.
+  const badForeclosureCeiling = await apiFetch(`${base}/loan-accounts/${accountId}/foreclosure-quote?foreclosureChargeName=Foreclosure fee&foreclosureChargeAmount=2500`);
+  assert.equal(badForeclosureCeiling.status, 422);
+  const badFcBody = await badForeclosureCeiling.json();
+  assert(badFcBody.findings.some(f => f.message.includes("exceeds the product policy ceiling")));
+
+  // 4. Prepayment with charge exceeding KFS disclosed limit
+  const badPrepayLimit = await postJson(`${base}/loan-accounts/${accountId}/prepayments`, {
+    amount: 20000,
+    paymentRef: "pay_prepay_bad_limit",
+    prepaymentChargeName: "Prepayment fee",
+    prepaymentChargeAmount: 3000 // Disclosed limit is 2500
+  });
+  assert.equal(badPrepayLimit.status, 422);
+  assert(badPrepayLimit.body.findings.some(f => f.message.includes("exceeds the disclosed KFS limit")));
+
+  // 5. Prepayment with charge exceeding computed policy BPS ceiling
+  // principalPrepaid is 20000. 2% of 20000 is 400. Prepayment charge of 500 exceeds 2% ceiling.
+  const badPrepayCeiling = await postJson(`${base}/loan-accounts/${accountId}/prepayments`, {
+    amount: 20000,
+    paymentRef: "pay_prepay_bad_ceil",
+    prepaymentChargeName: "Prepayment fee",
+    prepaymentChargeAmount: 500
+  });
+  assert.equal(badPrepayCeiling.status, 422);
+  assert(badPrepayCeiling.body.findings.some(f => f.message.includes("exceeds the product policy ceiling")));
+
+  // 6. Valid prepayment charge assessment
+  // principalPrepaid is 20000. Prepayment charge of 300 (which is <= 400 ceiling and <= 2500 catalog cap)
+  const validPrepay = await postJson(`${base}/loan-accounts/${accountId}/prepayments`, {
+    amount: 20300, // 20000 principal prepayment + 300 prepayment fee
+    paymentRef: "pay_prepay_ok",
+    prepaymentChargeName: "Prepayment fee",
+    prepaymentChargeAmount: 300
+  });
+  assert.equal(validPrepay.status, 200);
+  // Verify that the prepayment charge was assessed on the ledger
+  const prepayAccount = validPrepay.body.loanAccount;
+  const chargeEvent = prepayAccount.ledger.find(e => e.type === "charge_assessed" && e.chargeName === "Prepayment fee");
+  assert.ok(chargeEvent);
+  assert.equal(chargeEvent.amount, 300);
+});
+

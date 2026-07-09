@@ -48,7 +48,7 @@ Legend:
 | Cooling-off period | KFS requires at least one day. | Done |
 | Recovery mechanism | KFS requires recovery mechanism. | Done |
 | Grievance officer | KFS requires name and email. | Done |
-| Undisclosed fees cannot be charged later | Fee-posting module must enforce KFS fee registry. | Planned |
+| Undisclosed fees cannot be charged later | Ground KFS charges in Product Policy and block ad-hoc, foreclosure, and prepayment ledger charges exceeding KFS/policy limits. | Done |
 | Digitally signed/rendered KFS | HTML/text document packet renderer with checksum and delivery evidence; eSign/PDF planned. | Partial |
 | KFS workflow state | KFS route separates issued KFS from decision-ready KFS based on acceptance and delivery evidence. | Done |
 

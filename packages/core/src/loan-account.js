@@ -681,51 +681,64 @@ export function quoteForeclosure(account, input = {}, now = new Date()) {
 
   if (!account) {
     findings.push(createFinding("error", "RBI-DL-2025", "Loan account is required.", "loanAccount"));
+    return { quote: null, findings, summary: summarizeFindings(findings) };
   }
-  if (account && account.status !== ACTIVE_STATUS) {
+  if (account.status !== ACTIVE_STATUS) {
     findings.push(createFinding("error", "RBI-DL-2025", "Only an active loan account can be foreclosed.", "status"));
   }
+
+  const balance = summarizeLoanAccount(account, asOf);
 
   let foreclosureCharge = 0;
   let disclosedChargeRef = null;
   if (input.foreclosureChargeName) {
-    const disclosed = findDisclosedCharge(account?.disclosedChargeCatalog ?? [], input.foreclosureChargeName);
+    const disclosed = findDisclosedCharge(account.disclosedChargeCatalog ?? [], input.foreclosureChargeName);
     if (!disclosed) {
       findings.push(createFinding("error", "RBI-KFS-2024", "Foreclosure charge must be disclosed in KFS.", "foreclosureChargeName"));
     } else {
-      foreclosureCharge = roundMoney(disclosed.amount ?? input.foreclosureChargeAmount ?? 0);
+      foreclosureCharge = roundMoney(input.foreclosureChargeAmount ?? disclosed.amount ?? 0);
       disclosedChargeRef = disclosed.name;
+      if (Number.isFinite(disclosed.amount) && foreclosureCharge > disclosed.amount) {
+        findings.push(createFinding("error", "RBI-KFS-2024", `Foreclosure charge (${foreclosureCharge}) exceeds the disclosed KFS limit of ${disclosed.amount}.`, "foreclosureCharge"));
+      }
     }
   }
 
-  if (account) {
-    const foreclPolicy = account.foreclosurePolicy ?? { allowed: true, chargeBps: 0, lockInMonths: 0 };
-    if (foreclPolicy.allowed === false) {
-      findings.push(createFinding("error", "RBI-DL-2025", "Foreclosure is not allowed under product policy.", "foreclosurePolicy.allowed"));
+  const foreclPolicy = account.foreclosurePolicy ?? { allowed: true, chargeBps: 0, lockInMonths: 0 };
+  if (foreclPolicy.allowed === false) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Foreclosure is not allowed under product policy.", "foreclosurePolicy.allowed"));
+  }
+  if (foreclPolicy.lockInMonths > 0 && account.disbursedAt) {
+    const monthsElapsed = calculateMonthsElapsed(account.disbursedAt, asOf);
+    if (monthsElapsed < foreclPolicy.lockInMonths) {
+      findings.push(createFinding("error", "RBI-DL-2025", `Foreclosure is blocked within the lock-in period of ${foreclPolicy.lockInMonths} months.`, "foreclosurePolicy.lockInMonths"));
     }
-    if (foreclPolicy.lockInMonths > 0 && account.disbursedAt) {
-      const monthsElapsed = calculateMonthsElapsed(account.disbursedAt, asOf);
-      if (monthsElapsed < foreclPolicy.lockInMonths) {
-        findings.push(createFinding("error", "RBI-DL-2025", `Foreclosure is blocked within the lock-in period of ${foreclPolicy.lockInMonths} months.`, "foreclosurePolicy.lockInMonths"));
-      }
-    }
+  }
 
-    const rateType = account.interestRateType ?? "fixed";
-    const bType = account.borrowerType ?? "individual";
-    const isBusiness = account.productType === "business_loan" || account.productType === "msme_loan";
-    if (rateType === "floating" && bType === "individual" && !isBusiness) {
-      if (foreclosureCharge > 0 || (input.foreclosureChargeAmount ?? 0) > 0) {
-        findings.push(createFinding("error", "RBI-FPC-PENAL", "Foreclosure charges are prohibited on floating-rate individual retail loans.", "foreclosureCharge"));
-      }
+  const rateType = account.interestRateType ?? "fixed";
+  const bType = account.borrowerType ?? "individual";
+  const isBusiness = account.productType === "business_loan" || account.productType === "msme_loan";
+  if (rateType === "floating" && bType === "individual" && !isBusiness) {
+    if (foreclosureCharge > 0 || (input.foreclosureChargeAmount ?? 0) > 0) {
+      findings.push(createFinding("error", "RBI-FPC-PENAL", "Foreclosure charges are prohibited on floating-rate individual retail loans.", "foreclosureCharge"));
+    }
+  } else if (foreclPolicy.chargeBps > 0 && foreclosureCharge > 0) {
+    const ceiling = roundMoney((balance.principalOutstanding * foreclPolicy.chargeBps) / 10000);
+    if (foreclosureCharge > ceiling) {
+      findings.push(createFinding(
+        "error",
+        "RBI-KFS-2024",
+        `Foreclosure charge (${foreclosureCharge}) exceeds the product policy ceiling of ${ceiling} (${foreclPolicy.chargeBps} bps of outstanding principal).`,
+        "foreclosureCharge"
+      ));
     }
   }
 
   const summary = summarizeFindings(findings);
-  if (summary.status === "blocked" || !account) {
+  if (summary.status === "blocked") {
     return { quote: null, findings, summary };
   }
 
-  const balance = summarizeLoanAccount(account, asOf);
   return {
     quote: {
       asOf: asOf.toISOString(),
@@ -954,6 +967,21 @@ export function prepayLoanAccount(account, input = {}, now = new Date()) {
     findings.push(createFinding("error", "RBI-DL-2025", "Prepayment mode must be reduce_emi or reduce_tenure.", "mode"));
   }
 
+  let prepaymentCharge = 0;
+  let disclosedChargeRef = null;
+  if (account && input.prepaymentChargeName) {
+    const disclosed = findDisclosedCharge(account.disclosedChargeCatalog ?? [], input.prepaymentChargeName);
+    if (!disclosed) {
+      findings.push(createFinding("error", "RBI-KFS-2024", "Prepayment charge must be disclosed in KFS.", "prepaymentChargeName"));
+    } else {
+      prepaymentCharge = roundMoney(input.prepaymentChargeAmount ?? disclosed.amount ?? 0);
+      disclosedChargeRef = disclosed.name;
+      if (Number.isFinite(disclosed.amount) && prepaymentCharge > disclosed.amount) {
+        findings.push(createFinding("error", "RBI-KFS-2024", `Prepayment charge (${prepaymentCharge}) exceeds the disclosed KFS limit of ${disclosed.amount}.`, "prepaymentCharge"));
+      }
+    }
+  }
+
   if (account) {
     const prepayPolicy = account.prepaymentPolicy ?? { allowed: true, chargeBps: 0, lockInMonths: 0 };
     if (prepayPolicy.allowed === false) {
@@ -965,15 +993,55 @@ export function prepayLoanAccount(account, input = {}, now = new Date()) {
         findings.push(createFinding("error", "RBI-DL-2025", `Part-prepayment is blocked within the lock-in period of ${prepayPolicy.lockInMonths} months.`, "prepaymentPolicy.lockInMonths"));
       }
     }
+
+    const rateType = account.interestRateType ?? "fixed";
+    const bType = account.borrowerType ?? "individual";
+    const isBusiness = account.productType === "business_loan" || account.productType === "msme_loan";
+    if (rateType === "floating" && bType === "individual" && !isBusiness) {
+      if (prepaymentCharge > 0 || (input.prepaymentChargeAmount ?? 0) > 0) {
+        findings.push(createFinding("error", "RBI-FPC-PENAL", "Prepayment charges are prohibited on floating-rate individual retail loans.", "prepaymentCharge"));
+      }
+    } else if (prepayPolicy.chargeBps > 0 && prepaymentCharge > 0) {
+      const balance = summarizeLoanAccount(account, receivedAt);
+      const prepaidPrincipal = Math.max(0, input.amount - balance.interestOutstanding - balance.chargesOutstanding);
+      const ceiling = roundMoney((prepaidPrincipal * prepayPolicy.chargeBps) / 10000);
+      if (prepaymentCharge > ceiling) {
+        findings.push(createFinding(
+          "error",
+          "RBI-KFS-2024",
+          `Prepayment charge (${prepaymentCharge}) exceeds the product policy ceiling of ${ceiling} (${prepayPolicy.chargeBps} bps of prepaid principal).`,
+          "prepaymentCharge"
+        ));
+      }
+    }
   }
 
   const preSummary = summarizeFindings(findings);
-  if (preSummary.status === "blocked") {
+  if (preSummary.status === "blocked" || !account) {
     return { loanAccount: account, paymentEvent: null, prepayment: null, schedule: account?.schedule ?? [], findings, summary: preSummary };
   }
 
+  let workingAccount = account;
+  if (prepaymentCharge > 0) {
+    const chargeResult = assessChargeToLoanAccount(
+      workingAccount,
+      {
+        name: input.prepaymentChargeName,
+        reason: "Part-prepayment fee",
+        amount: prepaymentCharge,
+        assessedAt: receivedAt.toISOString(),
+        actor: input.actor ?? "system"
+      },
+      now
+    );
+    if (chargeResult.summary.status === "blocked") {
+      return { loanAccount: account, paymentEvent: null, prepayment: null, schedule: account.schedule ?? [], findings: chargeResult.findings, summary: chargeResult.summary };
+    }
+    workingAccount = chargeResult.loanAccount;
+  }
+
   const paymentResult = postPaymentToLoanAccount(
-    account,
+    workingAccount,
     {
       amount: input.amount,
       receivedAt: receivedAt.toISOString(),
@@ -1630,6 +1698,13 @@ export function assessChargeToLoanAccount(account, input, now = new Date()) {
   const disclosedCharge = findDisclosedCharge(account?.disclosedChargeCatalog ?? [], input?.name);
   if (!disclosedCharge) {
     findings.push(createFinding("error", "RBI-KFS-2024", "Charge must be disclosed in KFS before assessment.", "name"));
+  } else if (Number.isFinite(disclosedCharge.amount) && input.amount > disclosedCharge.amount) {
+    findings.push(createFinding(
+      "error",
+      "RBI-KFS-2024",
+      `Assessed amount for '${input.name}' (${input.amount}) exceeds the disclosed KFS limit of ${disclosedCharge.amount}.`,
+      "amount"
+    ));
   }
 
   const summary = summarizeFindings(findings);

@@ -40,12 +40,13 @@ Tasks:
 - Prepayment/foreclosure policy. Done: product policy validates allowability, lock-in period, and blocks fees on floating-rate individual retail loans; quoteForeclosure and prepayLoanAccount enforce these checks at transaction level.
 - Floating-rate reset policy where applicable. Done: resetFloatingRate implements choice-based re-amortization options (extend tenor, increase EMI, switch to fixed with switch fee) under maker-checker flow.
 - Policy versioning and effective dates. First slice done: a product policy carries a `version` and `effectiveFrom`/`effectiveTo`; `upsertProductPolicy` publishes each material change as a new version (must increase and take effect after the current one), archiving the superseded version with its window closed in `priorVersions`. `selectProductPolicyVersion(product, asOf)` (and `GET /products/{id}?asOf=`) resolve the version governing a given date, so an application is always priced by the policy effective on its date.
-- Tests for missing policy, invalid cooling-off, undisclosed fee posting. Partial.
+- Tests for missing policy, invalid cooling-off, undisclosed fee posting. Done.
 
 Done when:
 
-- KFS generation pulls fees and charges from product policy.
-- Fees cannot be posted outside product/KFS disclosure.
+- KFS generation pulls fees and charges from product policy. Done: buildKeyFactStatement maps product policies, and validateKfsBeforeDecision grounds KFS charges and prepayment/foreclosure policy parameters in approved Product Policy limits.
+- Fees cannot be posted outside product/KFS disclosure. Done: assessChargeToLoanAccount, quoteForeclosure, and prepayLoanAccount enforce KFS-disclosed caps and computed policy ceilings.
+
 
 ## Epic 3: Borrower, Consent, and KYC
 

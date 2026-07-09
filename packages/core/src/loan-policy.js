@@ -193,6 +193,103 @@ export function validateKfsBeforeDecision(application) {
     findings.push(createFinding("error", "RBI-DL-2025", "Digitally delivered KFS evidence is required.", "kfs.deliveryRef"));
   }
 
+  if (application.kfs && application.product) {
+    const kfs = application.kfs;
+    const product = application.product;
+
+    const validateChargeList = (kfsList, productList, path) => {
+      if (!Array.isArray(kfsList)) return;
+      const prodList = Array.isArray(productList) ? productList : [];
+      for (const charge of kfsList) {
+        if (!charge.name) continue;
+        const matching = prodList.find(p => p.name === charge.name);
+        if (!matching) {
+          findings.push(createFinding(
+            "error",
+            "RBI-KFS-2024",
+            `KFS charge '${charge.name}' is not disclosed in the product policy.`,
+            `${path}.name`
+          ));
+        } else {
+          if (Number.isFinite(charge.amount) && Number.isFinite(matching.amount) && charge.amount > matching.amount) {
+            findings.push(createFinding(
+              "error",
+              "RBI-KFS-2024",
+              `KFS charge '${charge.name}' amount (${charge.amount}) exceeds the product policy limit of ${matching.amount}.`,
+              `${path}.amount`
+            ));
+          }
+          if (Number.isFinite(charge.chargeBps) && Number.isFinite(matching.chargeBps) && charge.chargeBps > matching.chargeBps) {
+            findings.push(createFinding(
+              "error",
+              "RBI-KFS-2024",
+              `KFS charge '${charge.name}' rate (${charge.chargeBps} bps) exceeds the product policy limit of ${matching.chargeBps} bps.`,
+              `${path}.chargeBps`
+            ));
+          }
+        }
+      }
+    };
+
+    validateChargeList(kfs.charges, product.charges, "kfs.charges");
+    validateChargeList(kfs.penalCharges, product.penalCharges, "kfs.penalCharges");
+    validateChargeList(kfs.contingentCharges, product.contingentCharges, "kfs.contingentCharges");
+
+    if (kfs.prepaymentPolicy && product.prepaymentPolicy) {
+      if (kfs.prepaymentPolicy.allowed === true && product.prepaymentPolicy.allowed === false) {
+        findings.push(createFinding(
+          "error",
+          "RBI-KFS-2024",
+          "KFS allows prepayment but product policy prohibits it.",
+          "kfs.prepaymentPolicy.allowed"
+        ));
+      }
+      if (Number.isFinite(kfs.prepaymentPolicy.chargeBps) && Number.isFinite(product.prepaymentPolicy.chargeBps) && kfs.prepaymentPolicy.chargeBps > product.prepaymentPolicy.chargeBps) {
+        findings.push(createFinding(
+          "error",
+          "RBI-KFS-2024",
+          `KFS prepayment fee rate (${kfs.prepaymentPolicy.chargeBps} bps) exceeds the product policy limit of ${product.prepaymentPolicy.chargeBps} bps.`,
+          "kfs.prepaymentPolicy.chargeBps"
+        ));
+      }
+      if (Number.isFinite(kfs.prepaymentPolicy.lockInMonths) && Number.isFinite(product.prepaymentPolicy.lockInMonths) && kfs.prepaymentPolicy.lockInMonths > product.prepaymentPolicy.lockInMonths) {
+        findings.push(createFinding(
+          "error",
+          "RBI-KFS-2024",
+          `KFS prepayment lock-in period (${kfs.prepaymentPolicy.lockInMonths} months) exceeds the product policy limit of ${product.prepaymentPolicy.lockInMonths} months.`,
+          "kfs.prepaymentPolicy.lockInMonths"
+        ));
+      }
+    }
+
+    if (kfs.foreclosurePolicy && product.foreclosurePolicy) {
+      if (kfs.foreclosurePolicy.allowed === true && product.foreclosurePolicy.allowed === false) {
+        findings.push(createFinding(
+          "error",
+          "RBI-KFS-2024",
+          "KFS allows foreclosure but product policy prohibits it.",
+          "kfs.foreclosurePolicy.allowed"
+        ));
+      }
+      if (Number.isFinite(kfs.foreclosurePolicy.chargeBps) && Number.isFinite(product.foreclosurePolicy.chargeBps) && kfs.foreclosurePolicy.chargeBps > product.foreclosurePolicy.chargeBps) {
+        findings.push(createFinding(
+          "error",
+          "RBI-KFS-2024",
+          `KFS foreclosure fee rate (${kfs.foreclosurePolicy.chargeBps} bps) exceeds the product policy limit of ${product.foreclosurePolicy.chargeBps} bps.`,
+          "kfs.foreclosurePolicy.chargeBps"
+        ));
+      }
+      if (Number.isFinite(kfs.foreclosurePolicy.lockInMonths) && Number.isFinite(product.foreclosurePolicy.lockInMonths) && kfs.foreclosurePolicy.lockInMonths > product.foreclosurePolicy.lockInMonths) {
+        findings.push(createFinding(
+          "error",
+          "RBI-KFS-2024",
+          `KFS foreclosure lock-in period (${kfs.foreclosurePolicy.lockInMonths} months) exceeds the product policy limit of ${product.foreclosurePolicy.lockInMonths} months.`,
+          "kfs.foreclosurePolicy.lockInMonths"
+        ));
+      }
+    }
+  }
+
   return {
     findings,
     summary: summarizeFindings(findings)

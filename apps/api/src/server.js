@@ -2784,7 +2784,8 @@ async function route(req, res, dataDir, platformAdminKey) {
     }
     const result = quoteForeclosure(loanAccount, {
       asOf: url.searchParams.get("asOf") ?? undefined,
-      foreclosureChargeName: url.searchParams.get("foreclosureChargeName") ?? undefined
+      foreclosureChargeName: url.searchParams.get("foreclosureChargeName") ?? undefined,
+      foreclosureChargeAmount: url.searchParams.get("foreclosureChargeAmount") ? Number(url.searchParams.get("foreclosureChargeAmount")) : undefined
     });
     if (result.summary.status === "blocked") {
       sendJson(res, 422, {
