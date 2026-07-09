@@ -7,6 +7,39 @@ const VERIFIED_KYC_STATUS = "verified";
 const CONSENT_PURPOSES = new Set(["data_processing", "third_party_sharing", "credit_bureau", "ckyc", "communications"]);
 const BORROWER_TYPES = new Set(["individual", "sole_proprietor", "company", "partnership", "llp", "trust"]);
 
+// The RBI KYC Master Direction requires periodic updation of KYC on a
+// risk-based cycle. Once a verified record passes its review-due date it is no
+// longer good enough to sanction against — it becomes `refresh_required` until
+// re-verified.
+export const KYC_STATUSES = ["created", "pending", "verified", "rejected", "expired", "refresh_required"];
+const KYC_REVIEW_INTERVAL_YEARS = { low: 10, medium: 8, high: 2 };
+
+export function computeKycReviewDueAt(record) {
+  if (record?.nextReviewDueAt) {
+    return record.nextReviewDueAt;
+  }
+  const intervalYears = KYC_REVIEW_INTERVAL_YEARS[record?.riskCategory];
+  if (!record?.verifiedAt || !intervalYears) {
+    return null;
+  }
+  const due = new Date(record.verifiedAt);
+  due.setUTCFullYear(due.getUTCFullYear() + intervalYears);
+  return due.toISOString();
+}
+
+// The effective status accounts for expiry and periodic-review lapse on top of
+// the stored status, so callers reason about one value.
+export function evaluateKycStatus(record, now = new Date()) {
+  const nextReviewDueAt = computeKycReviewDueAt(record);
+  if (record?.status !== VERIFIED_KYC_STATUS) {
+    return { effectiveStatus: record?.status ?? null, expired: false, reviewDue: false, nextReviewDueAt };
+  }
+  const expired = Boolean(record.expiresAt && new Date(record.expiresAt).getTime() <= now.getTime());
+  const reviewDue = Boolean(nextReviewDueAt && new Date(nextReviewDueAt).getTime() <= now.getTime());
+  const effectiveStatus = expired ? "expired" : reviewDue ? "refresh_required" : VERIFIED_KYC_STATUS;
+  return { effectiveStatus, expired, reviewDue, nextReviewDueAt };
+}
+
 export function validateBorrowerProfile(profile, now = new Date()) {
   const findings = [];
 
@@ -185,7 +218,7 @@ export function validateKycRecord(record, now = new Date()) {
   if (!record?.borrowerId) {
     findings.push(createFinding("error", "RBI-KYC-2016", "borrowerId is required for KYC.", "borrowerId"));
   }
-  if (!["created", "pending", "verified", "rejected", "expired"].includes(record?.status)) {
+  if (!KYC_STATUSES.includes(record?.status)) {
     findings.push(createFinding("error", "RBI-KYC-2016", "KYC status is invalid.", "status"));
   }
   if (record?.riskCategory && !["low", "medium", "high"].includes(record.riskCategory)) {
@@ -211,7 +244,7 @@ export function validateKycRecord(record, now = new Date()) {
 }
 
 export function normalizeKycRecord(input, now = new Date()) {
-  return {
+  const base = {
     kycRecordId: input.kycRecordId ?? createLoanId("kyc"),
     borrowerId: input.borrowerId,
     status: input.status ?? "pending",
@@ -219,6 +252,7 @@ export function normalizeKycRecord(input, now = new Date()) {
     riskCategory: input.riskCategory ?? null,
     verifiedAt: input.verifiedAt ?? null,
     expiresAt: input.expiresAt ?? null,
+    nextReviewDueAt: input.nextReviewDueAt ?? null,
     ckycRef: input.ckycRef ?? null,
     vCip: {
       used: Boolean(input.vCip?.used),
@@ -234,6 +268,9 @@ export function normalizeKycRecord(input, now = new Date()) {
     createdAt: input.createdAt ?? now.toISOString(),
     updatedAt: now.toISOString()
   };
+  // Derive the periodic-review due date from the risk-based cycle when it is not
+  // supplied explicitly, so refresh gating works without extra caller input.
+  return { ...base, nextReviewDueAt: computeKycReviewDueAt(base) };
 }
 
 export function upsertKycRecord(registry, input, borrowerProfiles = {}, now = new Date()) {
@@ -300,10 +337,20 @@ export function resolveBorrowerApplicationReferences(application, registries = {
   }
 
   const kycRecord = findLatestKyc(registries.kycRecords ?? {}, borrower.borrowerId);
+  const kycStatus = kycRecord ? evaluateKycStatus(kycRecord, now) : null;
   if (!kycRecord || kycRecord.status !== VERIFIED_KYC_STATUS) {
     findings.push(createFinding("error", "RBI-KYC-2016", "A verified KYC record is required.", "borrowerId"));
-  } else if (kycRecord.expiresAt && new Date(kycRecord.expiresAt).getTime() <= now.getTime()) {
+  } else if (kycStatus.effectiveStatus === "expired") {
     findings.push(createFinding("error", "RBI-KYC-2016", "Verified KYC record is expired.", "borrowerId"));
+  } else if (kycStatus.effectiveStatus === "refresh_required") {
+    findings.push(
+      createFinding(
+        "error",
+        "RBI-KYC-2016",
+        "Verified KYC is due for periodic refresh; sanction is blocked until KYC is refreshed.",
+        "borrowerId"
+      )
+    );
   }
 
   resolved = {
@@ -333,10 +380,12 @@ export function resolveBorrowerApplicationReferences(application, registries = {
       ? {
           kycRecordId: kycRecord.kycRecordId,
           status: kycRecord.status,
+          effectiveStatus: kycStatus.effectiveStatus,
           method: kycRecord.method,
           riskCategory: kycRecord.riskCategory,
           verifiedAt: kycRecord.verifiedAt,
           expiresAt: kycRecord.expiresAt,
+          nextReviewDueAt: kycStatus.nextReviewDueAt,
           aadhaar: kycRecord.aadhaar,
           vCip: kycRecord.vCip
         }

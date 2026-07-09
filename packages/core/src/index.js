@@ -77,6 +77,9 @@ export {
 } from "./registries.js";
 
 export {
+  KYC_STATUSES,
+  computeKycReviewDueAt,
+  evaluateKycStatus,
   listBorrowerConsents,
   listBorrowerKycRecords,
   normalizeBorrowerProfile,

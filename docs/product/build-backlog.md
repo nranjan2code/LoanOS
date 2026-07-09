@@ -60,7 +60,7 @@ Tasks:
 - Consent grant/revoke ledger. Done.
 - Third-party sharing consent.
 - Data retention choice and deletion request workflow.
-- KYC state machine: created, pending, verified, rejected, expired, refresh_required. Partial.
+- KYC state machine: created, pending, verified, rejected, expired, refresh_required. Done: `refresh_required` is a first-class status; `evaluateKycStatus`/`computeKycReviewDueAt` derive an effective status from the RBI risk-based periodic-review cycle (high 2y, medium 8y, low 10y) on top of the stored status and expiry. A verified record past its review-due date reads as `refresh_required`, and preflight (`resolveBorrowerApplicationReferences`) blocks new sanction on a refresh-due or expired KYC. `GET /borrowers/{id}/kyc-records` surfaces the effective status and `nextReviewDueAt`.
 - CKYC search/download/upload adapter boundary.
 - V-CIP evidence object. Partial.
 - Aadhaar connector guardrails with no biometric/OTP/PID persistence. Done.
@@ -70,7 +70,7 @@ Tasks:
 Done when:
 
 - Application preflight can reference borrower profile, KYC record, and consent ledger by ID.
-- KYC refresh requirements block new sanction where required.
+- KYC refresh requirements block new sanction where required. Done.
 
 ## Epic 4: LOS Workflow
 

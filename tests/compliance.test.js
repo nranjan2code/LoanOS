@@ -14,6 +14,7 @@ import {
   classifyAuditDataClass,
   createIncident,
   createModelRegistryState,
+  evaluateKycStatus,
   recordIncidentNotification,
   stampAuditEvents,
   recordPostIncidentReview,
@@ -783,6 +784,100 @@ test("borrower resolution blocks revoked consent and expired KYC", () => {
   assert.equal(resolution.summary.status, "blocked");
   assert(resolution.findings.some((finding) => finding.message.includes("data-processing consent")));
   assert(resolution.findings.some((finding) => finding.message.includes("expired")));
+});
+
+test("KYC periodic-review lapse turns a verified record refresh_required and blocks sanction", () => {
+  // A high-risk KYC is on a 2-year review cycle. Just under 2 years in, it is
+  // still good; past the review-due date it becomes refresh_required.
+  const highRisk = {
+    status: "verified",
+    riskCategory: "high",
+    verifiedAt: "2024-01-01T00:00:00.000Z"
+  };
+  assert.equal(evaluateKycStatus(highRisk, new Date("2025-06-01T00:00:00.000Z")).effectiveStatus, "verified");
+  const lapsed = evaluateKycStatus(highRisk, new Date("2026-02-01T00:00:00.000Z"));
+  assert.equal(lapsed.effectiveStatus, "refresh_required");
+  assert.equal(lapsed.reviewDue, true);
+
+  // A refresh-due verified KYC blocks a new sanction even though it is not expired.
+  const borrowerResult = upsertBorrowerProfile({}, validBorrowerProfile());
+  const consentResult = upsertConsentRecord({}, validConsentRecord(), borrowerResult.registry);
+  const kycResult = upsertKycRecord(
+    {},
+    merge(validKycRecord(), {
+      riskCategory: "high",
+      verifiedAt: "2024-01-01T00:00:00.000Z",
+      expiresAt: "2030-01-01T00:00:00.000Z"
+    }),
+    borrowerResult.registry
+  );
+  assert.equal(kycResult.summary.status, "ready");
+
+  const resolution = resolveBorrowerApplicationReferences(
+    { borrowerId: "bor_001" },
+    {
+      borrowerProfiles: borrowerResult.registry,
+      consentRecords: consentResult.registry,
+      kycRecords: kycResult.registry
+    },
+    new Date("2026-06-01T00:00:00.000Z")
+  );
+  assert.equal(resolution.summary.status, "blocked");
+  assert.equal(resolution.application.kyc.effectiveStatus, "refresh_required");
+  assert(resolution.findings.some((finding) => finding.message.includes("periodic refresh")));
+});
+
+test("API surfaces KYC refresh status and blocks an application on a refresh-due KYC", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+
+  await seedOperationalActors(base);
+  assert.equal((await postJson(`${base}/regulated-entities`, validRegulatedEntity())).status, 201);
+  assert.equal((await postJson(`${base}/products`, validProductPolicy())).status, 201);
+  assert.equal((await postJson(`${base}/borrowers`, validBorrowerProfile())).status, 201);
+  assert.equal((await postJson(`${base}/borrowers/bor_001/consents`, validConsentRecord())).status, 201);
+  // A high-risk KYC verified over two years ago is past its review cycle.
+  assert.equal(
+    (await postJson(`${base}/borrowers/bor_001/kyc-records`, {
+      ...validKycRecord(),
+      riskCategory: "high",
+      verifiedAt: "2023-01-01T00:00:00.000Z",
+      expiresAt: "2030-01-01T00:00:00.000Z"
+    })).status,
+    201
+  );
+
+  // The KYC list reflects the derived refresh_required status.
+  const kycList = await (await apiFetch(`${base}/borrowers/bor_001/kyc-records`)).json();
+  assert.equal(kycList.kycRecords[0].effectiveStatus, "refresh_required");
+  assert.ok(kycList.kycRecords[0].nextReviewDueAt);
+
+  // An application on the refresh-due KYC is blocked at preflight.
+  const application = await postJson(`${base}/loans/applications`, {
+    regulatedEntityId: "re_example_nbfc",
+    productId: "prod_personal_loan",
+    borrowerId: "bor_001",
+    requestedAmount: 125000,
+    requestedTenorMonths: 12,
+    disbursement: validApplication().disbursement,
+    repayment: validApplication().repayment
+  });
+  assert.equal(application.status, 422);
+  assert.ok(
+    JSON.stringify(application.body).includes("periodic refresh"),
+    "sanction is blocked citing KYC periodic refresh"
+  );
 });
 
 test("API stores blocked compliance applications", async (t) => {

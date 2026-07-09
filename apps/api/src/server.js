@@ -26,6 +26,7 @@ import {
   recordIncidentNotification,
   escalateComplaintToRbiCms,
   evaluateEligibility,
+  evaluateKycStatus,
   evaluateLoanApplication,
   generateDlaCimsExport,
   generateClosureCertificate,
@@ -1033,8 +1034,12 @@ async function route(req, res, dataDir, platformAdminKey) {
     }
 
     if (method === "GET") {
+      const asOf = url.searchParams.get("asOf") ? new Date(url.searchParams.get("asOf")) : new Date();
       sendJson(res, 200, {
-        kycRecords: listBorrowerKycRecords(state.kycRecords, borrowerId)
+        kycRecords: listBorrowerKycRecords(state.kycRecords, borrowerId).map((record) => ({
+          ...record,
+          ...evaluateKycStatus(record, asOf)
+        }))
       });
       return;
     }
