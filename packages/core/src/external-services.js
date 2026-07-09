@@ -28,7 +28,11 @@ export class ExternalServiceManager {
 
       vcipProvider: config.vcipProvider ?? (typeof process !== "undefined" ? process.env.LOANOS_VCIP_PROVIDER : "mock") ?? "mock",
       vcipApiUrl: config.vcipApiUrl ?? (typeof process !== "undefined" ? process.env.LOANOS_VCIP_API_URL : "") ?? "",
-      vcipApiKey: config.vcipApiKey ?? (typeof process !== "undefined" ? process.env.LOANOS_VCIP_API_KEY : "") ?? ""
+      vcipApiKey: config.vcipApiKey ?? (typeof process !== "undefined" ? process.env.LOANOS_VCIP_API_KEY : "") ?? "",
+
+      esignProvider: config.esignProvider ?? (typeof process !== "undefined" ? process.env.LOANOS_ESIGN_PROVIDER : "mock") ?? "mock",
+      esignApiUrl: config.esignApiUrl ?? (typeof process !== "undefined" ? process.env.LOANOS_ESIGN_API_URL : "") ?? "",
+      esignApiKey: config.esignApiKey ?? (typeof process !== "undefined" ? process.env.LOANOS_ESIGN_API_KEY : "") ?? ""
     };
   }
 
@@ -124,6 +128,44 @@ export class ExternalServiceManager {
         livenessConfirmed: match.livenessConfirmed,
         gps: match.location,
         verifiedAt: new Date().toISOString()
+      };
+    }
+  }
+
+  /**
+   * Verifies Aadhaar-based eSign OTP.
+   */
+  async verifyEsignOtp(aadhaarNumber, otp, payloadHash) {
+    if (!aadhaarNumber || aadhaarNumber.length !== 12 || !/^\d{12}$/.test(aadhaarNumber)) {
+      throw new Error("Invalid Aadhaar number format. Must be 12 numeric digits.");
+    }
+    if (this.config.esignProvider === "real") {
+      if (!this.config.esignApiUrl || !this.config.esignApiKey) {
+        throw new Error("Real eSign provider configured but credentials missing.");
+      }
+      const res = await fetch(this.config.esignApiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${this.config.esignApiKey}`
+        },
+        body: JSON.stringify({ aadhaarNumber, otp, payloadHash })
+      });
+      if (!res.ok) {
+        throw new Error(`Real eSign service failed with status ${res.status}`);
+      }
+      return await res.json();
+    } else {
+      // Mock provider
+      if (otp !== "123456") {
+        throw new Error("Invalid eSign OTP. Mock provider expects OTP '123456'.");
+      }
+      return {
+        success: true,
+        provider: "mock",
+        signatureRef: `SIG-MOCK-${Date.now()}`,
+        signedAt: new Date().toISOString(),
+        esignProvider: "mock"
       };
     }
   }

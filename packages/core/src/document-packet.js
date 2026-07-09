@@ -199,15 +199,74 @@ export function validateDocumentPacketBeforeDisbursement(application) {
         findings.push(createFinding("error", "RBI-DL-2025", `Document packet is missing ${type}.`, "documentPacket.documents"));
       }
     }
-    if (application.documentPacket.status !== "delivered" || !application.documentPacket.delivery?.deliveryRef) {
+    if (application.documentPacket.status !== "signed" || !application.documentPacket.signature?.signatureRef) {
       findings.push(
-        createFinding("error", "RBI-DL-2025", "Document packet delivery evidence is required before disbursement.", "documentPacket.delivery")
+        createFinding(
+          "error",
+          "RBI-DL-2025",
+          "Document packet must be signed via eSign before disbursement.",
+          "documentPacket.status"
+        )
       );
     }
   }
   return {
     findings,
     summary: summarizeFindings(findings)
+  };
+}
+
+export function signDocumentPacket(application, input = {}, now = new Date()) {
+  const findings = [];
+  if (!application?.documentPacket) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Document packet is required before signing.", "documentPacket"));
+  } else if (application.documentPacket.status !== "delivered") {
+    findings.push(
+      createFinding(
+        "error",
+        "RBI-DL-2025",
+        `Document packet must be delivered before signing. Current status: ${application.documentPacket.status}`,
+        "documentPacket.status"
+      )
+    );
+  }
+  if (!input.aadhaarNumber || input.aadhaarNumber.length !== 12 || !/^\d{12}$/.test(input.aadhaarNumber)) {
+    findings.push(createFinding("error", "RBI-KYC-2016", "Signer Aadhaar number is required and must be 12 numeric digits.", "aadhaarNumber"));
+  }
+  if (!input.signerName) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Signer name is required.", "signerName"));
+  }
+  if (!input.signatureRef) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Signature transaction reference is required.", "signatureRef"));
+  }
+
+  const summary = summarizeFindings(findings);
+  if (summary.status === "blocked") {
+    return {
+      packet: application?.documentPacket ?? null,
+      findings,
+      summary
+    };
+  }
+
+  const signedAt = input.signedAt ?? now.toISOString();
+  const packet = {
+    ...application.documentPacket,
+    status: "signed",
+    signedAt,
+    signature: {
+      signedAt,
+      signerName: input.signerName,
+      aadhaarMasked: "XXXX-XXXX-" + input.aadhaarNumber.slice(-4),
+      signatureRef: input.signatureRef,
+      esignProvider: input.esignProvider ?? "mock"
+    }
+  };
+
+  return {
+    packet,
+    findings: [],
+    summary: summarizeFindings([])
   };
 }
 

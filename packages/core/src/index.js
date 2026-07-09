@@ -220,7 +220,8 @@ export {
   recordDocumentPacketDelivery,
   renderLoanStatementDocument,
   validateDocumentPacketBeforeDisbursement,
-  validateDocumentPacketGeneration
+  validateDocumentPacketGeneration,
+  signDocumentPacket
 } from "./document-packet.js";
 
 export {

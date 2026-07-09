@@ -1875,6 +1875,20 @@ test("API requires maker-checker approval before disbursement", async (t) => {
   const packet = await generateAndDeliverDocumentPacket(base, application.applicationId);
   assert.equal(packet.status, "delivered");
 
+  const preSignDisbursementResponse = await postJson(`${base}/loans/applications/${application.applicationId}/disbursement`, {
+    destinationAccount: validApplication().disbursement.destinationAccount
+  });
+  assert.equal(preSignDisbursementResponse.status, 422);
+  assert(preSignDisbursementResponse.body.findings.some((finding) => finding.path === "documentPacket.status"));
+
+  const esignResponse = await postJson(`${base}/loans/applications/${application.applicationId}/document-packet/esign`, {
+    aadhaarNumber: "123412341234",
+    otp: "123456",
+    signerName: "Asha Sharma"
+  });
+  assert.equal(esignResponse.status, 200);
+  assert.equal(esignResponse.body.status, "signed");
+
   const readyDisbursementResponse = await postJson(`${base}/loans/applications/${application.applicationId}/disbursement`, {
     destinationAccount: validApplication().disbursement.destinationAccount
   });
@@ -1975,6 +1989,37 @@ test("API generates and delivers execution document packet before disbursement",
   assert.equal(disbursementTaskResponse.status, 200);
   const disbursementTasks = await disbursementTaskResponse.json();
   assert.equal(disbursementTasks.count, 1);
+
+  const preSignDisbursementResponse = await postJson(`${base}/loans/applications/${application.applicationId}/disbursement`, {
+    destinationAccount: validApplication().disbursement.destinationAccount
+  });
+  assert.equal(preSignDisbursementResponse.status, 422);
+
+  // Sign with invalid Aadhaar
+  const badAadhaar = await postJson(`${base}/loans/applications/${application.applicationId}/document-packet/esign`, {
+    aadhaarNumber: "123",
+    otp: "123456",
+    signerName: "Asha Sharma"
+  });
+  assert.equal(badAadhaar.status, 422);
+
+  // Sign with invalid OTP
+  const badOtp = await postJson(`${base}/loans/applications/${application.applicationId}/document-packet/esign`, {
+    aadhaarNumber: "123412341234",
+    otp: "wrong_otp",
+    signerName: "Asha Sharma"
+  });
+  assert.equal(badOtp.status, 422);
+  assert.equal(badOtp.body.error.code, "esign_verification_failed");
+
+  // Sign with valid OTP
+  const esignResponse = await postJson(`${base}/loans/applications/${application.applicationId}/document-packet/esign`, {
+    aadhaarNumber: "123412341234",
+    otp: "123456",
+    signerName: "Asha Sharma"
+  });
+  assert.equal(esignResponse.status, 200);
+  assert.equal(esignResponse.body.status, "signed");
 
   const disbursementResponse = await postJson(`${base}/loans/applications/${application.applicationId}/disbursement`, {
     destinationAccount: validApplication().disbursement.destinationAccount
@@ -2666,6 +2711,12 @@ test("API rejects prepayment/foreclosure charges on floating-rate individual ret
     200
   );
   await generateAndDeliverDocumentPacket(base, application.body.applicationId);
+  const esignResponse = await postJson(`${base}/loans/applications/${application.body.applicationId}/document-packet/esign`, {
+    aadhaarNumber: "123412341234",
+    otp: "123456",
+    signerName: "Asha Sharma"
+  });
+  assert.equal(esignResponse.status, 200);
   const disbursement = await postJson(`${base}/loans/applications/${application.body.applicationId}/disbursement`, {
     destinationAccount: validApplication().disbursement.destinationAccount
   });
@@ -2807,6 +2858,12 @@ test("API enforces lock-in period restrictions for prepayment and foreclosure", 
     200
   );
   await generateAndDeliverDocumentPacket(base, application.body.applicationId);
+  const esignResponse = await postJson(`${base}/loans/applications/${application.body.applicationId}/document-packet/esign`, {
+    aadhaarNumber: "123412341234",
+    otp: "123456",
+    signerName: "Asha Sharma"
+  });
+  assert.equal(esignResponse.status, 200);
   const disbursement = await postJson(`${base}/loans/applications/${application.body.applicationId}/disbursement`, {
     destinationAccount: validApplication().disbursement.destinationAccount,
     disbursedAt: "2026-07-08T12:00:00.000Z"
@@ -5732,6 +5789,12 @@ async function approveAndDisburseApplication(base) {
     200
   );
   await generateAndDeliverDocumentPacket(base, application.applicationId);
+  const esignResponse = await postJson(`${base}/loans/applications/${application.applicationId}/document-packet/esign`, {
+    aadhaarNumber: "123412341234",
+    otp: "123456",
+    signerName: "Asha Sharma"
+  });
+  assert.equal(esignResponse.status, 200);
   const disbursement = await postJson(`${base}/loans/applications/${application.applicationId}/disbursement`, {
     destinationAccount: validApplication().disbursement.destinationAccount
   });
@@ -6048,6 +6111,12 @@ test("API controls undisclosed charge caps and enforces computed ceilings", asyn
 
   // Document packet and disburse
   await generateAndDeliverDocumentPacket(base, response.body.applicationId);
+  const esignResponse = await postJson(`${base}/loans/applications/${response.body.applicationId}/document-packet/esign`, {
+    aadhaarNumber: "123412341234",
+    otp: "123456",
+    signerName: "Asha Sharma"
+  });
+  assert.equal(esignResponse.status, 200);
   const disburseRes = await postJson(`${base}/loans/applications/${response.body.applicationId}/disbursement`, {
     destinationAccount: validApplication().disbursement.destinationAccount
   });

@@ -121,7 +121,8 @@ import {
   waiveLoanAccountCharge,
   validateMarketplaceNeutrality,
   rankMarketplaceOffers,
-  ExternalServiceManager
+  ExternalServiceManager,
+  signDocumentPacket
 } from "../../../packages/core/src/index.js";
 import {
   AUDIT_ACTOR_TYPES,
@@ -2379,6 +2380,80 @@ async function route(req, res, dataDir, platformAdminKey) {
         applicationId: stored.applicationId,
         packetId: deliveryResult.packet.packetId,
         deliveryRef: deliveryResult.packet.delivery.deliveryRef
+      }
+    );
+    await store.save(nextState);
+    sendJson(res, 200, stored.documentPacket);
+    return;
+  }
+
+  const documentPacketEsignMatch = path.match(/^\/loans\/applications\/([^/]+)\/document-packet\/esign$/);
+  if (method === "POST" && documentPacketEsignMatch) {
+    const body = await readJson(req);
+    const state = await store.load();
+    const application = state.loanApplications[decodeURIComponent(documentPacketEsignMatch[1])];
+    if (!application) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Loan application not found." } });
+      return;
+    }
+
+    const { aadhaarNumber, otp, signerName } = body;
+    if (!aadhaarNumber || !otp || !signerName) {
+      sendJson(res, 400, { error: { code: "bad_request", message: "aadhaarNumber, otp, and signerName are required." } });
+      return;
+    }
+
+    const manager = new ExternalServiceManager();
+    let esignResult = null;
+    try {
+      const payloadHash = (application.documentPacket?.documents ?? []).map(d => d.checksumSha256).join(",");
+      esignResult = await manager.verifyEsignOtp(aadhaarNumber, otp, payloadHash);
+    } catch (err) {
+      sendJson(res, 422, {
+        error: {
+          code: "esign_verification_failed",
+          message: err.message
+        }
+      });
+      return;
+    }
+
+    const signResult = signDocumentPacket(application, {
+      aadhaarNumber,
+      signerName,
+      signatureRef: esignResult.signatureRef,
+      esignProvider: esignResult.esignProvider
+    });
+
+    if (signResult.summary.status === "blocked") {
+      sendJson(res, 422, {
+        error: {
+          code: "document_packet_signing_blocked",
+          message: "Document packet signing is blocked by workflow findings."
+        },
+        findings: signResult.findings
+      });
+      return;
+    }
+
+    const stored = {
+      ...application,
+      documentPacket: signResult.packet
+    };
+    const nextState = appendEvent(
+      {
+        ...state,
+        loanApplications: {
+          ...state.loanApplications,
+          [stored.applicationId]: stored
+        }
+      },
+      {
+        type: "loan.document_packet.signed",
+        applicationId: stored.applicationId,
+        packetId: signResult.packet.packetId,
+        signatureRef: esignResult.signatureRef,
+        signerName
       }
     );
     await store.save(nextState);
