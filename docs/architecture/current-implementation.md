@@ -352,7 +352,7 @@ Current tests prove:
 - Aadhaar biometric/OTP persistence is blocked.
 - Invalid KFS cooling-off and penal-charge design are blocked.
 - KFS acceptance and delivery evidence gate sanction readiness.
-- AI model kill switch blocks model-assisted underwriting.
+- AI model kill switch blocks model-assisted underwriting; decision proposal locks model-use evidence in a permanent, tamper-evident snapshot immune to later suspensions.
 - Model lifecycle blocks illegal transitions and un-validated approval, and only a validated, activated model can be used; API drives draft → active.
 - A kill-switch trigger opens an incident, the global switch cannot be cleared before a recorded post-incident review, and clearance closes the incident while retaining the review evidence.
 - A generative model must evidence adversarial (red-team) and hallucination testing before validation approval; a drift observation breaching threshold trips a model-scoped kill switch and opens an incident.
@@ -382,7 +382,7 @@ Current tests prove:
 - Eligibility engine computes affordability and returns eligible, refer, and ineligible outcomes.
 - API assesses eligibility and blocks approval of an ineligible borrower while allowing a decline.
 - API routes a refer-band application to a manual underwriting task instead of the straight-through credit-decision task.
-- API blocks approval of a refer-band application until a manual underwriting override is recorded and carries that override into the final approved decision.
+- API blocks approval of a refer-band application unless the LWS manual underwriting task is assigned and the override underwriter matches the assigned staff actor, and successfully completes the task on proposal.
 - API blocks a manual underwriting override whose named underwriter is not a registered, active credit officer.
 - API blocks a decision checker who is also the manual underwriting underwriter, preserving four-eyes separation on referred approvals.
 - The checker's decision-approval task surfaces the manual underwriting override rationale and policy reference for review.
