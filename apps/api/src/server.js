@@ -1472,11 +1472,24 @@ async function route(req, res, dataDir, platformAdminKey) {
 
     if (method === "POST") {
       const body = await readJson(req);
+      const isPending = body.status === "pending_verification" || body.requestOtp === true;
+      let otp = null;
+      let otpVerification = null;
+      if (isPending) {
+        otp = Math.floor(100000 + Math.random() * 900000).toString();
+        otpVerification = {
+          otp,
+          attempts: 0,
+          expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString()
+        };
+      }
       const result = upsertConsentRecord(
         state.consentRecords,
         {
           ...body,
-          borrowerId
+          borrowerId,
+          status: isPending ? "pending_verification" : (body.status ?? "pending_verification"),
+          otpVerification
         },
         state.borrowerProfiles
       );
@@ -1496,10 +1509,123 @@ async function route(req, res, dataDir, platformAdminKey) {
                 status: result.consent.status
               }
             );
+      if (result.summary.status !== "blocked" && isPending) {
+        const borrower = state.borrowerProfiles[borrowerId];
+        const phone = borrower?.contact?.mobile || "+919999999999";
+        const manager = new ExternalServiceManager();
+        try {
+          await manager.sendSms(phone, `Your LoanOS Consent Verification OTP is ${otp}`);
+        } catch (err) {
+          // Ignore SMS dispatch failures in mock/test
+        }
+      }
       await store.save(nextState);
       sendJson(res, result.summary.status === "blocked" ? 422 : 201, result);
       return;
     }
+  }
+
+  const consentVerifyMatch = path.match(/^\/borrowers\/([^/]+)\/consents\/([^/]+)\/verify$/);
+  if (method === "POST" && consentVerifyMatch) {
+    const borrowerId = decodeURIComponent(consentVerifyMatch[1]);
+    const consentId = decodeURIComponent(consentVerifyMatch[2]);
+    const body = await readJson(req);
+    const state = await store.load();
+    if (!state.borrowerProfiles[borrowerId]) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Borrower not found." } });
+      return;
+    }
+    const consent = state.consentRecords[consentId];
+    if (!consent || consent.borrowerId !== borrowerId) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Consent record not found." } });
+      return;
+    }
+    if (consent.status !== "pending_verification") {
+      sendJson(res, 400, { error: { code: "bad_request", message: "Consent is not in pending_verification status." } });
+      return;
+    }
+    const { otp } = body;
+    if (!otp) {
+      sendJson(res, 400, { error: { code: "bad_request", message: "otp is required." } });
+      return;
+    }
+    const verification = consent.otpVerification;
+    if (!verification) {
+      sendJson(res, 422, { error: { code: "verification_failed", message: "No active OTP verification session found." } });
+      return;
+    }
+    if (new Date().toISOString() > verification.expiresAt) {
+      sendJson(res, 422, { error: { code: "verification_failed", message: "OTP has expired." } });
+      return;
+    }
+    if (verification.otp !== otp) {
+      const attempts = (verification.attempts ?? 0) + 1;
+      let updatedConsent;
+      if (attempts >= 3) {
+        updatedConsent = {
+          ...consent,
+          status: "revoked",
+          revokedAt: new Date().toISOString(),
+          otpVerification: null
+        };
+      } else {
+        updatedConsent = {
+          ...consent,
+          otpVerification: {
+            ...verification,
+            attempts
+          }
+        };
+      }
+      const nextState = appendEvent(
+        {
+          ...state,
+          consentRecords: {
+            ...state.consentRecords,
+            [consentId]: updatedConsent
+          }
+        },
+        {
+          type: "borrower_consent.verification_failed",
+          borrowerId,
+          consentId,
+          attempts
+        }
+      );
+      await store.save(nextState);
+      sendJson(res, 422, {
+        error: {
+          code: "verification_failed",
+          message: attempts >= 3 ? "OTP verification locked. Consent revoked." : "Incorrect OTP."
+        },
+        attemptsRemaining: Math.max(0, 3 - attempts)
+      });
+      return;
+    }
+    const updatedConsent = {
+      ...consent,
+      status: "granted",
+      acceptedAt: new Date().toISOString(),
+      otpVerification: null
+    };
+    const nextState = appendEvent(
+      {
+        ...state,
+        consentRecords: {
+          ...state.consentRecords,
+          [consentId]: updatedConsent
+        }
+      },
+      {
+        type: "borrower_consent.verified",
+        borrowerId,
+        consentId,
+        purpose: consent.purpose
+      }
+    );
+    await store.save(nextState);
+    sendJson(res, 200, updatedConsent);
+    return;
   }
 
   const borrowerKycMatch = path.match(/^\/borrowers\/([^/]+)\/kyc-records$/);

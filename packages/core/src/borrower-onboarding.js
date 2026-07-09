@@ -150,8 +150,8 @@ export function validateConsentRecord(record) {
   if (!record?.noticeVersion) {
     findings.push(createFinding("error", "DPDP-RULES-2025", "noticeVersion is required.", "noticeVersion"));
   }
-  if (!["granted", "revoked"].includes(record?.status)) {
-    findings.push(createFinding("error", "DPDP-2023", "Consent status must be granted or revoked.", "status"));
+  if (!["granted", "revoked", "pending_verification"].includes(record?.status)) {
+    findings.push(createFinding("error", "DPDP-2023", "Consent status must be granted, revoked, or pending_verification.", "status"));
   }
   if (record?.status === GRANTED_STATUS && !record?.acceptedAt) {
     findings.push(createFinding("error", "DPDP-2023", "Granted consent requires acceptedAt.", "acceptedAt"));
@@ -178,6 +178,7 @@ export function normalizeConsentRecord(input, now = new Date()) {
     revokedAt: input.revokedAt ?? null,
     channel: input.channel ?? null,
     evidenceRef: input.evidenceRef ?? null,
+    otpVerification: input.otpVerification ?? null,
     createdAt: input.createdAt ?? now.toISOString(),
     updatedAt: now.toISOString()
   };

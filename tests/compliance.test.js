@@ -1403,6 +1403,80 @@ test("KYC periodic-review lapse turns a verified record refresh_required and blo
   assert(resolution.findings.some((finding) => finding.message.includes("periodic refresh")));
 });
 
+test("API supports SMS OTP verification for borrower consents", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-consents-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+
+  await seedOperationalActors(base);
+  assert.equal((await postJson(`${base}/regulated-entities`, validRegulatedEntity())).status, 201);
+  assert.equal((await postJson(`${base}/products`, validProductPolicy())).status, 201);
+  assert.equal((await postJson(`${base}/borrowers`, validBorrowerProfile())).status, 201);
+  assert.equal((await postJson(`${base}/borrowers/bor_001/kyc-records`, validKycRecord())).status, 201);
+
+  // 1. Submit consent with pending_verification status
+  const consentRecord = {
+    ...validConsentRecord(),
+    consentId: "otp_consent_1",
+    status: "pending_verification"
+  };
+  const consentResponse = await postJson(`${base}/borrowers/bor_001/consents`, consentRecord);
+  assert.equal(consentResponse.status, 201);
+  assert.equal(consentResponse.body.consent.status, "pending_verification");
+  const storedOtp = consentResponse.body.consent.otpVerification.otp;
+  assert.ok(storedOtp);
+
+  const appResponse = await postJson(`${base}/loans/applications`, {
+    regulatedEntityId: "re_example_nbfc",
+    productId: "prod_personal_loan",
+    borrowerId: "bor_001",
+    requestedAmount: 100000,
+    requestedTenorMonths: 12,
+    disbursement: validApplication().disbursement,
+    repayment: validApplication().repayment
+  });
+  assert.equal(appResponse.status, 422);
+  assert.equal(appResponse.body.compliance.summary.status, "blocked");
+  assert(appResponse.body.compliance.findings.some(f => f.path === "borrowerId" && f.controlId === "DPDP-2023"));
+
+  // 3. Verify consent with incorrect OTP
+  const badVerify = await postJson(`${base}/borrowers/bor_001/consents/otp_consent_1/verify`, {
+    otp: "wrong_otp"
+  });
+  assert.equal(badVerify.status, 422);
+
+  // 4. Verify consent with correct OTP
+  const goodVerify = await postJson(`${base}/borrowers/bor_001/consents/otp_consent_1/verify`, {
+    otp: storedOtp
+  });
+  assert.equal(goodVerify.status, 200);
+  assert.equal(goodVerify.body.status, "granted");
+
+  // 5. Try creating application again -> should now succeed with ready_for_kfs
+  const appResponse2 = await postJson(`${base}/loans/applications`, {
+    regulatedEntityId: "re_example_nbfc",
+    productId: "prod_personal_loan",
+    borrowerId: "bor_001",
+    requestedAmount: 100000,
+    requestedTenorMonths: 12,
+    disbursement: validApplication().disbursement,
+    repayment: validApplication().repayment
+  });
+  assert.equal(appResponse2.status, 201);
+  assert.equal(appResponse2.body.status, "ready_for_kfs");
+  assert.equal(appResponse2.body.compliance.summary.status, "ready");
+});
+
 test("API surfaces KYC refresh status and blocks an application on a refresh-due KYC", async (t) => {
   const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
   t.after(async () => {
