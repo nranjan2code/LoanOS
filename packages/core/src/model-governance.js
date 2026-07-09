@@ -110,6 +110,8 @@ export function registerModel(state, input, now = new Date()) {
     purpose: input.purpose,
     borrowerImpact: input.borrowerImpact ?? "unknown",
     riskTier: input.riskTier,
+    // A generative model carries extra adversarial-robustness duties.
+    modelClass: input.modelClass ?? (input.generative ? "generative" : "traditional"),
     materialDecision: Boolean(input.materialDecision),
     customerFacing: Boolean(input.customerFacing),
     validationStatus: input.validationStatus,
@@ -118,6 +120,7 @@ export function registerModel(state, input, now = new Date()) {
     fairnessAssessmentRef: input.fairnessAssessmentRef ?? null,
     explainabilityRef: input.explainabilityRef ?? null,
     redTeamRef: input.redTeamRef ?? null,
+    hallucinationTestRef: input.hallucinationTestRef ?? null,
     driftThreshold: Number.isFinite(input.driftThreshold) ? input.driftThreshold : null,
     driftObservations: [],
     status: input.status ?? (input.validationStatus === "approved" ? "active" : "draft"),
@@ -181,6 +184,8 @@ export function transitionModel(state, input, now = new Date()) {
     const fairnessAssessmentRef = input.fairnessAssessmentRef ?? model.fairnessAssessmentRef;
     const explainabilityRef = input.explainabilityRef ?? model.explainabilityRef;
     const monitoringPlanRef = input.monitoringPlanRef ?? model.monitoringPlanRef;
+    const redTeamRef = input.redTeamRef ?? model.redTeamRef;
+    const hallucinationTestRef = input.hallucinationTestRef ?? model.hallucinationTestRef;
 
     if (!independentValidationRef) {
       findings.push(createFinding("error", "RBI-MRM-DRAFT-2026", "Validation approval requires independentValidationRef.", "independentValidationRef"));
@@ -199,12 +204,24 @@ export function transitionModel(state, input, now = new Date()) {
         findings.push(createFinding("error", "RBI-MRM-DRAFT-2026", "High-risk validation requires monitoringPlanRef.", "monitoringPlanRef"));
       }
     }
+    // A generative model must additionally evidence adversarial (red-team) and
+    // hallucination testing before it can be validated for use.
+    if (model.modelClass === "generative") {
+      if (!redTeamRef) {
+        findings.push(createFinding("error", "RBI-MRM-DRAFT-2026", "Generative model validation requires redTeamRef (adversarial testing).", "redTeamRef"));
+      }
+      if (!hallucinationTestRef) {
+        findings.push(createFinding("error", "RBI-MRM-DRAFT-2026", "Generative model validation requires hallucinationTestRef.", "hallucinationTestRef"));
+      }
+    }
 
     validationEvidence = {
       independentValidationRef: independentValidationRef ?? null,
       fairnessAssessmentRef: fairnessAssessmentRef ?? null,
       explainabilityRef: explainabilityRef ?? null,
       monitoringPlanRef: monitoringPlanRef ?? null,
+      redTeamRef: redTeamRef ?? null,
+      hallucinationTestRef: hallucinationTestRef ?? null,
       validatedBy: input.actor,
       validatedAt: now.toISOString()
     };

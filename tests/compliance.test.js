@@ -3315,6 +3315,51 @@ test("DPDP erasure is held by an active loan and by statutory retention", () => 
   assert.equal(blocked.summary.status, "blocked");
 });
 
+test("generative model validation requires adversarial and hallucination testing", () => {
+  const registered = registerModel(createModelRegistryState(), {
+    modelId: "gen_assist_v1",
+    name: "Generative loan assistant",
+    owner: "risk-owner",
+    purpose: "customer support",
+    riskTier: "medium",
+    modelClass: "generative",
+    validationStatus: "pending",
+    actor: "model-risk"
+  });
+  assert.equal(registered.model.modelClass, "generative");
+
+  const submitted = transitionModel(registered.registry, {
+    modelId: "gen_assist_v1",
+    action: "submit_for_validation",
+    actor: "risk-owner"
+  });
+
+  // With independent validation but no red-team/hallucination evidence, blocked.
+  const missing = transitionModel(submitted.registry, {
+    modelId: "gen_assist_v1",
+    action: "approve_validation",
+    actor: "validator-1",
+    independentValidationRef: "ivr_1"
+  });
+  assert.equal(missing.summary.status, "blocked");
+  assert(missing.findings.some((finding) => finding.path === "redTeamRef"));
+  assert(missing.findings.some((finding) => finding.path === "hallucinationTestRef"));
+
+  // Providing both testing references clears validation.
+  const approved = transitionModel(submitted.registry, {
+    modelId: "gen_assist_v1",
+    action: "approve_validation",
+    actor: "validator-1",
+    independentValidationRef: "ivr_1",
+    redTeamRef: "redteam_1",
+    hallucinationTestRef: "halluc_1"
+  });
+  assert.equal(approved.summary.status, "ready");
+  assert.equal(approved.model.status, "approved");
+  assert.equal(approved.model.redTeamRef, "redteam_1");
+  assert.equal(approved.model.hallucinationTestRef, "halluc_1");
+});
+
 test("model drift monitoring trips a kill switch on a threshold breach", () => {
   // An approved model registers straight into active with a drift threshold.
   const registered = registerModel(createModelRegistryState(), {
