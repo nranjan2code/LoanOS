@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { randomBytes } from "node:crypto";
 import {
   accrueInterest,
   attachKfs,
@@ -91,16 +92,22 @@ import {
   createEmptyTenantData,
   ensureBootstrapTenants,
   generateApiKey,
+  generateBreakGlassKey,
   getTenantData,
+  grantBreakGlass,
+  listBreakGlassGrants,
   listSubProcessors,
   listTenants,
   loadState as loadWholeState,
   offboardTenant,
+  publicBreakGlassGrant,
   publicSubProcessor,
   publicTenant,
   registerSubProcessor,
   registerTenant,
+  resolveBreakGlass,
   resolveTenantByApiKey,
+  revokeBreakGlass,
   saveState as saveWholeState,
   setTenantData,
   validateSubProcessor
@@ -167,12 +174,22 @@ async function route(req, res, dataDir, platformAdminKey) {
   // --- Tenant context: every data-plane route runs inside exactly one tenant. ---
   const wholeState = await loadWholeState(dataDir);
   const apiKey = tenantApiKeyFromRequest(req);
-  const tenant = resolveTenantByApiKey(wholeState, apiKey);
+  let tenant = resolveTenantByApiKey(wholeState, apiKey);
+  // A tenant's own api key is the primary path. Failing that, platform staff may
+  // present a break-glass credential scoped to exactly one tenant.
+  let breakGlass = null;
+  if (!tenant) {
+    const resolved = resolveBreakGlass(wholeState, breakGlassKeyFromRequest(req));
+    if (resolved) {
+      tenant = resolved.tenant;
+      breakGlass = resolved.grant;
+    }
+  }
   if (!tenant) {
     sendJson(res, 401, {
       error: {
         code: "tenant_auth_required",
-        message: "A valid tenant API key is required for this route."
+        message: "A valid tenant API key or break-glass credential is required for this route."
       }
     });
     return;
@@ -194,6 +211,26 @@ async function route(req, res, dataDir, platformAdminKey) {
       await saveWholeState(scopedWholeState, dataDir);
     }
   };
+
+  // Break-glass access is never silent: record it into the tenant's own audit
+  // chain before dispatching, so the reach-in is visible to the tenant via
+  // GET /audit/events regardless of whether the request reads or writes.
+  if (breakGlass) {
+    const current = await store.load();
+    await store.save(
+      appendEvent(current, {
+        type: "platform.break_glass.access",
+        actor: `platform:${breakGlass.staffId}`,
+        actorType: "platform_staff",
+        dataClass: "tenant_scoped",
+        grantId: breakGlass.grantId,
+        staffId: breakGlass.staffId,
+        reason: breakGlass.reason,
+        method,
+        path
+      })
+    );
+  }
 
   if (method === "GET" && path === "/audit/events") {
     const state = await store.load();
@@ -224,6 +261,15 @@ async function route(req, res, dataDir, platformAdminKey) {
   if (method === "GET" && path === "/sub-processors") {
     sendJson(res, 200, {
       subProcessors: listSubProcessors(wholeState)
+    });
+    return;
+  }
+
+  // Break-glass transparency: a tenant can see every platform-staff break-glass
+  // grant scoped to it, past and present, with its effective status.
+  if (method === "GET" && path === "/break-glass-grants") {
+    sendJson(res, 200, {
+      grants: listBreakGlassGrants(scopedWholeState, tenant.tenantId)
     });
     return;
   }
@@ -2213,6 +2259,11 @@ function tenantApiKeyFromRequest(req) {
   return null;
 }
 
+function breakGlassKeyFromRequest(req) {
+  const key = req.headers["x-break-glass-key"];
+  return Array.isArray(key) ? key[0] : key ?? null;
+}
+
 function platformAdminKeyFromRequest(req) {
   const key = req.headers["x-platform-admin-key"];
   return Array.isArray(key) ? key[0] : key ?? null;
@@ -2261,6 +2312,68 @@ async function routePlatform(req, res, { dataDir, platformAdminKey, method, path
     await saveWholeState(nextState, dataDir);
     sendJson(res, 201, {
       subProcessor: publicSubProcessor(nextState.controlPlane.subProcessors[body.subProcessorId])
+    });
+    return;
+  }
+
+  // Break-glass grant administration (platform admin only). Minting returns a
+  // one-time, time-boxed credential stored only as a hash.
+  const breakGlassMintMatch = path.match(/^\/platform\/tenants\/([^/]+)\/break-glass$/);
+  if (method === "POST" && breakGlassMintMatch) {
+    const body = await readJson(req);
+    const tenantId = decodeURIComponent(breakGlassMintMatch[1]);
+    const state = await loadWholeState(dataDir);
+    const tenantRecord = state.controlPlane.tenants[tenantId];
+    if (!tenantRecord) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Tenant not found." } });
+      return;
+    }
+    if (!body.staffId || !body.reason) {
+      sendJson(res, 422, {
+        error: {
+          code: "break_glass_invalid",
+          message: "Break-glass access requires a staffId and a reason."
+        }
+      });
+      return;
+    }
+    const credential = generateBreakGlassKey();
+    const grantId = `bg_${randomBytes(8).toString("hex")}`;
+    const nextState = grantBreakGlass(state, {
+      grantId,
+      tenantId,
+      staffId: body.staffId,
+      reason: body.reason,
+      ttlMinutes: body.ttlMinutes,
+      createdBy: "platform_admin",
+      credential
+    });
+    await saveWholeState(nextState, dataDir);
+    sendJson(res, 201, {
+      grant: publicBreakGlassGrant(nextState.controlPlane.breakGlassGrants[grantId]),
+      credential
+    });
+    return;
+  }
+
+  if (method === "GET" && breakGlassMintMatch) {
+    const state = await loadWholeState(dataDir);
+    const tenantId = decodeURIComponent(breakGlassMintMatch[1]);
+    sendJson(res, 200, { grants: listBreakGlassGrants(state, tenantId) });
+    return;
+  }
+
+  const breakGlassRevokeMatch = path.match(/^\/platform\/break-glass\/([^/]+)\/revoke$/);
+  if (method === "POST" && breakGlassRevokeMatch) {
+    const state = await loadWholeState(dataDir);
+    const nextState = revokeBreakGlass(state, decodeURIComponent(breakGlassRevokeMatch[1]));
+    if (!nextState) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Break-glass grant not found." } });
+      return;
+    }
+    await saveWholeState(nextState, dataDir);
+    sendJson(res, 200, {
+      grant: publicBreakGlassGrant(nextState.controlPlane.breakGlassGrants[decodeURIComponent(breakGlassRevokeMatch[1])])
     });
     return;
   }

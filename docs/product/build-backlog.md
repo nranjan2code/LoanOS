@@ -247,7 +247,7 @@ Done when:
 
 ## Epic 11: SaaS Tenancy and Platform Isolation
 
-Status: S1–S6 first slice complete (tenant partitioning, tenant-scoped auth, isolation suite, hash-chained audit spine + evidence export, tenant portability export + evidenced offboarding, disclosed sub-processor register, 6-hour incident-notification workflow); remaining tasks planned.
+Status: S1–S6 first slice complete (tenant partitioning, tenant-scoped auth, isolation suite, hash-chained audit spine + evidence export, tenant portability export + evidenced offboarding, disclosed sub-processor register, 6-hour incident-notification workflow, audited platform-staff break-glass access); one task remains.
 
 Goal: LoanOS runs as a multi-tenant SaaS where cross-tenant access is impossible by construction and the platform satisfies RE outsourcing obligations.
 
@@ -259,7 +259,7 @@ Tasks:
 - Tenant-scoped API credentials and tenant-context middleware on every route. Done: `x-api-key`/bearer resolves the tenant, 401 otherwise.
 - Platform control plane to mint tenants. Done: `POST /platform/tenants` behind a platform admin key returns a one-time api key stored only as a hash.
 - Cross-tenant isolation regression suite covering every resource type. Done.
-- Platform-staff break-glass access with audit and tenant reporting. Planned.
+- Platform-staff break-glass access with audit and tenant reporting. First slice done: `POST /platform/tenants/{id}/break-glass` (platform admin) mints a time-boxed, tenant-scoped break-glass credential (returned once, stored only as a hash); presenting it via `x-break-glass-key` authenticates as that one tenant and seals a `platform.break_glass.access` event (staff id, reason, method, path) into the tenant's own audit chain on every request. Tenants read every grant scoped to them via `GET /break-glass-grants`; `POST /platform/break-glass/{grantId}/revoke` and TTL expiry immediately stop authentication.
 - Hash-chained, tenant-scoped audit event module; migrate module event emission onto it. Done: `packages/core/src/audit.js` seals each tenant's events into a tamper-evident SHA-256 chain on every save.
 - Evidence export pack generated from the audit spine. Done: `GET /audit/export` (integrity-attested, filterable) and `GET /audit/events` (chain + validity verdict).
 - Tenant onboarding/offboarding workflow with exit/portability export and evidenced deletion. First slice done: `GET /platform/tenants/{id}/export` returns a reproducible portability pack (control record + full data plane + audit evidence pack), and `POST /platform/tenants/{id}/offboarding` performs evidenced deletion — purging the data plane, revoking the api key, and retaining a control-plane deletion attestation (erased event count, audit head hash, content digest, actor, reason).

@@ -68,7 +68,8 @@ export function createEmptyState() {
     version: STATE_VERSION,
     controlPlane: {
       tenants: {},
-      subProcessors: {}
+      subProcessors: {},
+      breakGlassGrants: {}
     },
     tenants: {}
   };
@@ -83,7 +84,8 @@ function normalizeState(state) {
     version: STATE_VERSION,
     controlPlane: {
       tenants: state?.controlPlane?.tenants ?? {},
-      subProcessors: state?.controlPlane?.subProcessors ?? {}
+      subProcessors: state?.controlPlane?.subProcessors ?? {},
+      breakGlassGrants: state?.controlPlane?.breakGlassGrants ?? {}
     },
     tenants
   };
@@ -262,6 +264,107 @@ export function registerSubProcessor(state, input, now = new Date()) {
 
 export function listSubProcessors(state) {
   return Object.values(state.controlPlane.subProcessors ?? {}).map(publicSubProcessor);
+}
+
+// --- Platform-staff break-glass access -------------------------------------
+
+// Cross-tenant access is impossible by construction, but platform staff may need
+// emergency access to one tenant's data plane (incident response, recovery). A
+// break-glass grant is minted by the platform admin, scoped to a single tenant,
+// time-boxed, and carries a reason. Every request made under it is sealed into
+// that tenant's audit chain, so the tenant can see exactly who reached in, when,
+// and why — access is transparent to the tenant, never silent.
+
+const DEFAULT_BREAK_GLASS_TTL_MINUTES = 60;
+
+export function generateBreakGlassKey() {
+  return `bgk_${randomBytes(24).toString("hex")}`;
+}
+
+export function grantBreakGlass(state, input, now = new Date()) {
+  const { tenantId } = input;
+  if (!tenantId || !state.controlPlane.tenants[tenantId]) {
+    throw new Error("grantBreakGlass requires an existing tenantId.");
+  }
+  const grantId = input.grantId ?? `bg_${randomBytes(8).toString("hex")}`;
+  const ttlMinutes = Number.isFinite(input.ttlMinutes) ? input.ttlMinutes : DEFAULT_BREAK_GLASS_TTL_MINUTES;
+  const record = {
+    grantId,
+    tenantId,
+    staffId: input.staffId,
+    reason: input.reason,
+    credentialHash: hashApiKey(input.credential),
+    status: "active",
+    createdBy: input.createdBy ?? null,
+    createdAt: now.toISOString(),
+    expiresAt: new Date(now.getTime() + ttlMinutes * 60 * 1000).toISOString()
+  };
+  return {
+    ...state,
+    controlPlane: {
+      ...state.controlPlane,
+      breakGlassGrants: {
+        ...state.controlPlane.breakGlassGrants,
+        [grantId]: record
+      }
+    }
+  };
+}
+
+export function breakGlassEffectiveStatus(record, now = new Date()) {
+  if (record.status !== "active") {
+    return record.status;
+  }
+  return new Date(record.expiresAt).getTime() < now.getTime() ? "expired" : "active";
+}
+
+export function publicBreakGlassGrant(record, now = new Date()) {
+  if (!record) {
+    return null;
+  }
+  const { credentialHash, ...rest } = record;
+  return { ...rest, effectiveStatus: breakGlassEffectiveStatus(record, now) };
+}
+
+export function resolveBreakGlass(state, credential, now = new Date()) {
+  if (!credential) {
+    return null;
+  }
+  const hash = hashApiKey(credential);
+  const grant = Object.values(state.controlPlane.breakGlassGrants ?? {}).find(
+    (record) => record.credentialHash === hash && breakGlassEffectiveStatus(record, now) === "active"
+  );
+  if (!grant) {
+    return null;
+  }
+  const tenant = state.controlPlane.tenants[grant.tenantId];
+  if (!tenant || tenant.status !== "active") {
+    return null;
+  }
+  return { grant, tenant };
+}
+
+export function revokeBreakGlass(state, grantId, now = new Date()) {
+  const record = state.controlPlane.breakGlassGrants?.[grantId];
+  if (!record) {
+    return null;
+  }
+  return {
+    ...state,
+    controlPlane: {
+      ...state.controlPlane,
+      breakGlassGrants: {
+        ...state.controlPlane.breakGlassGrants,
+        [grantId]: { ...record, status: "revoked", revokedAt: now.toISOString() }
+      }
+    }
+  };
+}
+
+export function listBreakGlassGrants(state, tenantId, now = new Date()) {
+  return Object.values(state.controlPlane.breakGlassGrants ?? {})
+    .filter((record) => !tenantId || record.tenantId === tenantId)
+    .map((record) => publicBreakGlassGrant(record, now));
 }
 
 // --- Tenant-scoped data accessors (the isolation seam) --------------------

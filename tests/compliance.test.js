@@ -2969,6 +2969,94 @@ test("platform can export a tenant and offboard it with evidenced deletion", asy
   assert.equal(again.status, 409);
 });
 
+test("platform break-glass access is scoped, audit-sealed, and tenant-visible", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const adminKey = "platform-admin-secret";
+  const server = createLoanOsServer({
+    dataDir,
+    bootstrapTenants: [TENANT_A, TENANT_B],
+    platformAdminKey: adminKey
+  });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+  const adminHeaders = { "content-type": "application/json", "x-platform-admin-key": adminKey };
+
+  // A random break-glass header does not authenticate.
+  const noGrant = await rawFetch(`${base}/regulated-entities`, { headers: { "x-break-glass-key": "bgk_nope" } });
+  assert.equal(noGrant.status, 401);
+
+  // Minting requires a staffId and reason.
+  const invalidMint = await rawFetch(`${base}/platform/tenants/${TENANT_A.tenantId}/break-glass`, {
+    method: "POST",
+    headers: adminHeaders,
+    body: JSON.stringify({ staffId: "sre-1" })
+  });
+  assert.equal(invalidMint.status, 422);
+
+  // Platform admin mints a time-boxed grant scoped to tenant A.
+  const mint = await rawFetch(`${base}/platform/tenants/${TENANT_A.tenantId}/break-glass`, {
+    method: "POST",
+    headers: adminHeaders,
+    body: JSON.stringify({ staffId: "sre-1", reason: "P1 incident recovery", ttlMinutes: 30 })
+  });
+  assert.equal(mint.status, 201);
+  const mintBody = await mint.json();
+  assert.ok(mintBody.credential.startsWith("bgk_"));
+  assert.equal(mintBody.grant.tenantId, TENANT_A.tenantId);
+  assert.equal(mintBody.grant.effectiveStatus, "active");
+  assert.equal(mintBody.grant.credentialHash, undefined);
+  const credential = mintBody.credential;
+  const grantId = mintBody.grant.grantId;
+
+  // The credential grants access to tenant A's data plane.
+  const access = await rawFetch(`${base}/regulated-entities`, { headers: { "x-break-glass-key": credential } });
+  assert.equal(access.status, 200);
+
+  // The reach-in is sealed into tenant A's own audit chain, visible to the tenant.
+  const events = await (await apiFetch(`${base}/audit/events`, {}, TENANT_A.apiKey)).json();
+  assert.equal(events.chainValid, true);
+  const breakGlassEvents = events.events.filter((event) => event.type === "platform.break_glass.access");
+  assert.ok(breakGlassEvents.length >= 1);
+  assert.equal(breakGlassEvents[0].staffId, "sre-1");
+  assert.equal(breakGlassEvents[0].reason, "P1 incident recovery");
+  assert.equal(breakGlassEvents[0].actorType, "platform_staff");
+
+  // The tenant can see every grant scoped to it.
+  const tenantView = await (await apiFetch(`${base}/break-glass-grants`, {}, TENANT_A.apiKey)).json();
+  assert.equal(tenantView.grants.length, 1);
+  assert.equal(tenantView.grants[0].grantId, grantId);
+
+  // The grant is scoped to tenant A only: it cannot reach tenant B's data.
+  const wrongTenant = await rawFetch(`${base}/break-glass-grants`, {
+    headers: { "x-break-glass-key": credential }
+  });
+  // The credential authenticates as tenant A, so it only ever sees tenant A.
+  const wrongTenantBody = await wrongTenant.json();
+  assert.equal(wrongTenant.status, 200);
+  assert.ok(wrongTenantBody.grants.every((grant) => grant.tenantId === TENANT_A.tenantId));
+
+  // Revoking the grant immediately stops it authenticating.
+  const revoke = await rawFetch(`${base}/platform/break-glass/${grantId}/revoke`, {
+    method: "POST",
+    headers: adminHeaders
+  });
+  assert.equal(revoke.status, 200);
+  assert.equal((await revoke.json()).grant.effectiveStatus, "revoked");
+  const afterRevoke = await rawFetch(`${base}/regulated-entities`, {
+    headers: { "x-break-glass-key": credential }
+  });
+  assert.equal(afterRevoke.status, 401);
+});
+
 test("platform maintains a sub-processor register disclosed to every tenant", async (t) => {
   const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
   t.after(async () => {
