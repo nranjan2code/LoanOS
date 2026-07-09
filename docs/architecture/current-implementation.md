@@ -30,7 +30,7 @@ npm run dev:api
 | `packages/core/src/access-control.js` | Staff actor registry, role checks, queue assignment authority, and regulated-action actor validation. |
 | `packages/core/src/grievance.js` | Complaint registry, grievance lifecycle, 30-day RBI Ombudsman clock, and RBI CMS escalation evidence. |
 | `packages/core/src/document-packet.js` | KFS, sanction letter, loan agreement summary, and privacy notice rendering, rendered borrower loan-statement document, plus delivery evidence controls. |
-| `packages/core/src/registries.js` | Regulated-entity, LSP, DLA, and product-policy registries, DLA CIMS export shape, plus application reference resolution. |
+| `packages/core/src/registries.js` | Regulated-entity, LSP, DLA, and product-policy registries, prepayment/foreclosure/reset validations, DLA CIMS export shape, plus application reference resolution. |
 | `packages/core/src/borrower-onboarding.js` | Borrower profile, consent ledger, KYC records (with RBI risk-based periodic-review refresh status), a PMLA beneficial-owner registry for legal-entity borrowers, borrower reference resolution, and in-place redaction for DPDP erasure. |
 | `packages/core/src/eligibility.js` | Policy-driven creditworthiness/affordability engine: EMI/FOIR computation, age-at-maturity, amount/tenor bounds, and eligible/refer/ineligible decision. |
 | `packages/core/src/data-sharing.js` | Third-party data-disclosure ledger: consent-gated `consent`-basis sharing, `legal_obligation`-basis sharing requiring a legal reference, both logged as DPDP record-of-processing entries. |
@@ -38,8 +38,8 @@ npm run dev:api
 | `packages/core/src/fraud-case.js` | Fraud case module: natural-justice gate (show-cause notice + response or 21-day RBI FRM-2024 window) and four-eyes classification, plus a checksum-sealed committee pack generator. |
 | `packages/core/src/recovery-agent.js` | Recovery-agent empanelment registry: an active agent requires due-diligence/police-verification, training certification, code-of-conduct acknowledgment, and authorization-letter/ID-card evidence, referencing an active regulated entity. |
 | `packages/core/src/application-workflow.js` | LOS application state machine, KFS workflow, human review, decision proposal, manual underwriting override gate for referred applications, coded decline-reason taxonomy, maker-checker approval, disbursement transition. |
-| `packages/core/src/loan-account.js` | LMS loan account creation, amortization schedule, ledger balance reconstruction, interest accrual, payment posting, part-prepayment re-amortization, foreclosure quote and payoff, closure No-Objection Certificate, statements, charges, waivers, reversals, delinquency, collections reminders (RBI FPC contact-hours gate), recovery controls, hardship restructure, settlement/write-off, asset classification, and CIC snapshots. |
-| `packages/core/src/loan-policy.js` | India-only loan validation, KFS validation, sanction readiness, disbursement checks. |
+| `packages/core/src/loan-account.js` | LMS loan account creation, amortization schedule, ledger balance reconstruction, interest accrual, payment posting, part-prepayment re-amortization, foreclosure quote and payoff, closure No-Objection Certificate, statements, charges, waivers, reversals, delinquency, collections reminders (RBI FPC contact-hours gate), recovery controls, hardship restructure, floating-rate interest rate resets, settlement/write-off, asset classification, and CIC snapshots. |
+| `packages/core/src/loan-policy.js` | India-only loan validation, KFS validation (including prepayment/foreclosure checks), sanction readiness, disbursement checks. |
 | `packages/core/src/model-governance.js` | AI/model inventory (including generative model class), model status, governed lifecycle transitions with a validation gate (fairness/explainability/monitoring for high-risk, adversarial/hallucination testing for generative), drift monitoring with auto kill-switch, global/model kill switch, kill-switch incident and post-incident review workflow, runtime model-use evaluation. |
 | `packages/core/src/ai-interaction.js` | Customer-facing AI disclosure generation (blocked for back-office/inactive/kill-switched models) and human-handoff request/resolution workflow. |
 | `packages/core/src/incident-notification.js` | Tenant-scoped security/data incident tracking with an independent 6-hour reporting clock per authority (CERT-In and RBI), surfacing overdue reporting duties. |
@@ -165,6 +165,7 @@ npm run dev:api
 | `POST /loan-accounts/:id/recovery-assignments` | Assigns a recovery agent only with borrower notice evidence. |
 | `POST /loan-accounts/:id/reminders` | Logs a collections reminder/notice, blocking voice-channel contact outside the RBI FPC 08:00-19:00 IST window. |
 | `POST /loan-accounts/:id/restructure` | Restructures a stressed loan under four-eyes approval (tenure extension and/or rate concession, re-amortized). |
+| `POST /loan-accounts/:id/rate-resets` | Resets interest rate on a floating-rate loan under four-eyes approval (options: extend tenor, increase EMI, switch to fixed). |
 | `POST /loan-accounts/:id/settlement` | Closes a loan for less than outstanding under four-eyes approval, waiving the shortfall. |
 | `POST /loan-accounts/:id/write-off` | Marks a loan written off (book loss) while retaining the ledger dues. |
 | `POST /loan-accounts/:id/charges` | Assesses a KFS-disclosed charge. |
@@ -231,10 +232,10 @@ npm run dev:api
 | Repayment schedule | Generates monthly reducing-balance amortization schedule from KFS/product terms. |
 | Loan ledger | Reconstructs principal, interest, paid amounts, outstanding balance, and next due from ledger and schedule. |
 | Interest accrual | Recognizes scheduled interest as immutable `interest_accrual` ledger events once each installment period closes; idempotent per installment, reconstructable from the ledger, and reconciled against the schedule in the balance summary. |
-| Foreclosure | Quotes a payoff of outstanding principal plus interest and charges already due (no future interest); any foreclosure charge must be KFS-disclosed. Execution requires the amount to cover the payoff, settles it through the ledger, and closes the account. |
+| Foreclosure | Quotes a payoff of outstanding principal plus interest and charges already due (no future interest); any foreclosure charge must be KFS-disclosed, and enforces lock-in period and floating-rate individual retail fee prohibitions. Execution requires the amount to cover the payoff, settles it through the ledger, and closes the account. |
 | Closure NOC | A settled (closed, zero-dues) account can issue a checksum-sealed No-Objection Certificate declaring no dues remain and no objection to releasing securities; re-issue returns the same certificate. |
 | Payment posting | Posts payment events, allocates to due interest first and principal next, and updates account status. |
-| Part-prepayment | Clears dues then reduces principal, requiring a real principal reduction, and rebuilds the future schedule either to lower each EMI over the same term (`reduce_emi`) or keep the EMI and shorten the tenure (`reduce_tenure`). |
+| Part-prepayment | Enforces lock-in period and floating-rate individual retail fee prohibitions, clears dues then reduces principal, requiring a real principal reduction, and rebuilds the future schedule either to lower each EMI over the same term (`reduce_emi`) or keep the EMI and shorten the tenure (`reduce_tenure`). |
 | Borrower statements | Generates period statement from schedule and ledger transactions. |
 | Rendered statement document | Renders the period statement into a checksum-sealed HTML/text borrower document (opening/closing balances, dues, transactions, totals) in the same shape as the execution packet. |
 | Charge controls | Blocks undisclosed charges and penal-interest/capitalizing charge designs. |
@@ -242,6 +243,7 @@ npm run dev:api
 | Delinquency buckets | Computes DPD bucket, earliest unpaid installment, and overdue amounts from schedule plus ledger. |
 | Collections reminder workflow | Logs each borrower reminder/notice (channel, stage, delinquency snapshot); voice-channel (call/IVR) contact outside the RBI FPC 08:00-19:00 IST window is blocked. |
 | Hardship restructure | Modifies a stressed active loan under four-eyes approval, extending tenure and/or conceding rate, and re-amortizes the remaining principal (past installments untouched); flags the account `restructured`. |
+| Floating-rate reset | Resets the interest rate on a floating loan under four-eyes approval, offering choice-based re-amortization (extend tenor, increase EMI, switch to fixed with fee). |
 | Settlement and write-off | `settleLoanAccount` closes a loan for less than outstanding under four-eyes approval via principal/interest waiver credits (`closureType: "settled"`); `writeOffLoanAccount` marks `written_off` as a book loss while retaining ledger dues; both surface in the CIC snapshot. |
 | Asset classification | Maps DPD to standard, SMA-0, SMA-1, SMA-2, and NPA classes. |
 | CIC snapshots | Produces account and portfolio reporting snapshots from schedule, ledger, borrower, RE, product, and asset-classification state. |

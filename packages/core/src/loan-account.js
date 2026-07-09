@@ -123,9 +123,16 @@ export function createLoanAccountFromApplication(application, disbursement, now 
     tenorMonths,
     repaymentFrequency: application.kfs?.repaymentFrequency ?? application.product?.repaymentFrequency ?? "monthly",
     openedAt: now.toISOString(),
+    disbursedAt: disbursement.disbursedAt ?? now.toISOString(),
     disclosedChargeCatalog: normalizeChargeCatalog(application.kfs),
     schedule: scheduleResult.schedule,
-    ledger: [disbursementEvent]
+    ledger: [disbursementEvent],
+    interestRateType: application.kfs?.interestRateType ?? application.product?.interestRateType ?? "fixed",
+    borrowerType: application.borrower?.borrowerType ?? "individual",
+    productType: application.product?.productType ?? null,
+    prepaymentPolicy: application.kfs?.prepaymentPolicy ?? application.product?.prepaymentPolicy ?? { allowed: true, chargeBps: 0, lockInMonths: 0 },
+    foreclosurePolicy: application.kfs?.foreclosurePolicy ?? application.product?.foreclosurePolicy ?? { allowed: true, chargeBps: 0, lockInMonths: 0 },
+    interestRateResetPolicy: application.kfs?.interestRateResetPolicy ?? application.product?.interestRateResetPolicy ?? null
   };
 
   return {
@@ -656,6 +663,14 @@ export function postCashRecoveryToLoanAccount(account, input, now = new Date()) 
   };
 }
 
+function calculateMonthsElapsed(startDate, endDate) {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  const years = end.getFullYear() - start.getFullYear();
+  const months = end.getMonth() - start.getMonth();
+  return years * 12 + months;
+}
+
 // Foreclosure lets a borrower settle early by paying outstanding principal plus
 // interest and charges already due as of the foreclosure date. Future interest
 // is not owed. Any foreclosure charge must be disclosed in the KFS to be
@@ -680,6 +695,28 @@ export function quoteForeclosure(account, input = {}, now = new Date()) {
     } else {
       foreclosureCharge = roundMoney(disclosed.amount ?? input.foreclosureChargeAmount ?? 0);
       disclosedChargeRef = disclosed.name;
+    }
+  }
+
+  if (account) {
+    const foreclPolicy = account.foreclosurePolicy ?? { allowed: true, chargeBps: 0, lockInMonths: 0 };
+    if (foreclPolicy.allowed === false) {
+      findings.push(createFinding("error", "RBI-DL-2025", "Foreclosure is not allowed under product policy.", "foreclosurePolicy.allowed"));
+    }
+    if (foreclPolicy.lockInMonths > 0 && account.disbursedAt) {
+      const monthsElapsed = calculateMonthsElapsed(account.disbursedAt, asOf);
+      if (monthsElapsed < foreclPolicy.lockInMonths) {
+        findings.push(createFinding("error", "RBI-DL-2025", `Foreclosure is blocked within the lock-in period of ${foreclPolicy.lockInMonths} months.`, "foreclosurePolicy.lockInMonths"));
+      }
+    }
+
+    const rateType = account.interestRateType ?? "fixed";
+    const bType = account.borrowerType ?? "individual";
+    const isBusiness = account.productType === "business_loan" || account.productType === "msme_loan";
+    if (rateType === "floating" && bType === "individual" && !isBusiness) {
+      if (foreclosureCharge > 0 || (input.foreclosureChargeAmount ?? 0) > 0) {
+        findings.push(createFinding("error", "RBI-FPC-PENAL", "Foreclosure charges are prohibited on floating-rate individual retail loans.", "foreclosureCharge"));
+      }
     }
   }
 
@@ -917,6 +954,19 @@ export function prepayLoanAccount(account, input = {}, now = new Date()) {
     findings.push(createFinding("error", "RBI-DL-2025", "Prepayment mode must be reduce_emi or reduce_tenure.", "mode"));
   }
 
+  if (account) {
+    const prepayPolicy = account.prepaymentPolicy ?? { allowed: true, chargeBps: 0, lockInMonths: 0 };
+    if (prepayPolicy.allowed === false) {
+      findings.push(createFinding("error", "RBI-DL-2025", "Part-prepayment is not allowed under product policy.", "prepaymentPolicy.allowed"));
+    }
+    if (prepayPolicy.lockInMonths > 0 && account.disbursedAt) {
+      const monthsElapsed = calculateMonthsElapsed(account.disbursedAt, receivedAt);
+      if (monthsElapsed < prepayPolicy.lockInMonths) {
+        findings.push(createFinding("error", "RBI-DL-2025", `Part-prepayment is blocked within the lock-in period of ${prepayPolicy.lockInMonths} months.`, "prepaymentPolicy.lockInMonths"));
+      }
+    }
+  }
+
   const preSummary = summarizeFindings(findings);
   if (preSummary.status === "blocked") {
     return { loanAccount: account, paymentEvent: null, prepayment: null, schedule: account?.schedule ?? [], findings, summary: preSummary };
@@ -1105,6 +1155,184 @@ export function restructureLoanAccount(account, input = {}, now = new Date()) {
   };
 
   return { loanAccount: updated, restructure, schedule, findings: [], summary: summarizeFindings([]) };
+}
+
+// A floating-rate reset implements the RBI-mandated option flow for interest rate
+// resets on floating-rate term loans. The RE must offer options: extend tenor,
+// increase EMI, switch to fixed rate, or prepay. Resets require four-eyes maker-checker.
+export function resetFloatingRate(account, input = {}, now = new Date()) {
+  const findings = [];
+  const effectiveAt = input.effectiveAt ? new Date(input.effectiveAt) : now;
+  const optionSelected = input.optionSelected ?? "increase_emi";
+
+  if (!account) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Loan account is required.", "loanAccount"));
+  }
+  if (account && account.status !== ACTIVE_STATUS) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Only an active loan account can have its rate reset.", "status"));
+  }
+  if (account && account.interestRateType !== "floating") {
+    findings.push(createFinding("error", "RBI-DL-2025", "Rate reset is only applicable to floating-rate loans.", "interestRateType"));
+  }
+  if (!input.proposedBy) {
+    findings.push(createFinding("error", "RBI-IT-GRC", "Rate reset requires a proposing maker.", "proposedBy"));
+  }
+  if (!input.approvedBy) {
+    findings.push(createFinding("error", "RBI-IT-GRC", "Rate reset requires an approving checker.", "approvedBy"));
+  }
+  if (!input.approvalReference) {
+    findings.push(createFinding("error", "RBI-IT-GRC", "Rate reset requires an approvalReference.", "approvalReference"));
+  }
+  if (input.proposedBy && input.approvedBy && input.proposedBy === input.approvedBy) {
+    findings.push(createFinding("error", "RBI-IT-GRC", "Rate reset checker must differ from the proposer (four-eyes).", "approvedBy"));
+  }
+  if (!Number.isFinite(input.newAnnualInterestRateBps) || input.newAnnualInterestRateBps <= 0) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Rate reset requires a positive newAnnualInterestRateBps.", "newAnnualInterestRateBps"));
+  }
+  if (!["extend_tenor", "increase_emi", "switch_to_fixed"].includes(optionSelected)) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Option selected must be extend_tenor, increase_emi, or switch_to_fixed.", "optionSelected"));
+  }
+
+  if (account && optionSelected === "switch_to_fixed") {
+    const resetPolicy = account.interestRateResetPolicy ?? {};
+    if (!resetPolicy.fixedSwitchAllowed) {
+      findings.push(createFinding("error", "RBI-DL-2025", "Switch to fixed rate is not allowed under product policy.", "optionSelected"));
+    }
+  }
+
+  const summary = summarizeFindings(findings);
+  if (summary.status === "blocked" || !account) {
+    return { loanAccount: account, reset: null, events: [], findings, summary };
+  }
+
+  const balance = summarizeLoanAccount(account, effectiveAt);
+  const remainingPrincipal = balance.principalOutstanding;
+  if (remainingPrincipal <= 0) {
+    const blocked = [createFinding("error", "RBI-DL-2025", "A fully repaid loan cannot have its rate reset.", "status")];
+    return { loanAccount: account, reset: null, events: [], findings: blocked, summary: summarizeFindings(blocked) };
+  }
+
+  const newRateBps = input.newAnnualInterestRateBps;
+  const effectiveTime = effectiveAt.getTime();
+  const pastInstallments = (account.schedule ?? []).filter((installment) => dueTime(installment.dueDate) <= effectiveTime);
+  const futureInstallments = (account.schedule ?? []).filter((installment) => dueTime(installment.dueDate) > effectiveTime);
+
+  if (futureInstallments.length === 0) {
+    const blocked = [createFinding("error", "RBI-DL-2025", "No future installments available to re-amortize.", "schedule")];
+    return { loanAccount: account, reset: null, events: [], findings: blocked, summary: summarizeFindings(blocked) };
+  }
+
+  const anchorDate = pastInstallments.length > 0 ? new Date(`${pastInstallments.at(-1).dueDate}T00:00:00.000Z`) : effectiveAt;
+  const currentEmi = roundMoney(futureInstallments[0].principalAmount + futureInstallments[0].interestAmount);
+
+  let newRemainingTermMonths = futureInstallments.length;
+  let validationFindings = [];
+
+  if (optionSelected === "extend_tenor") {
+    const monthlyRate = newRateBps / 120000;
+    if (monthlyRate === 0) {
+      newRemainingTermMonths = Math.ceil(remainingPrincipal / currentEmi);
+    } else {
+      const ratio = (remainingPrincipal * monthlyRate) / currentEmi;
+      if (ratio >= 1) {
+        validationFindings.push(createFinding("error", "RBI-DL-2025", "Tenor extension is impossible because interest at the new rate exceeds the current EMI. Please select increase_emi.", "optionSelected"));
+      } else {
+        newRemainingTermMonths = Math.round(-Math.log(1 - ratio) / Math.log(1 + monthlyRate));
+      }
+    }
+    if (newRemainingTermMonths < 1) {
+      newRemainingTermMonths = 1;
+    }
+  }
+
+  const valSummary = summarizeFindings(validationFindings);
+  if (valSummary.status === "blocked") {
+    return { loanAccount: account, reset: null, events: [], findings: validationFindings, summary: valSummary };
+  }
+
+  let working = account;
+  const events = [];
+
+  if (optionSelected === "switch_to_fixed") {
+    const switchFee = account.interestRateResetPolicy?.fixedSwitchFeeAmount ?? 0;
+    if (switchFee > 0) {
+      const chargeResult = assessChargeToLoanAccount(
+        working,
+        {
+          name: "Rate switch fee",
+          reason: "Option to switch to fixed rate exercised at interest rate reset",
+          amount: switchFee,
+          assessedAt: effectiveAt.toISOString(),
+          actor: input.approvedBy
+        },
+        now
+      );
+      if (chargeResult.summary.status === "blocked") {
+        return { loanAccount: account, reset: null, events: [], findings: chargeResult.findings, summary: chargeResult.summary };
+      }
+      working = chargeResult.loanAccount;
+      events.push(chargeResult.chargeEvent);
+    }
+  }
+
+  const rebuilt = generateRepaymentSchedule({
+    principalAmount: remainingPrincipal,
+    annualInterestRateBps: newRateBps,
+    tenorMonths: newRemainingTermMonths,
+    startDate: anchorDate.toISOString()
+  });
+
+  if (rebuilt.summary.status === "blocked") {
+    return { loanAccount: working, reset: null, events, findings: rebuilt.findings, summary: rebuilt.summary };
+  }
+
+  const rebuiltFuture = rebuilt.schedule.map((installment, index) => ({
+    ...installment,
+    installmentNumber: pastInstallments.length + index + 1
+  }));
+  const schedule = [...pastInstallments, ...rebuiltFuture];
+
+  const resetDetails = {
+    resetId: input.resetId ?? createLoanId("reset"),
+    optionSelected,
+    resetAt: effectiveAt.toISOString(),
+    priorTerms: {
+      annualInterestRateBps: account.annualInterestRateBps ?? null,
+      interestRateType: account.interestRateType ?? "fixed",
+      remainingInstallments: futureInstallments.length,
+      currentEmi
+    },
+    newTerms: {
+      annualInterestRateBps: newRateBps,
+      interestRateType: optionSelected === "switch_to_fixed" ? "fixed" : "floating",
+      remainingInstallments: rebuiltFuture.length,
+      newEmi: rebuiltFuture[0] ? roundMoney(rebuiltFuture[0].principalAmount + rebuiltFuture[0].interestAmount) : 0
+    },
+    proposedBy: input.proposedBy,
+    approvedBy: input.approvedBy,
+    approvalReference: input.approvalReference
+  };
+
+  const updated = {
+    ...working,
+    schedule,
+    annualInterestRateBps: newRateBps,
+    interestRateType: optionSelected === "switch_to_fixed" ? "fixed" : "floating",
+    interestRateResets: [...(working.interestRateResets ?? []), resetDetails],
+    servicingEvents: [
+      ...(working.servicingEvents ?? []),
+      {
+        type: "loan_account.interest_rate_reset",
+        resetId: resetDetails.resetId,
+        optionSelected,
+        at: effectiveAt.toISOString(),
+        actor: resetDetails.approvedBy
+      }
+    ],
+    updatedAt: now.toISOString()
+  };
+
+  return { loanAccount: updated, reset: resetDetails, events, findings: [], summary: summarizeFindings([]) };
 }
 
 // A compromise settlement (one-time settlement) closes the account for a sum

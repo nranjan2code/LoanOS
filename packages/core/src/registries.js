@@ -604,6 +604,77 @@ export function validateProductPolicy(product, regulatedEntities = {}) {
     findings.push(createFinding("error", "RBI-DL-2025", "Product eligibility minMonthlyIncome is required.", "eligibility.minMonthlyIncome"));
   }
 
+  // Prepayment, Foreclosure and Floating-rate Reset validations
+  const rateType = product?.interestRateType ?? "fixed";
+  if (!["fixed", "floating"].includes(rateType)) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Product interestRateType must be fixed or floating.", "interestRateType"));
+  }
+
+  if (rateType === "floating") {
+    const resetPolicy = product?.interestRateResetPolicy;
+    if (!resetPolicy) {
+      findings.push(createFinding("error", "RBI-DL-2025", "Floating-rate products require an interestRateResetPolicy.", "interestRateResetPolicy"));
+    } else {
+      if (!resetPolicy.resetBenchmark) {
+        findings.push(createFinding("error", "RBI-DL-2025", "Interest rate reset benchmark is required.", "interestRateResetPolicy.resetBenchmark"));
+      }
+      if (!Number.isInteger(resetPolicy.resetFrequencyMonths) || resetPolicy.resetFrequencyMonths <= 0) {
+        findings.push(createFinding("error", "RBI-DL-2025", "Interest rate reset frequency in months must be a positive integer.", "interestRateResetPolicy.resetFrequencyMonths"));
+      }
+      if (Number.isFinite(resetPolicy.fixedSwitchFeeAmount) && resetPolicy.fixedSwitchFeeAmount < 0) {
+        findings.push(createFinding("error", "RBI-DL-2025", "Fixed switch fee amount must be non-negative.", "interestRateResetPolicy.fixedSwitchFeeAmount"));
+      }
+    }
+  }
+
+  const prepay = product?.prepaymentPolicy;
+  if (prepay) {
+    if (typeof prepay.allowed !== "boolean") {
+      findings.push(createFinding("error", "RBI-DL-2025", "Prepayment policy allowed flag must be a boolean.", "prepaymentPolicy.allowed"));
+    }
+    if (Number.isFinite(prepay.chargeBps) && prepay.chargeBps < 0) {
+      findings.push(createFinding("error", "RBI-DL-2025", "Prepayment charge bps must be non-negative.", "prepaymentPolicy.chargeBps"));
+    }
+    if (Number.isFinite(prepay.lockInMonths) && prepay.lockInMonths < 0) {
+      findings.push(createFinding("error", "RBI-DL-2025", "Prepayment lock-in period must be non-negative.", "prepaymentPolicy.lockInMonths"));
+    }
+  }
+
+  const forecl = product?.foreclosurePolicy;
+  if (forecl) {
+    if (typeof forecl.allowed !== "boolean") {
+      findings.push(createFinding("error", "RBI-DL-2025", "Foreclosure policy allowed flag must be a boolean.", "foreclosurePolicy.allowed"));
+    }
+    if (Number.isFinite(forecl.chargeBps) && forecl.chargeBps < 0) {
+      findings.push(createFinding("error", "RBI-DL-2025", "Foreclosure charge bps must be non-negative.", "foreclosurePolicy.chargeBps"));
+    }
+    if (Number.isFinite(forecl.lockInMonths) && forecl.lockInMonths < 0) {
+      findings.push(createFinding("error", "RBI-DL-2025", "Foreclosure lock-in period must be non-negative.", "foreclosurePolicy.lockInMonths"));
+    }
+  }
+
+  // RBI Rule: No prepayment penalty/foreclosure charge on floating rate term loans to individual borrowers for non-business purposes.
+  // We check if rate type is floating and productType is a retail loan (not business/msme).
+  const isRetail = product?.productType !== "business_loan" && product?.productType !== "msme_loan";
+  if (rateType === "floating" && isRetail) {
+    if (prepay?.chargeBps > 0) {
+      findings.push(createFinding("error", "RBI-FPC-PENAL", "Prepayment penalty is prohibited on floating-rate individual retail loans.", "prepaymentPolicy.chargeBps"));
+    }
+    if (forecl?.chargeBps > 0) {
+      findings.push(createFinding("error", "RBI-FPC-PENAL", "Foreclosure charge is prohibited on floating-rate individual retail loans.", "foreclosurePolicy.chargeBps"));
+    }
+
+    // Also scan charges, contingentCharges, penalCharges for any non-zero foreclosure/prepayment fees
+    const allCharges = [...(product?.charges ?? []), ...(product?.contingentCharges ?? []), ...(product?.penalCharges ?? [])];
+    for (const c of allCharges) {
+      const name = (c.name ?? "").toLowerCase();
+      const reason = (c.reason ?? "").toLowerCase();
+      if ((name.includes("foreclosure") || name.includes("prepayment") || reason.includes("foreclosure") || reason.includes("prepayment")) && (c.amount > 0 || c.chargeBps > 0)) {
+        findings.push(createFinding("error", "RBI-FPC-PENAL", `Charge '${c.name}' is prohibited on floating-rate individual retail loans.`, "charges"));
+      }
+    }
+  }
+
   validateCharges("charges", product?.charges, findings);
   validateCharges("contingentCharges", product?.contingentCharges, findings);
   validateCharges("penalCharges", product?.penalCharges, findings, { penal: true });
@@ -639,6 +710,33 @@ export function normalizeProductPolicy(input, now = new Date()) {
     repaymentFrequency: input.repaymentFrequency ?? "monthly",
     coolingOffDays: input.coolingOffDays ?? 1,
     recoveryMechanism: input.recoveryMechanism,
+    interestRateType: input.interestRateType ?? "fixed",
+    interestRateResetPolicy: input.interestRateResetPolicy
+      ? {
+          resetBenchmark: input.interestRateResetPolicy.resetBenchmark ?? null,
+          resetFrequencyMonths: Number.isInteger(input.interestRateResetPolicy.resetFrequencyMonths)
+            ? input.interestRateResetPolicy.resetFrequencyMonths
+            : null,
+          fixedSwitchFeeAmount: Number.isFinite(input.interestRateResetPolicy.fixedSwitchFeeAmount)
+            ? input.interestRateResetPolicy.fixedSwitchFeeAmount
+            : 0,
+          fixedSwitchAllowed: !!input.interestRateResetPolicy.fixedSwitchAllowed
+        }
+      : null,
+    prepaymentPolicy: input.prepaymentPolicy
+      ? {
+          allowed: input.prepaymentPolicy.allowed ?? true,
+          chargeBps: Number.isFinite(input.prepaymentPolicy.chargeBps) ? input.prepaymentPolicy.chargeBps : 0,
+          lockInMonths: Number.isFinite(input.prepaymentPolicy.lockInMonths) ? input.prepaymentPolicy.lockInMonths : 0
+        }
+      : { allowed: true, chargeBps: 0, lockInMonths: 0 },
+    foreclosurePolicy: input.foreclosurePolicy
+      ? {
+          allowed: input.foreclosurePolicy.allowed ?? true,
+          chargeBps: Number.isFinite(input.foreclosurePolicy.chargeBps) ? input.foreclosurePolicy.chargeBps : 0,
+          lockInMonths: Number.isFinite(input.foreclosurePolicy.lockInMonths) ? input.foreclosurePolicy.lockInMonths : 0
+        }
+      : { allowed: true, chargeBps: 0, lockInMonths: 0 },
     charges: Array.isArray(input.charges) ? input.charges : [],
     contingentCharges: Array.isArray(input.contingentCharges) ? input.contingentCharges : [],
     penalCharges: Array.isArray(input.penalCharges) ? input.penalCharges : [],

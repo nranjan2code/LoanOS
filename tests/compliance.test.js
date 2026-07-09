@@ -2247,6 +2247,317 @@ test("API quotes and executes foreclosure, closing the loan account", async (t) 
   assert(repeat.body.findings.some((finding) => finding.path === "status"));
 });
 
+test("API rejects prepayment/foreclosure charges on floating-rate individual retail loans and validates resets", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+  await seedOperationalActors(base);
+  assert.equal((await postJson(`${base}/regulated-entities`, validRegulatedEntity())).status, 201);
+
+  // 1. Prohibits non-zero prepayment/foreclosure charge in prepaymentPolicy/foreclosurePolicy on floating retail
+  const invalidPolicy1 = {
+    ...validProductPolicy(),
+    productId: "invalid_floating_prod",
+    productCode: "FL_INVALID",
+    interestRateType: "floating",
+    interestRateResetPolicy: {
+      resetBenchmark: "EBLR",
+      resetFrequencyMonths: 3,
+      fixedSwitchAllowed: true,
+      fixedSwitchFeeAmount: 500
+    },
+    prepaymentPolicy: { allowed: true, chargeBps: 200, lockInMonths: 0 }
+  };
+  const invalidResult1 = await postJson(`${base}/products`, invalidPolicy1);
+  assert.equal(invalidResult1.status, 422);
+  assert(invalidResult1.body.findings.some((f) => f.controlId === "RBI-FPC-PENAL"));
+
+  // 2. Prohibits foreclosure/prepayment charges in the general charges lists on floating retail
+  const invalidPolicy2 = {
+    ...validProductPolicy(),
+    productId: "invalid_floating_prod2",
+    productCode: "FL_INVALID2",
+    interestRateType: "floating",
+    interestRateResetPolicy: {
+      resetBenchmark: "EBLR",
+      resetFrequencyMonths: 3
+    },
+    charges: [
+      {
+        name: "Foreclosure Penalty Charge",
+        reason: "penalty on foreclosure",
+        amount: 2000,
+        type: "fixed"
+      }
+    ]
+  };
+  const invalidResult2 = await postJson(`${base}/products`, invalidPolicy2);
+  assert.equal(invalidResult2.status, 422);
+  assert(invalidResult2.body.findings.some((f) => f.controlId === "RBI-FPC-PENAL"));
+
+  // 3. Register valid floating rate policy
+  const validFloatingPolicy = {
+    ...validProductPolicy(),
+    productId: "floating_prod",
+    productCode: "FL_VALID",
+    interestRateType: "floating",
+    interestRateResetPolicy: {
+      resetBenchmark: "EBLR",
+      resetFrequencyMonths: 3,
+      fixedSwitchAllowed: true,
+      fixedSwitchFeeAmount: 1000
+    },
+    prepaymentPolicy: { allowed: true, chargeBps: 0, lockInMonths: 0 },
+    foreclosurePolicy: { allowed: true, chargeBps: 0, lockInMonths: 0 },
+    contingentCharges: [
+      {
+        name: "Rate switch fee",
+        reason: "Option to switch to fixed rate exercised at interest rate reset",
+        amount: 1000,
+        type: "fixed"
+      }
+    ]
+  };
+  assert.equal((await postJson(`${base}/products`, validFloatingPolicy)).status, 201);
+
+  // 4. Onboard borrower and create loan account
+  assert.equal((await postJson(`${base}/borrowers`, validBorrowerProfile())).status, 201);
+  assert.equal((await postJson(`${base}/borrowers/bor_001/consents`, validConsentRecord())).status, 201);
+  assert.equal((await postJson(`${base}/borrowers/bor_001/kyc-records`, validKycRecord())).status, 201);
+
+  const application = await postJson(`${base}/loans/applications`, {
+    regulatedEntityId: "re_example_nbfc",
+    productId: "floating_prod",
+    borrowerId: "bor_001",
+    requestedAmount: 120000,
+    requestedTenorMonths: 12,
+    disbursement: validApplication().disbursement,
+    repayment: validApplication().repayment
+  });
+  assert.equal(application.status, 201);
+
+  assert.equal(
+    (
+      await postJson(`${base}/loans/applications/${application.body.applicationId}/kfs`, {
+        acceptance: {
+          acceptedAt: "2026-07-08T07:00:00.000Z",
+          deliveryChannel: "email",
+          deliveryRef: "email_msg_123"
+        }
+      })
+    ).status,
+    201
+  );
+  assert.equal(
+    (
+      await postJson(`${base}/loans/applications/${application.body.applicationId}/decision`, {
+        status: "approved",
+        proposedBy: "credit-maker-1",
+        reason: "Approved floating-rate"
+      })
+    ).status,
+    202
+  );
+  assert.equal(
+    (
+      await postJson(`${base}/loans/applications/${application.body.applicationId}/approvals`, {
+        outcome: "approved",
+        approvedBy: "credit-checker-1",
+        approvalRef: "approval_002"
+      })
+    ).status,
+    200
+  );
+  await generateAndDeliverDocumentPacket(base, application.body.applicationId);
+  const disbursement = await postJson(`${base}/loans/applications/${application.body.applicationId}/disbursement`, {
+    destinationAccount: validApplication().disbursement.destinationAccount
+  });
+  assert.equal(disbursement.status, 200);
+
+  const accountId = disbursement.body.loanAccountId;
+  
+  // 5. Verify foreclosure quote blocks charging a fee on this floating individual loan
+  const quoteRes = await apiFetch(`${base}/loan-accounts/${accountId}/foreclosure-quote?asOf=2026-07-08T12:00:00.000Z`);
+  assert.equal(quoteRes.status, 200);
+  const quote = await quoteRes.json();
+  assert.equal(quote.foreclosureCharge, 0);
+
+  // Try foreclosing with an explicit charge - should fail
+  const badForeclose = await postJson(`${base}/loan-accounts/${accountId}/foreclosure`, {
+    amount: quote.payoffAmount + 1000,
+    foreclosureChargeName: "Foreclosure charge",
+    foreclosureChargeAmount: 1000,
+    paymentRef: "pmt_fc_001"
+  });
+  assert.equal(badForeclose.status, 422);
+
+  // 6. Test Interest Rate Resets
+  // Propose without checker -> blocked (four-eyes)
+  const badReset = await postJson(`${base}/loan-accounts/${accountId}/rate-resets`, {
+    newAnnualInterestRateBps: 2000,
+    optionSelected: "increase_emi",
+    proposedBy: "credit-maker-1",
+    approvedBy: "credit-maker-1",
+    approvalReference: "ref_001"
+  });
+  assert.equal(badReset.status, 422);
+
+  // Valid reset: Increase EMI
+  const resetEmi = await postJson(`${base}/loan-accounts/${accountId}/rate-resets`, {
+    newAnnualInterestRateBps: 2000,
+    optionSelected: "increase_emi",
+    proposedBy: "credit-maker-1",
+    approvedBy: "credit-checker-1",
+    approvalReference: "ref_002"
+  });
+  if (resetEmi.status !== 200) {
+    console.log("resetEmi failed body:", JSON.stringify(resetEmi.body, null, 2));
+  }
+  assert.equal(resetEmi.status, 200);
+  assert.equal(resetEmi.body.loanAccount.annualInterestRateBps, 2000);
+  assert.equal(resetEmi.body.reset.optionSelected, "increase_emi");
+  assert.equal(resetEmi.body.loanAccount.schedule.length, 12);
+
+  // Valid reset: Switch to fixed
+  const resetFixed = await postJson(`${base}/loan-accounts/${accountId}/rate-resets`, {
+    newAnnualInterestRateBps: 1800,
+    optionSelected: "switch_to_fixed",
+    proposedBy: "credit-maker-1",
+    approvedBy: "credit-checker-1",
+    approvalReference: "ref_003"
+  });
+  if (resetFixed.status !== 200) {
+    console.log("resetFixed failed body:", JSON.stringify(resetFixed.body, null, 2));
+  }
+  assert.equal(resetFixed.status, 200);
+  assert.equal(resetFixed.body.loanAccount.interestRateType, "fixed");
+  assert(resetFixed.body.events.some((e) => e.chargeName === "Rate switch fee" && e.amount === 1000));
+});
+
+test("API enforces lock-in period restrictions for prepayment and foreclosure", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+  await seedOperationalActors(base);
+  assert.equal((await postJson(`${base}/regulated-entities`, validRegulatedEntity())).status, 201);
+
+  // Register product policy with lock-in periods
+  const lockInProduct = {
+    ...validProductPolicy(),
+    productId: "lockin_prod",
+    productCode: "PL_LOCKIN",
+    prepaymentPolicy: { allowed: true, chargeBps: 200, lockInMonths: 6 },
+    foreclosurePolicy: { allowed: true, chargeBps: 300, lockInMonths: 6 }
+  };
+  assert.equal((await postJson(`${base}/products`, lockInProduct)).status, 201);
+
+  // Onboard borrower and create loan account
+  assert.equal((await postJson(`${base}/borrowers`, validBorrowerProfile())).status, 201);
+  assert.equal((await postJson(`${base}/borrowers/bor_001/consents`, validConsentRecord())).status, 201);
+  assert.equal((await postJson(`${base}/borrowers/bor_001/kyc-records`, validKycRecord())).status, 201);
+
+  const application = await postJson(`${base}/loans/applications`, {
+    regulatedEntityId: "re_example_nbfc",
+    productId: "lockin_prod",
+    borrowerId: "bor_001",
+    requestedAmount: 120000,
+    requestedTenorMonths: 12,
+    disbursement: validApplication().disbursement,
+    repayment: validApplication().repayment
+  });
+  assert.equal(application.status, 201);
+
+  assert.equal(
+    (
+      await postJson(`${base}/loans/applications/${application.body.applicationId}/kfs`, {
+        acceptance: {
+          acceptedAt: "2026-07-08T07:00:00.000Z",
+          deliveryChannel: "email",
+          deliveryRef: "email_msg_123"
+        }
+      })
+    ).status,
+    201
+  );
+  assert.equal(
+    (
+      await postJson(`${base}/loans/applications/${application.body.applicationId}/decision`, {
+        status: "approved",
+        proposedBy: "credit-maker-1",
+        reason: "Approved"
+      })
+    ).status,
+    202
+  );
+  assert.equal(
+    (
+      await postJson(`${base}/loans/applications/${application.body.applicationId}/approvals`, {
+        outcome: "approved",
+        approvedBy: "credit-checker-1",
+        approvalRef: "approval_002"
+      })
+    ).status,
+    200
+  );
+  await generateAndDeliverDocumentPacket(base, application.body.applicationId);
+  const disbursement = await postJson(`${base}/loans/applications/${application.body.applicationId}/disbursement`, {
+    destinationAccount: validApplication().disbursement.destinationAccount,
+    disbursedAt: "2026-07-08T12:00:00.000Z"
+  });
+  assert.equal(disbursement.status, 200);
+
+  const accountId = disbursement.body.loanAccountId;
+
+  // Prepayment on Day 1 (0 months elapsed) -> should fail lock-in
+  const badPrepay = await postJson(`${base}/loan-accounts/${accountId}/prepayments`, {
+    amount: 10000,
+    paymentRef: "pmt_pre_001",
+    receivedAt: "2026-07-08T12:00:00.000Z",
+    mode: "reduce_emi"
+  });
+  assert.equal(badPrepay.status, 422);
+  assert(badPrepay.body.findings.some((f) => f.path === "prepaymentPolicy.lockInMonths"));
+
+  // Foreclosure quote on Day 1 (0 months elapsed) -> should fail lock-in
+  const badQuote = await apiFetch(`${base}/loan-accounts/${accountId}/foreclosure-quote?asOf=2026-07-08T12:00:00.000Z`);
+  assert.equal(badQuote.status, 422);
+  const badQuoteBody = await badQuote.json();
+  assert.equal(badQuoteBody.error.code, "foreclosure_quote_blocked");
+  assert(badQuoteBody.findings.some((f) => f.path === "foreclosurePolicy.lockInMonths"));
+
+  // Now test after lock-in period passes (e.g. 7 months later: 2027-02-08)
+  const goodPrepay = await postJson(`${base}/loan-accounts/${accountId}/prepayments`, {
+    amount: 10000,
+    paymentRef: "pmt_pre_002",
+    receivedAt: "2027-02-08T12:00:00.000Z",
+    mode: "reduce_emi"
+  });
+  assert.equal(goodPrepay.status, 200);
+
+  const goodQuote = await apiFetch(`${base}/loan-accounts/${accountId}/foreclosure-quote?asOf=2027-02-08T12:00:00.000Z`);
+  assert.equal(goodQuote.status, 200);
+});
+
 test("API issues a No-Objection closure certificate for a settled loan", async (t) => {
   const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
   t.after(async () => {

@@ -148,6 +148,7 @@ Useful data-plane endpoints (tenant api key required):
 - `POST /loan-accounts/:id/payments`
 - `POST /loan-accounts/:id/prepayments`
 - `POST /loan-accounts/:id/restructure`
+- `POST /loan-accounts/:id/rate-resets`
 - `POST /loan-accounts/:id/reminders`
 - `POST /loan-accounts/:id/settlement`
 - `POST /loan-accounts/:id/write-off`

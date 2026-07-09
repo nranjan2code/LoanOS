@@ -34,6 +34,9 @@ Legend:
 | Overseas processing return/delete within 24 hours | Processing duration check implemented. | Done |
 | DLA CIMS reporting | Active DLA registry validates own/LSP app and web surfaces, CCO/compliance attestation, grievance contact, RE website linkage, India data controls, and exports CIMS-ready rows. | Done |
 | CIC reporting | Internal account-level and portfolio-level CIC-ready snapshots from ledger/schedule state; external CIC submission planned. | Partial |
+| Prepayment/foreclosure policy rules | Product registry validates interestRateType, interestRateResetPolicy, prepaymentPolicy, and foreclosurePolicy; blocks charging foreclosure/prepayment fees on floating-rate individual retail loans. | Done |
+| Floating-rate reset options | resetFloatingRate allows rate resets under maker-checker flow and re-amortizes schedule based on borrower choice (extend tenor, increase EMI, switch to fixed). | Done |
+
 
 ## KFS for Loans and Advances
 
@@ -164,6 +167,8 @@ Legend:
 | Cash recovery same-day posting | Cash recovery requires active noticed recovery assignment and same-India-day account posting. | Done |
 | Cash recovery exception workflow | Cash recovery requires a coded exception reason (cash is an exception channel, not the default) plus an approver checked against the active `collections_manager` role, mirroring the actor/reason/approver/reference shape used for waivers and reversals. | Done |
 | Hardship restructure | Four-eyes tenure extension and/or rate concession, re-amortizing the remaining principal. | Done |
+| Prepayment and foreclosure servicing | quoteForeclosure and prepayLoanAccount enforce product lock-in policies and block fees on floating-rate individual retail loans. | Done |
+| Floating-rate interest reset servicing | resetFloatingRate implements choice-based re-amortization (extend tenor, increase EMI, switch to fixed with fee) under four-eyes check. | Done |
 | Settlement and write-off | Four-eyes below-par closure via waiver credits (settlement) or book-loss marking retaining ledger dues (write-off); both surface on the CIC snapshot. | Done |
 | SMA/NPA asset classification | Asset class maps DPD to standard, SMA-0, SMA-1, SMA-2, and NPA. | Done |
 | CIC-ready snapshots | Internal account-level and portfolio-level CIC reporting snapshots are generated from account lifecycle state. | Done |

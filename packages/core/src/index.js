@@ -160,6 +160,7 @@ export {
   prepayLoanAccount,
   recordCollectionsReminder,
   restructureLoanAccount,
+  resetFloatingRate,
   settleLoanAccount,
   writeOffLoanAccount,
   quoteForeclosure,

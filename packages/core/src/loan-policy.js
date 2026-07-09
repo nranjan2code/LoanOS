@@ -71,9 +71,11 @@ export function buildKeyFactStatement(application, terms, now = new Date()) {
     kfsId: createLoanId("kfs"),
     generatedAt: now.toISOString(),
     borrowerId: application.borrower?.borrowerId ?? null,
+    borrowerType: application.borrower?.borrowerType ?? "individual",
     applicationId: application.applicationId ?? null,
     lenderName: application.tenant?.regulatedEntityName ?? null,
     productCode: product.productCode ?? null,
+    productType: product.productType ?? null,
     currency: terms?.currency ?? product.currency ?? "INR",
     principalAmount: terms?.principalAmount ?? product.requestedAmount ?? null,
     tenorMonths: terms?.tenorMonths ?? product.requestedTenorMonths ?? product.defaultTenorMonths ?? null,
@@ -88,7 +90,11 @@ export function buildKeyFactStatement(application, terms, now = new Date()) {
     grievanceOfficer: terms?.grievanceOfficer ?? application.tenant?.grievanceOfficer ?? null,
     privacyPolicyUrl: terms?.privacyPolicyUrl ?? application.tenant?.privacyPolicyUrl ?? null,
     allFeesDisclosed: true,
-    digitallyDeliverable: true
+    digitallyDeliverable: true,
+    interestRateType: product.interestRateType ?? "fixed",
+    interestRateResetPolicy: product.interestRateResetPolicy ?? null,
+    prepaymentPolicy: product.prepaymentPolicy ?? { allowed: true, chargeBps: 0, lockInMonths: 0 },
+    foreclosurePolicy: product.foreclosurePolicy ?? { allowed: true, chargeBps: 0, lockInMonths: 0 }
   };
 }
 
@@ -136,6 +142,20 @@ export function validateKfs(kfs) {
     findings.push(createFinding("error", "RBI-DL-2025", "KFS must disclose recovery mechanism.", "kfs.recoveryMechanism"));
   }
 
+  // Prepayment & Foreclosure validations in KFS
+  const rateType = kfs.interestRateType ?? "fixed";
+  const bType = kfs.borrowerType ?? "individual";
+  const isBusiness = kfs.productType === "business_loan" || kfs.productType === "msme_loan";
+
+  if (rateType === "floating" && bType === "individual" && !isBusiness) {
+    if (kfs.prepaymentPolicy?.chargeBps > 0) {
+      findings.push(createFinding("error", "RBI-FPC-PENAL", "Prepayment penalty is prohibited on floating-rate individual retail loans.", "kfs.prepaymentPolicy.chargeBps"));
+    }
+    if (kfs.foreclosurePolicy?.chargeBps > 0) {
+      findings.push(createFinding("error", "RBI-FPC-PENAL", "Foreclosure charge is prohibited on floating-rate individual retail loans.", "kfs.foreclosurePolicy.chargeBps"));
+    }
+  }
+
   for (const charge of [...(kfs.charges ?? []), ...(kfs.penalCharges ?? [])]) {
     if (!charge.name || !charge.reason) {
       findings.push(createFinding("error", "RBI-KFS-2024", "Each KFS charge must include name and reason.", "kfs.charges"));
@@ -145,6 +165,14 @@ export function validateKfs(kfs) {
     }
     if (charge.capitalizes === true) {
       findings.push(createFinding("error", "RBI-FPC-PENAL", "Penal charges must not be capitalized.", "kfs.penalCharges"));
+    }
+
+    if (rateType === "floating" && bType === "individual" && !isBusiness) {
+      const name = (charge.name ?? "").toLowerCase();
+      const reason = (charge.reason ?? "").toLowerCase();
+      if ((name.includes("foreclosure") || name.includes("prepayment") || reason.includes("foreclosure") || reason.includes("prepayment")) && (charge.amount > 0 || charge.chargeBps > 0)) {
+        findings.push(createFinding("error", "RBI-FPC-PENAL", `Charge '${charge.name}' is prohibited on floating-rate individual retail loans.`, "kfs.charges"));
+      }
     }
   }
 
