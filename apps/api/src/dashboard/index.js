@@ -129,8 +129,9 @@ async function initConfig() {
   
   dom.apiKeyInput.value = apiState.apiKey;
   dom.timeAsOfInput.value = apiState.simulationDate;
-  
+
   updateConnectionStatus(false);
+  updateAdminButtonVisibility();
 
   try {
     const me = await bareFetch('/auth/me');
@@ -167,7 +168,9 @@ function applyAuthenticatedContext(context) {
   apiState.apiKey = '';
   dom.apiKeyInput.value = '';
   if (context.scope === 'tenant') {
-    apiState.currentActorId = context.user?.staffActorId || apiState.currentActorId || '';
+    // The login user's own userId is the acting identity — there is no
+    // separate staff-actor id to look up.
+    apiState.currentActorId = context.user?.userId || apiState.currentActorId || '';
     if (apiState.currentActorId) {
       localStorage.setItem('loanos_actor_id', apiState.currentActorId);
     }
@@ -175,6 +178,31 @@ function applyAuthenticatedContext(context) {
   } else {
     dom.footerTenantLabel.textContent = `Platform: ${context.user?.email || ''}`;
   }
+  updateAdminButtonVisibility();
+}
+
+const TENANT_ADMIN_FAMILY_ROLES = ['tenant_admin', 'user_admin', 'security_admin', 'auditor'];
+
+// Mirrors the server's own gate (hasTenantAdminRole in identity.js) so the
+// Admin button only appears when the signed-in identity could actually do
+// something behind it — a plain "operator" tenant user never sees it. This is
+// a UX improvement, not the security boundary: every /admin and /platform
+// route re-checks the caller's role server-side regardless of what the client
+// renders.
+function canOpenTenantAdmin() {
+  if (apiState.authScope === 'platform') return true;
+  if (apiState.authScope === 'tenant_service' || !!apiState.apiKey) return true;
+  if (apiState.authScope === 'tenant') {
+    const roles = apiState.currentUser?.adminRoles || [];
+    return roles.some(role => TENANT_ADMIN_FAMILY_ROLES.includes(role));
+  }
+  return false;
+}
+
+function updateAdminButtonVisibility() {
+  const canOpen = canOpenTenantAdmin();
+  dom.btnAdminOpen.classList.toggle('hidden', !canOpen);
+  dom.btnAdminOpen.disabled = !canOpen;
 }
 
 // ─── Connection Status ──────────────────────────────────────────────────────
@@ -325,8 +353,10 @@ async function onApiKeyChange() {
   localStorage.setItem('loanos_api_key', apiState.apiKey);
   apiState.authScope = apiState.apiKey ? 'tenant_service' : '';
   apiState.currentUser = null;
-  
+  updateAdminButtonVisibility();
+
   if (!apiState.apiKey) {
+    dom.actorSelect.disabled = false;
     dom.actorSelect.innerHTML = '<option value="">— Sign In First —</option>';
     updateConnectionStatus(false);
     return;
@@ -342,67 +372,78 @@ async function onApiKeyChange() {
 }
 
 async function loadTenantWorkspace(label) {
+  // "Staff actors" are just tenant login users that carry a workflow role —
+  // GET /staff/actors is a read-only projection of state.users, not a
+  // separate registry, so there is nothing left to auto-seed here.
   const res = await apiFetch('/staff/actors');
   apiState.actors = res.actors || [];
   updateConnectionStatus(true, label || `Tenant: ${apiState.currentTenant?.tenantId || 'active'}`);
 
   dom.actorSelect.innerHTML = '';
 
-  if (apiState.actors.length === 0) {
-    dom.actorSelect.innerHTML = '<option value="seed">Seeding needed…</option>';
-    await seedDefaultActors();
-    return;
-  }
+  // A real human login is bound to its own identity everywhere it matters —
+  // the server ignores/overrides any other actor a session claims to act as
+  // (see resolveSessionActorId in server.js), so letting the dropdown offer
+  // every actor here would just be misleading UI. Only a service-key
+  // connection (no personal login identity) gets free actor selection, which
+  // mirrors how the server actually treats that principal type.
+  if (apiState.authScope === 'tenant') {
+    renderBoundActorSelect();
+  } else if (apiState.actors.length === 0) {
+    dom.actorSelect.innerHTML = '<option value="">No staff users yet — create one in Admin</option>';
+    dom.actorSelect.disabled = true;
+  } else {
+    apiState.actors.forEach(actor => {
+      const opt = document.createElement('option');
+      opt.value = actor.actorId;
+      opt.textContent = `${actor.displayName} (${actor.roles.join(', ')})`;
+      if (actor.actorId === apiState.currentActorId) {
+        opt.selected = true;
+      }
+      dom.actorSelect.appendChild(opt);
+    });
 
-  apiState.actors.forEach(actor => {
-    const opt = document.createElement('option');
-    opt.value = actor.actorId;
-    opt.textContent = `${actor.displayName} (${actor.roles.join(', ')})`;
-    if (actor.actorId === apiState.currentActorId) {
-      opt.selected = true;
+    if (!apiState.currentActorId && apiState.actors.length > 0) {
+      apiState.currentActorId = apiState.actors[0].actorId;
+      localStorage.setItem('loanos_actor_id', apiState.currentActorId);
     }
-    dom.actorSelect.appendChild(opt);
-  });
 
-  if (!apiState.currentActorId && apiState.actors.length > 0) {
-    apiState.currentActorId = apiState.currentUser?.staffActorId || apiState.actors[0].actorId;
-    localStorage.setItem('loanos_actor_id', apiState.currentActorId);
-  }
-
-  if (apiState.currentActorId) {
-    dom.actorSelect.value = apiState.currentActorId;
+    if (apiState.currentActorId) {
+      dom.actorSelect.value = apiState.currentActorId;
+    }
+    dom.actorSelect.disabled = false;
   }
 
   showToast('Connected and loaded staff actors.', 'success');
   loadTasks();
 }
 
-// ─── Seed Default Actors ────────────────────────────────────────────────────
-async function seedDefaultActors() {
-  const defaults = [
-    { actorId: 'loan_officer_1', displayName: 'Loan Officer Alpha', roles: ['loan_officer'], queues: ['loan_ops'] },
-    { actorId: 'credit_officer_1', displayName: 'Credit Officer Beta', roles: ['credit_officer'], queues: ['credit_ops'] },
-    { actorId: 'credit_checker_1', displayName: 'Checker Gamma', roles: ['credit_checker'], queues: ['credit_checker'] },
-    { actorId: 'disbursement_maker_1', displayName: 'Disbursement Maker Delta', roles: ['disbursement_maker'], queues: ['disbursement_ops'] },
-    { actorId: 'collections_manager_1', displayName: 'Collections Manager Epsilon', roles: ['collections_manager'], queues: ['collections_ops'] },
-    { actorId: 'grievance_officer_1', displayName: 'Grievance Officer Zeta', roles: ['grievance_officer'], queues: ['grievance_ops'] },
-    { actorId: 'compliance_analyst_1', displayName: 'Compliance Analyst Eta', roles: ['compliance_analyst'], queues: ['compliance_ops'] },
-    { actorId: 'human_reviewer_1', displayName: 'Human Reviewer Theta', roles: ['human_reviewer'], queues: ['model_risk'] }
-  ];
-  
-  showToast('Seeding test staff actors…', 'info');
-  try {
-    for (const actor of defaults) {
-      await apiFetch('/staff/actors', {
-        method: 'POST',
-        body: JSON.stringify(actor)
-      });
-    }
-    showToast('Seeded staff actors successfully!', 'success');
-    onApiKeyChange();
-  } catch (err) {
-    showToast(`Seeding failed: ${err.message}`, 'error');
+// Locks the "Acting User" control to the logged-in session's own identity.
+// If the account has no workflow roles, it's shown as unlinked rather than
+// falling back to picking someone else's identity.
+function renderBoundActorSelect() {
+  const boundActorId = apiState.currentUser?.userId || '';
+  apiState.currentActorId = boundActorId;
+  if (boundActorId) {
+    localStorage.setItem('loanos_actor_id', boundActorId);
+  } else {
+    localStorage.removeItem('loanos_actor_id');
   }
+
+  const boundActor = apiState.actors.find(actor => actor.actorId === boundActorId);
+  const opt = document.createElement('option');
+  if (boundActor) {
+    opt.value = boundActor.actorId;
+    opt.textContent = `${boundActor.displayName} (${boundActor.roles.join(', ')})`;
+  } else {
+    opt.value = '';
+    opt.textContent = 'No staff actor linked — ask an admin';
+  }
+  opt.selected = true;
+  dom.actorSelect.innerHTML = '';
+  dom.actorSelect.appendChild(opt);
+  dom.actorSelect.disabled = true;
+  dom.actorSelect.title = 'Actions are recorded under your own signed-in identity and cannot be changed here.';
 }
 
 // ─── Load Tasks ─────────────────────────────────────────────────────────────
@@ -550,12 +591,12 @@ function renderTasksList() {
     card.innerHTML = `
       <div class="task-card-header">
         <span class="task-card-title">${task.title}</span>
-        <span class="sla-badge ${task.slaStatus}">${getSlaLabel(task.slaStatus)}</span>
+        <span class="sla-badge ${task.slaStatus || 'within_sla'}">${getSlaLabel(task.slaStatus)}</span>
       </div>
       <div class="task-card-body">${task.description}</div>
       <div class="task-card-footer">
         <div class="task-meta-left">
-          <span class="priority-marker ${task.priority}">${getPriorityLabel(task.priority)}</span>
+          <span class="priority-marker ${task.priority || 'medium'}">${getPriorityLabel(task.priority)}</span>
           <span>·</span>
           <span>${assignedLabel}</span>
         </div>
@@ -584,13 +625,13 @@ function selectTask(task) {
   
   // Fill details
   dom.detailPriority.textContent = getPriorityLabel(task.priority);
-  dom.detailPriority.className = `priority-badge ${task.priority}`;
+  dom.detailPriority.className = `priority-badge ${task.priority || 'medium'}`;
   dom.detailTitle.textContent = task.title;
   dom.detailDescription.textContent = task.description;
   dom.detailTaskId.textContent = task.taskId;
   dom.detailRole.textContent = task.role;
   dom.detailSlaStatus.textContent = getSlaLabel(task.slaStatus);
-  dom.detailSlaStatus.className = `meta-value sla-badge ${task.slaStatus}`;
+  dom.detailSlaStatus.className = `meta-value sla-badge ${task.slaStatus || 'within_sla'}`;
   
   const due = task.dueAt ? new Date(task.dueAt).toLocaleString() : 'N/A';
   dom.detailDueAt.textContent = due;
@@ -1485,8 +1526,12 @@ async function logout() {
   apiState.connected = false;
   localStorage.removeItem('loanos_api_key');
   dom.apiKeyInput.value = '';
+  dom.actorSelect.disabled = false;
+  dom.actorSelect.title = '';
+  dom.actorSelect.innerHTML = '<option value="">— Sign In First —</option>';
   closeDetails();
   updateConnectionStatus(false);
+  updateAdminButtonVisibility();
   showLogin();
 }
 
@@ -1501,6 +1546,10 @@ function setAdminTab(tabName) {
 }
 
 async function openAdminConsole() {
+  if (!canOpenTenantAdmin()) {
+    showToast('Your account does not have an administration role.', 'warning');
+    return;
+  }
   dom.dialogAdmin.showModal();
   if (apiState.authScope === 'platform') {
     setAdminTab('platform');
@@ -1578,11 +1627,12 @@ function renderUserRow(user) {
       <div class="admin-row-header">
         <div>
           <div class="admin-row-title">${escapeHtml(user.displayName || user.email)}</div>
-          <p>${escapeHtml(user.email)} · ${escapeHtml(user.staffActorId || 'no staff actor')}</p>
+          <p>${escapeHtml(user.email)} · ${escapeHtml(user.userId)}</p>
         </div>
         <span class="admin-pill">${escapeHtml(user.status)}</span>
       </div>
       <p>Admin roles: ${(user.adminRoles || []).map(escapeHtml).join(', ') || 'none'}</p>
+      <p>Staff roles: ${(user.roles || []).map(escapeHtml).join(', ') || 'none'}${(user.queues || []).length ? ` · queues: ${(user.queues || []).map(escapeHtml).join(', ')}` : ''}</p>
       <div class="op-buttons">
         <button class="btn btn-secondary btn-sm" data-user-status="${escapeHtml(user.userId)}" data-status="${nextStatus}">
           Mark ${nextStatus}
@@ -1764,6 +1814,13 @@ function escapeHtml(value) {
     .replaceAll("'", '&#039;');
 }
 
+function parseCommaList(value) {
+  return String(value ?? '')
+    .split(',')
+    .map(entry => entry.trim())
+    .filter(Boolean);
+}
+
 
 // ─── Event Handlers & Initializers ──────────────────────────────────────────
 
@@ -1795,8 +1852,9 @@ dom.adminUserForm.addEventListener('submit', async (event) => {
         email: document.getElementById('admin-user-email').value.trim(),
         displayName: document.getElementById('admin-user-name').value.trim(),
         password: document.getElementById('admin-user-password').value,
-        staffActorId: document.getElementById('admin-user-staff-actor').value.trim() || null,
-        adminRoles: [document.getElementById('admin-user-role').value]
+        adminRoles: [document.getElementById('admin-user-role').value],
+        roles: parseCommaList(document.getElementById('admin-user-staff-roles').value),
+        queues: parseCommaList(document.getElementById('admin-user-staff-queues').value)
       })
     });
     dom.adminUserForm.reset();

@@ -8,7 +8,7 @@
   <meta name="description" content="Manage compliance, credit underwriting, grievances, and loan actions in a secure, multi-tenant workspace.">
   
   <!-- Favicon -->
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%236366f1'/><text x='50' y='68' font-size='50' text-anchor='middle' fill='white' font-weight='bold'>L</text></svg>">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230a1018'/><text x='50' y='68' font-size='50' text-anchor='middle' fill='%23faf9f1' font-weight='bold'>L</text></svg>">
 
   <!-- Inter + JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -387,7 +387,6 @@
             <input id="admin-user-email" type="email" placeholder="user@example.in" required>
             <input id="admin-user-name" placeholder="Display name" required>
             <input id="admin-user-password" type="password" placeholder="Temporary password" required>
-            <input id="admin-user-staff-actor" placeholder="Staff actor ID, optional">
             <select id="admin-user-role">
               <option value="operator">Operator</option>
               <option value="tenant_admin">Tenant Admin</option>
@@ -395,6 +394,8 @@
               <option value="security_admin">Security Admin</option>
               <option value="auditor">Auditor</option>
             </select>
+            <input id="admin-user-staff-roles" placeholder="Staff roles, optional (e.g. credit_officer, workflow_admin)">
+            <input id="admin-user-staff-queues" placeholder="Queues, optional (e.g. credit_ops, *)">
             <button class="btn btn-primary" type="submit">Create User</button>
           </div>
         </form>
