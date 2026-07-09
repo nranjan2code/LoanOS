@@ -2191,20 +2191,64 @@ test("API enforces recovery-agent notice and same-day cash recovery posting", as
     amount: firstInstallment.totalDue,
     collectedAt: `${overdueDate}T11:00:00.000Z`,
     postedAt: `${addDays(overdueDate, 1)}T09:00:00.000Z`,
-    receiptRef: "cash_receipt_001"
+    receiptRef: "cash_receipt_001",
+    exceptionReason: "no_digital_access",
+    approvedBy: "collections-manager-1",
+    approvalRef: "cash_exception_approval_001"
   });
   assert.equal(latePosting.status, 422);
 
-  const cashRecovery = await postJson(`${base}/loan-accounts/${account.loanAccountId}/cash-recoveries`, {
+  const missingApprover = await postJson(`${base}/loan-accounts/${account.loanAccountId}/cash-recoveries`, {
     recoveryAgentId: "agent_001",
     amount: firstInstallment.totalDue,
     collectedAt: `${overdueDate}T11:00:00.000Z`,
     postedAt: `${overdueDate}T12:00:00.000Z`,
     receiptRef: "cash_receipt_002"
   });
+  assert.equal(missingApprover.status, 422);
+  assert.equal(missingApprover.body.error.code, "cash_recovery_access_blocked");
+  assert(missingApprover.body.findings.some((finding) => finding.path === "approvedBy"));
+
+  const missingExceptionReason = await postJson(`${base}/loan-accounts/${account.loanAccountId}/cash-recoveries`, {
+    recoveryAgentId: "agent_001",
+    amount: firstInstallment.totalDue,
+    collectedAt: `${overdueDate}T11:00:00.000Z`,
+    postedAt: `${overdueDate}T12:00:00.000Z`,
+    receiptRef: "cash_receipt_002",
+    approvedBy: "collections-manager-1",
+    approvalRef: "cash_exception_approval_001"
+  });
+  assert.equal(missingExceptionReason.status, 422);
+  assert.equal(missingExceptionReason.body.error.code, "cash_recovery_blocked");
+  assert(missingExceptionReason.body.findings.some((finding) => finding.path === "exceptionReason"));
+
+  const unregisteredApprover = await postJson(`${base}/loan-accounts/${account.loanAccountId}/cash-recoveries`, {
+    recoveryAgentId: "agent_001",
+    amount: firstInstallment.totalDue,
+    collectedAt: `${overdueDate}T11:00:00.000Z`,
+    postedAt: `${overdueDate}T12:00:00.000Z`,
+    receiptRef: "cash_receipt_002",
+    exceptionReason: "no_digital_access",
+    approvedBy: "agent_001",
+    approvalRef: "cash_exception_approval_001"
+  });
+  assert.equal(unregisteredApprover.status, 422);
+
+  const cashRecovery = await postJson(`${base}/loan-accounts/${account.loanAccountId}/cash-recoveries`, {
+    recoveryAgentId: "agent_001",
+    amount: firstInstallment.totalDue,
+    collectedAt: `${overdueDate}T11:00:00.000Z`,
+    postedAt: `${overdueDate}T12:00:00.000Z`,
+    receiptRef: "cash_receipt_002",
+    exceptionReason: "no_digital_access",
+    approvedBy: "collections-manager-1",
+    approvalRef: "cash_exception_approval_001"
+  });
   assert.equal(cashRecovery.status, 200);
   assert.equal(cashRecovery.body.paymentEvent.type, "cash_recovery_payment");
   assert.equal(cashRecovery.body.paymentEvent.receiptRef, "cash_receipt_002");
+  assert.equal(cashRecovery.body.paymentEvent.exceptionReason, "no_digital_access");
+  assert.equal(cashRecovery.body.paymentEvent.approvedBy, "collections-manager-1");
   assert(cashRecovery.body.paymentEvent.interestCredit > 0);
   assert(cashRecovery.body.paymentEvent.principalCredit > 0);
   assert(cashRecovery.body.summary.principalOutstanding < account.summary.principalOutstanding);

@@ -129,7 +129,7 @@ Done when:
 
 ## Epic 6: Collections, Recovery, and Delinquency
 
-Status: first executable slice complete; hardship restructure, settlement/write-off, and recovery-agent registry first slices complete.
+Status: first executable slice complete; hardship restructure, settlement/write-off, recovery-agent registry, and cash-recovery exception workflow first slices complete.
 
 Goal: manage overdue accounts without violating borrower protection and recovery rules.
 
@@ -139,7 +139,7 @@ Tasks:
 - Reminder and notice workflow. First slice done: `recordCollectionsReminder` (`packages/core/src/loan-account.js`) logs each borrower reminder/notice (channel, stage, delinquency state at the time) and enforces the RBI Fair Practices Code contact window — voice-channel (call/IVR) recovery contact outside 08:00–19:00 IST is blocked; asynchronous channels are unrestricted. `POST /loan-accounts/{id}/reminders` drives it and seals a `loan_account.reminder_sent` event into the audit spine.
 - Recovery-agent registry. Done: `packages/core/src/recovery-agent.js` empanels a recovery agent against an active regulated entity, requiring (for `active` status) due-diligence/police-verification evidence, a training-certification reference, a signed code-of-conduct acknowledgment, and an authorization-letter/ID-card reference. `POST/GET /recovery-agents`, `GET /recovery-agents/{id}` drive it; `assignRecoveryAgent` now blocks a recovery assignment unless `recoveryAgentId` names a registered, active agent.
 - Recovery-agent assignment notice before contact. Done.
-- Cash recovery exception workflow. Partial.
+- Cash recovery exception workflow. Done: cash is treated as an exception channel, not the default — `postCashRecoveryToLoanAccount` (`loan-account.js`) requires a coded `exceptionReason` (`CASH_RECOVERY_EXCEPTION_REASONS`; `other` requires a narrative) plus `approvedBy`/`approvalRef`, and the API additionally role-checks `approvedBy` against a registered, active `collections_manager` staff actor (`validateCashRecoveryApprovalAccess`) before the domain gate runs.
 - Same-day cash recovery posting. Done.
 - Hardship and restructure workflow. First slice done: `restructureLoanAccount` (`packages/core/src/loan-account.js`) modifies a stressed but active loan under maker-checker approval (four-eyes) — extending the remaining tenure and/or conceding the rate and re-amortizing the remaining principal over the new term (past installments untouched). The account is flagged `restructured`, which surfaces in `classifyLoanAsset` and the CIC snapshot. `POST /loan-accounts/{id}/restructure` drives it and seals the event into the audit spine.
 - Settlement and write-off approval. First slice done: `settleLoanAccount` closes an active loan for less than the full outstanding under maker-checker approval (four-eyes) — the borrower pays the agreed amount and the RE waives (sacrifices) the shortfall via principal/interest waiver ledger credits, closing the account as `settled`; `writeOffLoanAccount` marks an account `written_off` as a book loss while retaining the borrower's legal dues on the ledger. Both are reported to the CIC snapshot (`settled`/`closureType`, `writtenOff`/`writeOffAmount`). `POST /loan-accounts/{id}/settlement` and `POST /loan-accounts/{id}/write-off` drive them and seal events into the audit spine.

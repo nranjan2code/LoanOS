@@ -173,7 +173,7 @@ npm run dev:api
 | `POST /loan-accounts/:id/closure-certificate` | Issues a No-Objection closure certificate for a settled account (idempotent re-issue). |
 | `POST /loan-accounts/:id/payments` | Posts payment ledger event and returns updated balance summary. |
 | `POST /loan-accounts/:id/prepayments` | Posts a part-prepayment and re-amortizes the remaining schedule (`reduce_emi` or `reduce_tenure`). |
-| `POST /loan-accounts/:id/cash-recoveries` | Posts noticed-agent cash recovery with same-day reflection control. |
+| `POST /loan-accounts/:id/cash-recoveries` | Posts noticed-agent cash recovery with same-day reflection control, a coded exception reason, and a role-checked approver. |
 | `POST /loan-accounts/:id/waivers` | Posts approved charge waiver. |
 | `POST /loan-accounts/:id/reversals` | Posts approved reversal of a ledger event. |
 
@@ -244,7 +244,7 @@ npm run dev:api
 | CIC snapshots | Produces account and portfolio reporting snapshots from schedule, ledger, borrower, RE, product, and asset-classification state. |
 | Recovery-agent registry | An active recovery agent must reference an active regulated entity and carry due-diligence/police-verification, training-certification, code-of-conduct, and authorization-letter/ID-card evidence. |
 | Recovery-agent notice | Recovery assignment requires delinquent account, an empanelled active recovery agent, borrower notice timestamp, and delivery reference. |
-| Cash recovery posting | Cash recovery requires active noticed assignment and same-India-day posting to borrower account. |
+| Cash recovery posting | Cash recovery requires active noticed assignment, same-India-day posting to borrower account, a coded exception reason (cash is treated as an exception, not the default channel), and an approver checked against the active `collections_manager` staff-actor role. |
 | Consent | Requires data-processing evidence and notice version. |
 | KYC | Requires `verified` KYC state and risk category validation. |
 | Aadhaar | Blocks biometric, OTP, or PID persistence flags. |
@@ -309,6 +309,7 @@ Current tests prove:
 - The platform can export a tenant (reproducible portability pack) and offboard it with evidenced deletion; break-glass access is time-boxed, tenant-visible, and seals an audit event on every use; the sub-processor register is disclosed to every tenant.
 - Every sealed audit event carries a uniform actor/actorType/dataClass provenance envelope, attributed to the tenant or to platform staff under break-glass.
 - Recovery-agent empanelment requires training, authorization, and code-of-conduct evidence for an active agent (and blocks an unknown regulated entity); a recovery assignment is blocked unless it names a registered, active recovery agent.
+- Cash recovery is blocked without a coded exception reason and an approver holding the active `collections_manager` role; an unregistered approver is rejected before the domain gate runs.
 - API stores blocked compliance applications and supports lookup.
 - Regulated entity and product policy registries resolve an application.
 - Unsafe product penal-charge design is rejected.

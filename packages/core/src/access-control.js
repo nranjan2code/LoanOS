@@ -123,6 +123,10 @@ export function validateRecoveryAssignmentAccess(staffActors = {}, input) {
   return validateActorRole(staffActors, input?.assignedBy, STAFF_ROLES.COLLECTIONS_MANAGER, "assignedBy");
 }
 
+export function validateCashRecoveryApprovalAccess(staffActors = {}, input) {
+  return validateActorRole(staffActors, input?.approvedBy, STAFF_ROLES.COLLECTIONS_MANAGER, "approvedBy");
+}
+
 export function validateGrievanceOfficerAccess(staffActors = {}, actorId, path = "actor") {
   return validateActorRole(staffActors, actorId, STAFF_ROLES.GRIEVANCE_OFFICER, path);
 }

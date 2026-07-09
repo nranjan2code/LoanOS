@@ -162,6 +162,7 @@ Legend:
 | Recovery-agent empanelment | An active recovery agent must reference an active regulated entity and carry due-diligence/police-verification, training-certification, code-of-conduct, and authorization-letter/ID-card evidence. | Done |
 | Recovery-agent notice | Recovery assignment requires an empanelled active recovery agent, borrower notice timestamp, and delivery reference before active assignment. | Done |
 | Cash recovery same-day posting | Cash recovery requires active noticed recovery assignment and same-India-day account posting. | Done |
+| Cash recovery exception workflow | Cash recovery requires a coded exception reason (cash is an exception channel, not the default) plus an approver checked against the active `collections_manager` role, mirroring the actor/reason/approver/reference shape used for waivers and reversals. | Done |
 | Hardship restructure | Four-eyes tenure extension and/or rate concession, re-amortizing the remaining principal. | Done |
 | Settlement and write-off | Four-eyes below-par closure via waiver credits (settlement) or book-loss marking retaining ledger dues (write-off); both surface on the CIC snapshot. | Done |
 | SMA/NPA asset classification | Asset class maps DPD to standard, SMA-0, SMA-1, SMA-2, and NPA. | Done |

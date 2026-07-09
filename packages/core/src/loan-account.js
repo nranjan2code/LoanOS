@@ -527,6 +527,20 @@ export function postPaymentToLoanAccount(account, input, now = new Date()) {
   };
 }
 
+// Cash is an exception channel, not the default: RBI's Fair Practices Code
+// expects repayment through traceable (digital/cheque/NACH) channels, so a
+// cash collection must carry a coded justification plus a registered,
+// role-checked internal approver — the same actor/reason/approver/timestamp/
+// policy-reference shape used for waivers and reversals.
+export const CASH_RECOVERY_EXCEPTION_REASONS = {
+  no_digital_access: "Borrower or location lacks access to digital repayment",
+  digital_payment_failed: "A digital repayment attempt failed at the time of collection",
+  borrower_requested_cash: "Borrower requested cash settlement",
+  field_recovery_drive: "Scheduled field recovery/collection drive",
+  other: "Other (requires narrative)"
+};
+const CASH_RECOVERY_EXCEPTION_REASON_CODES = new Set(Object.keys(CASH_RECOVERY_EXCEPTION_REASONS));
+
 export function postCashRecoveryToLoanAccount(account, input, now = new Date()) {
   const findings = [];
   const collectedAt = input?.collectedAt ? new Date(input.collectedAt) : null;
@@ -562,6 +576,17 @@ export function postCashRecoveryToLoanAccount(account, input, now = new Date()) 
   }
   if (!delinquency || delinquency.daysPastDue <= 0) {
     findings.push(createFinding("error", "RBI-DL-2025", "Cash recovery is allowed only for delinquent loan accounts.", "collectedAt"));
+  }
+  if (!input?.exceptionReason || !CASH_RECOVERY_EXCEPTION_REASON_CODES.has(input.exceptionReason)) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Cash recovery requires a coded exceptionReason.", "exceptionReason"));
+  } else if (input.exceptionReason === "other" && !input?.exceptionNarrative) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Cash recovery exceptionReason 'other' requires exceptionNarrative.", "exceptionNarrative"));
+  }
+  if (!input?.approvedBy) {
+    findings.push(createFinding("error", "RBI-IT-GRC", "Cash recovery requires approvedBy.", "approvedBy"));
+  }
+  if (!input?.approvalRef) {
+    findings.push(createFinding("error", "RBI-IT-GRC", "Cash recovery requires approvalRef.", "approvalRef"));
   }
 
   const summary = summarizeFindings(findings);
@@ -600,7 +625,11 @@ export function postCashRecoveryToLoanAccount(account, input, now = new Date()) 
     postedAt: postedAt.toISOString(),
     receiptRef: input.receiptRef,
     recoveryAgentId: input.recoveryAgentId,
-    assignmentId: activeAssignment.assignmentId
+    assignmentId: activeAssignment.assignmentId,
+    exceptionReason: input.exceptionReason,
+    exceptionNarrative: input.exceptionNarrative ?? null,
+    approvedBy: input.approvedBy,
+    approvalRef: input.approvalRef
   };
   const updated = {
     ...paymentResult.loanAccount,

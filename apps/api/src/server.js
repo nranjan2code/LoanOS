@@ -94,6 +94,7 @@ import {
   upsertRegulatedEntity,
   upsertStaffActor,
   validateDisbursement,
+  validateCashRecoveryApprovalAccess,
   validateDecisionApprovalAccess,
   validateDecisionProposalAccess,
   validateDocumentPacketAccess,
@@ -2134,6 +2135,19 @@ async function route(req, res, dataDir, platformAdminKey) {
     const loanAccount = state.loanAccounts[loanAccountId];
     if (!loanAccount) {
       sendJson(res, 404, { error: { code: "not_found", message: "Loan account not found." } });
+      return;
+    }
+
+    const accessFindings = validateCashRecoveryApprovalAccess(state.staffActors, body);
+    const accessSummary = summarizeFindings(accessFindings);
+    if (accessSummary.status === "blocked") {
+      sendJson(res, 422, {
+        error: {
+          code: "cash_recovery_access_blocked",
+          message: "Cash recovery approval is blocked by actor role policy."
+        },
+        findings: accessFindings
+      });
       return;
     }
 
