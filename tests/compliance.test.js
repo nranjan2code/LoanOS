@@ -3842,6 +3842,42 @@ test("eligibility engine assesses affordability and product bounds", () => {
   assert.equal(refer.summary.status, "review");
 });
 
+test("eligibility engine blocks borrower with low credit score", () => {
+  const lowScoreApp = eligibilityApplication({
+    bureauReport: { score: 550, activeAccounts: 1, defaultAccounts: 0 }
+  });
+  const result = evaluateEligibility(lowScoreApp);
+  assert.equal(result.assessment.decision, ELIGIBILITY_DECISIONS.INELIGIBLE);
+  assert(result.findings.some(f => f.path === "bureauReport.score" && f.severity === "error"));
+});
+
+test("eligibility engine blocks borrower with credit defaults", () => {
+  const defaultApp = eligibilityApplication({
+    bureauReport: { score: 750, activeAccounts: 2, defaultAccounts: 1 }
+  });
+  const result = evaluateEligibility(defaultApp);
+  assert.equal(result.assessment.decision, ELIGIBILITY_DECISIONS.INELIGIBLE);
+  assert(result.findings.some(f => f.path === "bureauReport.defaultAccounts" && f.severity === "error"));
+});
+
+test("eligibility engine refers borrower with review credit score", () => {
+  const reviewApp = eligibilityApplication({
+    bureauReport: { score: 650, activeAccounts: 2, defaultAccounts: 0 }
+  });
+  const result = evaluateEligibility(reviewApp);
+  assert.equal(result.assessment.decision, ELIGIBILITY_DECISIONS.REFER);
+  assert(result.findings.some(f => f.path === "bureauReport.score" && f.severity === "warning"));
+});
+
+test("eligibility engine refers borrower with thin file", () => {
+  const thinFileApp = eligibilityApplication({
+    bureauReport: null
+  });
+  const result = evaluateEligibility(thinFileApp);
+  assert.equal(result.assessment.decision, ELIGIBILITY_DECISIONS.REFER);
+  assert(result.findings.some(f => f.path === "bureauReport" && f.severity === "warning"));
+});
+
 test("API assesses eligibility and blocks approval of an ineligible borrower", async (t) => {
   const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
   t.after(async () => {
@@ -5117,6 +5153,12 @@ function eligibilityApplication(overrides = {}) {
       occupation: "salaried",
       monthlyIncome: 75000
     },
+    bureauReport: {
+      score: 750,
+      activeAccounts: 2,
+      defaultAccounts: 0,
+      provider: "mock"
+    },
     product: {
       productCode: "PL_IN_DIGITAL",
       currency: "INR",
@@ -5140,7 +5182,8 @@ function eligibilityApplication(overrides = {}) {
     ...overrides,
     borrower: { ...base.borrower, ...(overrides.borrower ?? {}) },
     economicProfile: { ...base.economicProfile, ...(overrides.economicProfile ?? {}) },
-    product: { ...base.product, ...(overrides.product ?? {}) }
+    product: { ...base.product, ...(overrides.product ?? {}) },
+    bureauReport: overrides.bureauReport !== undefined ? overrides.bureauReport : base.bureauReport
   };
 }
 

@@ -116,7 +116,62 @@ export function evaluateEligibility(application, options = {}) {
     findings.push(createFinding("error", "RBI-DL-2025", "Borrower monthly income is below the product eligibility minimum.", "economicProfile.monthlyIncome"));
   }
 
+  // Credit Bureau (CIBIL equivalent) scoring.
+  const bureauReport = application.bureauReport;
+  if (bureauReport) {
+    if (Number.isFinite(bureauReport.defaultAccounts) && bureauReport.defaultAccounts > 0) {
+      findings.push(
+        createFinding(
+          "error",
+          "RBI-DL-2025",
+          `Borrower has active default accounts (${bureauReport.defaultAccounts}) on credit bureau.`,
+          "bureauReport.defaultAccounts"
+        )
+      );
+    }
+    if (Number.isFinite(bureauReport.score)) {
+      if (bureauReport.score < 600) {
+        findings.push(
+          createFinding(
+            "error",
+            "RBI-DL-2025",
+            `Borrower credit score (${bureauReport.score}) is below the minimum limit of 600.`,
+            "bureauReport.score"
+          )
+        );
+      } else if (bureauReport.score < 700) {
+        findings.push(
+          createFinding(
+            "warning",
+            "RBI-DL-2025",
+            `Borrower credit score (${bureauReport.score}) is within review band and requires manual underwriting.`,
+            "bureauReport.score"
+          )
+        );
+      }
+    } else {
+      findings.push(
+        createFinding(
+          "warning",
+          "RBI-DL-2025",
+          "Borrower credit report has no score (thin file); routing to manual underwriting.",
+          "bureauReport.score"
+        )
+      );
+    }
+  } else {
+    findings.push(
+      createFinding(
+        "warning",
+        "RBI-DL-2025",
+        "Borrower has no credit bureau history; routing to manual underwriting.",
+        "bureauReport"
+      )
+    );
+  }
+
   const estimatedEmi = estimateEmi(requestedAmount, annualInterestRateBps, requestedTenorMonths);
+
   let foir = null;
   if (Number.isFinite(monthlyIncome) && monthlyIncome > 0 && Number.isFinite(estimatedEmi)) {
     foir = roundRatio((existingMonthlyObligations + estimatedEmi) / monthlyIncome);

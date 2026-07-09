@@ -120,7 +120,8 @@ import {
   validateWorkflowAssignmentAccess,
   waiveLoanAccountCharge,
   validateMarketplaceNeutrality,
-  rankMarketplaceOffers
+  rankMarketplaceOffers,
+  ExternalServiceManager
 } from "../../../packages/core/src/index.js";
 import {
   AUDIT_ACTOR_TYPES,
@@ -1850,11 +1851,21 @@ async function route(req, res, dataDir, platformAdminKey) {
   if (method === "POST" && path === "/loans/applications") {
     const body = await readJson(req);
     const state = await store.load();
+    const borrower = state.borrowerProfiles?.[body.borrowerId];
+    const pan = borrower?.pan || "ABCDE1234F";
+    const manager = new ExternalServiceManager();
+    let bureauReport = null;
+    try {
+      bureauReport = await manager.queryCreditBureau(pan);
+    } catch (err) {
+      // Ignore
+    }
     const application = {
       ...body,
       applicationId: body.applicationId ?? createLoanId("app"),
       status: "application_received",
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      bureauReport
     };
     const borrowerResolution = resolveBorrowerApplicationReferences(application, {
       borrowerProfiles: state.borrowerProfiles,
@@ -1979,9 +1990,22 @@ async function route(req, res, dataDir, platformAdminKey) {
       sendJson(res, 404, { error: { code: "not_found", message: "Loan application not found." } });
       return;
     }
-    const eligibility = evaluateEligibility(application);
-    const stored = {
+    const borrower = state.borrowerProfiles?.[application.borrowerId];
+    const pan = borrower?.pan || "ABCDE1234F";
+    const manager = new ExternalServiceManager();
+    let bureauReport = null;
+    try {
+      bureauReport = await manager.queryCreditBureau(pan);
+    } catch (err) {
+      // Allow query failures to fall back to a null report (thin-file behavior)
+    }
+    const appWithBureau = {
       ...application,
+      bureauReport
+    };
+    const eligibility = evaluateEligibility(appWithBureau);
+    const stored = {
+      ...appWithBureau,
       eligibility: eligibility.assessment
     };
     const nextState = appendEvent(
