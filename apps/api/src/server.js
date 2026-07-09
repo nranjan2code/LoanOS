@@ -29,6 +29,7 @@ import {
   enrichFraudCase,
   enrichIncident,
   fulfillErasureRequest,
+  generateFraudCommitteePack,
   issueShowCauseNotice,
   redactBorrowerProfile,
   recordFraudResponse,
@@ -554,6 +555,20 @@ async function route(req, res, dataDir, platformAdminKey) {
     }
     const asOf = url.searchParams.get("asOf") ? new Date(url.searchParams.get("asOf")) : new Date();
     sendJson(res, 200, enrichFraudCase(fraudCase, asOf));
+    return;
+  }
+
+  const fraudCommitteePackMatch = path.match(/^\/fraud-cases\/([^/]+)\/committee-pack$/);
+  if (method === "GET" && fraudCommitteePackMatch) {
+    const state = await store.load();
+    const fraudCase = state.fraudCases[decodeURIComponent(fraudCommitteePackMatch[1])];
+    if (!fraudCase) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Fraud case not found." } });
+      return;
+    }
+    const asOf = url.searchParams.get("asOf") ? new Date(url.searchParams.get("asOf")) : new Date();
+    const result = generateFraudCommitteePack(fraudCase, {}, asOf);
+    sendJson(res, 200, result.committeePack);
     return;
   }
 

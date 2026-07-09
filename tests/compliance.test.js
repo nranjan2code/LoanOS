@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -16,6 +17,7 @@ import {
   assessErasureEligibility,
   createErasureRequest,
   createFraudCase,
+  generateFraudCommitteePack,
   createIncident,
   createModelRegistryState,
   evaluateKycStatus,
@@ -2988,6 +2990,47 @@ test("fraud classification is gated on natural justice and four-eyes approval", 
   assert.equal(classified.fraudCase.status, "classified_fraud");
 });
 
+test("fraud committee pack seals the case and states classification readiness", () => {
+  const created = createFraudCase(
+    {},
+    {
+      category: "misrepresentation",
+      summary: "Inflated turnover in the application",
+      subjectBorrowerId: "bor_001",
+      reportedBy: "fraud-analyst-1"
+    }
+  );
+
+  // Before any notice, the pack flags that classification is not yet permitted.
+  const early = generateFraudCommitteePack(created.fraudCase, {}, new Date("2026-06-01T00:00:00.000Z"));
+  assert.equal(early.summary.status, "ready");
+  assert.equal(early.committeePack.classificationPermitted, false);
+  assert.ok(early.committeePack.blockers.some((blocker) => blocker.includes("show-cause")));
+  assert.ok(early.committeePack.checksumSha256);
+
+  // Any edit to the sealed content changes the checksum (tamper-evident).
+  const tampered = { ...early.committeePack, case: { ...early.committeePack.case, summary: "edited" } };
+  const { checksumSha256, ...content } = tampered;
+  const recomputed = createHash("sha256").update(JSON.stringify(content)).digest("hex");
+  assert.notEqual(recomputed, checksumSha256);
+
+  // After notice + response, the pack reports classification is permitted.
+  const noticed = issueShowCauseNotice(created.fraudCase, {
+    actor: "fraud-analyst-1",
+    noticeReference: "SCN-2",
+    deliveryRef: "ack-2",
+    issuedAt: "2026-06-01T00:00:00.000Z"
+  });
+  const responded = recordFraudResponse(noticed.fraudCase, {
+    actor: "fraud-analyst-1",
+    summary: "Borrower disputes the figures"
+  });
+  const ready = generateFraudCommitteePack(responded.fraudCase, {}, new Date("2026-06-05T00:00:00.000Z"));
+  assert.equal(ready.committeePack.classificationPermitted, true);
+  assert.equal(ready.committeePack.blockers.length, 0);
+  assert.equal(ready.committeePack.naturalJustice.responded, true);
+});
+
 test("incident reporting clock breaches after the 6-hour CERT-In/RBI window", () => {
   const detectedAt = "2026-07-09T00:00:00.000Z";
   const created = createIncident(
@@ -3141,6 +3184,12 @@ test("API runs a fraud case through the natural-justice classification gate", as
   });
   assert.equal(created.status, 201);
   const fraudCaseId = created.body.fraudCase.fraudCaseId;
+
+  // A committee pack is available and reports classification not yet permitted.
+  const earlyPack = await (await apiFetch(`${base}/fraud-cases/${fraudCaseId}/committee-pack`)).json();
+  assert.equal(earlyPack.documentType, "fraud_committee_pack");
+  assert.equal(earlyPack.classificationPermitted, false);
+  assert.ok(earlyPack.checksumSha256);
 
   // Classifying as fraud without a show-cause notice is blocked.
   const premature = await postJson(`${base}/fraud-cases/${fraudCaseId}/classification`, {

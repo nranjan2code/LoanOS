@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { createFinding, summarizeFindings } from "./compliance-controls.js";
 import { createLoanId } from "./loan-policy.js";
 
@@ -234,6 +235,64 @@ export function enrichFraudCase(fraudCase, asOf = new Date()) {
     naturalJustice = { noticeIssued: false, classificationPermitted: false };
   }
   return { ...fraudCase, naturalJustice };
+}
+
+// A checksum-sealed pack assembling everything a fraud/approval committee needs
+// to decide a case: the allegations, the natural-justice trail (show-cause
+// notice + borrower representation), the event timeline, and an explicit verdict
+// on whether the case may lawfully be classified as fraud yet. The seal makes
+// the pack tamper-evident once tabled.
+export function generateFraudCommitteePack(fraudCase, input = {}, now = new Date()) {
+  if (!fraudCase) {
+    const findings = [createFinding("error", "RBI-FRM-2024", "Fraud case is required.", "fraudCaseId")];
+    return { committeePack: null, findings, summary: summarizeFindings(findings) };
+  }
+
+  const enriched = enrichFraudCase(fraudCase, now);
+  const naturalJustice = enriched.naturalJustice;
+  const blockers = [];
+  if (!naturalJustice.noticeIssued) {
+    blockers.push("No show-cause notice has been issued.");
+  } else if (!naturalJustice.classificationPermitted) {
+    blockers.push("Borrower has neither responded nor exhausted the notice period.");
+  }
+
+  const content = {
+    packId: input.packId ?? createLoanId("fcpack"),
+    documentType: "fraud_committee_pack",
+    fraudCaseId: fraudCase.fraudCaseId,
+    generatedAt: now.toISOString(),
+    generatedBy: input.actor ?? "system",
+    case: {
+      status: fraudCase.status,
+      category: fraudCase.category,
+      summary: fraudCase.summary,
+      description: fraudCase.description,
+      amountInvolved: fraudCase.amountInvolved,
+      subjectBorrowerId: fraudCase.subjectBorrowerId,
+      subjectLoanAccountId: fraudCase.subjectLoanAccountId,
+      reportedBy: fraudCase.reportedBy,
+      investigatedBy: fraudCase.investigatedBy
+    },
+    naturalJustice: {
+      showCauseNotice: fraudCase.showCauseNotice,
+      borrowerResponse: fraudCase.borrowerResponse,
+      responseDueBy: naturalJustice.responseDueBy ?? null,
+      responded: Boolean(fraudCase.borrowerResponse),
+      windowElapsed: naturalJustice.windowElapsed ?? false
+    },
+    classification: fraudCase.classification,
+    timeline: (fraudCase.events ?? []).map((event) => ({ type: event.type, at: event.at })),
+    // The committee sees at a glance whether an adverse finding is lawful now.
+    classificationPermitted: naturalJustice.classificationPermitted && blockers.length === 0,
+    blockers
+  };
+
+  const committeePack = {
+    ...content,
+    checksumSha256: createHash("sha256").update(JSON.stringify(content)).digest("hex")
+  };
+  return { committeePack, findings: [], summary: summarizeFindings([]) };
 }
 
 function normalizeFraudCase(input, existing = {}, now = new Date()) {

@@ -167,7 +167,7 @@ Tasks:
 - Grievance module and 30-day RBI CMS escalation clock. First slice done.
 - Fraud case module. First slice done: `packages/core/src/fraud-case.js` runs a tenant-scoped fraud case (`reported → under_investigation → show_cause_issued → classified_fraud/classified_not_fraud`). `POST/GET /fraud-cases`, `GET /fraud-cases/{id}`, and `POST /fraud-cases/{id}/(show-cause-notice|responses|classification)` drive it; every action seals into the audit spine.
 - Natural justice notice and response workflow. First slice done (fraud path): an adverse (fraud) classification is blocked until a show-cause notice has been issued (with delivery proof) and either the borrower has responded or the RBI FRM-2024 21-day response window has elapsed, and the classifying authority must be independent of the investigator (four-eyes).
-- Committee pack generator.
+- Committee pack generator. First slice done (fraud): `generateFraudCommitteePack` (`packages/core/src/fraud-case.js`) and `GET /fraud-cases/{id}/committee-pack` assemble a checksum-sealed, tamper-evident pack — case facts, the natural-justice trail (show-cause notice + borrower response), the event timeline, and an explicit `classificationPermitted` verdict with `blockers` — so a committee can see at a glance whether an adverse finding is lawful.
 - Audit export.
 - Tests for LWS approval, recovery queues, wrong-role assignment, and SLA metadata. First slice done.
 - Tests for grievance lifecycle and RBI CMS escalation. First slice done.
