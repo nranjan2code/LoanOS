@@ -31,6 +31,7 @@ npm run dev:api
 | `packages/core/src/grievance.js` | Complaint registry, grievance lifecycle, 30-day RBI Ombudsman clock, and RBI CMS escalation evidence. |
 | `packages/core/src/document-packet.js` | KFS, sanction letter, loan agreement summary, and privacy notice rendering, rendered borrower loan-statement document, plus delivery evidence controls. |
 | `packages/core/src/registries.js` | Regulated-entity, LSP, DLA, and product-policy registries, prepayment/foreclosure/reset validations, DLA CIMS export shape, plus application reference resolution. |
+| `packages/core/src/offer-marketplace.js` | Multi-lender offer marketplace: validates offer presentation neutrality, enforces ranking and partner disclosures, blocks dark patterns, and performs objective sorting. |
 | `packages/core/src/borrower-onboarding.js` | Borrower profile, consent ledger, KYC records (with RBI risk-based periodic-review refresh status), a PMLA beneficial-owner registry for legal-entity borrowers, borrower reference resolution, and in-place redaction for DPDP erasure. |
 | `packages/core/src/eligibility.js` | Policy-driven creditworthiness/affordability engine: EMI/FOIR computation, age-at-maturity, amount/tenor bounds, and eligible/refer/ineligible decision. |
 | `packages/core/src/data-sharing.js` | Third-party data-disclosure ledger: consent-gated `consent`-basis sharing, `legal_obligation`-basis sharing requiring a legal reference, both logged as DPDP record-of-processing entries. |
@@ -153,6 +154,8 @@ npm run dev:api
 | `POST /loans/applications/:id/document-packet` | Generates rendered KFS, sanction letter, agreement summary, and privacy notice documents. |
 | `POST /loans/applications/:id/document-packet/delivery` | Records document packet digital delivery evidence. |
 | `POST /loans/applications/:id/disbursement` | Records disbursement after fund-flow and KFS checks. |
+| `POST /loans/marketplace-offers` | Evaluates, validates, and ranks multi-lender marketplace offers, blocking dark patterns. |
+| `GET /loans/marketplace-offers/:id` | Reads a stored marketplace offer evaluation record. |
 | `GET /loan-accounts` | Lists loan accounts. |
 | `GET /loan-accounts/:id` | Reads a loan account with balance summary. |
 | `GET /loan-accounts/:id/schedule` | Reads repayment schedule. |

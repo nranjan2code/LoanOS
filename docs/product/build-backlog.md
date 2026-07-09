@@ -86,7 +86,7 @@ Tasks:
 - Manual review queue. Partial. Eligibility `refer` outcomes route to a manual underwriting LWS task, and that task's approval is gated on a manual underwriting override captured as decision evidence.
 - Maker-checker decision approval. Done.
 - AI model-use evidence on decision. Partial.
-- Offer generation.
+- Offer generation and neutrality. Done: validateMarketplaceNeutrality and rankMarketplaceOffers implement multi-lender offer marketplace checks, dark-pattern prevention, partner completeness, and objective sorting.
 - KFS generation from product policy. Done.
 - Document packet model: KFS, sanction letter, agreement summary, privacy policy. First execution packet slice done.
 - Rendered LMS statement document packet. First slice done: the period statement renders as a checksum-sealed HTML/text borrower document.

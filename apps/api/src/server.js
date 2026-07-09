@@ -109,7 +109,9 @@ import {
   validateRecoveryAssignmentAccess,
   validateWorkflowActorAccess,
   validateWorkflowAssignmentAccess,
-  waiveLoanAccountCharge
+  waiveLoanAccountCharge,
+  validateMarketplaceNeutrality,
+  rankMarketplaceOffers
 } from "../../../packages/core/src/index.js";
 import {
   AUDIT_ACTOR_TYPES,
@@ -1598,6 +1600,62 @@ async function route(req, res, dataDir, platformAdminKey) {
     );
     await store.save(nextState);
     sendJson(res, combined.summary.status === "blocked" ? 422 : 201, stored);
+    return;
+  }
+
+  if (method === "POST" && path === "/loans/marketplace-offers") {
+    const body = await readJson(req);
+    const state = await store.load();
+
+    const activePartnerLenderIds = Object.values(state.lendingServiceProviders ?? {})
+      .filter((lsp) => lsp.lspId === body.lspId && lsp.status === "active")
+      .map((lsp) => lsp.regulatedEntityId);
+
+    const validation = validateMarketplaceNeutrality(body, activePartnerLenderIds);
+    const offers = rankMarketplaceOffers(body.offers ?? [], body.rankingCriteria ?? "lowest_apr");
+
+    const record = {
+      marketplaceOfferId: body.marketplaceOfferId ?? createLoanId("mko"),
+      lspId: body.lspId,
+      dlaId: body.dlaId,
+      offers,
+      rankingCriteria: body.rankingCriteria,
+      disclosureRef: body.disclosureRef,
+      partnerLendersDisclosureRef: body.partnerLendersDisclosureRef,
+      darkPatternCheck: body.darkPatternCheck,
+      compliance: validation,
+      createdAt: new Date().toISOString()
+    };
+
+    const nextState = appendEvent(
+      {
+        ...state,
+        marketplaceOffers: {
+          ...(state.marketplaceOffers ?? {}),
+          [record.marketplaceOfferId]: record
+        }
+      },
+      {
+        type: "marketplace.offers.evaluated",
+        marketplaceOfferId: record.marketplaceOfferId,
+        status: validation.summary.status
+      }
+    );
+
+    await store.save(nextState);
+    sendJson(res, validation.summary.status === "blocked" ? 422 : 201, record);
+    return;
+  }
+
+  const marketplaceOffersMatch = path.match(/^\/loans\/marketplace-offers\/([^/]+)$/);
+  if (method === "GET" && marketplaceOffersMatch) {
+    const state = await store.load();
+    const record = state.marketplaceOffers?.[marketplaceOffersMatch[1]];
+    if (!record) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Marketplace offers not found." } });
+      return;
+    }
+    sendJson(res, 200, record);
     return;
   }
 

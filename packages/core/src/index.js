@@ -235,3 +235,8 @@ export {
   releaseWorkflowTask,
   startWorkflowTask
 } from "./workflow-tasks.js";
+
+export {
+  validateMarketplaceNeutrality,
+  rankMarketplaceOffers
+} from "./offer-marketplace.js";

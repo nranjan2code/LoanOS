@@ -45,6 +45,7 @@ export function createEmptyTenantData() {
     workflowTasks: normalizeWorkflowTaskStore(),
     modelRegistry: createModelRegistryState(),
     aiHandoffRequests: {},
+    marketplaceOffers: {},
     events: []
   };
 }
@@ -71,6 +72,7 @@ function normalizeTenantData(data) {
     workflowTasks: normalizeWorkflowTaskStore(data?.workflowTasks),
     modelRegistry: normalizeModelRegistryState(data?.modelRegistry),
     aiHandoffRequests: data?.aiHandoffRequests ?? {},
+    marketplaceOffers: data?.marketplaceOffers ?? {},
     events: Array.isArray(data?.events) ? data.events : []
   };
 }

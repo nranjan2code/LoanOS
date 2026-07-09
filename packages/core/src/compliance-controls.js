@@ -192,6 +192,19 @@ export const REGULATORY_CONTROLS = [
     obligations: [
       "Payment-system data operated by payment system providers must be stored only in India."
     ]
+  },
+  {
+    id: "CCPA-DARK-PATTERNS",
+    regulator: "CCPA",
+    title: "Guidelines for Prevention and Regulation of Dark Patterns, 2023",
+    status: "final",
+    sourceUrl: "https://consumeraffairs.nic.in/sites/default/files/Dark_Patterns_Guidelines_2023.pdf",
+    obligations: [
+      "LSP/DLA multi-lender offer marketplaces must be neutral and unbiased.",
+      "Multi-lender loan comparisons must explicitly describe the criteria used for ranking and sorting offers.",
+      "Pre-selected lender options, pre-checked add-on services, deceptive urgency, and commercial bias are prohibited dark patterns.",
+      "All active partner lenders must be disclosed, and any unmatched partner must be transparently displayed."
+    ]
   }
 ];
 

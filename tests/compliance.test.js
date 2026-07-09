@@ -53,7 +53,9 @@ import {
   upsertRecoveryAgent,
   upsertRegulatedEntity,
   validateKfs,
-  validateKfsBeforeDecision
+  validateKfsBeforeDecision,
+  validateMarketplaceNeutrality,
+  rankMarketplaceOffers
 } from "../packages/core/src/index.js";
 import { createLoanOsServer } from "../apps/api/src/server.js";
 
@@ -5401,3 +5403,167 @@ async function generateAndDeliverDocumentPacket(base, applicationId) {
   assert.equal(delivered.status, 200);
   return delivered.body;
 }
+
+test("validateMarketplaceNeutrality detects dark patterns and ensures partner completeness", () => {
+  const activePartnerLenderIds = ["re_partner_1", "re_partner_2"];
+
+  // Valid, compliant request
+  const validRequest = {
+    lspId: "lsp_example",
+    dlaId: "dla_example",
+    rankingCriteria: "lowest_apr",
+    disclosureRef: "disclosure_v1",
+    partnerLendersDisclosureRef: "partners_v1",
+    darkPatternCheck: {
+      preSelectedLender: false,
+      preSelectedAddOns: false,
+      deceptiveUrgency: false,
+      commercialBias: false,
+      obfuscatedCost: false
+    },
+    offers: [
+      { regulatedEntityId: "re_partner_1", aprBps: 1200, status: "offered" },
+      { regulatedEntityId: "re_partner_2", status: "unmatched" }
+    ]
+  };
+
+  const check1 = validateMarketplaceNeutrality(validRequest, activePartnerLenderIds);
+  assert.equal(check1.summary.status, "ready");
+
+  // Rejects pre-selected lender (dark pattern)
+  const badRequest1 = {
+    ...validRequest,
+    darkPatternCheck: {
+      ...validRequest.darkPatternCheck,
+      preSelectedLender: true
+    }
+  };
+  const check2 = validateMarketplaceNeutrality(badRequest1, activePartnerLenderIds);
+  assert.equal(check2.summary.status, "blocked");
+  assert(check2.findings.some(f => f.path === "darkPatternCheck.preSelectedLender"));
+
+  // Rejects missing partner lender
+  const badRequest2 = {
+    ...validRequest,
+    offers: [
+      { regulatedEntityId: "re_partner_1", aprBps: 1200, status: "offered" }
+    ]
+  };
+  const check3 = validateMarketplaceNeutrality(badRequest2, activePartnerLenderIds);
+  assert.equal(check3.summary.status, "blocked");
+  assert(check3.findings.some(f => f.controlId === "CCPA-DARK-PATTERNS" && f.message.includes("must be represented")));
+
+  // Rejects missing disclosure
+  const badRequest3 = {
+    ...validRequest,
+    disclosureRef: null
+  };
+  const check4 = validateMarketplaceNeutrality(badRequest3, activePartnerLenderIds);
+  assert.equal(check4.summary.status, "blocked");
+  assert(check4.findings.some(f => f.path === "disclosureRef"));
+});
+
+test("rankMarketplaceOffers sorts offers neutrally based on objective criteria", () => {
+  const offers = [
+    { regulatedEntityId: "re_b", regulatedEntityName: "Lender B", aprBps: 1400, processingFee: 500, tenorMonths: 12 },
+    { regulatedEntityId: "re_a", regulatedEntityName: "Lender A", aprBps: 1200, processingFee: 1000, tenorMonths: 24 },
+    { regulatedEntityId: "re_c", regulatedEntityName: "Lender C", status: "unmatched" }
+  ];
+
+  // lowest_apr sorting: Lender A (1200), Lender B (1400), Lender C (unmatched stays at bottom)
+  const sortedApr = rankMarketplaceOffers(offers, "lowest_apr");
+  assert.equal(sortedApr[0].regulatedEntityId, "re_a");
+  assert.equal(sortedApr[1].regulatedEntityId, "re_b");
+  assert.equal(sortedApr[2].regulatedEntityId, "re_c");
+
+  // highest_tenor sorting: Lender A (24), Lender B (12), Lender C (unmatched stays at bottom)
+  const sortedTenor = rankMarketplaceOffers(offers, "highest_tenor");
+  assert.equal(sortedTenor[0].regulatedEntityId, "re_a");
+  assert.equal(sortedTenor[1].regulatedEntityId, "re_b");
+
+  // lowest_processing_fee sorting: Lender B (500), Lender A (1000)
+  const sortedFee = rankMarketplaceOffers(offers, "lowest_processing_fee");
+  assert.equal(sortedFee[0].regulatedEntityId, "re_b");
+  assert.equal(sortedFee[1].regulatedEntityId, "re_a");
+});
+
+test("API marketplace offers routes manage multi-lender offer evaluations and block dark patterns", async (t) => {
+  const dir = await mkdtemp(join(tmpdir(), "loanos-test-marketplace-"));
+  const server = createLoanOsServer({ dataDir: dir, bootstrapTenants: [TENANT_A] });
+  await listen(server);
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+
+  try {
+    // Register active Regulated Entity
+    const rePayload = {
+      ...validRegulatedEntity(),
+      regulatedEntityId: "re_test_lender"
+    };
+    const reRes = await postJson(`${base}/regulated-entities`, rePayload);
+    assert.equal(reRes.status, 201);
+
+    // Register active LSP partner
+    const lspPayload = validLendingServiceProvider({
+      lspId: "lsp_test_marketplace",
+      regulatedEntityId: "re_test_lender",
+      status: "active"
+    });
+    const lspRes = await postJson(`${base}/lending-service-providers`, lspPayload);
+    if (lspRes.status !== 201) {
+      console.log("DEBUG: POST /lending-service-providers failed with body:", JSON.stringify(lspRes.body, null, 2));
+    }
+    assert.equal(lspRes.status, 201);
+
+    // 1. Submit valid multi-lender offers
+    const evaluationRequest = {
+      lspId: "lsp_test_marketplace",
+      dlaId: "dla_test_mkt",
+      rankingCriteria: "lowest_apr",
+      disclosureRef: "ranking_disclosure_v1",
+      partnerLendersDisclosureRef: "partner_disclosure_v1",
+      darkPatternCheck: {
+        preSelectedLender: false,
+        preSelectedAddOns: false,
+        deceptiveUrgency: false,
+        commercialBias: false,
+        obfuscatedCost: false
+      },
+      offers: [
+        { regulatedEntityId: "re_test_lender", regulatedEntityName: "Test Lender", aprBps: 1100, status: "offered" }
+      ]
+    };
+
+    const res = await postJson(`${base}/loans/marketplace-offers`, evaluationRequest);
+    if (res.status !== 201) {
+      console.log("DEBUG: POST /loans/marketplace-offers failed with body:", JSON.stringify(res.body, null, 2));
+    }
+    assert.equal(res.status, 201);
+    assert.equal(res.body.compliance.summary.status, "ready");
+    assert.ok(res.body.marketplaceOfferId);
+
+    // Retrieve by ID
+    const getRes = await apiFetch(`${base}/loans/marketplace-offers/${res.body.marketplaceOfferId}`);
+    assert.equal(getRes.status, 200);
+    const getBody = await getRes.json();
+    assert.equal(getBody.lspId, "lsp_test_marketplace");
+
+    // 2. Submit invalid offers with pre-selected lender (dark pattern)
+    const badRequest = {
+      ...evaluationRequest,
+      darkPatternCheck: {
+        ...evaluationRequest.darkPatternCheck,
+        preSelectedLender: true
+      }
+    };
+    const badRes = await postJson(`${base}/loans/marketplace-offers`, badRequest);
+    assert.equal(badRes.status, 422);
+    assert.equal(badRes.body.compliance.summary.status, "blocked");
+    assert(badRes.body.compliance.findings.some(f => f.path === "darkPatternCheck.preSelectedLender"));
+
+  } finally {
+    await close(server);
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
