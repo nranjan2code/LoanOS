@@ -903,7 +903,7 @@ export function upsertProductPolicy(registry, input, regulatedEntities = {}, now
   };
 }
 
-export function resolveLoanApplicationReferences(application, registries = {}) {
+export function resolveLoanApplicationReferences(application, registries = {}, now = new Date()) {
   const findings = [];
   let resolved = { ...application };
 
@@ -936,27 +936,33 @@ export function resolveLoanApplicationReferences(application, registries = {}) {
   }
 
   if (application.productId || application.productCode) {
-    const product = findProductPolicy(application, registries.productPolicies ?? {}, resolved.regulatedEntityId);
-    if (!product) {
+    const baseProduct = findProductPolicy(application, registries.productPolicies ?? {}, resolved.regulatedEntityId);
+    if (!baseProduct) {
       findings.push(
         createFinding("error", "RBI-DL-2025", "Application productId/productCode does not match an active product policy.", "productId")
       );
-    } else if (product.status !== ACTIVE_STATUS) {
-      findings.push(createFinding("error", "RBI-DL-2025", "Referenced product policy is not active.", "productId"));
     } else {
-      resolved = {
-        ...resolved,
-        productId: product.productId,
-        product: {
-          ...product,
-          requestedAmount: application.product?.requestedAmount ?? application.requestedAmount,
-          requestedTenorMonths: application.product?.requestedTenorMonths ?? application.requestedTenorMonths
-        },
-        repayment: {
-          ...(application.repayment ?? {}),
-          recoveryMechanism: application.repayment?.recoveryMechanism ?? product.recoveryMechanism
-        }
-      };
+      const asOf = application.appliedAt ?? application.createdAt ?? now;
+      const product = selectProductPolicyVersion(baseProduct, asOf);
+      if (!product) {
+        findings.push(createFinding("error", "RBI-DL-2025", "No effective version of product policy was found for this date.", "productId"));
+      } else if (product.status !== ACTIVE_STATUS) {
+        findings.push(createFinding("error", "RBI-DL-2025", "Referenced product policy version is not active.", "productId"));
+      } else {
+        resolved = {
+          ...resolved,
+          productId: baseProduct.productId,
+          product: {
+            ...product,
+            requestedAmount: application.product?.requestedAmount ?? application.requestedAmount,
+            requestedTenorMonths: application.product?.requestedTenorMonths ?? application.requestedTenorMonths
+          },
+          repayment: {
+            ...(application.repayment ?? {}),
+            recoveryMechanism: application.repayment?.recoveryMechanism ?? product.recoveryMechanism
+          }
+        };
+      }
     }
   }
 

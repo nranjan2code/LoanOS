@@ -7311,3 +7311,117 @@ test("API serves tenant sandbox environments and enforces synthetic bounds", asy
   });
   assert.equal(deadHeaderRes.status, 404);
 });
+
+test("API resolves product policy version effective on the application date", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-policy-version-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const base = `http://127.0.0.1:${server.address().port}`;
+
+  // Seed operational actors, regulated entity, and model registry
+  await seedOperationalActors(base);
+  await postJson(`${base}/regulated-entities`, validRegulatedEntity());
+
+  // 1. Create version 1 of product policy (1200 bps, effective 2026-01-01)
+  const productV1 = {
+    ...validProductPolicy(),
+    productId: "prod_versioned",
+    productCode: "VERSIONED_PL",
+    version: 1,
+    effectiveFrom: "2026-01-01",
+    annualInterestRateBps: 1200,
+    aprBps: 1500
+  };
+  const v1Res = await postJson(`${base}/products`, productV1);
+  assert.equal(v1Res.status, 201);
+  assert.equal(v1Res.body.product.version, 1);
+
+  // 2. Create version 2 of product policy (1800 bps, effective 2026-06-01)
+  const productV2 = {
+    ...productV1,
+    version: 2,
+    effectiveFrom: "2026-06-01",
+    annualInterestRateBps: 1800,
+    aprBps: 2100
+  };
+  const v2Res = await postJson(`${base}/products`, productV2);
+  assert.equal(v2Res.status, 201);
+  assert.equal(v2Res.body.product.version, 2);
+
+  // 3. Verify GET /products list API filtering with ?asOf
+  // No asOf parameter: returns version 2 by default
+  const defaultList = await apiFetch(`${base}/products`);
+  const defaultListBody = await defaultList.json();
+  const foundDefault = defaultListBody.products.find(p => p.productId === "prod_versioned");
+  assert.equal(foundDefault.version, 2);
+  assert.equal(foundDefault.annualInterestRateBps, 1800);
+
+  // Query as of 2026-03-01: should return version 1
+  const v1List = await apiFetch(`${base}/products?asOf=2026-03-01`);
+  const v1ListBody = await v1List.json();
+  const foundV1 = v1ListBody.products.find(p => p.productId === "prod_versioned");
+  assert.equal(foundV1.version, 1);
+  assert.equal(foundV1.annualInterestRateBps, 1200);
+
+  // Query as of 2026-07-01: should return version 2
+  const v2List = await apiFetch(`${base}/products?asOf=2026-07-01`);
+  const v2ListBody = await v2List.json();
+  const foundV2 = v2ListBody.products.find(p => p.productId === "prod_versioned");
+  assert.equal(foundV2.version, 2);
+  assert.equal(foundV2.annualInterestRateBps, 1800);
+
+  // 4. Create borrower and seed required preflight data (KYC, consent)
+  await postJson(`${base}/borrowers`, validBorrowerProfile());
+  await postJson(`${base}/borrowers/bor_001/consents`, validConsentRecord());
+  await postJson(`${base}/borrowers/bor_001/kyc-records`, validKycRecord());
+
+  // 5. Submit application app_v1 (appliedAt: 2026-03-15) -> matches version 1 (1200 bps)
+  const appV1Res = await postJson(`${base}/loans/applications`, {
+    applicationId: "app_v1",
+    borrowerId: "bor_001",
+    regulatedEntityId: "re_example_nbfc",
+    productId: "prod_versioned",
+    product: {
+      requestedAmount: 100000,
+      requestedTenorMonths: 12
+    },
+    dataResidency: {
+      primaryStorageCountry: "IN",
+      paymentDataStorageCountry: "IN",
+      processedOutsideIndia: false
+    },
+    appliedAt: "2026-03-15T00:00:00.000Z"
+  });
+  assert.equal(appV1Res.status, 201);
+  assert.equal(appV1Res.body.product.version, 1);
+  assert.equal(appV1Res.body.product.annualInterestRateBps, 1200);
+
+  // 6. Submit application app_v2 (appliedAt: 2026-07-15) -> matches version 2 (1800 bps)
+  const appV2Res = await postJson(`${base}/loans/applications`, {
+    applicationId: "app_v2",
+    borrowerId: "bor_001",
+    regulatedEntityId: "re_example_nbfc",
+    productId: "prod_versioned",
+    product: {
+      requestedAmount: 100000,
+      requestedTenorMonths: 12
+    },
+    dataResidency: {
+      primaryStorageCountry: "IN",
+      paymentDataStorageCountry: "IN",
+      processedOutsideIndia: false
+    },
+    appliedAt: "2026-07-15T00:00:00.000Z"
+  });
+  assert.equal(appV2Res.status, 201);
+  assert.equal(appV2Res.body.product.version, 2);
+  assert.equal(appV2Res.body.product.annualInterestRateBps, 1800);
+});

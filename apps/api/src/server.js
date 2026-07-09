@@ -1593,8 +1593,16 @@ async function route(req, res, dataDir, platformAdminKey) {
 
   if (method === "GET" && path === "/products") {
     const state = await store.load();
+    const asOfParam = url.searchParams.get("asOf");
+    let productsList = Object.values(state.productPolicies);
+    if (asOfParam) {
+      const asOfDate = new Date(asOfParam);
+      productsList = productsList
+        .map((p) => selectProductPolicyVersion(p, asOfDate))
+        .filter(Boolean);
+    }
     sendJson(res, 200, {
-      products: Object.values(state.productPolicies)
+      products: productsList
     });
     return;
   }
