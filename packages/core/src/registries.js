@@ -543,6 +543,30 @@ export function generateDlaCimsExport(digitalLendingApps = {}, regulatedEntities
   };
 }
 
+// Compute the annualised mandatory charge cost in basis points from a charges array.
+// Only charges with an explicit chargeFrequency of "once", "monthly", or "annual"
+// and a positive numeric amount are included — ad-hoc or contingent charges are excluded.
+// The result is added to annualInterestRateBps to derive the minimum permissible aprBps.
+function computeAnnualisedChargeBps(charges, principalHint = 100000) {
+  if (!Array.isArray(charges) || principalHint <= 0) return 0;
+  let annualSum = 0;
+  for (const c of charges) {
+    const amount = Number.isFinite(c.amount) ? c.amount : 0;
+    if (amount <= 0) continue;
+    const freq = c.chargeFrequency;
+    if (freq === "once") {
+      annualSum += amount; // paid once over life; conservative: treat as annual cost in year 1
+    } else if (freq === "monthly") {
+      annualSum += amount * 12;
+    } else if (freq === "annual") {
+      annualSum += amount;
+    }
+    // charges without a chargeFrequency are not included in the floor calculation
+  }
+  // Convert absolute INR annual sum to annualised bps relative to a reference principal
+  return Math.round((annualSum / principalHint) * 10000);
+}
+
 export function validateProductPolicy(product, regulatedEntities = {}) {
   const findings = [];
 
@@ -594,12 +618,47 @@ export function validateProductPolicy(product, regulatedEntities = {}) {
   if (!Number.isFinite(product?.aprBps) || product.aprBps < product.annualInterestRateBps) {
     findings.push(createFinding("error", "RBI-KFS-2024", "Product aprBps must be at least annualInterestRateBps.", "aprBps"));
   }
+
+  // Interest calculation method: must be declared and valid.
+  const interestCalcMethod = product?.interestCalcMethod;
+  if (interestCalcMethod !== undefined && interestCalcMethod !== null) {
+    if (!["reducing_balance", "flat"].includes(interestCalcMethod)) {
+      findings.push(createFinding("error", "RBI-KFS-2024", "interestCalcMethod must be 'reducing_balance' or 'flat'.", "interestCalcMethod"));
+    }
+    // Flat-rate products must disclose the flat-to-EIR equivalent so the full cost of credit is stated.
+    if (interestCalcMethod === "flat" && !Number.isFinite(product?.flatToEirBps)) {
+      findings.push(createFinding("error", "RBI-KFS-2024", "Flat-rate products must disclose flatToEirBps (effective interest rate equivalent).", "flatToEirBps"));
+    }
+  }
+
+  // APR mathematical floor: aprBps must cover annualInterestRateBps plus the annualised sum of
+  // all mandatory upfront charges that carry a known chargeFrequency.
+  if (Number.isFinite(product?.aprBps) && Number.isFinite(product?.annualInterestRateBps)) {
+    const annualisedChargeBps = computeAnnualisedChargeBps(product?.charges ?? []);
+    const aprFloor = product.annualInterestRateBps + annualisedChargeBps;
+    if (product.aprBps < aprFloor) {
+      findings.push(
+        createFinding(
+          "error",
+          "RBI-KFS-2024",
+          `Product aprBps (${product.aprBps}) is below the computed floor of annualInterestRateBps + annualised mandatory charges (${aprFloor}). APR must reflect the full cost of credit.`,
+          "aprBps"
+        )
+      );
+    }
+  }
+
+  // Mandatory pricing policy reference.
+  if (!product?.policyRefs?.pricingPolicyRef) {
+    findings.push(createFinding("error", "RBI-KFS-2024", "Product pricingPolicyRef is required.", "policyRefs.pricingPolicyRef"));
+  }
   if (!product?.recoveryMechanism) {
     findings.push(createFinding("error", "RBI-DL-2025", "Product recoveryMechanism is required.", "recoveryMechanism"));
   }
   if (!product?.policyRefs?.boardApprovalRef) {
     findings.push(createFinding("error", "RBI-DL-2025", "Product boardApprovalRef is required.", "policyRefs.boardApprovalRef"));
   }
+
   if (!Number.isFinite(product?.eligibility?.minAgeYears) || product.eligibility.minAgeYears < 18) {
     findings.push(createFinding("error", "RBI-DL-2025", "Product eligibility minAgeYears must be at least 18.", "eligibility.minAgeYears"));
   }
@@ -710,6 +769,8 @@ export function normalizeProductPolicy(input, now = new Date()) {
     maxTenorMonths: input.maxTenorMonths,
     annualInterestRateBps: input.annualInterestRateBps,
     aprBps: input.aprBps ?? input.annualInterestRateBps,
+    interestCalcMethod: input.interestCalcMethod ?? "reducing_balance",
+    flatToEirBps: Number.isFinite(input.flatToEirBps) ? input.flatToEirBps : null,
     repaymentFrequency: input.repaymentFrequency ?? "monthly",
     coolingOffDays: input.coolingOffDays ?? 1,
     recoveryMechanism: input.recoveryMechanism,

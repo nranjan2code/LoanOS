@@ -20,7 +20,7 @@ Legend:
 | Borrower economic profile | Age, occupation, income required in preflight. | Done |
 | Creditworthiness assessment before sanction | Eligibility engine computes EMI/FOIR affordability, age-at-maturity, and amount/tenor bounds; ineligible borrowers cannot be approved. | Done |
 | KFS before execution | KFS validation and acceptance gate. | Done |
-| Product policy before origination | Product registry validates active RE link, board approval, INR, amount/tenor bounds, APR, cooling-off, recovery mechanism, eligibility, and charges. | Done |
+| Product policy before origination | Product registry validates active RE link, board approval, INR, amount/tenor bounds, APR (must be ≥ annualInterestRateBps + annualised mandatory charge floor), cooling-off, recovery mechanism, eligibility, charges, and mandatory `pricingPolicyRef`. `interestCalcMethod` must be `reducing_balance` or `flat`; flat-rate products must additionally disclose `flatToEirBps` (flat-to-EIR equivalent). | Done |
 | Product policy versioning and effective dates | A higher `version` publishes a new policy version, archiving the superseded window; `selectProductPolicyVersion`/`?asOf=` resolve the version governing a given date. | Done |
 | Digitally delivered KFS/documents | KFS delivery evidence gates decision; execution document packet delivery gates disbursement. | Done |
 | Direct disbursement to borrower/end-beneficiary | LSP/pass-through disbursement blocked. | Done |

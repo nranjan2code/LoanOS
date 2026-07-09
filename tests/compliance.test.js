@@ -898,6 +898,78 @@ test("product policy rejects unsafe penal charge design", () => {
   assert(productResult.findings.some((finding) => finding.controlId === "RBI-FPC-PENAL"));
 });
 
+test("product policy rejects invalid interest method and APR inconsistency", () => {
+  const reResult = upsertRegulatedEntity({}, validRegulatedEntity());
+  const upsert = (patch) => upsertProductPolicy({}, merge(validProductPolicy(), patch), reResult.registry);
+
+  // Unknown interestCalcMethod must be rejected.
+  const badMethod = upsert({ interestCalcMethod: "simple" });
+  assert.equal(badMethod.summary.status, "blocked");
+  assert(badMethod.findings.some((f) => f.path === "interestCalcMethod"));
+
+  // Flat-rate product without flatToEirBps disclosure must be rejected.
+  const flatNoEir = upsert({ interestCalcMethod: "flat" });
+  assert.equal(flatNoEir.summary.status, "blocked");
+  assert(flatNoEir.findings.some((f) => f.path === "flatToEirBps"));
+
+  // Flat-rate product WITH flatToEirBps is accepted.
+  const flatWithEir = upsert({ interestCalcMethod: "flat", flatToEirBps: 3200 });
+  assert.equal(flatWithEir.summary.status, "ready");
+
+  // Reducing balance product without interestCalcMethod is fine (defaults).
+  const defaultMethod = upsert({});
+  assert.equal(defaultMethod.summary.status, "ready");
+
+  // Reducing balance product with explicit interestCalcMethod is fine.
+  const explicitReducing = upsert({ interestCalcMethod: "reducing_balance" });
+  assert.equal(explicitReducing.summary.status, "ready");
+
+  // APR below the computed floor: charge with chargeFrequency:"once" and amount:12000 on a
+  // ₹1,00,000 reference principal = 1200 bps annual floor. annualInterestRateBps=1800 + 1200 = 3000.
+  // aprBps=2100 < 3000 → blocked.
+  const aprBelowFloor = upsert({
+    charges: [
+      {
+        name: "Processing fee",
+        reason: "One-time mandatory fee",
+        amount: 12000,
+        type: "fixed",
+        chargeFrequency: "once"
+      }
+    ],
+    annualInterestRateBps: 1800,
+    aprBps: 2100
+  });
+  assert.equal(aprBelowFloor.summary.status, "blocked");
+  assert(aprBelowFloor.findings.some((f) => f.path === "aprBps" && f.controlId === "RBI-KFS-2024"));
+
+  // APR meets the floor: same charge but aprBps raised to cover it.
+  const aprMeetsFloor = upsert({
+    charges: [
+      {
+        name: "Processing fee",
+        reason: "One-time mandatory fee",
+        amount: 12000,
+        type: "fixed",
+        chargeFrequency: "once"
+      }
+    ],
+    annualInterestRateBps: 1800,
+    aprBps: 3000
+  });
+  assert.equal(aprMeetsFloor.summary.status, "ready");
+
+  // Missing pricingPolicyRef must be rejected.
+  const base = validProductPolicy();
+  const noPricingRef = upsertProductPolicy(
+    {},
+    { ...base, policyRefs: { boardApprovalRef: "board_v1", pricingPolicyRef: null, penalChargesPolicyRef: "pcp_v1" } },
+    reResult.registry
+  );
+  assert.equal(noPricingRef.summary.status, "blocked");
+  assert(noPricingRef.findings.some((f) => f.path === "policyRefs.pricingPolicyRef"));
+});
+
 test("product policy versioning retains prior versions and resolves by effective date", () => {
   const reResult = upsertRegulatedEntity({}, validRegulatedEntity());
 
