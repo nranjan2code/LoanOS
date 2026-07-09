@@ -1,5 +1,10 @@
 import { createFinding, summarizeFindings } from "./compliance-controls.js";
 import { createLoanId } from "./loan-policy.js";
+import {
+  redactBorrowerProfile,
+  redactBorrowerKycRecords,
+  redactBorrowerBeneficialOwners
+} from "./borrower-onboarding.js";
 
 // DPDP 2023 gives the data principal a right to erasure, but the fiduciary must
 // retain records it is legally required to keep. RBI KYC Master Direction and
@@ -239,4 +244,51 @@ function normalizeDate(value) {
   }
   const date = value instanceof Date ? value : new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
+}
+
+export function findExpiredRetentionBorrowers(state, now = new Date()) {
+  const expiredBorrowerIds = [];
+  const profiles = state.borrowerProfiles ?? {};
+  for (const [borrowerId, profile] of Object.entries(profiles)) {
+    if (profile.status === "erased") {
+      continue;
+    }
+    const eligibility = assessErasureEligibility(borrowerId, state, now);
+    if (eligibility.eligible) {
+      expiredBorrowerIds.push(borrowerId);
+    }
+  }
+  return expiredBorrowerIds;
+}
+
+export function executeAutoRetentionCleanup(state = {}, now = new Date()) {
+  const expiredIds = findExpiredRetentionBorrowers(state, now);
+  let borrowerProfiles = { ...state.borrowerProfiles };
+  let kycRecords = { ...state.kycRecords };
+  let beneficialOwners = { ...state.beneficialOwners };
+  const events = [];
+
+  for (const borrowerId of expiredIds) {
+    if (borrowerProfiles[borrowerId]) {
+      borrowerProfiles[borrowerId] = redactBorrowerProfile(borrowerProfiles[borrowerId], now);
+    }
+    kycRecords = redactBorrowerKycRecords(kycRecords, borrowerId, now);
+    beneficialOwners = redactBorrowerBeneficialOwners(beneficialOwners, borrowerId, now);
+
+    const event = {
+      eventId: createLoanId("erasureevt"),
+      type: "data_erasure.auto_cleanup_executed",
+      borrowerId,
+      at: now.toISOString()
+    };
+    events.push(event);
+  }
+
+  return {
+    borrowerProfiles,
+    kycRecords,
+    beneficialOwners,
+    cleanedBorrowerIds: expiredIds,
+    events
+  };
 }

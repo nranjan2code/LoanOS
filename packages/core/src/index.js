@@ -113,7 +113,9 @@ export {
   validateKycRecord,
   searchCkyc,
   downloadCkycRecord,
-  uploadCkycRecord
+  uploadCkycRecord,
+  redactBorrowerKycRecords,
+  redactBorrowerBeneficialOwners
 } from "./borrower-onboarding.js";
 
 export {
@@ -123,7 +125,9 @@ export {
   createErasureRequest,
   enrichErasureRequest,
   fulfillErasureRequest,
-  rejectErasureRequest
+  rejectErasureRequest,
+  findExpiredRetentionBorrowers,
+  executeAutoRetentionCleanup
 } from "./data-retention.js";
 
 export {

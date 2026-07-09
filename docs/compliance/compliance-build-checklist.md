@@ -93,10 +93,10 @@ Legend:
 | Notice and consent evidence | Consent timestamp and notice version required. | Done |
 | Consent revocation | Consent ledger with revocation workflow (revoked consent blocks borrower resolution). | Done |
 | Third-party disclosure record-of-processing | `data-sharing.js` logs every disclosure; consent-basis sharing requires an active `third_party_sharing` consent, legal-obligation-basis sharing requires a cited legal reference. | Done |
-| Data principal rights (erasure) | Right-to-erasure workflow (`data-retention.js`) gated on statutory retention (active loan or 5-year RBI/PMLA window); fulfilment redacts the borrower profile in place. | Done |
+| Data principal rights (erasure) | Right-to-erasure workflow (`data-retention.js`) gated on statutory retention (active loan or 5-year RBI/PMLA window); fulfilment/cleanup redacts the borrower profile, KYC records, and beneficial owners in place. | Done |
 | Data principal rights (access/correction) | `data-principal-rights.js` implements access requests (assemble a portable data pack: profile, consent ledger, KYC summary, loan accounts, disclosures) and correction requests (apply/reject a field change, applied corrections propagate to the borrower profile), both under a 30-day DPDP SLA clock with overdue detection and LWS task derivation. | Done |
 | Breach workflow | Incident tracking (`incident-notification.js`) with an independent 6-hour CERT-In/RBI reporting clock and overdue detection; DPBI-specific reporting evidence planned. | Partial |
-| Retention and deletion | Statutory-retention-gated erasure workflow implemented for borrower profiles; a general retention/deletion policy engine across all record types is planned. | Partial |
+| Retention and deletion | Statutory-retention-gated erasure workflow implemented for borrower profiles, KYC records, and beneficial owners; automated retention cleanup job redacts expired inactive borrowers. | Done |
 
 ## IT Governance, Cybersecurity, and Data Residency
 

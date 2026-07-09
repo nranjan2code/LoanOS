@@ -75,6 +75,7 @@ import {
   CTR_THRESHOLD_INR
 } from "../packages/core/src/index.js";
 import { createLoanOsServer } from "../apps/api/src/server.js";
+import { loadState, saveState } from "../apps/api/src/file-store.js";
 
 // Every data-plane request runs inside a tenant. Tests bootstrap a primary
 // tenant (A) and inject its api key by default; the isolation suite adds a
@@ -7549,4 +7550,194 @@ test("API supports eSign envelope storage, PDF generation, and document vault do
   const jsonBody = await jsonRes.json();
   assert.equal(jsonBody.documentId, testDoc.documentId);
   assert.ok(jsonBody.html);
+});
+
+test("API supports complete erasure fulfillment and automated data-retention cleanup", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-retention-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const base = `http://127.0.0.1:${server.address().port}`;
+
+  // --- 1. Test complete erasure fulfillment (redacting KYC and beneficial owners) ---
+  // Register a corporate borrower with beneficial owners and KYC
+  const borRes = await postJson(`${base}/borrowers`, {
+    borrowerId: "bor_corp_ret",
+    borrowerType: "company",
+    fullName: "Retention Corp Ltd",
+    legalName: "Retention Corp Ltd",
+    residencyCountry: "IN",
+    primaryAddressCountry: "IN",
+    primaryAddress: "Mumbai, India",
+    contact: { email: "corp@retention.in", mobile: "9876543210" },
+    economicProfile: { monthlyIncome: 500000 }
+  });
+  assert.equal(borRes.status, 201);
+
+  // Add beneficial owner
+  const boRes = await postJson(`${base}/borrowers/bor_corp_ret/beneficial-owners`, {
+    beneficialOwnerId: "bo_corp_ret_owner",
+    name: "Aditya Roy",
+    type: "ownership",
+    ownershipPercentage: 51,
+    identificationRef: "PAN_RET_001",
+    dateOfBirth: "1980-01-01"
+  });
+  assert.equal(boRes.status, 201);
+
+  // Add KYC record
+  const kycRes = await postJson(`${base}/borrowers/bor_corp_ret/kyc-records`, {
+    kycRecordId: "kyc_corp_ret",
+    status: "verified",
+    method: "v_cip",
+    riskCategory: "low",
+    verifiedAt: "2026-07-08T00:00:00.000Z",
+    expiresAt: "2027-07-08T00:00:00.000Z",
+    ckycRef: "ckyc_ret_001",
+    aadhaar: { biometricStored: false, otpStored: false, pidStored: false },
+    vCip: {
+      used: true,
+      storageCountry: "IN",
+      recordingRef: "recording_ret_001",
+      activityLogRef: "log_ret_001"
+    }
+  });
+  assert.equal(kycRes.status, 201);
+
+  // Create and fulfill erasure request
+  const reqRes = await postJson(`${base}/erasure-requests`, {
+    borrowerId: "bor_corp_ret",
+    requestedBy: "asha@example.in",
+    reason: "Requested erasure of corporate profile",
+    requestChannel: "email"
+  });
+  assert.equal(reqRes.status, 201);
+  const erasureRequestId = reqRes.body.erasureRequest.erasureRequestId;
+
+  const fulfillRes = await postJson(`${base}/erasure-requests/${erasureRequestId}/fulfillment`, {
+    actor: "compliance-officer-1",
+    confirmationRef: "conf_erasure_001"
+  });
+  assert.equal(fulfillRes.status, 200);
+
+  // Verify borrower profile is redacted
+  const profileGet = await apiFetch(`${base}/borrowers/bor_corp_ret`);
+  assert.equal(profileGet.status, 200);
+  const profile = await profileGet.json();
+  assert.equal(profile.status, "erased");
+  assert.equal(profile.fullName, null);
+  assert.equal(profile.contact.email, null);
+
+  // Verify KYC record is redacted
+  const fullState = (await loadState(dataDir)).tenants["tnt_test_a"];
+
+  const redactedKyc = fullState.kycRecords.kyc_corp_ret;
+  assert.equal(redactedKyc.status, "erased");
+  assert.equal(redactedKyc.ckycRef, null);
+  assert.equal(redactedKyc.aadhaar.otpStored, false);
+  assert.equal(redactedKyc.vCip.recordingRef, null);
+
+  // Verify Beneficial Owner is redacted
+  const redactedBo = fullState.beneficialOwners.bo_corp_ret_owner;
+  assert.equal(redactedBo.status, "erased");
+  assert.equal(redactedBo.name, null);
+  assert.equal(redactedBo.identificationRef, null);
+
+  // --- 2. Test automatic data-retention cleanup job ---
+  // We will create two borrowers:
+  // Borrower A (bor_ret_clean): will have a closed loan that is expired when run at 2032-01-01
+  const borARes = await postJson(`${base}/borrowers`, {
+    borrowerId: "bor_ret_clean",
+    borrowerType: "individual",
+    fullName: "Clean Me",
+    legalName: "Clean Me",
+    dateOfBirth: "1990-01-01",
+    residencyCountry: "IN",
+    primaryAddressCountry: "IN",
+    primaryAddress: "Delhi, India",
+    contact: { email: "clean@individual.in", mobile: "9876543211" },
+    economicProfile: { occupation: "salaried", monthlyIncome: 50000 }
+  });
+  assert.equal(borARes.status, 201);
+
+  // Register KYC for Borrower A
+  const kycARes = await postJson(`${base}/borrowers/bor_ret_clean/kyc-records`, {
+    kycRecordId: "kyc_ret_clean",
+    status: "verified",
+    method: "v_cip",
+    riskCategory: "low",
+    verifiedAt: "2026-07-08T00:00:00.000Z",
+    expiresAt: "2027-07-08T00:00:00.000Z",
+    ckycRef: "ckyc_clean_001"
+  });
+  assert.equal(kycARes.status, 201);
+
+  // Borrower B (bor_ret_active): has active loan relationship
+  const borBRes = await postJson(`${base}/borrowers`, {
+    borrowerId: "bor_ret_active",
+    borrowerType: "individual",
+    fullName: "Keep Me",
+    legalName: "Keep Me",
+    dateOfBirth: "1990-01-01",
+    residencyCountry: "IN",
+    primaryAddressCountry: "IN",
+    primaryAddress: "Bangalore, India",
+    contact: { email: "keep@individual.in", mobile: "9876543212" },
+    economicProfile: { occupation: "salaried", monthlyIncome: 60000 }
+  });
+  assert.equal(borBRes.status, 201);
+
+  // Seed loans directly into the tenant state
+  const dbState = await loadState(dataDir);
+  dbState.tenants["tnt_test_a"].loanAccounts["loan_closed_ret"] = {
+    loanAccountId: "loan_closed_ret",
+    borrowerId: "bor_ret_clean",
+    regulatedEntityId: "re_example_nbfc",
+    productId: "prod_retail_personal",
+    status: "closed",
+    closedAt: "2026-07-08T12:00:00.000Z",
+    openedAt: "2026-07-08T00:00:00.000Z",
+    currency: "INR"
+  };
+  dbState.tenants["tnt_test_a"].loanAccounts["loan_active_ret"] = {
+    loanAccountId: "loan_active_ret",
+    borrowerId: "bor_ret_active",
+    regulatedEntityId: "re_example_nbfc",
+    productId: "prod_retail_personal",
+    status: "active",
+    openedAt: "2026-07-08T00:00:00.000Z",
+    currency: "INR"
+  };
+  await saveState(dbState, dataDir);
+
+  // Trigger cleanup at current time (should clean nothing because 5 years retention has not passed)
+  const cleanupRes1 = await postJson(`${base}/data-retention/cleanup`);
+  assert.equal(cleanupRes1.status, 200);
+  assert.equal(cleanupRes1.body.cleanedBorrowerIds.length, 0);
+
+  // Trigger cleanup as of 2032-01-01 (should clean Borrower A)
+  const cleanupRes2 = await postJson(`${base}/data-retention/cleanup?asOf=2032-01-01T00:00:00.000Z`);
+  assert.equal(cleanupRes2.status, 200);
+  assert.deepEqual(cleanupRes2.body.cleanedBorrowerIds, ["bor_ret_clean"]);
+  assert.equal(cleanupRes2.body.eventCount, 1);
+
+  // Verify Borrower A is redacted
+  const profileAGet = await apiFetch(`${base}/borrowers/bor_ret_clean`);
+  assert.equal(profileAGet.status, 200);
+  const profileA = await profileAGet.json();
+  assert.equal(profileA.status, "erased");
+  assert.equal(profileA.fullName, null);
+
+  // Verify Borrower B is NOT redacted
+  const profileBGet = await apiFetch(`${base}/borrowers/bor_ret_active`);
+  assert.equal(profileBGet.status, 200);
+  const profileB = await profileBGet.json();
+  assert.equal(profileB.fullName, "Keep Me");
 });

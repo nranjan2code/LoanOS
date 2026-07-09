@@ -603,6 +603,55 @@ export function redactBorrowerProfile(profile, now = new Date()) {
   };
 }
 
+export function redactBorrowerKycRecords(kycRecords = {}, borrowerId, now = new Date()) {
+  const nextKyc = { ...kycRecords };
+  for (const [id, record] of Object.entries(nextKyc)) {
+    if (record.borrowerId === borrowerId) {
+      nextKyc[id] = {
+        kycRecordId: record.kycRecordId,
+        borrowerId: record.borrowerId,
+        status: "erased",
+        method: record.method,
+        riskCategory: record.riskCategory,
+        verifiedAt: record.verifiedAt,
+        expiresAt: record.expiresAt,
+        ckycRef: null,
+        aadhaar: { biometricStored: false, otpStored: false, pidStored: false },
+        vCip: record.vCip ? {
+          used: record.vCip.used,
+          storageCountry: record.vCip.storageCountry,
+          recordingRef: null,
+          activityLogRef: null
+        } : null,
+        updatedAt: now.toISOString(),
+        erasedAt: now.toISOString()
+      };
+    }
+  }
+  return nextKyc;
+}
+
+export function redactBorrowerBeneficialOwners(beneficialOwners = {}, borrowerId, now = new Date()) {
+  const nextBo = { ...beneficialOwners };
+  for (const [id, record] of Object.entries(nextBo)) {
+    if (record.borrowerId === borrowerId) {
+      nextBo[id] = {
+        beneficialOwnerId: record.beneficialOwnerId,
+        borrowerId: record.borrowerId,
+        status: "erased",
+        name: null,
+        type: record.type,
+        ownershipPercentage: record.ownershipPercentage,
+        identificationRef: null,
+        dateOfBirth: null,
+        updatedAt: now.toISOString(),
+        erasedAt: now.toISOString()
+      };
+    }
+  }
+  return nextBo;
+}
+
 export function listBorrowerConsents(consentRecords, borrowerId) {
   return Object.values(consentRecords ?? {}).filter((record) => record.borrowerId === borrowerId);
 }

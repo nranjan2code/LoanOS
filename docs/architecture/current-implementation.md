@@ -36,7 +36,7 @@ npm run dev:api
 | `packages/core/src/borrower-onboarding.js` | Borrower profile, consent ledger, KYC records (with RBI risk-based periodic-review refresh status), a PMLA beneficial-owner registry for legal-entity borrowers, borrower reference resolution, and in-place redaction for DPDP erasure. |
 | `packages/core/src/eligibility.js` | Policy-driven creditworthiness/affordability engine: EMI/FOIR computation, age-at-maturity, amount/tenor bounds, and eligible/refer/ineligible decision. |
 | `packages/core/src/data-sharing.js` | Third-party data-disclosure ledger: consent-gated `consent`-basis sharing, `legal_obligation`-basis sharing requiring a legal reference, both logged as DPDP record-of-processing entries. |
-| `packages/core/src/data-retention.js` | DPDP right-to-erasure workflow: `assessErasureEligibility` holds erasure while a statutory retention window (active loan, or a closed account inside the 5-year RBI/PMLA window) applies; fulfilment redacts the borrower profile in place. |
+| `packages/core/src/data-retention.js` | DPDP right-to-erasure workflow: `assessErasureEligibility` holds erasure while a statutory retention window (active loan, or a closed account inside the 5-year RBI/PMLA window) applies; fulfilment and automated data-retention cleanup redact the borrower profile, KYC records, and beneficial owners in place. |
 | `packages/core/src/fraud-case.js` | Fraud case module: natural-justice gate (show-cause notice + response or 21-day RBI FRM-2024 window) and four-eyes classification, plus a checksum-sealed committee pack generator. |
 | `packages/core/src/recovery-agent.js` | Recovery-agent empanelment registry: an active agent requires due-diligence/police-verification, training certification, code-of-conduct acknowledgment, and authorization-letter/ID-card evidence, referencing an active regulated entity. |
 | `packages/core/src/application-workflow.js` | LOS application state machine, KFS workflow, human review, decision proposal, manual underwriting override gate for referred applications, coded decline-reason taxonomy, maker-checker approval, disbursement transition. |
@@ -109,6 +109,7 @@ npm run dev:api
 | `GET /erasure-requests/:id` | Reads one erasure request with computed retention-eligibility status. |
 | `POST /erasure-requests/:id/fulfillment` | Fulfils an eligible erasure request, redacting the borrower profile in place. |
 | `POST /erasure-requests/:id/rejection` | Rejects an erasure request still held by statutory retention. |
+| `POST /data-retention/cleanup` | Runs automated DPDP data retention cleanup for expired borrowers. |
 | `GET /borrowers/:id/access-requests` | Lists a borrower's DPDP data-principal access requests with SLA status. |
 | `POST /borrowers/:id/access-requests` | Creates a DPDP access request for a borrower. |
 | `POST /borrowers/:id/access-requests/:reqId/fulfillment` | Fulfils an access request, assembling and returning the portable data pack. |

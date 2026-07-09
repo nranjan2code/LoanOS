@@ -39,6 +39,9 @@ import {
   generateFraudCommitteePack,
   issueShowCauseNotice,
   redactBorrowerProfile,
+  redactBorrowerKycRecords,
+  redactBorrowerBeneficialOwners,
+  executeAutoRetentionCleanup,
   recordFraudResponse,
   recordIncidentNotification,
   rejectErasureRequest,
@@ -1265,10 +1268,20 @@ async function route(req, res, dataDir, platformAdminKey) {
             [stored.borrowerId]: redactBorrowerProfile(state.borrowerProfiles[stored.borrowerId])
           }
         : state.borrowerProfiles;
+    const kycRecords =
+      action === "fulfillment"
+        ? redactBorrowerKycRecords(state.kycRecords, stored.borrowerId, now)
+        : state.kycRecords;
+    const beneficialOwners =
+      action === "fulfillment"
+        ? redactBorrowerBeneficialOwners(state.beneficialOwners, stored.borrowerId, now)
+        : state.beneficialOwners;
     const nextState = appendEvent(
       {
         ...state,
         borrowerProfiles,
+        kycRecords,
+        beneficialOwners,
         erasureRequests: { ...state.erasureRequests, [stored.erasureRequestId]: stored }
       },
       {
@@ -1280,6 +1293,31 @@ async function route(req, res, dataDir, platformAdminKey) {
     );
     await store.save(nextState);
     sendJson(res, 200, { erasureRequest: stored, event: result.event });
+    return;
+  }
+
+  if (method === "POST" && path === "/data-retention/cleanup") {
+    const state = await store.load();
+    const now = url.searchParams.get("asOf") ? new Date(url.searchParams.get("asOf")) : new Date();
+    const result = executeAutoRetentionCleanup(state, now);
+
+    const nextState = {
+      ...state,
+      borrowerProfiles: result.borrowerProfiles,
+      kycRecords: result.kycRecords,
+      beneficialOwners: result.beneficialOwners
+    };
+
+    let finalState = nextState;
+    for (const event of result.events) {
+      finalState = appendEvent(finalState, event);
+    }
+
+    await store.save(finalState);
+    sendJson(res, 200, {
+      cleanedBorrowerIds: result.cleanedBorrowerIds,
+      eventCount: result.events.length
+    });
     return;
   }
 
