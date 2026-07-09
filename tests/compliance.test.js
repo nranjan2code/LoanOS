@@ -5834,3 +5834,96 @@ test("API controls undisclosed charge caps and enforces computed ceilings", asyn
   assert.equal(chargeEvent.amount, 300);
 });
 
+test("CKYC Search, Download, and Upload flow", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-ckyc-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+
+  // 1. Seed RE and Borrower (in draft state)
+  await seedOperationalActors(base);
+  assert.equal((await postJson(`${base}/regulated-entities`, validRegulatedEntity())).status, 201);
+  
+  // Seed borrower profile with valid placeholder values in draft state
+  const draftBorrower = {
+    ...validBorrowerProfile(),
+    fullName: "Draft Placeholder Name",
+    dateOfBirth: "1990-01-01",
+    status: "draft"
+  };
+  assert.equal((await postJson(`${base}/borrowers`, draftBorrower)).status, 201);
+
+  // 2. Search CKYC by PAN (should find the pre-seeded record)
+  const searchRes = await postJson(`${base}/borrowers/bor_001/ckyc/search`, {
+    idType: "pan",
+    idNumber: "ABCDE1234F"
+  });
+  assert.equal(searchRes.status, 200);
+  assert.equal(searchRes.body.results.length, 1);
+  assert.equal(searchRes.body.results[0].ckycNumber, "99999999999999");
+  assert.equal(searchRes.body.results[0].fullName, "Aaditya Patel");
+
+  // 3. Download the record and sync it
+  const downloadRes = await postJson(`${base}/borrowers/bor_001/ckyc/download`, {
+    ckycNumber: "99999999999999"
+  });
+  assert.equal(downloadRes.status, 200);
+  assert.equal(downloadRes.body.status, "verified");
+  assert.equal(downloadRes.body.method, "ckyc");
+  assert.equal(downloadRes.body.ckycRef, "99999999999999");
+
+  // Verify borrower profile was updated
+  const borrowerRes = await apiFetch(`${base}/borrowers/bor_001`);
+  const bBody = await borrowerRes.json();
+  assert.equal(bBody.fullName, "Aaditya Patel");
+  assert.equal(bBody.dateOfBirth, "1990-01-01");
+  assert.equal(bBody.status, "active");
+
+  // 4. Upload a local verified KYC record to CKYC
+  // Seed a new borrower profile
+  const newBorrower = {
+    ...validBorrowerProfile(),
+    borrowerId: "bor_002",
+    fullName: "Karan Johar",
+    pan: "ABCDE1234F"
+  };
+  assert.equal((await postJson(`${base}/borrowers`, newBorrower)).status, 201);
+
+  // Create a verified local KYC record
+  const kycInput = {
+    borrowerId: "bor_002",
+    status: "verified",
+    riskCategory: "medium",
+    verifiedAt: new Date().toISOString(),
+    method: "manual"
+  };
+  const seedKyc = await postJson(`${base}/borrowers/bor_002/kyc-records`, kycInput);
+  assert.equal(seedKyc.status, 201);
+
+  // Upload to CKYC
+  const uploadRes = await postJson(`${base}/borrowers/bor_002/ckyc/upload`, {
+    kycRecordId: seedKyc.body.kycRecord.kycRecordId
+  });
+  assert.equal(uploadRes.status, 200);
+  assert.equal(uploadRes.body.success, true);
+  assert.ok(uploadRes.body.ckycNumber);
+  assert.equal(uploadRes.body.kycRecord.ckycRef, uploadRes.body.ckycNumber);
+
+  // Verify that we can search for the uploaded record in CKYC
+  const searchRes2 = await postJson(`${base}/borrowers/bor_002/ckyc/search`, {
+    idType: "pan",
+    idNumber: "IDbor_002"
+  });
+  assert.equal(searchRes2.status, 200);
+  assert(searchRes2.body.results.some(r => r.fullName === "Karan Johar"));
+});
+

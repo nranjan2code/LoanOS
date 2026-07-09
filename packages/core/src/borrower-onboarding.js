@@ -583,3 +583,126 @@ function latestTime(record) {
   return new Date(record.revokedAt ?? record.verifiedAt ?? record.acceptedAt ?? record.updatedAt ?? record.createdAt ?? 0).getTime();
 }
 
+// --- CKYC Adapter Boundary (Epic 3) -----------------------------------------
+
+/**
+ * Searches the mock CKYC registry database by ID type and number, or contact details.
+ * @param {Object} ckycRegistry - The global ckycRegistry object from the control plane.
+ * @param {Object} query - The search query containing idType and idNumber.
+ * @returns {Object} List of matched CKYC search records (with masked personal info).
+ */
+export function searchCkyc(ckycRegistry, query) {
+  const findings = [];
+  const results = [];
+
+  if (!query?.idType || !query?.idNumber) {
+    findings.push(createFinding("error", "RBI-KYC-2016", "idType and idNumber are required for CKYC search.", "query"));
+    return { results, findings, summary: summarizeFindings(findings) };
+  }
+
+  const normalizedIdType = String(query.idType).toLowerCase();
+  const normalizedIdNumber = String(query.idNumber).trim().toUpperCase();
+
+  const registry = ckycRegistry ?? {};
+  for (const record of Object.values(registry)) {
+    if (
+      record.idType?.toLowerCase() === normalizedIdType &&
+      record.idNumber?.trim().toUpperCase() === normalizedIdNumber
+    ) {
+      results.push({
+        ckycNumber: record.ckycNumber,
+        fullName: record.fullName,
+        dateOfBirth: record.dateOfBirth,
+        gender: record.gender,
+        idType: record.idType,
+        idNumber: record.idNumber
+      });
+    }
+  }
+
+  return {
+    results,
+    findings,
+    summary: summarizeFindings(findings)
+  };
+}
+
+/**
+ * Downloads a customer record from the CKYC registry using a CKYC number.
+ * @param {Object} ckycRegistry - The global ckycRegistry object from the control plane.
+ * @param {string} ckycNumber - The 14-digit CKYC registry number.
+ * @returns {Object} The matching CKYC download result.
+ */
+export function downloadCkycRecord(ckycRegistry, ckycNumber) {
+  const findings = [];
+
+  if (!ckycNumber || typeof ckycNumber !== "string" || ckycNumber.length !== 14 || !/^\d{14}$/.test(ckycNumber)) {
+    findings.push(createFinding("error", "RBI-KYC-2016", "ckycNumber must be a valid 14-digit numeric string.", "ckycNumber"));
+    return { record: null, findings, summary: summarizeFindings(findings) };
+  }
+
+  const record = ckycRegistry?.[ckycNumber];
+  if (!record) {
+    findings.push(createFinding("error", "RBI-KYC-2016", `ckycNumber '${ckycNumber}' not found in registry.`, "ckycNumber"));
+    return { record: null, findings, summary: summarizeFindings(findings) };
+  }
+
+  return {
+    record,
+    findings,
+    summary: summarizeFindings(findings)
+  };
+}
+
+/**
+ * Uploads a verified KYC record to CKYC, generating a new 14-digit CKYC number.
+ * @param {Object} ckycRegistry - The global ckycRegistry object (to mutate).
+ * @param {Object} borrower - The verified Borrower profile.
+ * @param {Object} kycRecord - The verified local KycRecord.
+ * @returns {Object} The result of upload including success status and generated ckycNumber.
+ */
+export function uploadCkycRecord(ckycRegistry, borrower, kycRecord, now = new Date()) {
+  const findings = [];
+
+  if (!borrower || !kycRecord) {
+    findings.push(createFinding("error", "RBI-KYC-2016", "borrower and kycRecord are required for CKYC upload.", "upload"));
+    return { success: false, findings, summary: summarizeFindings(findings) };
+  }
+
+  if (kycRecord.status !== VERIFIED_KYC_STATUS) {
+    findings.push(createFinding("error", "RBI-KYC-2016", "Only verified KYC records can be uploaded to CKYC.", "kycRecord.status"));
+    return { success: false, findings, summary: summarizeFindings(findings) };
+  }
+
+  // Generate a random 14-digit CKYC number that is unique
+  let ckycNumber;
+  do {
+    ckycNumber = "9" + Math.floor(1000000000000 + Math.random() * 9000000000000).toString();
+  } while (ckycRegistry?.[ckycNumber]);
+
+  const newCkycRecord = {
+    ckycNumber,
+    fullName: borrower.fullName || borrower.legalName,
+    dateOfBirth: borrower.dateOfBirth || null,
+    gender: borrower.gender || "U",
+    idType: kycRecord.method === "aadhaar" ? "aadhaar" : "pan",
+    idNumber: kycRecord.aadhaar?.maskedNumber || borrower.pan || "ID" + borrower.borrowerId,
+    contact: {
+      mobile: borrower.contact?.mobile || null,
+      email: borrower.contact?.email || null
+    },
+    address: borrower.primaryAddress || { country: "IN" },
+    uploadedAt: now.toISOString()
+  };
+
+  ckycRegistry[ckycNumber] = newCkycRecord;
+
+  return {
+    success: true,
+    ckycNumber,
+    record: newCkycRecord,
+    findings,
+    summary: summarizeFindings(findings)
+  };
+}
+

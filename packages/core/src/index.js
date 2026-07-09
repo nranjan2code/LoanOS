@@ -110,7 +110,10 @@ export {
   validateBeneficialOwner,
   validateBorrowerProfile,
   validateConsentRecord,
-  validateKycRecord
+  validateKycRecord,
+  searchCkyc,
+  downloadCkycRecord,
+  uploadCkycRecord
 } from "./borrower-onboarding.js";
 
 export {

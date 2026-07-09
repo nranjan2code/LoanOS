@@ -77,17 +77,26 @@ function normalizeTenantData(data) {
   };
 }
 
-export function createEmptyState() {
-  return {
-    version: STATE_VERSION,
-    controlPlane: {
-      tenants: {},
-      subProcessors: {},
-      breakGlassGrants: {}
+const MOCK_CKYC_PRESEED = {
+  "99999999999999": {
+    ckycNumber: "99999999999999",
+    fullName: "Aaditya Patel",
+    dateOfBirth: "1990-01-01",
+    gender: "M",
+    idType: "pan",
+    idNumber: "ABCDE1234F",
+    contact: {
+      mobile: "+91-9999999999",
+      email: "aaditya@example.in"
     },
-    tenants: {}
-  };
-}
+    address: {
+      line1: "123 Residency Road",
+      city: "Bengaluru",
+      state: "Karnataka",
+      country: "IN"
+    }
+  }
+};
 
 function normalizeState(state) {
   const tenants = {};
@@ -99,9 +108,23 @@ function normalizeState(state) {
     controlPlane: {
       tenants: state?.controlPlane?.tenants ?? {},
       subProcessors: state?.controlPlane?.subProcessors ?? {},
-      breakGlassGrants: state?.controlPlane?.breakGlassGrants ?? {}
+      breakGlassGrants: state?.controlPlane?.breakGlassGrants ?? {},
+      ckycRegistry: state?.controlPlane?.ckycRegistry ?? { ...MOCK_CKYC_PRESEED }
     },
     tenants
+  };
+}
+
+export function createEmptyState() {
+  return {
+    version: STATE_VERSION,
+    controlPlane: {
+      tenants: {},
+      subProcessors: {},
+      breakGlassGrants: {},
+      ckycRegistry: { ...MOCK_CKYC_PRESEED }
+    },
+    tenants: {}
   };
 }
 

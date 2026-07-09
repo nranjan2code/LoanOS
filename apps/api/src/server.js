@@ -97,6 +97,9 @@ import {
   upsertRegulatedEntity,
   upsertStaffActor,
   validateDisbursement,
+  searchCkyc,
+  downloadCkycRecord,
+  uploadCkycRecord,
   validateCashRecoveryApprovalAccess,
   validateDecisionApprovalAccess,
   validateDecisionProposalAccess,
@@ -1553,6 +1556,141 @@ async function route(req, res, dataDir, platformAdminKey) {
             );
       await store.save(nextState);
       sendJson(res, result.summary.status === "blocked" ? 422 : 201, result);
+      return;
+    }
+  }
+
+  const ckycSearchMatch = path.match(/^\/borrowers\/([^/]+)\/ckyc\/search$/);
+  if (ckycSearchMatch) {
+    const borrowerId = decodeURIComponent(ckycSearchMatch[1]);
+    const state = await store.load();
+    if (!state.borrowerProfiles[borrowerId]) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Borrower not found." } });
+      return;
+    }
+
+    if (method === "POST") {
+      const body = await readJson(req);
+      const result = searchCkyc(scopedWholeState.controlPlane.ckycRegistry, body);
+      sendJson(res, result.summary.status === "blocked" ? 422 : 200, result);
+      return;
+    }
+  }
+
+  const ckycDownloadMatch = path.match(/^\/borrowers\/([^/]+)\/ckyc\/download$/);
+  if (ckycDownloadMatch) {
+    const borrowerId = decodeURIComponent(ckycDownloadMatch[1]);
+    const state = await store.load();
+    const borrower = state.borrowerProfiles[borrowerId];
+    if (!borrower) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Borrower not found." } });
+      return;
+    }
+
+    if (method === "POST") {
+      const body = await readJson(req);
+      const result = downloadCkycRecord(scopedWholeState.controlPlane.ckycRegistry, body.ckycNumber);
+      if (result.summary.status === "blocked") {
+        sendJson(res, 422, result);
+        return;
+      }
+
+      const record = result.record;
+      const syncProfileResult = upsertBorrowerProfile(state.borrowerProfiles, {
+        ...borrower,
+        fullName: record.fullName,
+        dateOfBirth: record.dateOfBirth,
+        primaryAddress: record.address,
+        contact: record.contact,
+        status: "active"
+      });
+
+      const syncKycResult = upsertKycRecord(
+        state.kycRecords,
+        {
+          borrowerId,
+          status: "verified",
+          method: "ckyc",
+          riskCategory: "low",
+          verifiedAt: new Date().toISOString(),
+          ckycRef: record.ckycNumber
+        },
+        syncProfileResult.registry
+      );
+
+      const nextState = appendEvent(
+        {
+          ...state,
+          borrowerProfiles: syncProfileResult.registry,
+          kycRecords: syncKycResult.registry
+        },
+        {
+          type: "borrower.kyc_synced_from_ckyc",
+          borrowerId,
+          ckycNumber: record.ckycNumber,
+          kycRecordId: syncKycResult.kycRecord.kycRecordId
+        }
+      );
+
+      await store.save(nextState);
+      sendJson(res, 200, syncKycResult.kycRecord);
+      return;
+    }
+  }
+
+  const ckycUploadMatch = path.match(/^\/borrowers\/([^/]+)\/ckyc\/upload$/);
+  if (ckycUploadMatch) {
+    const borrowerId = decodeURIComponent(ckycUploadMatch[1]);
+    const state = await store.load();
+    const borrower = state.borrowerProfiles[borrowerId];
+    if (!borrower) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Borrower not found." } });
+      return;
+    }
+
+    if (method === "POST") {
+      const body = await readJson(req);
+      const kycRecord = state.kycRecords[body.kycRecordId];
+      if (!kycRecord) {
+        sendJson(res, 404, { error: { code: "not_found", message: "KYC record not found." } });
+        return;
+      }
+      if (kycRecord.borrowerId !== borrowerId) {
+        sendJson(res, 422, { error: { code: "validation_failed", message: "KYC record does not belong to borrower." } });
+        return;
+      }
+
+      scopedWholeState.controlPlane.ckycRegistry = scopedWholeState.controlPlane.ckycRegistry ?? {};
+
+      const result = uploadCkycRecord(scopedWholeState.controlPlane.ckycRegistry, borrower, kycRecord);
+      if (result.summary.status === "blocked") {
+        sendJson(res, 422, result);
+        return;
+      }
+
+      const updatedKyc = {
+        ...kycRecord,
+        ckycRef: result.ckycNumber
+      };
+
+      const nextState = appendEvent(
+        {
+          ...state,
+          kycRecords: {
+            ...state.kycRecords,
+            [kycRecord.kycRecordId]: updatedKyc
+          }
+        },
+        {
+          type: "borrower.kyc_uploaded_to_ckyc",
+          borrowerId,
+          ckycNumber: result.ckycNumber,
+          kycRecordId: kycRecord.kycRecordId
+        }
+      );
+
+      await store.save(nextState);
+      sendJson(res, 200, { success: true, ckycNumber: result.ckycNumber, kycRecord: updatedKyc });
       return;
     }
   }
