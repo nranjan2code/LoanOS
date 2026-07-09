@@ -308,6 +308,7 @@ export function classifyLoanAsset(account, asOf = new Date()) {
     daysPastDue: delinquency.daysPastDue,
     delinquencyBucket: delinquency.bucket,
     isNpa: assetClass === "npa",
+    restructured: Boolean(account.restructured),
     basis: "days_past_due",
     npaThresholdDays: 90,
     delinquency
@@ -344,6 +345,8 @@ export function generateCicSnapshot(account, asOf = new Date()) {
     assetClass: classification.assetClass,
     delinquencyBucket: classification.delinquencyBucket,
     isNpa: classification.isNpa,
+    restructured: Boolean(account.restructured),
+    restructuredAt: (account.restructures ?? []).at(-1)?.restructuredAt ?? null,
     lastPaymentDate: lastPayment?.eventDate ?? null,
     lastPaymentAmount: lastPayment?.amount ?? null,
     totalPaid: summary.totalPaid,
@@ -940,6 +943,122 @@ export function prepayLoanAccount(account, input = {}, now = new Date()) {
   };
 
   return { loanAccount: updated, paymentEvent, prepayment, schedule, findings: [], summary: summarizeFindings([]) };
+}
+
+// A hardship restructure modifies the remaining terms of a stressed but active
+// loan — extending the tenure and/or conceding the rate to lower the EMI — under
+// maker-checker approval. Per RBI norms a restructure for financial difficulty
+// is a material event, so the account is flagged `restructured` and asset
+// classification / CIC reporting reflect it. Past installments are untouched;
+// the remaining principal is re-amortized over the new remaining term.
+export function restructureLoanAccount(account, input = {}, now = new Date()) {
+  const findings = [];
+  const effectiveAt = input.effectiveAt ? new Date(input.effectiveAt) : now;
+
+  if (!account) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Loan account is required.", "loanAccount"));
+  }
+  if (account && account.status !== ACTIVE_STATUS) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Only an active loan account can be restructured.", "status"));
+  }
+  if (!input.reason) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Restructure requires a hardship reason.", "reason"));
+  }
+  if (!input.proposedBy) {
+    findings.push(createFinding("error", "RBI-IT-GRC", "Restructure requires a proposing maker.", "proposedBy"));
+  }
+  if (!input.approvedBy) {
+    findings.push(createFinding("error", "RBI-IT-GRC", "Restructure requires an approving checker.", "approvedBy"));
+  }
+  if (!input.approvalReference) {
+    findings.push(createFinding("error", "RBI-IT-GRC", "Restructure requires an approvalReference.", "approvalReference"));
+  }
+  if (input.proposedBy && input.approvedBy && input.proposedBy === input.approvedBy) {
+    findings.push(
+      createFinding("error", "RBI-IT-GRC", "Restructure approver must differ from the proposer (four-eyes).", "approvedBy")
+    );
+  }
+  if (!Number.isFinite(input.newRemainingTermMonths) || input.newRemainingTermMonths < 1) {
+    findings.push(
+      createFinding("error", "RBI-DL-2025", "Restructure requires a positive newRemainingTermMonths.", "newRemainingTermMonths")
+    );
+  }
+
+  const summary = summarizeFindings(findings);
+  if (summary.status === "blocked") {
+    return { loanAccount: account, restructure: null, schedule: account?.schedule ?? [], findings, summary };
+  }
+
+  const balance = summarizeLoanAccount(account, effectiveAt);
+  const remainingPrincipal = balance.principalOutstanding;
+  if (remainingPrincipal <= 0) {
+    const blocked = [createFinding("error", "RBI-DL-2025", "A fully repaid loan cannot be restructured.", "status")];
+    return { loanAccount: account, restructure: null, schedule: account.schedule ?? [], findings: blocked, summary: summarizeFindings(blocked) };
+  }
+
+  const newRateBps = Number.isFinite(input.newAnnualInterestRateBps)
+    ? input.newAnnualInterestRateBps
+    : account.annualInterestRateBps ?? 0;
+  const effectiveTime = effectiveAt.getTime();
+  const pastInstallments = (account.schedule ?? []).filter((installment) => dueTime(installment.dueDate) <= effectiveTime);
+  const anchorDate =
+    pastInstallments.length > 0 ? new Date(`${pastInstallments.at(-1).dueDate}T00:00:00.000Z`) : effectiveAt;
+
+  const rebuilt = generateRepaymentSchedule({
+    principalAmount: remainingPrincipal,
+    annualInterestRateBps: newRateBps,
+    tenorMonths: input.newRemainingTermMonths,
+    startDate: anchorDate.toISOString()
+  });
+  if (rebuilt.summary.status === "blocked") {
+    return { loanAccount: account, restructure: null, schedule: account.schedule ?? [], findings: rebuilt.findings, summary: rebuilt.summary };
+  }
+  const rebuiltFuture = rebuilt.schedule.map((installment, index) => ({
+    ...installment,
+    installmentNumber: pastInstallments.length + index + 1
+  }));
+  const schedule = [...pastInstallments, ...rebuiltFuture];
+
+  const restructure = {
+    restructureId: input.restructureId ?? createLoanId("restructure"),
+    reason: input.reason,
+    hardshipCategory: input.hardshipCategory ?? null,
+    restructuredAt: effectiveAt.toISOString(),
+    priorTerms: {
+      annualInterestRateBps: account.annualInterestRateBps ?? null,
+      tenorMonths: account.tenorMonths ?? null,
+      remainingInstallments: (account.schedule ?? []).filter((i) => dueTime(i.dueDate) > effectiveTime).length
+    },
+    newTerms: {
+      annualInterestRateBps: newRateBps,
+      remainingInstallments: rebuiltFuture.length,
+      principalReamortized: remainingPrincipal,
+      firstNewDueDate: rebuiltFuture[0]?.dueDate ?? null
+    },
+    proposedBy: input.proposedBy,
+    approvedBy: input.approvedBy,
+    approvalReference: input.approvalReference
+  };
+  const updated = {
+    ...account,
+    schedule,
+    annualInterestRateBps: newRateBps,
+    tenorMonths: schedule.length,
+    restructured: true,
+    restructures: [...(account.restructures ?? []), restructure],
+    servicingEvents: [
+      ...(account.servicingEvents ?? []),
+      {
+        type: "loan_account.restructured",
+        restructureId: restructure.restructureId,
+        at: effectiveAt.toISOString(),
+        actor: restructure.approvedBy
+      }
+    ],
+    updatedAt: now.toISOString()
+  };
+
+  return { loanAccount: updated, restructure, schedule, findings: [], summary: summarizeFindings([]) };
 }
 
 export function assessChargeToLoanAccount(account, input, now = new Date()) {

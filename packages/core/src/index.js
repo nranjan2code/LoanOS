@@ -132,6 +132,7 @@ export {
   generateRepaymentSchedule,
   postCashRecoveryToLoanAccount,
   prepayLoanAccount,
+  restructureLoanAccount,
   quoteForeclosure,
   postPaymentToLoanAccount,
   reverseLoanAccountEvent,

@@ -129,7 +129,7 @@ Done when:
 
 ## Epic 6: Collections, Recovery, and Delinquency
 
-Status: first executable slice complete.
+Status: first executable slice complete; hardship restructure first slice complete.
 
 Goal: manage overdue accounts without violating borrower protection and recovery rules.
 
@@ -141,7 +141,7 @@ Tasks:
 - Recovery-agent assignment notice before contact. Done.
 - Cash recovery exception workflow. Partial.
 - Same-day cash recovery posting. Done.
-- Hardship and restructure workflow.
+- Hardship and restructure workflow. First slice done: `restructureLoanAccount` (`packages/core/src/loan-account.js`) modifies a stressed but active loan under maker-checker approval (four-eyes) — extending the remaining tenure and/or conceding the rate and re-amortizing the remaining principal over the new term (past installments untouched). The account is flagged `restructured`, which surfaces in `classifyLoanAsset` and the CIC snapshot. `POST /loan-accounts/{id}/restructure` drives it and seals the event into the audit spine.
 - Settlement and write-off approval.
 - Tests for recovery notice and same-day cash posting. Done.
 

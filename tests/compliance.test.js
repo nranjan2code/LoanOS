@@ -1577,6 +1577,65 @@ test("API part-prepayment re-amortizes the remaining schedule", async (t) => {
   );
 });
 
+test("API restructures a hardship loan under four-eyes approval and flags it", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+  const application = await approveAndDisburseApplication(base);
+  const account = await (await apiFetch(`${base}/loan-accounts/${application.loanAccountId}`)).json();
+  const originalCount = account.schedule.length;
+  const originalEmi = account.schedule[0].totalDue;
+
+  // Restructure requires an approving checker distinct from the proposer.
+  const fourEyes = await postJson(`${base}/loan-accounts/${account.loanAccountId}/restructure`, {
+    reason: "Borrower job loss",
+    newRemainingTermMonths: 24,
+    proposedBy: "collections-1",
+    approvedBy: "collections-1",
+    approvalReference: "RES-APP-1"
+  });
+  assert.equal(fourEyes.status, 422);
+  assert(fourEyes.body.findings.some((finding) => finding.path === "approvedBy"));
+
+  // A valid restructure extends the term and concedes the rate, lowering the EMI.
+  const restructured = await postJson(`${base}/loan-accounts/${account.loanAccountId}/restructure`, {
+    reason: "Borrower job loss",
+    hardshipCategory: "income_loss",
+    newRemainingTermMonths: 24,
+    newAnnualInterestRateBps: 1400,
+    proposedBy: "collections-1",
+    approvedBy: "collections-lead-1",
+    approvalReference: "RES-APP-2"
+  });
+  assert.equal(restructured.status, 200);
+  assert.equal(restructured.body.loanAccount.restructured, true);
+  assert.equal(restructured.body.restructure.approvedBy, "collections-lead-1");
+  assert(restructured.body.schedule.length > originalCount, "the extended term lengthens the schedule");
+  assert(restructured.body.schedule[restructured.body.schedule.length - 1].closingPrincipal === 0);
+  const newEmi = restructured.body.schedule[restructured.body.schedule.length - 1].totalDue;
+  assert(newEmi < originalEmi, "a longer term at a lower rate reduces the instalment");
+
+  // The restructure is reflected in the CIC-ready snapshot for reporting.
+  const snapshot = await (await apiFetch(`${base}/loan-accounts/${account.loanAccountId}/cic-snapshot`)).json();
+  assert.equal(snapshot.restructured, true);
+  assert.ok(snapshot.restructuredAt);
+
+  // A repeat with a fully repaid or closed account is rejected; here we confirm
+  // the event was sealed into the audit spine.
+  const events = await (await apiFetch(`${base}/audit/events`)).json();
+  assert.ok(events.events.some((event) => event.type === "loan_account.restructured"));
+});
+
 test("API quotes and executes foreclosure, closing the loan account", async (t) => {
   const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
   t.after(async () => {
