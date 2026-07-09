@@ -5398,6 +5398,71 @@ test("API verifies bank accounts and seals tenant audit evidence", async (t) => 
   assert(events.events.every((event) => event.dataClass === "financial"));
 });
 
+test("API dispatches communications with masked ledger evidence", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-comms-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+
+  const email = await postJson(`${base}/integrations/communications`, {
+    channel: "email",
+    to: "asha@example.in",
+    subject: "LoanOS document ready",
+    message: "Your signed document packet is ready.",
+    purpose: "document_delivery",
+    borrowerId: "bor_001",
+    applicationId: "app_001",
+    templateId: "doc_ready_v1"
+  });
+  assert.equal(email.status, 201);
+  assert.equal(email.body.communication.channel, "email");
+  assert.equal(email.body.communication.provider, "mock");
+  assert.equal(email.body.communication.dataResidencyCountry, "IN");
+  assert.equal(email.body.communication.recipientMasked, "as***@example.in");
+  assert.equal(email.body.communication.messageSha256.length, 64);
+  assert.equal(email.body.communication.subjectSha256.length, 64);
+  assert.equal(Object.hasOwn(email.body.communication, "message"), false);
+  assert.equal(Object.hasOwn(email.body.communication, "to"), false);
+
+  const whatsapp = await postJson(`${base}/integrations/communications`, {
+    channel: "whatsapp",
+    to: "+919876543210",
+    message: "Payment reminder",
+    purpose: "payment_reminder",
+    borrowerId: "bor_001"
+  });
+  assert.equal(whatsapp.status, 201);
+  assert.equal(whatsapp.body.communication.channel, "whatsapp");
+  assert.equal(whatsapp.body.communication.recipientMasked, "***3210");
+
+  const invalid = await postJson(`${base}/integrations/communications`, {
+    channel: "email",
+    to: "asha@example.in",
+    message: "Missing subject"
+  });
+  assert.equal(invalid.status, 422);
+
+  const ledgerResponse = await apiFetch(`${base}/communications?borrowerId=bor_001`);
+  assert.equal(ledgerResponse.status, 200);
+  const ledger = await ledgerResponse.json();
+  assert.equal(ledger.count, 2);
+  assert(ledger.communications.every((record) => record.status === "sent"));
+
+  const events = await (await apiFetch(`${base}/audit/events?type=integration.communication.sent`)).json();
+  assert.equal(events.chainValid, true);
+  assert.equal(events.count, 2);
+  assert(events.events.every((event) => event.dataClass === "personal_data"));
+});
+
 function eligibilityApplication(overrides = {}) {
   const base = {
     borrower: {

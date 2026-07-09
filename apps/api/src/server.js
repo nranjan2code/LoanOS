@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -407,6 +407,74 @@ async function route(req, res, dataDir, platformAdminKey) {
       return;
     }
     sendJson(res, 200, record);
+    return;
+  }
+
+  if (method === "GET" && path === "/communications") {
+    const state = await store.load();
+    const communications = Object.values(state.communications ?? {}).filter((record) =>
+      communicationMatchesFilters(record, url)
+    );
+    sendJson(res, 200, {
+      count: communications.length,
+      communications
+    });
+    return;
+  }
+
+  if (method === "POST" && path === "/integrations/communications") {
+    const body = await readJson(req);
+    let payload = null;
+    try {
+      payload = normalizeCommunicationPayload(body);
+    } catch (err) {
+      sendJson(res, 422, {
+        error: {
+          code: "communication_invalid",
+          message: err.message
+        }
+      });
+      return;
+    }
+
+    const manager = new ExternalServiceManager();
+    let dispatch = null;
+    try {
+      dispatch = await manager.sendCommunication(payload);
+    } catch (err) {
+      sendJson(res, 422, {
+        error: {
+          code: "communication_dispatch_failed",
+          message: err.message
+        }
+      });
+      return;
+    }
+
+    const state = await store.load();
+    const record = buildCommunicationRecord(body, payload, dispatch);
+    const nextState = appendEvent(
+      {
+        ...state,
+        communications: {
+          ...(state.communications ?? {}),
+          [record.communicationId]: record
+        }
+      },
+      {
+        type: "integration.communication.sent",
+        communicationId: record.communicationId,
+        channel: record.channel,
+        purpose: record.purpose,
+        borrowerId: record.borrowerId,
+        applicationId: record.applicationId,
+        provider: record.provider,
+        providerRef: record.providerRef,
+        dataResidencyCountry: record.dataResidencyCountry
+      }
+    );
+    await store.save(nextState);
+    sendJson(res, 201, { communication: record });
     return;
   }
 
@@ -4321,6 +4389,83 @@ function fraudCaseMatchesFilters(fraudCase, url) {
     return false;
   }
   return true;
+}
+
+function communicationMatchesFilters(record, url) {
+  const filters = {
+    channel: url.searchParams.get("channel"),
+    purpose: url.searchParams.get("purpose"),
+    borrowerId: url.searchParams.get("borrowerId"),
+    applicationId: url.searchParams.get("applicationId"),
+    loanAccountId: url.searchParams.get("loanAccountId")
+  };
+  if (filters.channel && record.channel !== filters.channel) return false;
+  if (filters.purpose && record.purpose !== filters.purpose) return false;
+  if (filters.borrowerId && record.borrowerId !== filters.borrowerId) return false;
+  if (filters.applicationId && record.applicationId !== filters.applicationId) return false;
+  if (filters.loanAccountId && record.loanAccountId !== filters.loanAccountId) return false;
+  return true;
+}
+
+function normalizeCommunicationPayload(input = {}) {
+  const channel = input.channel;
+  if (!["sms", "email", "whatsapp"].includes(channel)) {
+    throw new Error("Communication channel must be sms, email, or whatsapp.");
+  }
+  const to = input.to ?? input.phone ?? input.email;
+  if (!to) {
+    throw new Error("Communication recipient is required.");
+  }
+  if (!input.message) {
+    throw new Error("Communication message is required.");
+  }
+  if (channel === "email" && !input.subject) {
+    throw new Error("Email communication requires subject.");
+  }
+  return {
+    channel,
+    to,
+    subject: input.subject ?? null,
+    message: input.message
+  };
+}
+
+function buildCommunicationRecord(input, payload, dispatch, now = new Date()) {
+  const subject = payload.subject ?? "";
+  const message = String(payload.message ?? "");
+  return {
+    communicationId: input.communicationId ?? createLoanId("comm"),
+    channel: payload.channel,
+    purpose: input.purpose ?? "transactional",
+    borrowerId: input.borrowerId ?? null,
+    applicationId: input.applicationId ?? null,
+    loanAccountId: input.loanAccountId ?? null,
+    templateId: input.templateId ?? null,
+    recipientMasked: maskRecipient(payload.channel, payload.to),
+    subjectSha256: subject ? hashString(subject) : null,
+    subjectLength: subject.length,
+    messageSha256: hashString(message),
+    messageLength: message.length,
+    provider: dispatch.provider,
+    providerRef: dispatch.ref,
+    dataResidencyCountry: dispatch.dataResidencyCountry,
+    status: dispatch.success ? "sent" : "failed",
+    sentAt: now.toISOString()
+  };
+}
+
+function maskRecipient(channel, value) {
+  const recipient = String(value ?? "");
+  if (channel === "email") {
+    const [local, domain] = recipient.split("@");
+    return `${(local ?? "").slice(0, 2)}***@${domain ?? "***"}`;
+  }
+  const digits = recipient.replace(/\D/g, "");
+  return `***${digits.slice(-4)}`;
+}
+
+function hashString(value) {
+  return createHash("sha256").update(String(value ?? "")).digest("hex");
 }
 
 function combineComplianceResults(...results) {

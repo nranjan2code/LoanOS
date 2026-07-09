@@ -113,7 +113,7 @@ Deliverables:
 - Bank account verification. First slice done: `ExternalServiceManager` supports mock/real bank-account verification, `POST /integrations/bank-account-verification` returns sanitized verification evidence, and disbursement is blocked without verified active account proof matching the destination account.
 - eSign/document vault. First slice done: successful eSign automatically creates a tenant-scoped document-vault receipt with signature evidence, storage country, retention policy, per-document SHA-256 checksums, and a manifest checksum; PDF generation and external eSign envelope storage remain planned.
 - NACH/UPI/payment rails.
-- SMS/email/WhatsApp provider with India data posture.
+- SMS/email/WhatsApp provider with India data posture. First slice done: `ExternalServiceManager` dispatches SMS/email/WhatsApp through mock/real providers with India residency enforcement, `POST /integrations/communications` stores masked/hash-only dispatch evidence, and `GET /communications` exposes the tenant ledger.
 - Observability, secrets, IAM, DR, incident response.
 
 Exit criteria:

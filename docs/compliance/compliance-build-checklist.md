@@ -23,6 +23,7 @@ Legend:
 | Product policy before origination | Product registry validates active RE link, board approval, INR, amount/tenor bounds, APR (must be ≥ annualInterestRateBps + annualised mandatory charge floor), cooling-off, recovery mechanism, eligibility, charges, and mandatory `pricingPolicyRef`. `interestCalcMethod` must be `reducing_balance` or `flat`; flat-rate products must additionally disclose `flatToEirBps` (flat-to-EIR equivalent). | Done |
 | Product policy versioning and effective dates | A higher `version` publishes a new policy version, archiving the superseded window; `selectProductPolicyVersion`/`?asOf=` resolve the version governing a given date. | Done |
 | Digitally delivered KFS/documents | KFS delivery evidence gates decision; execution document packet delivery gates disbursement. | Done |
+| Borrower communication dispatch evidence | SMS/email/WhatsApp provider boundary enforces India data-residency posture and stores masked/hash-only dispatch receipts. | Done |
 | Direct disbursement to borrower/end-beneficiary | LSP/pass-through disbursement blocked; disbursement now requires verified active borrower/end-beneficiary bank-account evidence matching the destination account. | Done |
 | Direct repayment to RE account | LSP/pass-through repayment blocked. | Done |
 | LSP fees paid by RE, not borrower | LSP registry requires RE-paid fee controls and blocks separate borrower-charged LSP fees; vendor settlement module planned. | Partial |

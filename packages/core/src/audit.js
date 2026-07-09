@@ -41,7 +41,7 @@ export const AUDIT_DATA_CLASSES = {
 
 export function classifyAuditDataClass(type) {
   const value = String(type ?? "");
-  if (/borrower|consent|kyc|complaint|grievance/.test(value)) {
+  if (/borrower|consent|kyc|complaint|grievance|communication/.test(value)) {
     return AUDIT_DATA_CLASSES.PERSONAL;
   }
   if (

@@ -20,6 +20,39 @@ test("ExternalServiceManager SMS provider fails if set to real and missing API c
   );
 });
 
+test("ExternalServiceManager email and WhatsApp providers default to mock with India data posture", async () => {
+  const manager = new ExternalServiceManager();
+
+  const email = await manager.sendEmail("asha@example.in", "LoanOS update", "Your loan document is ready.");
+  assert.strictEqual(email.success, true);
+  assert.strictEqual(email.channel, "email");
+  assert.strictEqual(email.provider, "mock");
+  assert.strictEqual(email.dataResidencyCountry, "IN");
+  assert.match(email.ref, /^EMAIL-MOCK-/);
+
+  const whatsapp = await manager.sendWhatsApp("+919876543210", "Your payment reminder is ready.");
+  assert.strictEqual(whatsapp.success, true);
+  assert.strictEqual(whatsapp.channel, "whatsapp");
+  assert.strictEqual(whatsapp.provider, "mock");
+  assert.strictEqual(whatsapp.dataResidencyCountry, "IN");
+  assert.match(whatsapp.ref, /^WHATSAPP-MOCK-/);
+});
+
+test("ExternalServiceManager communication dispatch enforces India data residency", async () => {
+  const manager = new ExternalServiceManager({ emailDataResidencyCountry: "SG" });
+  await assert.rejects(
+    async () => {
+      await manager.sendCommunication({
+        channel: "email",
+        to: "asha@example.in",
+        subject: "LoanOS update",
+        message: "Hello"
+      });
+    },
+    /Email provider data residency country must be IN/
+  );
+});
+
 test("ExternalServiceManager Credit Bureau mock provider returns preseeded score", async () => {
   const manager = new ExternalServiceManager();
   // Aaditya Patel's PAN in mock preseed

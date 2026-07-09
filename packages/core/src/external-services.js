@@ -34,6 +34,17 @@ export class ExternalServiceManager {
       smsProvider: config.smsProvider ?? (typeof process !== "undefined" ? process.env.LOANOS_SMS_PROVIDER : "mock") ?? "mock",
       smsApiUrl: config.smsApiUrl ?? (typeof process !== "undefined" ? process.env.LOANOS_SMS_API_URL : "") ?? "",
       smsApiKey: config.smsApiKey ?? (typeof process !== "undefined" ? process.env.LOANOS_SMS_API_KEY : "") ?? "",
+      smsDataResidencyCountry: config.smsDataResidencyCountry ?? (typeof process !== "undefined" ? process.env.LOANOS_SMS_DATA_RESIDENCY_COUNTRY : "IN") ?? "IN",
+
+      emailProvider: config.emailProvider ?? (typeof process !== "undefined" ? process.env.LOANOS_EMAIL_PROVIDER : "mock") ?? "mock",
+      emailApiUrl: config.emailApiUrl ?? (typeof process !== "undefined" ? process.env.LOANOS_EMAIL_API_URL : "") ?? "",
+      emailApiKey: config.emailApiKey ?? (typeof process !== "undefined" ? process.env.LOANOS_EMAIL_API_KEY : "") ?? "",
+      emailDataResidencyCountry: config.emailDataResidencyCountry ?? (typeof process !== "undefined" ? process.env.LOANOS_EMAIL_DATA_RESIDENCY_COUNTRY : "IN") ?? "IN",
+
+      whatsappProvider: config.whatsappProvider ?? (typeof process !== "undefined" ? process.env.LOANOS_WHATSAPP_PROVIDER : "mock") ?? "mock",
+      whatsappApiUrl: config.whatsappApiUrl ?? (typeof process !== "undefined" ? process.env.LOANOS_WHATSAPP_API_URL : "") ?? "",
+      whatsappApiKey: config.whatsappApiKey ?? (typeof process !== "undefined" ? process.env.LOANOS_WHATSAPP_API_KEY : "") ?? "",
+      whatsappDataResidencyCountry: config.whatsappDataResidencyCountry ?? (typeof process !== "undefined" ? process.env.LOANOS_WHATSAPP_DATA_RESIDENCY_COUNTRY : "IN") ?? "IN",
 
       bureauProvider: config.bureauProvider ?? (typeof process !== "undefined" ? process.env.LOANOS_BUREAU_PROVIDER : "mock") ?? "mock",
       bureauApiUrl: config.bureauApiUrl ?? (typeof process !== "undefined" ? process.env.LOANOS_BUREAU_API_URL : "") ?? "",
@@ -65,6 +76,7 @@ export class ExternalServiceManager {
    * Sends an SMS notification.
    */
   async sendSms(phone, message) {
+    ensureIndiaDataResidency("SMS", this.config.smsDataResidencyCountry);
     if (this.config.smsProvider === "real") {
       if (!this.config.smsApiUrl || !this.config.smsApiKey) {
         throw new Error("Real SMS provider configured but API URL or API key is missing.");
@@ -81,12 +93,118 @@ export class ExternalServiceManager {
       if (!res.ok) {
         throw new Error(`Real SMS Gateway returned status ${res.status}`);
       }
-      return { success: true, provider: "real", ref: `SMS-REAL-${Date.now()}` };
+      return {
+        success: true,
+        channel: "sms",
+        provider: "real",
+        ref: `SMS-REAL-${Date.now()}`,
+        dataResidencyCountry: this.config.smsDataResidencyCountry
+      };
     } else {
       // Mock provider
       console.log(`[MOCK SMS] To: ${phone} | Message: ${message}`);
-      return { success: true, provider: "mock", ref: `SMS-MOCK-${Date.now()}` };
+      return {
+        success: true,
+        channel: "sms",
+        provider: "mock",
+        ref: `SMS-MOCK-${Date.now()}`,
+        dataResidencyCountry: this.config.smsDataResidencyCountry
+      };
     }
+  }
+
+  async sendEmail(to, subject, message) {
+    ensureIndiaDataResidency("Email", this.config.emailDataResidencyCountry);
+    if (!to || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) {
+      throw new Error("Valid email recipient is required.");
+    }
+    if (!subject) {
+      throw new Error("Email subject is required.");
+    }
+    if (this.config.emailProvider === "real") {
+      if (!this.config.emailApiUrl || !this.config.emailApiKey) {
+        throw new Error("Real email provider configured but API URL or API key is missing.");
+      }
+      const res = await fetch(this.config.emailApiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${this.config.emailApiKey}`
+        },
+        body: JSON.stringify({ to, subject, message })
+      });
+      if (!res.ok) {
+        throw new Error(`Real email provider returned status ${res.status}`);
+      }
+      return {
+        success: true,
+        channel: "email",
+        provider: "real",
+        ref: `EMAIL-REAL-${Date.now()}`,
+        dataResidencyCountry: this.config.emailDataResidencyCountry
+      };
+    }
+
+    console.log(`[MOCK EMAIL] To: ${to} | Subject: ${subject} | Message: ${message}`);
+    return {
+      success: true,
+      channel: "email",
+      provider: "mock",
+      ref: `EMAIL-MOCK-${Date.now()}`,
+      dataResidencyCountry: this.config.emailDataResidencyCountry
+    };
+  }
+
+  async sendWhatsApp(phone, message) {
+    ensureIndiaDataResidency("WhatsApp", this.config.whatsappDataResidencyCountry);
+    if (!/^\+?\d{10,15}$/.test(String(phone ?? "").replace(/[\s-]/g, ""))) {
+      throw new Error("Valid WhatsApp phone recipient is required.");
+    }
+    if (this.config.whatsappProvider === "real") {
+      if (!this.config.whatsappApiUrl || !this.config.whatsappApiKey) {
+        throw new Error("Real WhatsApp provider configured but API URL or API key is missing.");
+      }
+      const res = await fetch(this.config.whatsappApiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${this.config.whatsappApiKey}`
+        },
+        body: JSON.stringify({ phone, message })
+      });
+      if (!res.ok) {
+        throw new Error(`Real WhatsApp provider returned status ${res.status}`);
+      }
+      return {
+        success: true,
+        channel: "whatsapp",
+        provider: "real",
+        ref: `WHATSAPP-REAL-${Date.now()}`,
+        dataResidencyCountry: this.config.whatsappDataResidencyCountry
+      };
+    }
+
+    console.log(`[MOCK WHATSAPP] To: ${phone} | Message: ${message}`);
+    return {
+      success: true,
+      channel: "whatsapp",
+      provider: "mock",
+      ref: `WHATSAPP-MOCK-${Date.now()}`,
+      dataResidencyCountry: this.config.whatsappDataResidencyCountry
+    };
+  }
+
+  async sendCommunication({ channel, to, subject, message } = {}) {
+    if (channel === "sms") {
+      return this.sendSms(to, message);
+    }
+    if (channel === "email") {
+      return this.sendEmail(to, subject, message);
+    }
+    if (channel === "whatsapp") {
+      return this.sendWhatsApp(to, message);
+    }
+    throw new Error("Communication channel must be sms, email, or whatsapp.");
   }
 
   /**
@@ -364,4 +482,10 @@ export class ExternalServiceManager {
 
 function normalizeName(value) {
   return String(value ?? "").trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function ensureIndiaDataResidency(label, country) {
+  if (country !== "IN") {
+    throw new Error(`${label} provider data residency country must be IN.`);
+  }
 }

@@ -168,6 +168,7 @@ The current codebase contains Phase 0 executable controls:
 - Data residency checks.
 - Direct fund-flow checks.
 - Bank-account verification evidence before disbursement.
+- SMS/email/WhatsApp communication dispatch evidence with masked recipients and message hashes.
 - KFS generator and validator.
 - Sanction readiness gate requiring KFS acceptance and digital delivery evidence.
 - Execution document packet renderer for KFS, sanction letter, agreement summary, privacy notice, checksums, delivery evidence, eSign evidence, and document-vault receipt.
