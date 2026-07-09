@@ -19,10 +19,9 @@ export {
 } from "./audit.js";
 
 export {
+  KNOWN_STAFF_ROLES,
   STAFF_ACTOR_STATUSES,
   STAFF_ROLES,
-  normalizeStaffActor,
-  upsertStaffActor,
   validateCashRecoveryApprovalAccess,
   validateDecisionApprovalAccess,
   validateDecisionProposalAccess,
@@ -31,7 +30,6 @@ export {
   validateGrievanceOfficerAccess,
   validateHumanReviewAccess,
   validateRecoveryAssignmentAccess,
-  validateStaffActor,
   validateWorkflowActorAccess,
   validateWorkflowAssignmentAccess
 } from "./access-control.js";

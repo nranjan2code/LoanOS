@@ -3619,6 +3619,106 @@ test("API requires the manual underwriting override actor to be a credit officer
   assert.equal(valid.body.status, "pending_decision_approval");
 });
 
+test("a logged-in tenant user cannot spoof proposedBy/approvedBy as a different registered actor", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+  const application = await createRegistryBackedApplication(base, { requestedAmount: 90000 });
+
+  assert.equal(
+    (
+      await postJson(`${base}/loans/applications/${application.applicationId}/kfs`, {
+        acceptance: { acceptedAt: "2026-07-08T07:00:00.000Z", deliveryChannel: "email", deliveryRef: "email_msg_999" }
+      })
+    ).status,
+    201
+  );
+
+  // Log in as the "credit-maker-1" login user directly — createRegistryBackedApplication
+  // already seeded it (via seedOperationalActors) as a full tenant user with
+  // that userId, a password, and the credit_officer role. There is no separate
+  // "staff actor" to link to; the login identity IS the acting identity.
+  const loginRes = await rawFetch(`${base}/auth/login`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ tenantId: TENANT_A.tenantId, email: "credit-maker-1@test-a.example.in", password: TEST_STAFF_PASSWORD })
+  });
+  assert.equal(loginRes.status, 200);
+  const cookie = sessionCookieHeader(loginRes);
+
+  // The session belongs to credit-maker-1, but the request body claims to
+  // propose as credit-checker-1 — a different registered, eligible actor. The
+  // server must ignore the claimed identity and bind the action to the
+  // session's own login identity instead of trusting the request body.
+  const spoofedDecision = await rawFetch(`${base}/loans/applications/${application.applicationId}/decision`, {
+    method: "POST",
+    headers: { cookie, "content-type": "application/json" },
+    body: JSON.stringify({
+      status: "declined",
+      proposedBy: "credit-checker-1",
+      declineReasonCode: "affordability"
+    })
+  });
+  const spoofedDecisionBody = await spoofedDecision.json();
+  assert.equal(spoofedDecision.status, 202);
+  assert.equal(
+    spoofedDecisionBody.decision?.proposedBy ?? spoofedDecisionBody.pendingDecision?.proposedBy,
+    "credit-maker-1",
+    "proposedBy must be bound to the session's own login identity, not the client-claimed identity"
+  );
+
+  // A fresh application (the first is already pending_decision_approval and
+  // can't be re-proposed) to prove the same logged-in session cannot propose
+  // then self-approve: approvedBy is bound to the session's own actor too, so
+  // it collides with proposedBy and the domain's four-eyes check rejects it —
+  // closing the loophole where a free client-side actor picker let one human
+  // act as both maker and checker.
+  const secondApplication = await createRegistryBackedApplication(base, { requestedAmount: 91000 });
+  assert.equal(
+    (
+      await postJson(`${base}/loans/applications/${secondApplication.applicationId}/kfs`, {
+        acceptance: { acceptedAt: "2026-07-08T07:00:00.000Z", deliveryChannel: "email", deliveryRef: "email_msg_998" }
+      })
+    ).status,
+    201
+  );
+  await assignManualUnderwritingTask(base, secondApplication.applicationId, "credit-maker-1");
+  const proposeApproved = await rawFetch(`${base}/loans/applications/${secondApplication.applicationId}/decision`, {
+    method: "POST",
+    headers: { cookie, "content-type": "application/json" },
+    body: JSON.stringify({
+      status: "approved",
+      proposedBy: "credit-maker-1",
+      reason: "Manual review clears the applicant",
+      manualUnderwriting: {
+        underwriterId: "credit-checker-1",
+        reason: "Compensating factors support approval.",
+        policyReference: "board_underwriting_policy_v1"
+      }
+    })
+  });
+  assert.equal(proposeApproved.status, 202);
+
+  const selfApproval = await rawFetch(`${base}/loans/applications/${secondApplication.applicationId}/approvals`, {
+    method: "POST",
+    headers: { cookie, "content-type": "application/json" },
+    body: JSON.stringify({ outcome: "approved", approvedBy: "credit-checker-1", approvalRef: "approval_ref_spoof_1" })
+  });
+  const selfApprovalBody = await selfApproval.json();
+  assert.equal(selfApproval.status, 422, "the session cannot approve its own proposal under a different claimed identity");
+  assert.equal(selfApprovalBody.error.code, "approval_access_blocked");
+});
+
 test("API blocks a checker who is also the manual underwriting underwriter", async (t) => {
   const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
   t.after(async () => {
@@ -3638,8 +3738,10 @@ test("API blocks a checker who is also the manual underwriting underwriter", asy
   // A dual-role actor could both underwrite and check; four-eyes must still hold.
   assert.equal(
     (
-      await postJson(`${base}/staff/actors`, {
-        actorId: "credit-dual-1",
+      await postJson(`${base}/admin/users`, {
+        userId: "credit-dual-1",
+        email: "credit-dual-1@test-a.example.in",
+        password: TEST_STAFF_PASSWORD,
         displayName: "Credit Dual Role",
         roles: ["credit_officer", "credit_checker"],
         queues: ["credit_ops", "credit_checker"]
@@ -4403,8 +4505,10 @@ test("tenants are isolated: one tenant cannot read or mutate another's data", as
     201
   );
   assert.equal(
-    (await postJson(`${base}/staff/actors`, {
-      actorId: "credit-maker-1",
+    (await postJson(`${base}/admin/users`, {
+      userId: "credit-maker-1",
+      email: "credit-maker-1@test-a.example.in",
+      password: TEST_STAFF_PASSWORD,
       displayName: "Credit Maker",
       roles: ["credit_officer"],
       queues: ["credit_ops"]
@@ -4461,17 +4565,14 @@ test("tenant users log in with sessions and administer users, reviews, and servi
   const base = `http://127.0.0.1:${server.address().port}`;
 
   const adminUser = await postJson(`${base}/admin/users`, {
+    userId: "tenant-admin-actor",
     email: "admin@test-a.example.in",
     displayName: "Tenant Admin",
     password: "CorrectHorseBatteryStaple1!",
     adminRoles: ["tenant_admin", "user_admin", "security_admin"],
-    staffActor: {
-      actorId: "tenant-admin-actor",
-      displayName: "Tenant Admin Actor",
-      roles: ["workflow_admin"],
-      queues: ["*"],
-      canAssignQueues: ["*"]
-    }
+    roles: ["workflow_admin"],
+    queues: ["*"],
+    canAssignQueues: ["*"]
   }, TENANT_A.apiKey);
   assert.equal(adminUser.status, 201);
 
@@ -4489,7 +4590,8 @@ test("tenant users log in with sessions and administer users, reviews, and servi
   const tenantCookie = sessionCookieHeader(login);
   const loginBody = await login.json();
   assert.equal(loginBody.user.email, "admin@test-a.example.in");
-  assert.equal(loginBody.user.staffActorId, "tenant-admin-actor");
+  assert.equal(loginBody.user.userId, "tenant-admin-actor");
+  assert.deepEqual(loginBody.user.roles, ["workflow_admin"]);
 
   const sessionRead = await rawFetch(`${base}/staff/actors`, { headers: { cookie: tenantCookie } });
   assert.equal(sessionRead.status, 200);
@@ -6633,9 +6735,16 @@ async function assignManualUnderwritingTask(base, applicationId, assigneeId, ass
   }
 }
 
+// Staff actors are tenant login users with a workflow role — there is no
+// separate registry to seed. Each fixture below is a full user-creation body
+// (userId doubles as the actor id referenced by proposedBy/approvedBy/etc.
+// throughout this file, so every existing downstream reference stays valid
+// unchanged).
+const TEST_STAFF_PASSWORD = "StaffPass123!";
+
 async function seedOperationalActors(base) {
   for (const actor of operationalActors()) {
-    const response = await postJson(`${base}/staff/actors`, actor);
+    const response = await postJson(`${base}/admin/users`, actor);
     assert.equal(response.status, 201);
   }
 }
@@ -6643,70 +6752,92 @@ async function seedOperationalActors(base) {
 function operationalActors() {
   return [
     {
-      actorId: "credit-maker-1",
+      userId: "credit-maker-1",
+      email: "credit-maker-1@test-a.example.in",
+      password: TEST_STAFF_PASSWORD,
       displayName: "Credit Maker",
       roles: ["credit_officer"],
       queues: ["credit_ops"]
     },
     {
-      actorId: "credit-checker-1",
+      userId: "credit-checker-1",
+      email: "credit-checker-1@test-a.example.in",
+      password: TEST_STAFF_PASSWORD,
       displayName: "Credit Checker",
       roles: ["credit_checker"],
       queues: ["credit_checker"]
     },
     {
-      actorId: "credit-lead-1",
+      userId: "credit-lead-1",
+      email: "credit-lead-1@test-a.example.in",
+      password: TEST_STAFF_PASSWORD,
       displayName: "Credit Lead",
       roles: ["workflow_admin"],
       queues: ["*"],
       canAssignQueues: ["credit_checker"]
     },
     {
-      actorId: "credit-reviewer-1",
+      userId: "credit-reviewer-1",
+      email: "credit-reviewer-1@test-a.example.in",
+      password: TEST_STAFF_PASSWORD,
       displayName: "Credit Human Reviewer",
       roles: ["human_reviewer"],
       queues: ["model_risk"]
     },
     {
-      actorId: "loan-officer-1",
+      userId: "loan-officer-1",
+      email: "loan-officer-1@test-a.example.in",
+      password: TEST_STAFF_PASSWORD,
       displayName: "Loan Officer",
       roles: ["loan_officer"],
       queues: ["loan_ops"]
     },
     {
-      actorId: "collections-manager-1",
+      userId: "collections-manager-1",
+      email: "collections-manager-1@test-a.example.in",
+      password: TEST_STAFF_PASSWORD,
       displayName: "Collections Manager",
       roles: ["collections_manager"],
       queues: ["collections_ops"]
     },
     {
-      actorId: "collections-lead-1",
+      userId: "collections-lead-1",
+      email: "collections-lead-1@test-a.example.in",
+      password: TEST_STAFF_PASSWORD,
       displayName: "Collections Lead",
       roles: ["workflow_admin"],
       queues: ["*"],
       canAssignQueues: ["collections_ops"]
     },
     {
-      actorId: "portfolio-risk-1",
+      userId: "portfolio-risk-1",
+      email: "portfolio-risk-1@test-a.example.in",
+      password: TEST_STAFF_PASSWORD,
       displayName: "Portfolio Risk Manager",
       roles: ["portfolio_risk_manager"],
       queues: ["risk_ops"]
     },
     {
-      actorId: "grievance-officer-1",
+      userId: "grievance-officer-1",
+      email: "grievance-officer-1@test-a.example.in",
+      password: TEST_STAFF_PASSWORD,
       displayName: "Grievance Officer",
       roles: ["grievance_officer"],
       queues: ["grievance_ops"]
     },
     {
-      actorId: "grievance-lead-1",
+      userId: "grievance-lead-1",
+      email: "grievance-lead-1@test-a.example.in",
+      password: TEST_STAFF_PASSWORD,
       displayName: "Grievance Lead",
       roles: ["workflow_admin"],
       queues: ["*"],
       canAssignQueues: ["grievance_ops"]
     },
     {
-      actorId: "kyc-officer-1",
+      userId: "kyc-officer-1",
+      email: "kyc-officer-1@test-a.example.in",
+      password: TEST_STAFF_PASSWORD,
       displayName: "KYC Officer",
       roles: ["kyc_officer"],
       queues: ["kyc_ops"]
@@ -8226,8 +8357,10 @@ test("API locks AI model-use evidence on decision and isolates from subsequent u
   // 2. Create a borrower, RE, and product
   await postJson(`${base}/regulated-entities`, validRegulatedEntity());
   await postJson(`${base}/products`, validProductPolicy());
-  await postJson(`${base}/staff/actors`, {
-    actorId: "credit-maker-1",
+  await postJson(`${base}/admin/users`, {
+    userId: "credit-maker-1",
+    email: "credit-maker-1@test-a.example.in",
+    password: TEST_STAFF_PASSWORD,
     displayName: "Credit Maker",
     roles: ["credit_officer"],
     queues: ["credit_ops"]
@@ -8353,8 +8486,10 @@ test("LWS manual underwriting task assignment gates and completes decision propo
   assert.ok(kfsRes.status === 200 || kfsRes.status === 201);
 
   // Register extra credit-maker-2 staff actor
-  await postJson(`${base}/staff/actors`, {
-    actorId: "credit-maker-2",
+  await postJson(`${base}/admin/users`, {
+    userId: "credit-maker-2",
+    email: "credit-maker-2@test-a.example.in",
+    password: TEST_STAFF_PASSWORD,
     displayName: "Credit Maker 2",
     roles: ["credit_officer"],
     queues: ["credit_ops"]

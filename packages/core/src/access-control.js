@@ -20,79 +20,16 @@ export const STAFF_ROLES = {
   WORKFLOW_ADMIN: "workflow_admin"
 };
 
-const KNOWN_ROLES = new Set(Object.values(STAFF_ROLES));
+export const KNOWN_STAFF_ROLES = new Set(Object.values(STAFF_ROLES));
 const ACTIVE_STATUS = STAFF_ACTOR_STATUSES.ACTIVE;
 
-export function normalizeStaffActor(input, existing = {}, now = new Date()) {
-  const actorId = input?.actorId ?? existing.actorId;
-  return {
-    ...existing,
-    ...input,
-    actorId,
-    displayName: input?.displayName ?? existing.displayName ?? actorId ?? null,
-    country: input?.country ?? existing.country ?? "IN",
-    status: input?.status ?? existing.status ?? ACTIVE_STATUS,
-    roles: normalizeStringList(input?.roles ?? existing.roles),
-    queues: normalizeStringList(input?.queues ?? existing.queues),
-    canAssignQueues: normalizeStringList(input?.canAssignQueues ?? existing.canAssignQueues),
-    createdAt: existing.createdAt ?? input?.createdAt ?? now.toISOString(),
-    updatedAt: now.toISOString()
-  };
-}
-
-export function validateStaffActor(actor) {
-  const findings = [];
-
-  if (!actor?.actorId) {
-    findings.push(createFinding("error", "RBI-IT-GRC", "Staff actor requires actorId.", "actorId"));
-  }
-  if (!actor?.displayName) {
-    findings.push(createFinding("error", "RBI-IT-GRC", "Staff actor requires displayName.", "displayName"));
-  }
-  if (actor?.country !== "IN") {
-    findings.push(createFinding("error", "RBI-IT-GRC", "Staff actor must be India-operational for this platform.", "country"));
-  }
-  if (!Object.values(STAFF_ACTOR_STATUSES).includes(actor?.status)) {
-    findings.push(createFinding("error", "RBI-IT-GRC", "Staff actor status is invalid.", "status"));
-  }
-  if (!actor?.roles?.length) {
-    findings.push(createFinding("error", "RBI-IT-GRC", "Staff actor requires at least one role.", "roles"));
-  }
-  for (const role of actor?.roles ?? []) {
-    if (!KNOWN_ROLES.has(role)) {
-      findings.push(createFinding("error", "RBI-IT-GRC", `Staff actor role is not recognized: ${role}.`, "roles"));
-    }
-  }
-
-  return {
-    findings,
-    summary: summarizeFindings(findings)
-  };
-}
-
-export function upsertStaffActor(registry = {}, input, now = new Date()) {
-  const actor = normalizeStaffActor(input, registry?.[input?.actorId] ?? {}, now);
-  const validation = validateStaffActor(actor);
-
-  if (validation.summary.status === "blocked") {
-    return {
-      registry,
-      actor,
-      findings: validation.findings,
-      summary: validation.summary
-    };
-  }
-
-  return {
-    registry: {
-      ...registry,
-      [actor.actorId]: actor
-    },
-    actor,
-    findings: [],
-    summary: summarizeFindings([])
-  };
-}
+// The staff-actor registry used to be a separate store from tenant login
+// users; it has been merged directly into the tenant user record
+// (apps/api/src/identity.js: roles/queues/canAssignQueues/country fields), so
+// there is no longer a standalone actor to normalize/validate/upsert here.
+// Every function below is deliberately registry-shape-agnostic: it takes any
+// `{id: {status, roles, queues, canAssignQueues}}` map — callers now pass
+// `state.users` directly.
 
 export function validateDecisionProposalAccess(staffActors = {}, input) {
   const actorId = input?.proposedBy ?? input?.decidedBy;
@@ -200,9 +137,3 @@ function hasQueueAccess(actor, queue) {
   return actor?.queues?.includes(queue) || actor?.queues?.includes("*") || hasRole(actor, STAFF_ROLES.WORKFLOW_ADMIN);
 }
 
-function normalizeStringList(value) {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  return [...new Set(value.filter((entry) => typeof entry === "string" && entry.trim()).map((entry) => entry.trim()))];
-}

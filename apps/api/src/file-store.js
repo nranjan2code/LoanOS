@@ -2,14 +2,18 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { createHash, randomBytes } from "node:crypto";
 import { dirname, join } from "node:path";
 import {
+  AUDIT_ACTOR_TYPES,
   buildAuditEvidencePack,
   createModelRegistryState,
   normalizeModelRegistryState,
   normalizeWorkflowTaskStore,
+  sealAuditChain,
+  stampAuditEvents,
   verifyAuditChain
 } from "../../../packages/core/src/index.js";
 import {
   normalizeAccessReviews,
+  normalizeLoginAttempts,
   normalizePlatformUsers,
   normalizeSessions,
   normalizeTenantUsers,
@@ -18,16 +22,20 @@ import {
 
 export const STATE_VERSION = 4;
 
+// Modules default to enabled (opt-out): a tenant provisioned without an
+// explicit module selection gets full access, matching pre-entitlement
+// behavior. A platform admin narrows access by unchecking a module during
+// onboarding; enforceModuleAccess() in server.js then gates the routes below.
 export const TENANT_ONBOARDING_MODULES = [
   { id: "los", label: "Loan Origination", defaultEnabled: true },
   { id: "lms", label: "Loan Management", defaultEnabled: true },
   { id: "lws", label: "Workflow Studio", defaultEnabled: true },
   { id: "compliance", label: "Compliance Evidence", defaultEnabled: true },
   { id: "iam", label: "Identity and Access", defaultEnabled: true },
-  { id: "ai_governance", label: "AI Governance", defaultEnabled: false },
-  { id: "collections", label: "Collections and Recovery", defaultEnabled: false },
-  { id: "marketplace", label: "Marketplace Offers", defaultEnabled: false },
-  { id: "integrations", label: "External Integrations", defaultEnabled: false }
+  { id: "ai_governance", label: "AI Governance", defaultEnabled: true },
+  { id: "collections", label: "Collections and Recovery", defaultEnabled: true },
+  { id: "marketplace", label: "Marketplace Offers", defaultEnabled: true },
+  { id: "integrations", label: "External Integrations", defaultEnabled: true }
 ];
 
 export const TENANT_ONBOARDING_FLOWS = [
@@ -79,7 +87,6 @@ export function createEmptyTenantData() {
     beneficialOwners: {},
     erasureRequests: {},
     dataDisclosures: {},
-    staffActors: {},
     recoveryAgents: {},
     complaints: {},
     incidents: {},
@@ -115,7 +122,6 @@ function normalizeTenantData(data) {
     beneficialOwners: data?.beneficialOwners ?? {},
     erasureRequests: data?.erasureRequests ?? {},
     dataDisclosures: data?.dataDisclosures ?? {},
-    staffActors: data?.staffActors ?? {},
     recoveryAgents: data?.recoveryAgents ?? {},
     complaints: data?.complaints ?? {},
     incidents: data?.incidents ?? {},
@@ -173,6 +179,8 @@ function normalizeState(state) {
       breakGlassGrants: state?.controlPlane?.breakGlassGrants ?? {},
       platformUsers: normalizePlatformUsers(state?.controlPlane?.platformUsers),
       sessions: normalizeSessions(state?.controlPlane?.sessions),
+      loginAttempts: normalizeLoginAttempts(state?.controlPlane?.loginAttempts),
+      platformEvents: Array.isArray(state?.controlPlane?.platformEvents) ? state.controlPlane.platformEvents : [],
       ckycRegistry: state?.controlPlane?.ckycRegistry ?? { ...MOCK_CKYC_PRESEED }
     },
     tenants
@@ -188,10 +196,57 @@ export function createEmptyState() {
       breakGlassGrants: {},
       platformUsers: {},
       sessions: {},
+      loginAttempts: {},
+      platformEvents: [],
       ckycRegistry: { ...MOCK_CKYC_PRESEED }
     },
     tenants: {}
   };
+}
+
+// --- Platform-level audit chain (control-plane actions) --------------------
+
+// Mirrors the per-tenant audit spine but scoped to the fixed id "platform", so
+// tenant onboarding/status changes, platform user administration, break-glass
+// grants, and sub-processor registration are themselves tamper-evidently
+// logged, not just the tenant-scoped actions they trigger.
+const PLATFORM_AUDIT_SCOPE = "platform";
+
+export function appendPlatformEvent(state, event, { actor = null, actorType = AUDIT_ACTOR_TYPES.PLATFORM_STAFF } = {}, now = new Date()) {
+  const withEvent = [...(state.controlPlane.platformEvents ?? []), { ...event, at: event.at ?? now.toISOString() }];
+  const stamped = stampAuditEvents(withEvent, { actor, actorType });
+  const sealed = sealAuditChain(stamped, PLATFORM_AUDIT_SCOPE, { now });
+  return {
+    ...state,
+    controlPlane: {
+      ...state.controlPlane,
+      platformEvents: sealed
+    }
+  };
+}
+
+export function buildPlatformAuditEvidencePack(state, { now = new Date(), filters } = {}) {
+  return buildAuditEvidencePack(state.controlPlane.platformEvents ?? [], PLATFORM_AUDIT_SCOPE, { now, filters });
+}
+
+// --- Concurrency safety ------------------------------------------------------
+
+// The whole platform (every tenant's data plane plus the control plane) lives
+// in one state.json, loaded fully and rewritten fully on every save. Without
+// serialization, two concurrent requests can both load the same snapshot and
+// the second save silently overwrites the first (a lost update). withStateLock
+// serializes a request's entire load-modify-save span per dataDir via a
+// promise chain, so requests against the same dataDir queue instead of racing.
+// This does not add real concurrency (that needs per-record storage), but it
+// makes the single-file store correct under concurrent requests.
+const stateLocks = new Map();
+
+export function withStateLock(dataDir, fn) {
+  const key = dataDir ?? "";
+  const prior = stateLocks.get(key) ?? Promise.resolve();
+  const result = prior.then(fn, fn);
+  stateLocks.set(key, result.then(() => {}, () => {}));
+  return result;
 }
 
 export async function loadState(dataDir = resolveDataDir()) {
@@ -389,7 +444,6 @@ export function resetSandbox(state, sandboxId, preserveConfig = false) {
       lendingServiceProviders: tenantData.lendingServiceProviders ?? {},
       digitalLendingApps: tenantData.digitalLendingApps ?? {},
       productPolicies: tenantData.productPolicies ?? {},
-      staffActors: tenantData.staffActors ?? {},
       recoveryAgents: tenantData.recoveryAgents ?? {},
       users: tenantData.users ?? {},
       accessReviews: tenantData.accessReviews ?? {},
@@ -672,30 +726,20 @@ export async function ensureBootstrapTenants(dataDir, bootstrapTenants = []) {
 
     if (tenant.tenantId === "dev" && state.tenants["dev"]) {
       const devData = state.tenants["dev"];
-      if (!devData.staffActors?.["tenant_admin_1"]) {
-        devData.staffActors = {
-          ...(devData.staffActors ?? {}),
-          "tenant_admin_1": {
-            actorId: "tenant_admin_1",
-            displayName: "Dev Tenant Administrator",
-            country: "IN",
-            status: "active",
-            roles: ["workflow_admin"],
-            queues: ["*"],
-            canAssignQueues: ["*"],
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          }
-        };
-        changed = true;
-      }
       if (!devData.users || Object.keys(devData.users).length === 0) {
+        // One identity: the login user IS the staff actor. userId is set
+        // explicitly to "tenant_admin_1" so it reads as a familiar actor id
+        // wherever it's referenced (workflow assignment, proposedBy, etc.).
         const result = upsertTenantUser(devData.users ?? {}, {
+          userId: "tenant_admin_1",
           email: "admin@dev.local",
           displayName: "Dev Tenant Admin",
           password: process.env.LOANOS_DEV_ADMIN_PASSWORD ?? "dev-admin-password",
           adminRoles: ["tenant_admin", "user_admin", "security_admin", "auditor"],
-          staffActorId: "tenant_admin_1"
+          roles: ["workflow_admin"],
+          queues: ["*"],
+          canAssignQueues: ["*"],
+          country: "IN"
         });
         devData.users = result.users;
         changed = true;

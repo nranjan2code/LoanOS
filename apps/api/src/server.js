@@ -106,7 +106,6 @@ import {
   upsertProductPolicy,
   upsertRecoveryAgent,
   upsertRegulatedEntity,
-  upsertStaffActor,
   validateDisbursement,
   searchCkyc,
   downloadCkycRecord,
@@ -158,6 +157,8 @@ import {
 } from "../../../packages/core/src/index.js";
 import {
   appendEvent,
+  appendPlatformEvent,
+  buildPlatformAuditEvidencePack,
   buildTenantExport,
   computeTenantOnboardingReadiness,
   createEmptyTenantData,
@@ -186,23 +187,35 @@ import {
   setTenantData,
   TENANT_ONBOARDING_FLOWS,
   TENANT_ONBOARDING_MODULES,
-  validateSubProcessor
+  validateSubProcessor,
+  withStateLock
 } from "./file-store.js";
 import {
+  acceptTenantUserInvite,
   authenticatePlatformUser,
   authenticateTenantUser,
+  beginMfaEnrollment,
+  changeOwnPassword,
+  clearLoginAttempts,
   completeAccessReview,
+  confirmMfaEnrollment,
   createAccessReview,
   createSessionRecord,
+  createTenantUserInvite,
+  disableMfa,
   hasPlatformRole,
   hasTenantAdminRole,
+  isLoginLocked,
+  loginAttemptKey,
   publicPlatformUser,
   publicSession,
   publicTenantUser,
+  recordLoginFailure,
   resolveSession,
   revokeSession,
   upsertPlatformUser,
-  upsertTenantUser
+  upsertTenantUser,
+  verifyTotpCode
 } from "./identity.js";
 
 const DEFAULT_PORT = Number(process.env.PORT || 3040);
@@ -217,7 +230,10 @@ export function createLoanOsServer({ dataDir, bootstrapTenants = [], platformAdm
         bootstrapPromise = ensureBootstrapTenants(dataDir, bootstrapTenants);
       }
       await bootstrapPromise;
-      await route(req, res, dataDir, adminKey);
+      // Serialize this request's full load-modify-save span against every other
+      // request touching the same dataDir, so concurrent requests can't race a
+      // lost update against the single state.json file.
+      await withStateLock(dataDir, () => route(req, res, dataDir, adminKey));
     } catch (error) {
       sendJson(res, 500, {
         error: {
@@ -320,7 +336,6 @@ async function route(req, res, dataDir, platformAdminKey) {
       email: sessionResolution.user.email,
       displayName: sessionResolution.user.displayName,
       roles: sessionResolution.user.adminRoles ?? [],
-      staffActorId: sessionResolution.user.staffActorId ?? null,
       sessionId: sessionResolution.session.sessionId
     };
   }
@@ -389,6 +404,21 @@ async function route(req, res, dataDir, platformAdminKey) {
     authContext.effectiveTenantId = tenant.tenantId;
   }
 
+  // Module entitlements: modules default to enabled, so most tenants never hit
+  // this gate. A platform admin can narrow a tenant's onboarding to a module
+  // subset; requiredModuleForPath() maps the routes that belong to an
+  // optional module, and a tenant whose onboarding disabled it is blocked.
+  const requiredModule = requiredModuleForPath(path);
+  if (requiredModule && !(tenant.onboarding?.enabledModules ?? []).includes(requiredModule)) {
+    sendJson(res, 403, {
+      error: {
+        code: "module_disabled",
+        message: `The "${requiredModule}" module is not enabled for this tenant.`
+      }
+    });
+    return;
+  }
+
   // The store hands each handler ONLY this tenant's partition. There is no code
   // path from a handler back to another tenant's data. On every save the tenant's
   // audit events are sealed into an append-only hash chain, so the persisted
@@ -401,7 +431,7 @@ async function route(req, res, dataDir, platformAdminKey) {
   const auditActor = breakGlass
     ? { actor: `platform:${breakGlass.staffId}`, actorType: AUDIT_ACTOR_TYPES.PLATFORM_STAFF }
     : authContext?.principalType === "tenant_user"
-      ? { actor: authContext.staffActorId ?? authContext.userId, actorType: AUDIT_ACTOR_TYPES.TENANT_USER }
+      ? { actor: authContext.userId, actorType: AUDIT_ACTOR_TYPES.TENANT_USER }
       : { actor: tenant.tenantId, actorType: AUDIT_ACTOR_TYPES.TENANT };
   const store = {
     load: async () => getTenantData(scopedWholeState, tenant.tenantId) ?? createEmptyTenantData(),
@@ -945,11 +975,30 @@ async function route(req, res, dataDir, platformAdminKey) {
     return;
   }
 
+  // "Staff actors" are just tenant login users with a workflow role — there is
+  // no separate registry. This read is intentionally not admin-gated (unlike
+  // /admin/users): any signed-in tenant user needs to see who they can assign
+  // work to, and the projection below excludes admin-sensitive fields
+  // (email, adminRoles, credentials) that /admin/users would expose.
   if (method === "GET" && path === "/staff/actors") {
     const state = await store.load();
     sendJson(res, 200, {
-      actors: Object.values(state.staffActors)
+      actors: Object.values(state.users)
+        .filter((user) => (user.roles ?? []).length > 0)
+        .map(publicStaffActorView)
     });
+    return;
+  }
+
+  const staffActorViewMatch = path.match(/^\/staff\/actors\/([^/]+)$/);
+  if (method === "GET" && staffActorViewMatch) {
+    const state = await store.load();
+    const user = state.users[decodeURIComponent(staffActorViewMatch[1])];
+    if (!user || (user.roles ?? []).length === 0) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Staff actor not found." } });
+      return;
+    }
+    sendJson(res, 200, publicStaffActorView(user));
     return;
   }
 
@@ -1015,9 +1064,12 @@ async function route(req, res, dataDir, platformAdminKey) {
       return;
     }
 
+    if (action !== "assignments") {
+      body.actor = resolveSessionActorId(authContext, body.actor);
+    }
     const actorPath = action === "assignments" ? "assignedTo" : "actor";
     const actorId = action === "assignments" ? body.assignedTo : body.actor;
-    const accessFindings = validateGrievanceOfficerAccess(state.staffActors, actorId, actorPath);
+    const accessFindings = validateGrievanceOfficerAccess(state.users, actorId, actorPath);
     const accessSummary = summarizeFindings(accessFindings);
     if (accessSummary.status === "blocked") {
       sendJson(res, 422, {
@@ -1434,41 +1486,6 @@ async function route(req, res, dataDir, platformAdminKey) {
     return;
   }
 
-  if (method === "POST" && path === "/staff/actors") {
-    const body = await readJson(req);
-    const state = await store.load();
-    const result = upsertStaffActor(state.staffActors, body);
-    const nextState =
-      result.summary.status === "blocked"
-        ? state
-        : appendEvent(
-            {
-              ...state,
-              staffActors: result.registry
-            },
-            {
-              type: "staff_actor.upserted",
-              actorId: result.actor.actorId,
-              roles: result.actor.roles
-            }
-          );
-    await store.save(nextState);
-    sendJson(res, result.summary.status === "blocked" ? 422 : 201, result);
-    return;
-  }
-
-  const staffActorMatch = path.match(/^\/staff\/actors\/([^/]+)$/);
-  if (method === "GET" && staffActorMatch) {
-    const state = await store.load();
-    const actor = state.staffActors[decodeURIComponent(staffActorMatch[1])];
-    if (!actor) {
-      sendJson(res, 404, { error: { code: "not_found", message: "Staff actor not found." } });
-      return;
-    }
-    sendJson(res, 200, actor);
-    return;
-  }
-
   // Recovery-agent registry: empanelment evidence (due diligence, training,
   // code-of-conduct, authorization) an active agent must carry before a
   // recovery assignment can name them.
@@ -1552,10 +1569,15 @@ async function route(req, res, dataDir, platformAdminKey) {
     const asOf = body.asOf ? new Date(body.asOf) : new Date();
     const activeTasks = deriveWorkflowTasks(state, { asOf });
     const activeTask = activeTasks.find((task) => task.taskId === taskId) ?? null;
+    if (action === "assignments") {
+      body.assignedBy = resolveSessionActorId(authContext, body.assignedBy);
+    } else {
+      body.actor = resolveSessionActorId(authContext, body.actor);
+    }
     const accessFindings =
       action === "assignments"
-        ? validateWorkflowAssignmentAccess(state.staffActors, activeTask, body)
-        : validateWorkflowActorAccess(state.staffActors, activeTask, body.actor, "actor");
+        ? validateWorkflowAssignmentAccess(state.users, activeTask, body)
+        : validateWorkflowActorAccess(state.users, activeTask, body.actor, "actor");
     const accessSummary = summarizeFindings(accessFindings);
     if (accessSummary.status === "blocked") {
       sendJson(res, 422, {
@@ -2504,7 +2526,7 @@ async function route(req, res, dataDir, platformAdminKey) {
     if (method === "POST") {
       const body = await readJson(req);
       const officialId = body.vCip?.officialActorId;
-      const official = state.staffActors?.[officialId];
+      const official = state.users?.[officialId];
       if (!official) {
         sendJson(res, 422, {
           summary: { status: "blocked", errors: 1 },
@@ -2849,6 +2871,15 @@ async function route(req, res, dataDir, platformAdminKey) {
       return;
     }
 
+    const resolvedProposer = resolveSessionActorId(authContext, body.proposedBy ?? body.decidedBy);
+    body.proposedBy = resolvedProposer;
+    body.decidedBy = resolvedProposer;
+    if (body.manualUnderwriting?.underwriterId !== undefined) {
+      body.manualUnderwriting = {
+        ...body.manualUnderwriting,
+        underwriterId: resolveSessionActorId(authContext, body.manualUnderwriting.underwriterId)
+      };
+    }
     const eligibility = evaluateEligibility({
       ...application,
       aiDecision: body.aiDecision ?? application.aiDecision
@@ -2869,8 +2900,8 @@ async function route(req, res, dataDir, platformAdminKey) {
       body.status === "approved" &&
       Boolean(body.manualUnderwriting?.underwriterId);
     const accessFindings = [
-      ...validateDecisionProposalAccess(state.staffActors, body),
-      ...(requiresUnderwriterAccessCheck ? validateManualUnderwritingAccess(state.staffActors, body) : [])
+      ...validateDecisionProposalAccess(state.users, body),
+      ...(requiresUnderwriterAccessCheck ? validateManualUnderwritingAccess(state.users, body) : [])
     ];
     const accessSummary = summarizeFindings(accessFindings);
     if (accessSummary.status === "blocked") {
@@ -2947,7 +2978,8 @@ async function route(req, res, dataDir, platformAdminKey) {
       return;
     }
 
-    const accessFindings = validateHumanReviewAccess(state.staffActors, body);
+    body.reviewedBy = resolveSessionActorId(authContext, body.reviewedBy);
+    const accessFindings = validateHumanReviewAccess(state.users, body);
     const accessSummary = summarizeFindings(accessFindings);
     if (accessSummary.status === "blocked") {
       sendJson(res, 422, {
@@ -3003,7 +3035,8 @@ async function route(req, res, dataDir, platformAdminKey) {
       return;
     }
 
-    const accessFindings = validateDecisionApprovalAccess(state.staffActors, body);
+    body.approvedBy = resolveSessionActorId(authContext, body.approvedBy);
+    const accessFindings = validateDecisionApprovalAccess(state.users, body);
     const accessSummary = summarizeFindings(accessFindings);
     if (accessSummary.status === "blocked") {
       sendJson(res, 422, {
@@ -3070,8 +3103,10 @@ async function route(req, res, dataDir, platformAdminKey) {
 
     if (method === "POST") {
       const body = await readJson(req);
-      const actorId = body.actor ?? body.generatedBy;
-      const accessFindings = validateDocumentPacketAccess(state.staffActors, actorId, "actor");
+      const actorId = resolveSessionActorId(authContext, body.actor ?? body.generatedBy);
+      body.actor = actorId;
+      body.generatedBy = actorId;
+      const accessFindings = validateDocumentPacketAccess(state.users, actorId, "actor");
       const accessSummary = summarizeFindings(accessFindings);
       if (accessSummary.status === "blocked") {
         sendJson(res, 422, {
@@ -3127,8 +3162,10 @@ async function route(req, res, dataDir, platformAdminKey) {
       return;
     }
 
-    const actorId = body.actor ?? body.deliveredBy;
-    const accessFindings = validateDocumentPacketAccess(state.staffActors, actorId, "actor");
+    const actorId = resolveSessionActorId(authContext, body.actor ?? body.deliveredBy);
+    body.actor = actorId;
+    body.deliveredBy = actorId;
+    const accessFindings = validateDocumentPacketAccess(state.users, actorId, "actor");
     const accessSummary = summarizeFindings(accessFindings);
     if (accessSummary.status === "blocked") {
       sendJson(res, 422, {
@@ -3395,7 +3432,8 @@ async function route(req, res, dataDir, platformAdminKey) {
       return;
     }
 
-    const accessFindings = validateRecoveryAssignmentAccess(state.staffActors, body);
+    body.assignedBy = resolveSessionActorId(authContext, body.assignedBy);
+    const accessFindings = validateRecoveryAssignmentAccess(state.users, body);
     const accessSummary = summarizeFindings(accessFindings);
     if (accessSummary.status === "blocked") {
       sendJson(res, 422, {
@@ -3456,7 +3494,8 @@ async function route(req, res, dataDir, platformAdminKey) {
       return;
     }
 
-    const accessFindings = validateCashRecoveryApprovalAccess(state.staffActors, body);
+    body.approvedBy = resolveSessionActorId(authContext, body.approvedBy);
+    const accessFindings = validateCashRecoveryApprovalAccess(state.users, body);
     const accessSummary = summarizeFindings(accessFindings);
     if (accessSummary.status === "blocked") {
       sendJson(res, 422, {
@@ -4634,12 +4673,17 @@ function sessionTokenFromRequest(req) {
   return null;
 }
 
+function cookieSecureAttribute() {
+  const flag = (process.env.LOANOS_COOKIE_SECURE ?? "").toLowerCase();
+  return flag === "true" || process.env.NODE_ENV === "production" ? "; Secure" : "";
+}
+
 function sessionCookie(token, expiresAt) {
-  return `${SESSION_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Expires=${new Date(expiresAt).toUTCString()}`;
+  return `${SESSION_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax${cookieSecureAttribute()}; Expires=${new Date(expiresAt).toUTCString()}`;
 }
 
 function expiredSessionCookie() {
-  return `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+  return `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax${cookieSecureAttribute()}; Expires=Thu, 01 Jan 1970 00:00:00 GMT`;
 }
 
 async function platformAuthFromRequest(req, dataDir, platformAdminKey) {
@@ -4671,12 +4715,49 @@ async function platformAuthFromRequest(req, dataDir, platformAdminKey) {
   };
 }
 
+// Binds a request's "acting staff member" field to the authenticated
+// session's own login identity (userId), rather than trusting whatever actor
+// id the client sent in the body. Without this, a logged-in tenant user could
+// name any other staff member (propose as one, approve as another) and defeat
+// maker-checker four-eyes controls that only check the *named* user's role,
+// not who is actually logged in. Service-key and break-glass callers have no
+// personal session identity, so their explicit actor fields are trusted as
+// before — this only tightens interactive human logins.
+function resolveSessionActorId(authContext, providedActorId) {
+  if (authContext?.principalType === "tenant_user") {
+    return authContext.userId ?? null;
+  }
+  return providedActorId ?? null;
+}
+
+function requiredModuleForPath(path) {
+  if (path.startsWith("/ai/")) return "ai_governance";
+  if (path.startsWith("/integrations/")) return "integrations";
+  if (path === "/recovery-agents" || path.startsWith("/recovery-agents/")) return "collections";
+  if (path === "/loans/marketplace-offers" || path.startsWith("/loans/marketplace-offers/")) return "marketplace";
+  return null;
+}
+
 function authActor(authContext) {
-  return authContext?.staffActorId
-    ?? authContext?.userId
+  return authContext?.userId
     ?? authContext?.staffId
     ?? authContext?.actor
     ?? "system";
+}
+
+// A non-admin-safe projection of a tenant login user's workflow-facing
+// identity — used by GET /staff/actors so any signed-in user can see who they
+// can assign work to, without exposing email/adminRoles/credentials.
+function publicStaffActorView(user) {
+  return {
+    actorId: user.userId,
+    displayName: user.displayName,
+    status: user.status,
+    country: user.country,
+    roles: user.roles,
+    queues: user.queues,
+    canAssignQueues: user.canAssignQueues
+  };
 }
 
 function publicAuthContext(authContext) {
@@ -4823,11 +4904,39 @@ async function routeAuth(req, res, { dataDir, method, path }) {
     const scope = body.scope === "platform" ? "platform" : "tenant";
     const state = await loadWholeState(dataDir);
     const now = new Date();
+    const attemptKey = loginAttemptKey(scope === "platform" ? "platform" : `tenant:${body.tenantId ?? ""}`, body.email);
+
+    if (isLoginLocked(state.controlPlane.loginAttempts, attemptKey, now)) {
+      sendJson(res, 429, {
+        error: {
+          code: "login_locked",
+          message: "Too many failed login attempts. Try again later."
+        }
+      });
+      return;
+    }
+
+    const failLogin = async () => {
+      const nextState = {
+        ...state,
+        controlPlane: {
+          ...state.controlPlane,
+          loginAttempts: recordLoginFailure(state.controlPlane.loginAttempts, attemptKey, now)
+        }
+      };
+      await saveWholeState(nextState, dataDir);
+    };
 
     if (scope === "platform") {
       const authenticated = authenticatePlatformUser(state.controlPlane, body, now);
       if (!authenticated) {
+        await failLogin();
         sendJson(res, 401, { error: { code: "invalid_credentials", message: "Invalid email or password." } });
+        return;
+      }
+      if (authenticated.user.mfaEnabled && !verifyTotpCode(authenticated.storedUser.mfaSecret, body.mfaCode, { now })) {
+        await failLogin();
+        sendJson(res, 401, { error: { code: "mfa_code_required", message: "A valid MFA code is required." } });
         return;
       }
       const { token, session } = createSessionRecord({
@@ -4848,7 +4957,8 @@ async function routeAuth(req, res, { dataDir, method, path }) {
           sessions: {
             ...state.controlPlane.sessions,
             [session.sessionId]: session
-          }
+          },
+          loginAttempts: clearLoginAttempts(state.controlPlane.loginAttempts, attemptKey)
         }
       };
       await saveWholeState(nextState, dataDir);
@@ -4865,12 +4975,19 @@ async function routeAuth(req, res, { dataDir, method, path }) {
     const tenant = state.controlPlane.tenants?.[tenantId];
     const tenantData = state.tenants?.[tenantId];
     if (!tenant || tenant.status !== "active" || !tenantData) {
+      await failLogin();
       sendJson(res, 401, { error: { code: "invalid_credentials", message: "Invalid tenant, email, or password." } });
       return;
     }
     const authenticated = authenticateTenantUser(tenantData, body, now);
     if (!authenticated) {
+      await failLogin();
       sendJson(res, 401, { error: { code: "invalid_credentials", message: "Invalid tenant, email, or password." } });
+      return;
+    }
+    if (authenticated.user.mfaEnabled && !verifyTotpCode(authenticated.storedUser.mfaSecret, body.mfaCode, { now })) {
+      await failLogin();
+      sendJson(res, 401, { error: { code: "mfa_code_required", message: "A valid MFA code is required." } });
       return;
     }
     const { token, session } = createSessionRecord({
@@ -4879,8 +4996,7 @@ async function routeAuth(req, res, { dataDir, method, path }) {
       userId: authenticated.user.userId,
       email: authenticated.user.email,
       displayName: authenticated.user.displayName,
-      roles: authenticated.user.adminRoles,
-      staffActorId: authenticated.user.staffActorId
+      roles: authenticated.user.adminRoles
     }, now);
     const nextTenantData = {
       ...tenantData,
@@ -4896,7 +5012,8 @@ async function routeAuth(req, res, { dataDir, method, path }) {
         sessions: {
           ...state.controlPlane.sessions,
           [session.sessionId]: session
-        }
+        },
+        loginAttempts: clearLoginAttempts(state.controlPlane.loginAttempts, attemptKey)
       },
       tenants: {
         ...state.tenants,
@@ -4910,6 +5027,193 @@ async function routeAuth(req, res, { dataDir, method, path }) {
       { scope, tenant: publicTenant(tenant), user: authenticated.user, session: publicSession(session) },
       { "set-cookie": sessionCookie(token, session.expiresAt) }
     );
+    return;
+  }
+
+  if (method === "POST" && path === "/auth/password") {
+    const state = await loadWholeState(dataDir);
+    const resolved = resolveSession(state, sessionTokenFromRequest(req));
+    if (!resolved) {
+      sendJson(res, 401, { error: { code: "session_required", message: "A valid login session is required." } });
+      return;
+    }
+    const body = await readJson(req);
+    const now = new Date();
+    if (resolved.session.principalType === "tenant_user") {
+      const tenantData = state.tenants[resolved.tenant.tenantId];
+      const storedUser = tenantData.users[resolved.user.userId];
+      const result = changeOwnPassword(storedUser, body, now);
+      if (result.findings.length > 0) {
+        sendJson(res, 422, { error: { code: "password_change_invalid", message: "Password change is invalid." }, findings: result.findings });
+        return;
+      }
+      await saveWholeState({
+        ...state,
+        tenants: {
+          ...state.tenants,
+          [resolved.tenant.tenantId]: {
+            ...tenantData,
+            users: { ...tenantData.users, [result.user.userId]: result.user }
+          }
+        }
+      }, dataDir);
+      sendJson(res, 200, { ok: true });
+      return;
+    }
+    const storedUser = state.controlPlane.platformUsers[resolved.user.userId];
+    const result = changeOwnPassword(storedUser, body, now);
+    if (result.findings.length > 0) {
+      sendJson(res, 422, { error: { code: "password_change_invalid", message: "Password change is invalid." }, findings: result.findings });
+      return;
+    }
+    await saveWholeState({
+      ...state,
+      controlPlane: {
+        ...state.controlPlane,
+        platformUsers: { ...state.controlPlane.platformUsers, [result.user.userId]: result.user }
+      }
+    }, dataDir);
+    sendJson(res, 200, { ok: true });
+    return;
+  }
+
+  if (method === "POST" && path === "/auth/mfa/setup") {
+    const state = await loadWholeState(dataDir);
+    const resolved = resolveSession(state, sessionTokenFromRequest(req));
+    if (!resolved) {
+      sendJson(res, 401, { error: { code: "session_required", message: "A valid login session is required." } });
+      return;
+    }
+    const now = new Date();
+    if (resolved.session.principalType === "tenant_user") {
+      const tenantData = state.tenants[resolved.tenant.tenantId];
+      const storedUser = tenantData.users[resolved.user.userId];
+      const { user, secret, otpauthUrl } = beginMfaEnrollment(storedUser, now);
+      await saveWholeState({
+        ...state,
+        tenants: {
+          ...state.tenants,
+          [resolved.tenant.tenantId]: { ...tenantData, users: { ...tenantData.users, [user.userId]: user } }
+        }
+      }, dataDir);
+      sendJson(res, 200, { secret, otpauthUrl });
+      return;
+    }
+    const storedUser = state.controlPlane.platformUsers[resolved.user.userId];
+    const { user, secret, otpauthUrl } = beginMfaEnrollment(storedUser, now);
+    await saveWholeState({
+      ...state,
+      controlPlane: { ...state.controlPlane, platformUsers: { ...state.controlPlane.platformUsers, [user.userId]: user } }
+    }, dataDir);
+    sendJson(res, 200, { secret, otpauthUrl });
+    return;
+  }
+
+  if (method === "POST" && path === "/auth/mfa/enable") {
+    const state = await loadWholeState(dataDir);
+    const resolved = resolveSession(state, sessionTokenFromRequest(req));
+    if (!resolved) {
+      sendJson(res, 401, { error: { code: "session_required", message: "A valid login session is required." } });
+      return;
+    }
+    const body = await readJson(req);
+    const now = new Date();
+    if (resolved.session.principalType === "tenant_user") {
+      const tenantData = state.tenants[resolved.tenant.tenantId];
+      const storedUser = tenantData.users[resolved.user.userId];
+      const result = confirmMfaEnrollment(storedUser, body.code, now);
+      if (result.findings.length > 0) {
+        sendJson(res, 422, { error: { code: "mfa_enable_invalid", message: "MFA enrollment could not be confirmed." }, findings: result.findings });
+        return;
+      }
+      await saveWholeState({
+        ...state,
+        tenants: {
+          ...state.tenants,
+          [resolved.tenant.tenantId]: { ...tenantData, users: { ...tenantData.users, [result.user.userId]: result.user } }
+        }
+      }, dataDir);
+      sendJson(res, 200, { user: publicTenantUser(result.user) });
+      return;
+    }
+    const storedUser = state.controlPlane.platformUsers[resolved.user.userId];
+    const result = confirmMfaEnrollment(storedUser, body.code, now);
+    if (result.findings.length > 0) {
+      sendJson(res, 422, { error: { code: "mfa_enable_invalid", message: "MFA enrollment could not be confirmed." }, findings: result.findings });
+      return;
+    }
+    await saveWholeState({
+      ...state,
+      controlPlane: { ...state.controlPlane, platformUsers: { ...state.controlPlane.platformUsers, [result.user.userId]: result.user } }
+    }, dataDir);
+    sendJson(res, 200, { user: publicPlatformUser(result.user) });
+    return;
+  }
+
+  if (method === "POST" && path === "/auth/mfa/disable") {
+    const state = await loadWholeState(dataDir);
+    const resolved = resolveSession(state, sessionTokenFromRequest(req));
+    if (!resolved) {
+      sendJson(res, 401, { error: { code: "session_required", message: "A valid login session is required." } });
+      return;
+    }
+    const body = await readJson(req);
+    const now = new Date();
+    if (resolved.session.principalType === "tenant_user") {
+      const tenantData = state.tenants[resolved.tenant.tenantId];
+      const storedUser = tenantData.users[resolved.user.userId];
+      const result = disableMfa(storedUser, body, now);
+      if (result.findings.length > 0) {
+        sendJson(res, 422, { error: { code: "mfa_disable_invalid", message: "MFA could not be disabled." }, findings: result.findings });
+        return;
+      }
+      await saveWholeState({
+        ...state,
+        tenants: {
+          ...state.tenants,
+          [resolved.tenant.tenantId]: { ...tenantData, users: { ...tenantData.users, [result.user.userId]: result.user } }
+        }
+      }, dataDir);
+      sendJson(res, 200, { user: publicTenantUser(result.user) });
+      return;
+    }
+    const storedUser = state.controlPlane.platformUsers[resolved.user.userId];
+    const result = disableMfa(storedUser, body, now);
+    if (result.findings.length > 0) {
+      sendJson(res, 422, { error: { code: "mfa_disable_invalid", message: "MFA could not be disabled." }, findings: result.findings });
+      return;
+    }
+    await saveWholeState({
+      ...state,
+      controlPlane: { ...state.controlPlane, platformUsers: { ...state.controlPlane.platformUsers, [result.user.userId]: result.user } }
+    }, dataDir);
+    sendJson(res, 200, { user: publicPlatformUser(result.user) });
+    return;
+  }
+
+  if (method === "POST" && path === "/auth/accept-invite") {
+    const body = await readJson(req);
+    if (!body.tenantId) {
+      sendJson(res, 422, { error: { code: "tenant_id_required", message: "tenantId is required to accept an invite." } });
+      return;
+    }
+    const state = await loadWholeState(dataDir);
+    const tenantData = state.tenants?.[body.tenantId];
+    if (!tenantData) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Tenant not found." } });
+      return;
+    }
+    const now = new Date();
+    const result = acceptTenantUserInvite(tenantData.users ?? {}, body, now);
+    if (result.findings.length > 0) {
+      sendJson(res, 422, { error: { code: "invite_invalid", message: "Invite could not be accepted." }, findings: result.findings });
+      return;
+    }
+    await saveWholeState({
+      ...state,
+      tenants: { ...state.tenants, [body.tenantId]: { ...tenantData, users: result.users } }
+    }, dataDir);
+    sendJson(res, 200, { user: result.user });
     return;
   }
 
@@ -5010,19 +5314,9 @@ async function routeTenantAdmin(req, res, { dataDir, method, path, tenant, authC
   if (method === "POST" && path === "/admin/users") {
     const body = await readJson(req);
     const state = await store.load();
-    let nextStaffActors = state.staffActors;
-    if (body.staffActor) {
-      const staffResult = upsertStaffActor(state.staffActors, body.staffActor);
-      if (staffResult.summary.status === "blocked") {
-        sendJson(res, 422, {
-          error: { code: "staff_actor_invalid", message: "Linked staff actor is invalid." },
-          findings: staffResult.findings
-        });
-        return;
-      }
-      nextStaffActors = staffResult.registry;
-      body.staffActorId = staffResult.actor.actorId;
-    }
+    // roles/queues/canAssignQueues/country (the former staff-actor fields) are
+    // now plain fields on the user creation body — one identity, no separate
+    // registry to keep in sync.
     const result = upsertTenantUser(state.users ?? {}, body);
     if (result.findings.length > 0) {
       sendJson(res, 422, {
@@ -5034,7 +5328,6 @@ async function routeTenantAdmin(req, res, { dataDir, method, path, tenant, authC
     const nextState = appendEvent(
       {
         ...state,
-        staffActors: nextStaffActors,
         users: result.users
       },
       {
@@ -5042,11 +5335,37 @@ async function routeTenantAdmin(req, res, { dataDir, method, path, tenant, authC
         userId: result.user.userId,
         email: result.user.email,
         adminRoles: result.user.adminRoles,
+        roles: result.user.roles,
         actor: authActor(authContext)
       }
     );
     await store.save(nextState);
     sendJson(res, 201, { user: result.user });
+    return;
+  }
+
+  if (method === "POST" && path === "/admin/users/invite") {
+    const body = await readJson(req);
+    const state = await store.load();
+    const result = createTenantUserInvite(state.users ?? {}, body);
+    if (result.findings.length > 0) {
+      sendJson(res, 422, {
+        error: { code: "tenant_user_invite_invalid", message: "Tenant user invite is invalid." },
+        findings: result.findings
+      });
+      return;
+    }
+    const nextState = appendEvent(
+      { ...state, users: result.users },
+      {
+        type: "tenant_user.invited",
+        userId: result.user.userId,
+        email: result.user.email,
+        actor: authActor(authContext)
+      }
+    );
+    await store.save(nextState);
+    sendJson(res, 201, { user: result.user, tenantId: tenant.tenantId, inviteToken: result.token });
     return;
   }
 
@@ -5303,13 +5622,18 @@ async function routePlatform(req, res, { dataDir, platformAdminKey, method, path
       });
       return;
     }
-    const nextState = {
+    let nextState = {
       ...state,
       controlPlane: {
         ...state.controlPlane,
         platformUsers: result.users
       }
     };
+    nextState = appendPlatformEvent(
+      nextState,
+      { type: "platform.user.upserted", userId: result.user.userId, email: result.user.email, roles: result.user.roles },
+      { actor: authActor(authContext) }
+    );
     await saveWholeState(nextState, dataDir);
     sendJson(res, 201, { user: result.user });
     return;
@@ -5334,11 +5658,26 @@ async function routePlatform(req, res, { dataDir, platformAdminKey, method, path
       return;
     }
     const state = await loadWholeState(dataDir);
-    const nextState = registerSubProcessor(state, body);
+    let nextState = registerSubProcessor(state, body);
+    nextState = appendPlatformEvent(
+      nextState,
+      { type: "platform.sub_processor.registered", subProcessorId: body.subProcessorId },
+      { actor: authActor(authContext) }
+    );
     await saveWholeState(nextState, dataDir);
     sendJson(res, 201, {
       subProcessor: publicSubProcessor(nextState.controlPlane.subProcessors[body.subProcessorId])
     });
+    return;
+  }
+
+  if (method === "GET" && path === "/platform/audit-events") {
+    if (!hasPlatformRole(authContext, ["platform_admin", "security_admin", "auditor"])) {
+      sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } });
+      return;
+    }
+    const state = await loadWholeState(dataDir);
+    sendJson(res, 200, buildPlatformAuditEvidencePack(state));
     return;
   }
 
@@ -5369,7 +5708,7 @@ async function routePlatform(req, res, { dataDir, platformAdminKey, method, path
     }
     const credential = generateBreakGlassKey();
     const grantId = `bg_${randomBytes(8).toString("hex")}`;
-    const nextState = grantBreakGlass(state, {
+    let nextState = grantBreakGlass(state, {
       grantId,
       tenantId,
       staffId: body.staffId,
@@ -5378,6 +5717,11 @@ async function routePlatform(req, res, { dataDir, platformAdminKey, method, path
       createdBy: authActor(authContext),
       credential
     });
+    nextState = appendPlatformEvent(
+      nextState,
+      { type: "platform.break_glass.granted", grantId, tenantId, staffId: body.staffId, reason: body.reason },
+      { actor: authActor(authContext) }
+    );
     await saveWholeState(nextState, dataDir);
     sendJson(res, 201, {
       grant: publicBreakGlassGrant(nextState.controlPlane.breakGlassGrants[grantId]),
@@ -5400,11 +5744,17 @@ async function routePlatform(req, res, { dataDir, platformAdminKey, method, path
       return;
     }
     const state = await loadWholeState(dataDir);
-    const nextState = revokeBreakGlass(state, decodeURIComponent(breakGlassRevokeMatch[1]));
+    const grantId = decodeURIComponent(breakGlassRevokeMatch[1]);
+    let nextState = revokeBreakGlass(state, grantId);
     if (!nextState) {
       sendJson(res, 404, { error: { code: "not_found", message: "Break-glass grant not found." } });
       return;
     }
+    nextState = appendPlatformEvent(
+      nextState,
+      { type: "platform.break_glass.revoked", grantId },
+      { actor: authActor(authContext) }
+    );
     await saveWholeState(nextState, dataDir);
     sendJson(res, 200, {
       grant: publicBreakGlassGrant(nextState.controlPlane.breakGlassGrants[decodeURIComponent(breakGlassRevokeMatch[1])])
@@ -5485,6 +5835,11 @@ async function routePlatform(req, res, { dataDir, platformAdminKey, method, path
       nextState.controlPlane.tenants[body.tenantId],
       nextState.tenants[body.tenantId]
     );
+    nextState = appendPlatformEvent(
+      nextState,
+      { type: "platform.tenant.created", tenantId: body.tenantId, name: body.name ?? body.tenantId },
+      { actor: authActor(authContext) }
+    );
     await saveWholeState(nextState, dataDir);
     sendJson(res, 201, {
       tenant: publicTenant(nextState.controlPlane.tenants[body.tenantId]),
@@ -5492,6 +5847,59 @@ async function routePlatform(req, res, { dataDir, platformAdminKey, method, path
       readiness,
       apiKey
     });
+    return;
+  }
+
+  const tenantStatusMatch = path.match(/^\/platform\/tenants\/([^/]+)\/status$/);
+  if (method === "POST" && tenantStatusMatch) {
+    if (!hasPlatformRole(authContext, ["platform_admin", "security_admin"])) {
+      sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } });
+      return;
+    }
+    const body = await readJson(req);
+    const tenantId = decodeURIComponent(tenantStatusMatch[1]);
+    if (!["active", "suspended"].includes(body.status)) {
+      sendJson(res, 422, {
+        error: { code: "tenant_status_invalid", message: "status must be one of: active, suspended." }
+      });
+      return;
+    }
+    const state = await loadWholeState(dataDir);
+    const existing = state.controlPlane.tenants[tenantId];
+    if (!existing) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Tenant not found." } });
+      return;
+    }
+    if (existing.status === "offboarded") {
+      sendJson(res, 409, {
+        error: { code: "tenant_offboarded", message: "An offboarded tenant cannot change status; it must be re-onboarded." }
+      });
+      return;
+    }
+    const now = new Date();
+    let nextState = {
+      ...state,
+      controlPlane: {
+        ...state.controlPlane,
+        tenants: {
+          ...state.controlPlane.tenants,
+          [tenantId]: {
+            ...existing,
+            status: body.status,
+            statusReason: body.reason ?? null,
+            updatedAt: now.toISOString()
+          }
+        }
+      }
+    };
+    nextState = appendPlatformEvent(
+      nextState,
+      { type: "platform.tenant.status_changed", tenantId, status: body.status, reason: body.reason ?? null },
+      { actor: authActor(authContext) },
+      now
+    );
+    await saveWholeState(nextState, dataDir);
+    sendJson(res, 200, { tenant: publicTenant(nextState.controlPlane.tenants[tenantId]) });
     return;
   }
 

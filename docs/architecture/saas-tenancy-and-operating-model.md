@@ -28,7 +28,7 @@ Both tiers are India-hosted. Tier choice is a tenant-contract fact recorded in t
 ## Identity and Access
 
 - Local IAM now authenticates tenant/platform humans with HTTP-only sessions and services with scoped tenant API credentials; production IAM should federate this through OIDC/SSO per tenant.
-- The existing staff-actor registry becomes the tenant-level authorization layer: IAM proves who you are; the staff-actor registry decides what regulated actions you may perform (maker, checker, credit officer, grievance officer, human reviewer).
+- One identity, not two: workflow roles (maker, checker, credit officer, grievance officer, human reviewer), queues, and assignment authority are fields directly on the tenant login user record — there is no separate staff-actor registry to keep in sync. A request's acting identity is always the authenticated session's own login user; the server ignores any different actor id a client claims to act as.
 - Maker-checker and four-eyes rules already enforced in the domain remain the source of truth; IAM never bypasses them.
 
 ## Audit Evidence Spine

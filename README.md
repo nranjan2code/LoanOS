@@ -28,15 +28,21 @@ The API is multi-tenant and supports both human sessions and service credentials
 
 Human auth endpoints:
 
-- `POST /auth/login` — tenant or platform login; sets an HTTP-only session cookie
+- `POST /auth/login` — tenant or platform login; sets an HTTP-only session cookie. Accepts `5` failed attempts per `email`/scope before a `15`-minute lockout (`429 login_locked`). If the user has enabled MFA, a valid `mfaCode` (TOTP) is required or the call returns `401 mfa_code_required`.
 - `GET /auth/me`
 - `POST /auth/logout`
+- `POST /auth/password` — self-service password change (session required; `currentPassword` + `newPassword`, min 8 chars)
+- `POST /auth/mfa/setup` — begin TOTP enrollment for the current session; returns a secret and `otpauthUrl`
+- `POST /auth/mfa/enable` — confirm enrollment with a 6-digit code
+- `POST /auth/mfa/disable` — requires current password
+- `POST /auth/accept-invite` — an invited tenant user (`tenantId` + invite `token`) sets their own password and activates their account
 
 Tenant administration endpoints (tenant admin session or tenant service key):
 
 - `GET /admin/me`
 - `GET /admin/governance-summary`
 - `GET|POST /admin/users`
+- `POST /admin/users/invite` — create a tenant user with no password; returns a one-time invite token for out-of-band delivery, redeemed via `POST /auth/accept-invite`
 - `GET /admin/users/:id`
 - `POST /admin/users/:id/status`
 - `POST /admin/users/:id/password`
@@ -50,9 +56,11 @@ Control-plane endpoints (platform admin key via `x-platform-admin-key` or platfo
 - `POST /platform/tenants` — onboard a tenant, optionally with owner user, regulated entity, initial products, module/flow blueprint, readiness, and one-time api key
 - `GET /platform/tenants`
 - `GET /platform/tenants/:id`
+- `POST /platform/tenants/:id/status` — suspend or reactivate a tenant (`{ status: "active"|"suspended", reason }`); suspension immediately blocks all data-plane access for that tenant without destroying data, unlike offboarding
 - `GET /platform/tenants/:id/onboarding` — read onboarding blueprint, readiness checklist, seeded REs, and seeded products
 - `GET|POST /platform/users`
 - `GET /platform/admin-summary`
+- `GET /platform/audit-events` — tamper-evident, hash-chained log of control-plane actions (tenant create/status change, platform user admin, break-glass mint/revoke, sub-processor registration)
 - `GET /platform/tenants/:id/export` — reproducible tenant portability export
 - `POST /platform/tenants/:id/offboarding` — evidenced tenant deletion
 - `POST /platform/tenants/:id/break-glass` — mint a time-boxed break-glass credential
@@ -60,6 +68,10 @@ Control-plane endpoints (platform admin key via `x-platform-admin-key` or platfo
 - `POST /platform/break-glass/:grantId/revoke`
 - `POST /platform/sub-processors`
 - `GET /platform/sub-processors`
+
+Module entitlements: a tenant's `onboarding.enabledModules` defaults to every module (opt-out), but a platform admin can narrow it during onboarding. `ai_governance` gates `/ai/*`, `collections` gates `/recovery-agents*`, `marketplace` gates `/loans/marketplace-offers*`, and `integrations` gates `/integrations/*`; a disabled module returns `403 module_disabled`.
+
+Concurrency: all state lives in one `state.json`; each request's full load-modify-save span is serialized per `LOANOS_DATA_DIR` via an in-process lock (`withStateLock` in `apps/api/src/file-store.js`), so concurrent requests queue instead of racing a lost update. This is correctness, not scale — production would need per-record storage.
 
 Useful data-plane endpoints (tenant session or service key required):
 
@@ -128,8 +140,7 @@ Useful data-plane endpoints (tenant session or service key required):
 - `POST /borrowers/:id/kyc-records`
 - `GET /borrowers/:id/beneficial-owners`
 - `POST /borrowers/:id/beneficial-owners`
-- `GET /staff/actors`
-- `POST /staff/actors`
+- `GET /staff/actors` — read-only projection of tenant login users that carry a workflow role (roles/queues/canAssignQueues live directly on `POST /admin/users`; there is no separate staff-actor registry to write to)
 - `GET /staff/actors/:id`
 - `GET /recovery-agents`
 - `POST /recovery-agents`

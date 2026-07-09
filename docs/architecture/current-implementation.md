@@ -177,9 +177,8 @@ npm run dev:api
 | `GET /borrowers/:id/vcip/evidence` | Retrieves V-CIP evidence details for the borrower's V-CIP KYC record. |
 | `GET /borrowers/:id/beneficial-owners` | Lists a legal-entity borrower's declared beneficial owners. |
 | `POST /borrowers/:id/beneficial-owners` | Declares or updates a beneficial owner (ownership/control/senior-managing-official) with identification and verification evidence. |
-| `GET /staff/actors` | Lists operational staff actors. |
-| `POST /staff/actors` | Creates or updates an operational actor with roles, queues, and assignment authority. |
-| `GET /staff/actors/:id` | Reads one operational staff actor. |
+| `GET /staff/actors` | Lists tenant login users that carry a workflow role — a read-only projection of `state.users`, not a separate registry. |
+| `GET /staff/actors/:id` | Reads one such user's workflow-facing identity. |
 | `GET /recovery-agents` | Lists empanelled recovery agents. |
 | `POST /recovery-agents` | Registers or updates a recovery agent; an active agent requires due-diligence, training, code-of-conduct, and authorization evidence. |
 | `GET /recovery-agents/:id` | Reads one recovery agent. |
