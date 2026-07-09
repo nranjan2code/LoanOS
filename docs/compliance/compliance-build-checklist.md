@@ -26,6 +26,7 @@ Legend:
 | Borrower communication dispatch evidence | SMS/email/WhatsApp provider boundary enforces India data-residency posture and stores masked/hash-only dispatch receipts. | Done |
 | Direct disbursement to borrower/end-beneficiary | LSP/pass-through disbursement blocked; disbursement now requires verified active borrower/end-beneficiary bank-account evidence matching the destination account. | Done |
 | Direct repayment to RE account | LSP/pass-through repayment blocked. | Done |
+| NACH/UPI payment rail initiation evidence | Mock/real payment rail provider boundary registers NACH mandates and creates UPI collect requests with India data-residency enforcement; tenant ledger stores masked/hash-only rail evidence and seals financial audit events. Live settlement/reconciliation remains planned. | Partial |
 | LSP fees paid by RE, not borrower | LSP registry requires RE-paid fee controls and blocks separate borrower-charged LSP fees; vendor settlement module planned. | Partial |
 | Recovery-agent notice before contact | Recovery assignment requires borrower notice evidence before a recovery agent can contact the borrower. | Done |
 | Grievance officer and 30-day escalation path | Staff actor role, complaint registry, 30-day SLA, LWS grievance queue, and RBI CMS escalation evidence. | Done |
@@ -102,8 +103,8 @@ Legend:
 | Requirement | Platform behavior | Status |
 | --- | --- | --- |
 | India-hosted primary data | Preflight requires IN primary storage. | Done |
-| Payment data in India | Preflight requires IN payment data storage if specified. | Done |
-| Straight-through processing audit trail | Event model started; full STP checks planned. | Partial |
+| Payment data in India | Preflight requires IN payment data storage if specified; payment rail provider dispatch also enforces IN data residency. | Done |
+| Straight-through processing audit trail | Event model started; payment rail initiation evidence is sealed as financial audit events. Full STP settlement/reconciliation checks planned. | Partial |
 | Need-based access | Staff actor registry, roles, queue access, and regulated-action checks. External IAM and reviews planned. | Partial |
 | DC/DR and BCP | Production infrastructure design. | Planned |
 

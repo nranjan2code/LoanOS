@@ -478,6 +478,106 @@ async function route(req, res, dataDir, platformAdminKey) {
     return;
   }
 
+  if (method === "GET" && path === "/payment-rails") {
+    const state = await store.load();
+    const paymentRails = Object.values(state.paymentRails ?? {}).filter((record) =>
+      paymentRailMatchesFilters(record, url)
+    );
+    sendJson(res, 200, {
+      count: paymentRails.length,
+      paymentRails
+    });
+    return;
+  }
+
+  if (method === "POST" && path === "/integrations/payment-rails/nach-mandates") {
+    const body = await readJson(req);
+    const manager = new ExternalServiceManager();
+    let providerResult = null;
+    try {
+      providerResult = await manager.createNachMandate(body);
+    } catch (err) {
+      sendJson(res, 422, {
+        error: {
+          code: "payment_rail_nach_mandate_failed",
+          message: err.message
+        }
+      });
+      return;
+    }
+
+    const state = await store.load();
+    const record = buildNachMandateRecord(body, providerResult);
+    const nextState = appendEvent(
+      {
+        ...state,
+        paymentRails: {
+          ...(state.paymentRails ?? {}),
+          [record.paymentRailId]: record
+        }
+      },
+      {
+        type: "integration.payment_rail.nach_mandate_registered",
+        paymentRailId: record.paymentRailId,
+        borrowerId: record.borrowerId,
+        loanAccountId: record.loanAccountId,
+        applicationId: record.applicationId,
+        provider: record.provider,
+        providerRef: record.providerRef,
+        status: record.status,
+        amount: record.maxAmount,
+        dataResidencyCountry: record.dataResidencyCountry
+      }
+    );
+    await store.save(nextState);
+    sendJson(res, providerResult.success === false ? 422 : 201, { paymentRail: record });
+    return;
+  }
+
+  if (method === "POST" && path === "/integrations/payment-rails/upi-collects") {
+    const body = await readJson(req);
+    const manager = new ExternalServiceManager();
+    let providerResult = null;
+    try {
+      providerResult = await manager.createUpiCollect(body);
+    } catch (err) {
+      sendJson(res, 422, {
+        error: {
+          code: "payment_rail_upi_collect_failed",
+          message: err.message
+        }
+      });
+      return;
+    }
+
+    const state = await store.load();
+    const record = buildUpiCollectRecord(body, providerResult);
+    const nextState = appendEvent(
+      {
+        ...state,
+        paymentRails: {
+          ...(state.paymentRails ?? {}),
+          [record.paymentRailId]: record
+        }
+      },
+      {
+        type: "integration.payment_rail.upi_collect_created",
+        paymentRailId: record.paymentRailId,
+        borrowerId: record.borrowerId,
+        loanAccountId: record.loanAccountId,
+        applicationId: record.applicationId,
+        provider: record.provider,
+        providerRef: record.providerRef,
+        status: record.status,
+        amount: record.amount,
+        dataResidencyCountry: record.dataResidencyCountry
+      }
+    );
+    await store.save(nextState);
+    sendJson(res, providerResult.success === false ? 422 : 201, { paymentRail: record });
+    return;
+  }
+
   if (method === "POST" && path === "/integrations/bank-account-verification") {
     const body = await readJson(req);
     const manager = new ExternalServiceManager();
@@ -4407,6 +4507,26 @@ function communicationMatchesFilters(record, url) {
   return true;
 }
 
+function paymentRailMatchesFilters(record, url) {
+  const filters = {
+    type: url.searchParams.get("type"),
+    channel: url.searchParams.get("channel"),
+    status: url.searchParams.get("status"),
+    borrowerId: url.searchParams.get("borrowerId"),
+    applicationId: url.searchParams.get("applicationId"),
+    loanAccountId: url.searchParams.get("loanAccountId"),
+    providerRef: url.searchParams.get("providerRef")
+  };
+  if (filters.type && record.type !== filters.type) return false;
+  if (filters.channel && record.channel !== filters.channel) return false;
+  if (filters.status && record.status !== filters.status) return false;
+  if (filters.borrowerId && record.borrowerId !== filters.borrowerId) return false;
+  if (filters.applicationId && record.applicationId !== filters.applicationId) return false;
+  if (filters.loanAccountId && record.loanAccountId !== filters.loanAccountId) return false;
+  if (filters.providerRef && record.providerRef !== filters.providerRef) return false;
+  return true;
+}
+
 function normalizeCommunicationPayload(input = {}) {
   const channel = input.channel;
   if (!["sms", "email", "whatsapp"].includes(channel)) {
@@ -4454,6 +4574,56 @@ function buildCommunicationRecord(input, payload, dispatch, now = new Date()) {
   };
 }
 
+function buildNachMandateRecord(input, providerResult, now = new Date()) {
+  const accountNumber = input.accountNumber ? String(input.accountNumber).trim() : "";
+  return {
+    paymentRailId: input.paymentRailId ?? input.mandateId ?? createLoanId("payrail"),
+    type: "nach_mandate",
+    channel: "nach",
+    borrowerId: input.borrowerId,
+    applicationId: input.applicationId ?? null,
+    loanAccountId: input.loanAccountId ?? null,
+    maxAmount: Number(input.maxAmount),
+    currency: input.currency ?? "INR",
+    frequency: input.frequency ?? "monthly",
+    startsAt: input.startsAt ?? null,
+    expiresAt: input.expiresAt ?? null,
+    consentRef: input.consentRef ?? null,
+    bankAccountVerificationRef: input.bankAccountVerificationRef ?? null,
+    ifsc: input.ifsc ? String(input.ifsc).trim().toUpperCase() : null,
+    accountNumberLast4: input.accountNumberLast4 ?? (accountNumber ? accountNumber.slice(-4) : null),
+    accountNumberSha256: accountNumber ? hashString(accountNumber) : null,
+    provider: providerResult.provider,
+    providerRef: providerResult.mandateRef ?? providerResult.ref ?? providerResult.providerRef ?? null,
+    status: providerResult.status ?? (providerResult.success ? "registered" : "failed"),
+    dataResidencyCountry: providerResult.dataResidencyCountry ?? "IN",
+    registeredAt: providerResult.registeredAt ?? now.toISOString()
+  };
+}
+
+function buildUpiCollectRecord(input, providerResult, now = new Date()) {
+  const vpa = String(input.vpa ?? "").trim().toLowerCase();
+  return {
+    paymentRailId: input.paymentRailId ?? input.collectId ?? createLoanId("payrail"),
+    type: "upi_collect",
+    channel: "upi",
+    borrowerId: input.borrowerId ?? null,
+    applicationId: input.applicationId ?? null,
+    loanAccountId: input.loanAccountId ?? null,
+    amount: Number(input.amount),
+    currency: input.currency ?? "INR",
+    purpose: input.purpose ?? "repayment",
+    vpaMasked: maskVpa(vpa),
+    vpaSha256: hashString(vpa),
+    provider: providerResult.provider,
+    providerRef: providerResult.collectRef ?? providerResult.ref ?? providerResult.providerRef ?? null,
+    status: providerResult.status ?? (providerResult.success ? "pending" : "failed"),
+    dataResidencyCountry: providerResult.dataResidencyCountry ?? "IN",
+    createdAt: providerResult.createdAt ?? now.toISOString(),
+    expiresAt: input.expiresAt ?? null
+  };
+}
+
 function maskRecipient(channel, value) {
   const recipient = String(value ?? "");
   if (channel === "email") {
@@ -4462,6 +4632,11 @@ function maskRecipient(channel, value) {
   }
   const digits = recipient.replace(/\D/g, "");
   return `***${digits.slice(-4)}`;
+}
+
+function maskVpa(value) {
+  const [handle, provider] = String(value ?? "").split("@");
+  return `${(handle ?? "").slice(0, 2)}***@${provider ?? "***"}`;
 }
 
 function hashString(value) {

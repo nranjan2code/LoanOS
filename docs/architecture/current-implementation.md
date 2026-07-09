@@ -12,7 +12,7 @@ The current implementation is intentionally small:
 - Multi-tenant: every data-plane request runs inside exactly one tenant, resolved from an `x-api-key`/bearer token; cross-tenant access is impossible by construction because each request only ever receives its own tenant's partition.
 - Core domain logic in `packages/core/src`.
 - API wrapper in `apps/api/src`.
-- Automated tests in `tests/`.
+- Automated tests in `tests/` (119 tests as of the latest commit).
 
 Run it:
 
@@ -49,12 +49,13 @@ npm run dev:api
 | `packages/core/src/cersai.js` | CERSAI security-interest lifecycle (draft → filed → registered → modified → satisfied): maker-checker modification, closure-gated satisfaction, prior-encumbrance search, and a `securedLoan` disbursement gate (SARFAESI Act). |
 | `packages/core/src/data-principal-rights.js` | DPDP data-principal access requests (portable data pack assembly) and correction requests (apply/reject with profile propagation), both under a 30-day SLA clock with overdue detection. |
 | `packages/core/src/fiu-str.js` | FIU-IND STR/CTR/CCR lifecycle (draft → reviewed → filed → acknowledged): Principal Officer review gate, ₹10 lakh CTR threshold, and a tipping-off guard (PMLA). |
-| `packages/core/src/external-services.js` | Switchable `ExternalServiceManager` for external integrations (SMS, email, WhatsApp, credit bureau, V-CIP, bank-account verification, eSign, CERSAI, FIU-IND) with mock/real providers selected per integration and India data-residency checks for communications. |
+| `packages/core/src/external-services.js` | Switchable `ExternalServiceManager` for external integrations (SMS, email, WhatsApp, credit bureau, V-CIP, bank-account verification, NACH/UPI payment rails, eSign, CERSAI, FIU-IND) with mock/real providers selected per integration and India data-residency checks for communications/payment rails. |
 | `packages/core/src/audit.js` | Tenant-scoped, append-only audit hash chain: tenant-bound genesis, canonical hashing, `sealAuditChain`/`verifyAuditChain`/`buildAuditEvidencePack`, plus uniform `stampAuditEvents`/`classifyAuditDataClass` actor/data-class provenance. |
 | `packages/core/src/index.js` | Public exports for core domain modules. |
 | `apps/api/src/file-store.js` | Local JSON state load/save helpers; control-plane tenant registry (api-key hashing, tenant resolution), sub-processor register, and break-glass grants; per-tenant data partitions and tenant-scoped accessors; `buildTenantExport`/`offboardTenant` for portability and evidenced deletion. |
-| `apps/api/src/server.js` | HTTP API: platform control plane (tenant minting, export, offboarding, break-glass, sub-processors), tenant-context resolution with break-glass fallback and 401 gate, tenant-scoped store with centralized audit stamping, plus endpoints for compliance controls, AI models, kill switch, workflow tasks, applications, loan accounts, document vault, communications, fraud cases, erasure requests, data disclosures, incidents, bank-account verification, CERSAI security interests, DPDP access/correction requests, and FIU-IND reports. |
-| `tests/compliance.test.js` | Regression tests for the compliance gates (115 tests as of the latest commit). |
+| `apps/api/src/server.js` | HTTP API: platform control plane (tenant minting, export, offboarding, break-glass, sub-processors), tenant-context resolution with break-glass fallback and 401 gate, tenant-scoped store with centralized audit stamping, plus endpoints for compliance controls, AI models, kill switch, workflow tasks, applications, loan accounts, document vault, communications, payment rails, fraud cases, erasure requests, data disclosures, incidents, bank-account verification, CERSAI security interests, DPDP access/correction requests, and FIU-IND reports. |
+| `tests/compliance.test.js` | Regression tests for compliance, API, tenancy, audit, LOS/LMS/LWS, and integration-ledger gates. |
+| `tests/external-services.test.js` | Provider-boundary tests for `ExternalServiceManager` mock/real dispatch and residency guards. |
 
 ## Implemented API Endpoints
 
@@ -81,6 +82,9 @@ npm run dev:api
 | `GET /document-vault/:id` | Reads a document-vault receipt by id. |
 | `GET /communications` | Lists tenant communication dispatch receipts, filterable by channel, purpose, borrower, application, or loan account. |
 | `POST /integrations/communications` | Dispatches SMS/email/WhatsApp through `ExternalServiceManager`, stores a masked/hash-only communication receipt, and seals the attempt into the tenant audit chain. |
+| `GET /payment-rails` | Lists NACH/UPI payment rail initiation receipts, filterable by type, channel, status, borrower, application, loan account, or provider reference. |
+| `POST /integrations/payment-rails/nach-mandates` | Registers a NACH mandate through `ExternalServiceManager`, stores sanitized mandate evidence (account last-four/hash, provider ref, amount/frequency, consent/bank-verification refs), and seals the initiation into the tenant audit chain. |
+| `POST /integrations/payment-rails/upi-collects` | Creates a UPI collect request through `ExternalServiceManager`, stores masked/hash-only VPA evidence with provider/status data, and seals the initiation into the tenant audit chain. |
 | `POST /integrations/bank-account-verification` | Verifies a borrower/end-beneficiary bank account through `ExternalServiceManager`, returning sanitized evidence (`verificationRef`, IFSC, last four digits, status/name match) and sealing the attempt into the tenant audit chain. |
 | `GET /incidents` | Lists tenant security/data incidents with computed CERT-In/RBI reporting-clock status. |
 | `POST /incidents` | Creates a tenant security/data incident, starting the 6-hour reporting clock. |
@@ -296,6 +300,7 @@ npm run dev:api
 | Penal charges | Blocks penal interest and capitalization of penal charges. |
 | Fund flow | Blocks LSP, DLA, pass-through, and pool account fund control. |
 | Bank-account verification | `ExternalServiceManager.verifyBankAccount` supports mock/real providers; the API returns sanitized verification evidence and seals each attempt into the tenant audit chain. |
+| Payment rails | `ExternalServiceManager.createNachMandate` and `createUpiCollect` support mock/real providers with India residency checks; API receipts store provider refs, status, amount/frequency/purpose, account last-four/hash, and masked/hash-only VPA evidence rather than raw payment credentials. |
 | Communications provider | `ExternalServiceManager` dispatches SMS/email/WhatsApp through mock/real providers with India data-residency checks; API dispatch receipts store masked recipient, provider ref, purpose, residency country, and SHA-256 hashes rather than message bodies. |
 | Disbursement | Requires approved loan, valid KFS, signed and delivered document packet, registered CERSAI charge when applicable, verified borrower/end-beneficiary bank account evidence, and direct borrower/end-beneficiary account ownership. |
 | Model lifecycle | Governed transitions (draft → validation_pending → approved → active, plus suspend/reinstate/retire) with legal state guards. Approving validation requires independent validation evidence, an approver independent of the owner, and — for high-risk models — fairness, explainability, and monitoring evidence; a model reaches `active` only through this path. |
@@ -313,11 +318,11 @@ npm run dev:api
 - Persistence is local JSON only (now tenant-partitioned), not a production database.
 - Tenant authentication is a static api key per tenant (hashed at rest); there is no human login/session or key rotation yet. Actor-level authorization remains API-level registry validation within a tenant.
 - The platform admin key is a single shared secret from env/option; break-glass access is audited, but there are no individual platform-staff identities/roles yet (break-glass grants are minted by whoever holds the shared admin key).
-- No real KYC, CKYC, bureau, bank-account, payment, eSign, SMS, email, WhatsApp, or CERSAI integrations yet.
+- No live KYC, CKYC, bureau, bank-account, payment settlement/reconciliation, eSign, SMS, email, WhatsApp, or CERSAI integrations yet.
 - Registries are file-backed and lack external IAM, maker-checker administration workflow, and periodic access review.
 - Borrower/consent/KYC records are file-backed, but support CKYC registry and V-CIP evidence vault validation boundaries.
 - Workflow is file-backed; the local dashboard is not a production workflow UI and outbound RBI CMS API integration is still planned.
-- LMS restructure/settlement/write-off and collections reminders have first slices; NACH files, refunds, external CIC file/API submission, and full multi-channel recovery contact logging are still planned.
+- LMS restructure/settlement/write-off and collections reminders have first slices; full NACH file exchange, payment reconciliation, refunds, external CIC file/API submission, and full multi-channel recovery contact logging are still planned.
 - Document packet renders HTML/text and stores document-vault receipts, but does not yet create PDFs or external eSign envelopes.
 - UI is limited to the local operations dashboard; there is no production borrower/admin application yet.
 - AI governance has first slices for lifecycle, validation gates (fairness/explainability/monitoring for high-risk, adversarial/hallucination for generative), drift-triggered kill switch, disclosure, and human handoff; recurring fairness reports and a sectoral incident-intelligence pack are still planned.
@@ -378,6 +383,7 @@ Current tests prove:
 - API blocks disbursement until the execution document packet is generated and delivered.
 - API creates a document-vault receipt when eSign succeeds, exposes it by list/id routes, and seals a `document_vault.packet_vaulted` audit event.
 - API verifies borrower/end-beneficiary bank accounts through the integration boundary, seals sanitized evidence in the audit chain, and blocks disbursement without verified account proof.
+- API initiates NACH mandates and UPI collects through the integration boundary, keeps masked/hash-only payment rail evidence, enforces India data-residency posture, and seals payment rail audit events as financial data.
 - API dispatches SMS/email/WhatsApp communications through the integration boundary, keeps a masked/hash-only communication ledger, enforces India data-residency posture, and seals communication audit events as personal data.
 - API routes material AI decisions to human review before decision proposal.
 - API stores staff actors and enforces role/queue checks on regulated workflow actions.

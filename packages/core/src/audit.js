@@ -45,11 +45,12 @@ export function classifyAuditDataClass(type) {
     return AUDIT_DATA_CLASSES.PERSONAL;
   }
   if (
-    /^loan|^application|disburse|payment|charge|waiver|reversal|accrual|recovery|prepaid|prepay|foreclos|closure|npa|product_policy|bank_account|document_vault/.test(
+    /^loan|^application|disburse|payment|charge|waiver|reversal|accrual|recovery|prepaid|prepay|foreclos|closure|npa|product_policy|bank_account|document_vault|payment_rail/.test(
       value
     ) ||
     value.includes("bank_account") ||
-    value.includes("document_vault")
+    value.includes("document_vault") ||
+    value.includes("payment_rail")
   ) {
     return AUDIT_DATA_CLASSES.FINANCIAL;
   }

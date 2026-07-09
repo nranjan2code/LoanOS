@@ -58,6 +58,11 @@ export class ExternalServiceManager {
       bankAccountApiUrl: config.bankAccountApiUrl ?? (typeof process !== "undefined" ? process.env.LOANOS_BANK_ACCOUNT_API_URL : "") ?? "",
       bankAccountApiKey: config.bankAccountApiKey ?? (typeof process !== "undefined" ? process.env.LOANOS_BANK_ACCOUNT_API_KEY : "") ?? "",
 
+      paymentRailProvider: config.paymentRailProvider ?? (typeof process !== "undefined" ? process.env.LOANOS_PAYMENT_RAIL_PROVIDER : "mock") ?? "mock",
+      paymentRailApiUrl: config.paymentRailApiUrl ?? (typeof process !== "undefined" ? process.env.LOANOS_PAYMENT_RAIL_API_URL : "") ?? "",
+      paymentRailApiKey: config.paymentRailApiKey ?? (typeof process !== "undefined" ? process.env.LOANOS_PAYMENT_RAIL_API_KEY : "") ?? "",
+      paymentRailDataResidencyCountry: config.paymentRailDataResidencyCountry ?? (typeof process !== "undefined" ? process.env.LOANOS_PAYMENT_RAIL_DATA_RESIDENCY_COUNTRY : "IN") ?? "IN",
+
       esignProvider: config.esignProvider ?? (typeof process !== "undefined" ? process.env.LOANOS_ESIGN_PROVIDER : "mock") ?? "mock",
       esignApiUrl: config.esignApiUrl ?? (typeof process !== "undefined" ? process.env.LOANOS_ESIGN_API_URL : "") ?? "",
       esignApiKey: config.esignApiKey ?? (typeof process !== "undefined" ? process.env.LOANOS_ESIGN_API_KEY : "") ?? "",
@@ -350,6 +355,78 @@ export class ExternalServiceManager {
   }
 
   /**
+   * Registers a NACH mandate with a payment rail provider. This first slice
+   * records initiation evidence only; settlement/reconciliation stay in LMS.
+   */
+  async createNachMandate(input = {}) {
+    ensureIndiaDataResidency("Payment rail", this.config.paymentRailDataResidencyCountry);
+    const payload = normalizeNachMandateInput(input);
+    if (this.config.paymentRailProvider === "real") {
+      if (!this.config.paymentRailApiUrl || !this.config.paymentRailApiKey) {
+        throw new Error("Real payment rail provider configured but API URL or API key is missing.");
+      }
+      const res = await fetch(`${this.config.paymentRailApiUrl}/nach/mandates`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${this.config.paymentRailApiKey}`
+        },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        throw new Error(`Real payment rail provider returned status ${res.status}`);
+      }
+      return await res.json();
+    }
+
+    return {
+      success: true,
+      provider: "mock",
+      channel: "nach",
+      mandateRef: `NACH-MOCK-${Date.now()}`,
+      status: "registered",
+      dataResidencyCountry: this.config.paymentRailDataResidencyCountry,
+      registeredAt: new Date().toISOString()
+    };
+  }
+
+  /**
+   * Creates a UPI collect request. The response is initiation evidence, not a
+   * confirmed loan-account payment.
+   */
+  async createUpiCollect(input = {}) {
+    ensureIndiaDataResidency("Payment rail", this.config.paymentRailDataResidencyCountry);
+    const payload = normalizeUpiCollectInput(input);
+    if (this.config.paymentRailProvider === "real") {
+      if (!this.config.paymentRailApiUrl || !this.config.paymentRailApiKey) {
+        throw new Error("Real payment rail provider configured but API URL or API key is missing.");
+      }
+      const res = await fetch(`${this.config.paymentRailApiUrl}/upi/collects`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${this.config.paymentRailApiKey}`
+        },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        throw new Error(`Real payment rail provider returned status ${res.status}`);
+      }
+      return await res.json();
+    }
+
+    return {
+      success: true,
+      provider: "mock",
+      channel: "upi",
+      collectRef: `UPI-MOCK-${Date.now()}`,
+      status: "pending",
+      dataResidencyCountry: this.config.paymentRailDataResidencyCountry,
+      createdAt: new Date().toISOString()
+    };
+  }
+
+  /**
    * Verifies Aadhaar-based eSign OTP.
    */
   async verifyEsignOtp(aadhaarNumber, otp, payloadHash) {
@@ -482,6 +559,57 @@ export class ExternalServiceManager {
 
 function normalizeName(value) {
   return String(value ?? "").trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function normalizeNachMandateInput(input = {}) {
+  if (!input.borrowerId) {
+    throw new Error("NACH mandate requires borrowerId.");
+  }
+  const maxAmount = Number(input.maxAmount);
+  if (!Number.isFinite(maxAmount) || maxAmount <= 0) {
+    throw new Error("NACH mandate requires a positive maxAmount.");
+  }
+  const frequency = input.frequency ?? "monthly";
+  if (!["monthly", "quarterly", "half_yearly", "yearly", "as_presented"].includes(frequency)) {
+    throw new Error("NACH mandate frequency must be monthly, quarterly, half_yearly, yearly, or as_presented.");
+  }
+  if (!input.bankAccountVerificationRef && !input.accountNumberLast4) {
+    throw new Error("NACH mandate requires bankAccountVerificationRef or accountNumberLast4.");
+  }
+  return {
+    borrowerId: input.borrowerId,
+    loanAccountId: input.loanAccountId ?? null,
+    applicationId: input.applicationId ?? null,
+    maxAmount,
+    currency: input.currency ?? "INR",
+    frequency,
+    startsAt: input.startsAt ?? null,
+    expiresAt: input.expiresAt ?? null,
+    consentRef: input.consentRef ?? null,
+    bankAccountVerificationRef: input.bankAccountVerificationRef ?? null,
+    accountNumberLast4: input.accountNumberLast4 ?? null,
+    ifsc: input.ifsc ? String(input.ifsc).trim().toUpperCase() : null
+  };
+}
+
+function normalizeUpiCollectInput(input = {}) {
+  if (!input.vpa || !/^[A-Za-z0-9.\-_]{2,256}@[A-Za-z0-9.\-_]{2,64}$/.test(String(input.vpa))) {
+    throw new Error("UPI collect requires a valid VPA.");
+  }
+  const amount = Number(input.amount);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new Error("UPI collect requires a positive amount.");
+  }
+  return {
+    borrowerId: input.borrowerId ?? null,
+    loanAccountId: input.loanAccountId ?? null,
+    applicationId: input.applicationId ?? null,
+    amount,
+    currency: input.currency ?? "INR",
+    purpose: input.purpose ?? "repayment",
+    vpa: String(input.vpa).trim().toLowerCase(),
+    expiresAt: input.expiresAt ?? null
+  };
 }
 
 function ensureIndiaDataResidency(label, country) {

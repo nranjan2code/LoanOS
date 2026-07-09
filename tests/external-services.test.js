@@ -123,3 +123,67 @@ test("ExternalServiceManager bank account real provider fails without credential
     /Real bank account verification provider configured but credentials missing/
   );
 });
+
+test("ExternalServiceManager payment rail mock registers NACH mandates and UPI collects", async () => {
+  const manager = new ExternalServiceManager();
+  const mandate = await manager.createNachMandate({
+    borrowerId: "bor_001",
+    loanAccountId: "loan_001",
+    bankAccountVerificationRef: "BANK-VERIFY-MOCK-001",
+    accountNumberLast4: "9012",
+    maxAmount: 15000,
+    frequency: "monthly",
+    consentRef: "consent_nach_001"
+  });
+
+  assert.strictEqual(mandate.success, true);
+  assert.strictEqual(mandate.provider, "mock");
+  assert.strictEqual(mandate.channel, "nach");
+  assert.strictEqual(mandate.status, "registered");
+  assert.strictEqual(mandate.dataResidencyCountry, "IN");
+  assert.match(mandate.mandateRef, /^NACH-MOCK-/);
+
+  const collect = await manager.createUpiCollect({
+    borrowerId: "bor_001",
+    loanAccountId: "loan_001",
+    vpa: "asha@upi",
+    amount: 2500,
+    purpose: "repayment"
+  });
+
+  assert.strictEqual(collect.success, true);
+  assert.strictEqual(collect.provider, "mock");
+  assert.strictEqual(collect.channel, "upi");
+  assert.strictEqual(collect.status, "pending");
+  assert.strictEqual(collect.dataResidencyCountry, "IN");
+  assert.match(collect.collectRef, /^UPI-MOCK-/);
+});
+
+test("ExternalServiceManager payment rail real provider fails without credentials", async () => {
+  const manager = new ExternalServiceManager({ paymentRailProvider: "real" });
+  await assert.rejects(
+    async () => {
+      await manager.createNachMandate({
+        borrowerId: "bor_001",
+        bankAccountVerificationRef: "BANK-VERIFY-MOCK-001",
+        accountNumberLast4: "9012",
+        maxAmount: 15000
+      });
+    },
+    /Real payment rail provider configured but API URL or API key is missing/
+  );
+});
+
+test("ExternalServiceManager payment rail dispatch enforces India data residency", async () => {
+  const manager = new ExternalServiceManager({ paymentRailDataResidencyCountry: "SG" });
+  await assert.rejects(
+    async () => {
+      await manager.createUpiCollect({
+        vpa: "asha@upi",
+        amount: 2500,
+        purpose: "repayment"
+      });
+    },
+    /Payment rail provider data residency country must be IN/
+  );
+});

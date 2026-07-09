@@ -5306,6 +5306,7 @@ test("audit events carry a uniform actor/actorType/dataClass provenance envelope
   assert.equal(classifyAuditDataClass("loan.disbursement.recorded"), "financial");
   assert.equal(classifyAuditDataClass("integration.bank_account.verification_completed"), "financial");
   assert.equal(classifyAuditDataClass("document_vault.packet_vaulted"), "financial");
+  assert.equal(classifyAuditDataClass("integration.payment_rail.upi_collect_created"), "financial");
   assert.equal(classifyAuditDataClass("model.transitioned"), "model_governance");
   assert.equal(classifyAuditDataClass("platform.break_glass.access"), "platform");
   assert.equal(classifyAuditDataClass("regulated_entity.upserted"), "operational");
@@ -5461,6 +5462,76 @@ test("API dispatches communications with masked ledger evidence", async (t) => {
   assert.equal(events.chainValid, true);
   assert.equal(events.count, 2);
   assert(events.events.every((event) => event.dataClass === "personal_data"));
+});
+
+test("API initiates payment rails with masked ledger evidence", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-payrails-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+
+  const mandate = await postJson(`${base}/integrations/payment-rails/nach-mandates`, {
+    borrowerId: "bor_001",
+    applicationId: "app_001",
+    loanAccountId: "loan_001",
+    bankAccountVerificationRef: "BANK-VERIFY-MOCK-001",
+    accountNumber: "123456789012",
+    ifsc: "HDFC0000001",
+    maxAmount: 15000,
+    frequency: "monthly",
+    consentRef: "consent_nach_001"
+  });
+  assert.equal(mandate.status, 201);
+  assert.equal(mandate.body.paymentRail.type, "nach_mandate");
+  assert.equal(mandate.body.paymentRail.provider, "mock");
+  assert.equal(mandate.body.paymentRail.status, "registered");
+  assert.equal(mandate.body.paymentRail.dataResidencyCountry, "IN");
+  assert.equal(mandate.body.paymentRail.accountNumberLast4, "9012");
+  assert.equal(mandate.body.paymentRail.accountNumberSha256.length, 64);
+  assert.equal(Object.hasOwn(mandate.body.paymentRail, "accountNumber"), false);
+
+  const collect = await postJson(`${base}/integrations/payment-rails/upi-collects`, {
+    borrowerId: "bor_001",
+    loanAccountId: "loan_001",
+    vpa: "asha@upi",
+    amount: 2500,
+    purpose: "repayment"
+  });
+  assert.equal(collect.status, 201);
+  assert.equal(collect.body.paymentRail.type, "upi_collect");
+  assert.equal(collect.body.paymentRail.provider, "mock");
+  assert.equal(collect.body.paymentRail.status, "pending");
+  assert.equal(collect.body.paymentRail.vpaMasked, "as***@upi");
+  assert.equal(collect.body.paymentRail.vpaSha256.length, 64);
+  assert.equal(Object.hasOwn(collect.body.paymentRail, "vpa"), false);
+
+  const invalid = await postJson(`${base}/integrations/payment-rails/upi-collects`, {
+    vpa: "not-a-vpa",
+    amount: 2500
+  });
+  assert.equal(invalid.status, 422);
+
+  const ledgerResponse = await apiFetch(`${base}/payment-rails?borrowerId=bor_001`);
+  assert.equal(ledgerResponse.status, 200);
+  const ledger = await ledgerResponse.json();
+  assert.equal(ledger.count, 2);
+  assert(ledger.paymentRails.some((record) => record.type === "nach_mandate"));
+  assert(ledger.paymentRails.some((record) => record.type === "upi_collect"));
+
+  const events = await (await apiFetch(`${base}/audit/events`)).json();
+  const paymentRailEvents = events.events.filter((event) => String(event.type).startsWith("integration.payment_rail."));
+  assert.equal(events.chainValid, true);
+  assert.equal(paymentRailEvents.length, 2);
+  assert(paymentRailEvents.every((event) => event.dataClass === "financial"));
 });
 
 function eligibilityApplication(overrides = {}) {
