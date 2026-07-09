@@ -122,7 +122,7 @@ Tasks:
 - Closure and NOC. First slice done: a settled account issues a checksum-sealed No-Objection Certificate (no dues, security release), gated on closed status and zero outstanding, with idempotent re-issue.
 - Borrower statements. First slice done.
 - CIC-ready reporting snapshot. First slice done.
-- Tests for ledger reconstruction, statement accuracy, classification, and CIC snapshots. Partial.
+- Tests for ledger reconstruction, statement accuracy, classification, and CIC snapshots. Done: integrated tests verify balance reconstruction from raw ledger history, statement alignment, SMA asset classifications, and generated CIC reporting snapshots.
 
 Done when:
 

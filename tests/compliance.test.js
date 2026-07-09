@@ -8165,3 +8165,125 @@ test("LWS manual underwriting task assignment gates and completes decision propo
   assert.equal(taskData.status, "completed");
   assert.ok(taskData.events.some(e => e.type === "workflow.task.completed"));
 });
+
+test("LMS loan balance reconstruction statement accuracy and CIC snapshots", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-lms-reconstruction-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const round2 = (value) => Math.round((value + Number.EPSILON) * 100) / 100;
+
+  // 1. Originate and disburse a registry-backed loan
+  const application = await approveAndDisburseApplication(base);
+  const loanAccountId = application.loanAccountId;
+
+  // Retrieve initial loan account state
+  let account = await (await apiFetch(`${base}/loan-accounts/${loanAccountId}`)).json();
+  const schedule = account.schedule;
+
+  // Perform multiple accruals and payments to build ledger history
+  const installment1 = schedule[0];
+  const installment2 = schedule[1];
+  const installment3 = schedule[2];
+
+  // Accrue interest for installment 1
+  await postJson(`${base}/loan-accounts/${loanAccountId}/accruals`, {
+    asOf: `${installment1.dueDate}T00:00:00.000Z`
+  });
+
+  // Accrue interest for installment 2
+  await postJson(`${base}/loan-accounts/${loanAccountId}/accruals`, {
+    asOf: `${installment2.dueDate}T00:00:00.000Z`
+  });
+
+  // Post payment for installment 1
+  await postJson(`${base}/loan-accounts/${loanAccountId}/payments`, {
+    amount: installment1.totalDue,
+    receivedAt: `${installment1.dueDate}T12:00:00.000Z`,
+    paymentRef: "pmt_001",
+    channel: "nach"
+  });
+
+  // Fetch updated loan account as of the second installment due date
+  const queryAsOf = `${installment2.dueDate}T12:00:00.000Z`;
+  account = await (await apiFetch(`${base}/loan-accounts/${loanAccountId}?asOf=${queryAsOf}`)).json();
+  
+  // Re-fetch current outstanding balances
+  const summary = account.summary;
+
+  // 2. Reconstruct outstanding balances solely from ledger events
+  const targetTime = new Date(queryAsOf).getTime();
+  const ledger = account.ledger.filter((event) => new Date(event.eventDate).getTime() <= targetTime);
+  const principalDisbursed = ledger.reduce((sum, e) => sum + (e.principalDebit ?? 0), 0);
+  const principalPaid = ledger.reduce((sum, e) => sum + (e.principalCredit ?? 0), 0);
+  const principalWaived = ledger.reduce((sum, e) => sum + (e.principalWaiverCredit ?? 0), 0);
+  
+  const interestAccrued = ledger.reduce((sum, e) => sum + (e.interestDebit ?? 0), 0);
+  const interestPaid = ledger.reduce((sum, e) => sum + (e.interestCredit ?? 0), 0);
+  const interestWaived = ledger.reduce((sum, e) => sum + (e.interestWaiverCredit ?? 0), 0);
+
+  const chargesAssessed = ledger.reduce((sum, e) => sum + (e.chargesDebit ?? 0), 0);
+  const chargesWaived = ledger.reduce((sum, e) => sum + (e.chargesWaiverCredit ?? 0), 0);
+  const chargesPaid = ledger.reduce((sum, e) => sum + (e.chargesCredit ?? 0), 0);
+
+  const reconPrincipalOutstanding = Math.max(0, principalDisbursed - principalPaid - principalWaived);
+  const reconInterestOutstanding = Math.max(0, interestAccrued - interestPaid - interestWaived);
+  const reconChargesOutstanding = Math.max(0, chargesAssessed - chargesWaived - chargesPaid);
+  const reconTotalOutstanding = round2(reconPrincipalOutstanding + reconInterestOutstanding + reconChargesOutstanding);
+
+  // Assert balance reconstruction matches loan summaries
+  assert.equal(round2(reconPrincipalOutstanding), summary.principalOutstanding);
+  assert.equal(round2(reconInterestOutstanding), summary.interestOutstanding);
+  assert.equal(round2(reconChargesOutstanding), summary.chargesOutstanding);
+  assert.equal(reconTotalOutstanding, summary.totalOutstanding);
+
+  // 3. Verify statement accuracy matches ledger
+  const stmtRes = await apiFetch(`${base}/loan-accounts/${loanAccountId}/statement?from=${installment1.dueDate}&to=${installment2.dueDate}`);
+  assert.equal(stmtRes.status, 200);
+  const statement = await stmtRes.json();
+  
+  // Verify transaction counts match the ledger events in that window
+  const statementPayments = statement.transactions.filter(t => ["payment", "cash_recovery_payment"].includes(t.type));
+  assert.equal(statementPayments.length, 1);
+  assert.equal(statementPayments[0].amount, installment1.totalDue);
+
+  // 4. Verify delinquency asset classification transitions & CIC snapshots
+  // SMA-0: 1 to 30 days overdue
+  const sma0AsOf = `${addDays(installment2.dueDate, 15)}T00:00:00.000Z`;
+  const sma0Class = await (await apiFetch(`${base}/loan-accounts/${loanAccountId}/asset-classification?asOf=${sma0AsOf}`)).json();
+  assert.equal(sma0Class.assetClass, "sma_0");
+  assert.equal(sma0Class.daysPastDue, 15);
+
+  const sma0Cic = await (await apiFetch(`${base}/loan-accounts/${loanAccountId}/cic-snapshot?asOf=${sma0AsOf}`)).json();
+  assert.equal(sma0Cic.assetClass, "sma_0");
+  assert.equal(sma0Cic.daysPastDue, 15);
+  assert(sma0Cic.amountOverdue > 0);
+
+  // SMA-1: 31 to 60 days overdue
+  const sma1AsOf = `${addDays(installment2.dueDate, 45)}T00:00:00.000Z`;
+  const sma1Class = await (await apiFetch(`${base}/loan-accounts/${loanAccountId}/asset-classification?asOf=${sma1AsOf}`)).json();
+  assert.equal(sma1Class.assetClass, "sma_1");
+  assert.equal(sma1Class.daysPastDue, 45);
+
+  const sma1Cic = await (await apiFetch(`${base}/loan-accounts/${loanAccountId}/cic-snapshot?asOf=${sma1AsOf}`)).json();
+  assert.equal(sma1Cic.assetClass, "sma_1");
+  assert.equal(sma1Cic.daysPastDue, 45);
+
+  // SMA-2: 61 to 90 days overdue
+  const sma2AsOf = `${addDays(installment2.dueDate, 75)}T00:00:00.000Z`;
+  const sma2Class = await (await apiFetch(`${base}/loan-accounts/${loanAccountId}/asset-classification?asOf=${sma2AsOf}`)).json();
+  assert.equal(sma2Class.assetClass, "sma_2");
+  assert.equal(sma2Class.daysPastDue, 75);
+
+  const sma2Cic = await (await apiFetch(`${base}/loan-accounts/${loanAccountId}/cic-snapshot?asOf=${sma2AsOf}`)).json();
+  assert.equal(sma2Cic.assetClass, "sma_2");
+  assert.equal(sma2Cic.daysPastDue, 75);
+});

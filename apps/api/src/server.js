@@ -4041,9 +4041,10 @@ async function route(req, res, dataDir, platformAdminKey) {
       sendJson(res, 404, { error: { code: "not_found", message: "Loan account not found." } });
       return;
     }
+    const asOf = url.searchParams.get("asOf") ? new Date(url.searchParams.get("asOf")) : new Date();
     sendJson(res, 200, {
       ...loanAccount,
-      summary: summarizeLoanAccount(loanAccount)
+      summary: summarizeLoanAccount(loanAccount, asOf)
     });
     return;
   }
