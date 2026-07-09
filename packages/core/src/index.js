@@ -108,6 +108,13 @@ export {
 } from "./data-retention.js";
 
 export {
+  SHARING_LEGAL_BASES,
+  SHARING_RECIPIENT_TYPES,
+  listDataDisclosures,
+  recordDataDisclosure
+} from "./data-sharing.js";
+
+export {
   APPLICATION_STATUSES,
   DECLINE_REASON_CODES,
   applyDecisionApproval,

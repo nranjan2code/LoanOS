@@ -3622,6 +3622,90 @@ test("API holds a DPDP erasure request until retention clears, then redacts the 
   assert.ok(borrower.erasedAt);
 });
 
+test("API gates third-party data sharing on consent and logs statutory disclosures", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+
+  assert.equal((await postJson(`${base}/borrowers`, validBorrowerProfile())).status, 201);
+
+  // Consent-based sharing with no third-party-sharing consent is blocked.
+  const noConsent = await postJson(`${base}/data-disclosures`, {
+    borrowerId: "bor_001",
+    recipientName: "PartnerCo LSP",
+    recipientType: "lsp",
+    purpose: "loan servicing",
+    dataCategories: ["contact", "loan_account"],
+    legalBasis: "consent",
+    actor: "ops-1"
+  });
+  assert.equal(noConsent.status, 422);
+
+  // Grant a third-party-sharing consent, then the disclosure is permitted.
+  assert.equal(
+    (await postJson(`${base}/borrowers/bor_001/consents`, {
+      consentId: "consent_tps",
+      borrowerId: "bor_001",
+      purpose: "third_party_sharing",
+      status: "granted",
+      noticeVersion: "dpdp-notice-v1",
+      acceptedAt: "2026-07-08T06:30:00.000Z"
+    })).status,
+    201
+  );
+  const shared = await postJson(`${base}/data-disclosures`, {
+    borrowerId: "bor_001",
+    recipientName: "PartnerCo LSP",
+    recipientType: "lsp",
+    purpose: "loan servicing",
+    dataCategories: ["contact", "loan_account"],
+    legalBasis: "consent",
+    actor: "ops-1"
+  });
+  assert.equal(shared.status, 201);
+  assert.equal(shared.body.disclosure.consentId, "consent_tps");
+
+  // A statutory disclosure (CIC reporting) needs no consent but must cite the law.
+  const noRef = await postJson(`${base}/data-disclosures`, {
+    borrowerId: "bor_001",
+    recipientName: "CIBIL",
+    recipientType: "credit_information_company",
+    purpose: "credit reporting",
+    dataCategories: ["loan_account"],
+    legalBasis: "legal_obligation",
+    actor: "ops-1"
+  });
+  assert.equal(noRef.status, 422);
+  const statutory = await postJson(`${base}/data-disclosures`, {
+    borrowerId: "bor_001",
+    recipientName: "CIBIL",
+    recipientType: "credit_information_company",
+    purpose: "credit reporting",
+    dataCategories: ["loan_account"],
+    legalBasis: "legal_obligation",
+    legalReference: "CICRA-2005",
+    actor: "ops-1"
+  });
+  assert.equal(statutory.status, 201);
+  assert.equal(statutory.body.disclosure.consentId, null);
+
+  // The record of processing lists both disclosures for the borrower.
+  const ledger = await (await apiFetch(`${base}/data-disclosures?borrowerId=bor_001`)).json();
+  assert.equal(ledger.count, 2);
+  const events = await (await apiFetch(`${base}/audit/events`)).json();
+  assert.ok(events.events.some((event) => event.type === "data_disclosure.recorded"));
+});
+
 test("platform can export a tenant and offboard it with evidenced deletion", async (t) => {
   const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
   t.after(async () => {

@@ -47,6 +47,8 @@ import {
   initializeApplicationWorkflow,
   listBorrowerConsents,
   listBorrowerKycRecords,
+  listDataDisclosures,
+  recordDataDisclosure,
   listRegulatoryControls,
   registerModel,
   recordDriftObservation,
@@ -718,6 +720,40 @@ async function route(req, res, dataDir, platformAdminKey) {
     );
     await store.save(nextState);
     sendJson(res, 200, { erasureRequest: stored, event: result.event });
+    return;
+  }
+
+  // --- Third-party data-sharing disclosure ledger (DPDP record of processing) ---
+  if (method === "GET" && path === "/data-disclosures") {
+    const state = await store.load();
+    const disclosures = listDataDisclosures(state.dataDisclosures, url.searchParams.get("borrowerId") ?? undefined);
+    sendJson(res, 200, { count: disclosures.length, disclosures });
+    return;
+  }
+
+  if (method === "POST" && path === "/data-disclosures") {
+    const body = await readJson(req);
+    const state = await store.load();
+    const result = recordDataDisclosure(state.dataDisclosures, body, state);
+    if (result.summary.status === "blocked") {
+      sendJson(res, 422, {
+        error: { code: "data_disclosure_blocked", message: "Data disclosure is blocked by consent or validation findings." },
+        findings: result.findings
+      });
+      return;
+    }
+    const nextState = appendEvent(
+      { ...state, dataDisclosures: result.registry },
+      {
+        type: "data_disclosure.recorded",
+        disclosureId: result.disclosure.disclosureId,
+        borrowerId: result.disclosure.borrowerId,
+        recipientType: result.disclosure.recipientType,
+        legalBasis: result.disclosure.legalBasis
+      }
+    );
+    await store.save(nextState);
+    sendJson(res, 201, { disclosure: result.disclosure, event: result.event });
     return;
   }
 
