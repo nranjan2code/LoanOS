@@ -21,13 +21,14 @@ Legend:
 | Creditworthiness assessment before sanction | Eligibility engine computes EMI/FOIR affordability, age-at-maturity, and amount/tenor bounds; ineligible borrowers cannot be approved. | Done |
 | KFS before execution | KFS validation and acceptance gate. | Done |
 | Product policy before origination | Product registry validates active RE link, board approval, INR, amount/tenor bounds, APR, cooling-off, recovery mechanism, eligibility, and charges. | Done |
+| Product policy versioning and effective dates | A higher `version` publishes a new policy version, archiving the superseded window; `selectProductPolicyVersion`/`?asOf=` resolve the version governing a given date. | Done |
 | Digitally delivered KFS/documents | KFS delivery evidence gates decision; execution document packet delivery gates disbursement. | Done |
 | Direct disbursement to borrower/end-beneficiary | LSP/pass-through disbursement blocked. | Done |
 | Direct repayment to RE account | LSP/pass-through repayment blocked. | Done |
 | LSP fees paid by RE, not borrower | LSP registry requires RE-paid fee controls and blocks separate borrower-charged LSP fees; vendor settlement module planned. | Partial |
 | Recovery-agent notice before contact | Recovery assignment requires borrower notice evidence before a recovery agent can contact the borrower. | Done |
 | Grievance officer and 30-day escalation path | Staff actor role, complaint registry, 30-day SLA, LWS grievance queue, and RBI CMS escalation evidence. | Done |
-| Data minimization and explicit consent | Consent evidence required; detailed consent ledger planned. | Partial |
+| Data minimization and explicit consent | Consent evidence required at preflight, backed by the purpose-specific consent ledger below. | Done |
 | Purpose-specific consent ledger | Borrower-linked consent records track purpose, notice version, status, accepted/revoked timestamps, and evidence reference. | Done |
 | India data storage | Primary storage country required as IN. | Done |
 | Overseas processing return/delete within 24 hours | Processing duration check implemented. | Done |
@@ -66,6 +67,7 @@ Legend:
 | Risk categorization | Validates low/medium/high. | Done |
 | Borrower profile and economic profile | Borrower registry captures India borrower profile, contact channel, and economic profile for active borrowers. | Done |
 | KYC record expiry | Borrower-backed application resolution blocks expired verified KYC records. | Done |
+| KYC periodic-review refresh | A verified KYC record past its RBI risk-based review cycle (high 2y / medium 8y / low 10y) reads as `refresh_required` and blocks new sanction. | Done |
 | CKYC search/upload | CKYC connector. | Planned |
 | V-CIP evidence | India storage check exists; full evidence vault planned. | Partial |
 | FIU-IND reporting support | AML alerts and reporting pack. | Planned |
@@ -84,10 +86,11 @@ Legend:
 | Requirement | Platform behavior | Status |
 | --- | --- | --- |
 | Notice and consent evidence | Consent timestamp and notice version required. | Done |
-| Consent revocation | Consent ledger with revocation workflow. | Planned |
-| Data principal rights | Access/correction/deletion workflow. | Planned |
-| Breach workflow | Incident and DPBI reporting evidence. | Planned |
-| Retention and deletion | Retention policy engine. | Planned |
+| Consent revocation | Consent ledger with revocation workflow (revoked consent blocks borrower resolution). | Done |
+| Third-party disclosure record-of-processing | `data-sharing.js` logs every disclosure; consent-basis sharing requires an active `third_party_sharing` consent, legal-obligation-basis sharing requires a cited legal reference. | Done |
+| Data principal rights (erasure) | Right-to-erasure workflow (`data-retention.js`) gated on statutory retention (active loan or 5-year RBI/PMLA window); fulfilment redacts the borrower profile in place. Access/correction workflows planned. | Partial |
+| Breach workflow | Incident tracking (`incident-notification.js`) with an independent 6-hour CERT-In/RBI reporting clock and overdue detection; DPBI-specific reporting evidence planned. | Partial |
+| Retention and deletion | Statutory-retention-gated erasure workflow implemented for borrower profiles; a general retention/deletion policy engine across all record types is planned. | Partial |
 
 ## IT Governance, Cybersecurity, and Data Residency
 
@@ -103,9 +106,9 @@ Legend:
 
 | Requirement | Platform behavior | Status |
 | --- | --- | --- |
-| Fraud case workflow | LWS fraud module. | Planned |
+| Fraud case workflow | `fraud-case.js` runs `reported → under_investigation → show_cause_issued → classified_fraud/classified_not_fraud`. | Done |
 | LEA reporting for threshold frauds | Fraud reporting pack. | Planned |
-| Natural justice workflow | Notices, response capture, committee decision. | Planned |
+| Natural justice workflow | An adverse classification is blocked until a show-cause notice (with delivery proof) and either a borrower response or the RBI FRM-2024 21-day window elapsed; classifier must be independent of investigator (four-eyes). Committee pack seals case facts, natural-justice trail, and verdict. | Done |
 | Fraud monitoring return support | FMR export. | Planned |
 
 ## AI, FREE-AI, and Model Risk
@@ -117,11 +120,13 @@ Legend:
 | Independent validation for high-risk models | High-risk model requires independent validation reference. | Done |
 | Human review for material decisions | Warning emitted if missing. | Partial |
 | Human review workflow for material AI decisions | Decision proposal routes to `human_review_required` when a material model lacks human review evidence. | Done |
-| Customer disclosure for customer-facing AI | Warning emitted if missing. | Partial |
+| Customer disclosure for customer-facing AI | `GET /ai/models/:id/disclosure` generates the mandated disclosure for a customer-facing, active model; blocked for back-office, inactive, or kill-switched models. | Done |
+| Human handoff from AI interaction | `POST/GET /ai/handoff-requests` and resolution endpoint track pending → handled handoff by a named human agent. | Done |
 | Global kill switch | Implemented. | Done |
 | Model-level kill switch | Implemented. | Done |
-| Red-teaming and adversarial tests | Evidence fields exist; workflow planned. | Partial |
-| Drift, bias, hallucination monitoring | Monitoring service planned. | Planned |
+| Bias/fairness and explainability evidence | High-risk models require `fairnessAssessmentRef` and `explainabilityRef` (plus `monitoringPlanRef`) to approve validation. | Done |
+| Red-teaming, adversarial, and hallucination tests for generative models | A `modelClass: "generative"` model requires `redTeamRef` and `hallucinationTestRef` to approve validation. | Done |
+| Drift monitoring | `recordDriftObservation` records a metric against an active model; a threshold breach auto-trips a model-scoped kill switch and opens an incident. | Done |
 | AI incident reporting | Kill-switch incident record and post-incident review first slice implemented; sectoral incident pack planned. | Partial |
 
 ## Maker-Checker and Workflow
@@ -153,8 +158,11 @@ Legend:
 | Waivers | Waiver endpoint requires approver, approval reference, reason, and outstanding charges. | Done |
 | Reversals | Reversal endpoint requires original event, approval evidence, reason, and blocks duplicate reversal. | Done |
 | Delinquency buckets | DPD bucket, earliest unpaid installment, and overdue amounts are computed from schedule and ledger. | Done |
+| Collections reminder/notice workflow | Reminder logging requires channel/stage evidence; voice-channel (call/IVR) contact outside the RBI FPC 08:00-19:00 IST window is blocked. | Done |
 | Recovery-agent notice | Recovery assignment requires borrower notice timestamp and delivery reference before active assignment. | Done |
 | Cash recovery same-day posting | Cash recovery requires active noticed recovery assignment and same-India-day account posting. | Done |
+| Hardship restructure | Four-eyes tenure extension and/or rate concession, re-amortizing the remaining principal. | Done |
+| Settlement and write-off | Four-eyes below-par closure via waiver credits (settlement) or book-loss marking retaining ledger dues (write-off); both surface on the CIC snapshot. | Done |
 | SMA/NPA asset classification | Asset class maps DPD to standard, SMA-0, SMA-1, SMA-2, and NPA. | Done |
 | CIC-ready snapshots | Internal account-level and portfolio-level CIC reporting snapshots are generated from account lifecycle state. | Done |
 | External CIC submission | Provider-specific CIC file/API integration and acknowledgement handling. | Planned |
@@ -172,14 +180,15 @@ LoanOS is delivered as SaaS, so the platform itself has compliance obligations a
 | Platform control plane mints tenants | `POST /platform/tenants` behind a platform admin key issues a one-time api key stored only as a hash. | Done |
 | Append-only hash-chained audit spine | Every save seals the tenant's events into a per-tenant SHA-256 hash chain (tenant-bound genesis, previous-hash linkage); `verifyAuditChain` detects any edit, drop, reorder, or genesis swap. | Done |
 | Evidence export pack | `GET /audit/export` produces an auditor-ready pack (genesis/head anchors, whole-chain integrity attestation, optionally filtered events); a broken chain returns 409 instead of a silently-tampered pack. `GET /audit/events` lists the chain with a validity verdict. | Done |
+| Platform-staff break-glass access with audit | Time-boxed, tenant-scoped credential; use seals a `platform.break_glass.access` event into the tenant's own audit chain; tenant-visible grants, revocation, and TTL expiry. | Done |
 | Per-tenant encryption keys and key destruction on exit | Key management design. | Planned |
 | RE due-diligence pack (ownership, security, subcontractors) | Standing vendor-assessment pack. | External |
 | RE audit and inspection rights support | Contract terms plus evidence-export tooling. | Planned |
-| Incident notification supporting RE 6-hour RBI window | Incident workflow with tenant notification. | Planned |
-| CERT-In 6-hour reporting, 180-day India log retention, NTP sync | Platform incident-response and logging controls. | Planned |
+| Incident notification supporting RE 6-hour RBI window | `incident-notification.js` tracks an independent 6-hour reporting clock per authority (CERT-In and RBI); overdue duties surface as `overdue`/`reporting_overdue`. | Done |
+| CERT-In 6-hour reporting, 180-day India log retention, NTP sync | 6-hour incident-notification clock implemented; 180-day log retention and NTP sync are production infrastructure controls, still planned. | Partial |
 | BCP/DR with RTO/RPO commitments | Production infrastructure design. | Planned |
-| Exit plan: portability export and evidenced deletion | Documented, re-loadable full-tenant export. | Planned |
-| Sub-processor register and flow-down obligations | Vendor management module and contract terms. | External |
+| Exit plan: portability export and evidenced deletion | `GET /platform/tenants/:id/export` (reproducible control record + data plane + audit evidence) and `POST /platform/tenants/:id/offboarding` (data-plane purge, api-key revocation, deletion attestation). | Done |
+| Sub-processor register and flow-down obligations | `POST/GET /platform/sub-processors` requires a DPA and data-residency country per sub-processor; `GET /sub-processors` discloses the register to every tenant. Contract flow-down terms remain external. | Partial |
 | ISO 27001 / SOC 2 Type II roadmap | Certification program. | External |
 | DPDP processor terms per tenant | Contract templates backed by retention/deletion/breach tooling. | External |
 

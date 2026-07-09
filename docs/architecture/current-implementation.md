@@ -31,17 +31,23 @@ npm run dev:api
 | `packages/core/src/grievance.js` | Complaint registry, grievance lifecycle, 30-day RBI Ombudsman clock, and RBI CMS escalation evidence. |
 | `packages/core/src/document-packet.js` | KFS, sanction letter, loan agreement summary, and privacy notice rendering, rendered borrower loan-statement document, plus delivery evidence controls. |
 | `packages/core/src/registries.js` | Regulated-entity, LSP, DLA, and product-policy registries, DLA CIMS export shape, plus application reference resolution. |
-| `packages/core/src/borrower-onboarding.js` | Borrower profile, consent ledger, KYC records, and borrower reference resolution. |
+| `packages/core/src/borrower-onboarding.js` | Borrower profile, consent ledger, KYC records (with RBI risk-based periodic-review refresh status), borrower reference resolution, and in-place redaction for DPDP erasure. |
 | `packages/core/src/eligibility.js` | Policy-driven creditworthiness/affordability engine: EMI/FOIR computation, age-at-maturity, amount/tenor bounds, and eligible/refer/ineligible decision. |
+| `packages/core/src/data-sharing.js` | Third-party data-disclosure ledger: consent-gated `consent`-basis sharing, `legal_obligation`-basis sharing requiring a legal reference, both logged as DPDP record-of-processing entries. |
+| `packages/core/src/data-retention.js` | DPDP right-to-erasure workflow: `assessErasureEligibility` holds erasure while a statutory retention window (active loan, or a closed account inside the 5-year RBI/PMLA window) applies; fulfilment redacts the borrower profile in place. |
+| `packages/core/src/fraud-case.js` | Fraud case module: natural-justice gate (show-cause notice + response or 21-day RBI FRM-2024 window) and four-eyes classification, plus a checksum-sealed committee pack generator. |
 | `packages/core/src/application-workflow.js` | LOS application state machine, KFS workflow, human review, decision proposal, manual underwriting override gate for referred applications, coded decline-reason taxonomy, maker-checker approval, disbursement transition. |
-| `packages/core/src/loan-account.js` | LMS loan account creation, amortization schedule, ledger balance reconstruction, interest accrual, payment posting, part-prepayment re-amortization, foreclosure quote and payoff, closure No-Objection Certificate, statements, charges, waivers, reversals, delinquency, recovery controls, asset classification, and CIC snapshots. |
+| `packages/core/src/loan-account.js` | LMS loan account creation, amortization schedule, ledger balance reconstruction, interest accrual, payment posting, part-prepayment re-amortization, foreclosure quote and payoff, closure No-Objection Certificate, statements, charges, waivers, reversals, delinquency, collections reminders (RBI FPC contact-hours gate), recovery controls, hardship restructure, settlement/write-off, asset classification, and CIC snapshots. |
 | `packages/core/src/loan-policy.js` | India-only loan validation, KFS validation, sanction readiness, disbursement checks. |
-| `packages/core/src/model-governance.js` | AI/model inventory, model status, governed lifecycle transitions with a validation gate, global/model kill switch, kill-switch incident and post-incident review workflow, runtime model-use evaluation. |
+| `packages/core/src/model-governance.js` | AI/model inventory (including generative model class), model status, governed lifecycle transitions with a validation gate (fairness/explainability/monitoring for high-risk, adversarial/hallucination testing for generative), drift monitoring with auto kill-switch, global/model kill switch, kill-switch incident and post-incident review workflow, runtime model-use evaluation. |
+| `packages/core/src/ai-interaction.js` | Customer-facing AI disclosure generation (blocked for back-office/inactive/kill-switched models) and human-handoff request/resolution workflow. |
+| `packages/core/src/incident-notification.js` | Tenant-scoped security/data incident tracking with an independent 6-hour reporting clock per authority (CERT-In and RBI), surfacing overdue reporting duties. |
 | `packages/core/src/workflow-tasks.js` | LWS task derivation from LOS/LMS state plus task assignment, start, release, and comment lifecycle. |
+| `packages/core/src/audit.js` | Tenant-scoped, append-only audit hash chain: tenant-bound genesis, canonical hashing, `sealAuditChain`/`verifyAuditChain`/`buildAuditEvidencePack`, plus uniform `stampAuditEvents`/`classifyAuditDataClass` actor/data-class provenance. |
 | `packages/core/src/index.js` | Public exports for core domain modules. |
-| `apps/api/src/file-store.js` | Local JSON state load/save helpers, tenant control-plane registry (api-key hashing, tenant resolution), per-tenant data partitions, and tenant-scoped accessors. |
-| `apps/api/src/server.js` | HTTP API: platform control plane (tenant minting), tenant-context resolution and 401 gate, tenant-scoped store, plus endpoints for compliance controls, AI models, kill switch, workflow tasks, applications, and loan accounts. |
-| `tests/compliance.test.js` | Regression tests for the first compliance gates. |
+| `apps/api/src/file-store.js` | Local JSON state load/save helpers; control-plane tenant registry (api-key hashing, tenant resolution), sub-processor register, and break-glass grants; per-tenant data partitions and tenant-scoped accessors; `buildTenantExport`/`offboardTenant` for portability and evidenced deletion. |
+| `apps/api/src/server.js` | HTTP API: platform control plane (tenant minting, export, offboarding, break-glass, sub-processors), tenant-context resolution with break-glass fallback and 401 gate, tenant-scoped store with centralized audit stamping, plus endpoints for compliance controls, AI models, kill switch, workflow tasks, applications, loan accounts, fraud cases, erasure requests, data disclosures, and incidents. |
+| `tests/compliance.test.js` | Regression tests for the compliance gates (76 tests as of the latest commit). |
 
 ## Implemented API Endpoints
 
@@ -53,8 +59,35 @@ npm run dev:api
 | `POST /platform/tenants` | Mints a tenant and returns a one-time api key; requires the platform admin key. |
 | `GET /platform/tenants` | Lists tenants (no secrets); requires the platform admin key. |
 | `GET /platform/tenants/:id` | Reads one tenant record; requires the platform admin key. |
+| `GET /platform/tenants/:id/export` | Produces a reproducible tenant portability export (control record, data plane, audit evidence pack); requires the platform admin key. |
+| `POST /platform/tenants/:id/offboarding` | Purges the tenant's data plane, revokes its api key, and retains a deletion attestation; requires the platform admin key. |
+| `POST /platform/tenants/:id/break-glass` | Mints a time-boxed, tenant-scoped break-glass credential (returned once, hashed at rest); requires the platform admin key. |
+| `GET /platform/tenants/:id/break-glass` | Lists break-glass grants minted for a tenant; requires the platform admin key. |
+| `POST /platform/break-glass/:grantId/revoke` | Revokes a break-glass grant immediately; requires the platform admin key. |
+| `POST /platform/sub-processors` | Registers a sub-processor with DPA and data-residency evidence; requires the platform admin key. |
+| `GET /platform/sub-processors` | Lists the sub-processor register; requires the platform admin key. |
 | `GET /audit/events` | Lists the tenant's sealed audit chain (filterable by `type`/`subjectId`/`from`/`to`) with a chain-validity verdict. |
 | `GET /audit/export` | Produces an integrity-attested evidence pack from the tenant's audit chain; 409 if the chain fails verification. |
+| `GET /sub-processors` | Standing disclosure of the sub-processor register to every authenticated tenant, flagging cross-border processing. |
+| `GET /break-glass-grants` | Lists every break-glass grant scoped to the calling tenant, with effective status. |
+| `GET /incidents` | Lists tenant security/data incidents with computed CERT-In/RBI reporting-clock status. |
+| `POST /incidents` | Creates a tenant security/data incident, starting the 6-hour reporting clock. |
+| `GET /incidents/:id` | Reads one incident with computed reporting-clock status. |
+| `POST /incidents/:id/notifications` | Records a regulator notification (CERT-In/RBI) against an incident. |
+| `GET /fraud-cases` | Lists fraud cases. |
+| `POST /fraud-cases` | Creates a fraud case (reported → under_investigation). |
+| `GET /fraud-cases/:id` | Reads one fraud case. |
+| `POST /fraud-cases/:id/show-cause-notice` | Records a show-cause notice with delivery proof. |
+| `POST /fraud-cases/:id/responses` | Records the borrower's response to a show-cause notice. |
+| `POST /fraud-cases/:id/classification` | Classifies the case (fraud/not-fraud) under the natural-justice and four-eyes gate. |
+| `GET /fraud-cases/:id/committee-pack` | Generates a checksum-sealed committee pack with the natural-justice trail and classification verdict. |
+| `GET /erasure-requests` | Lists DPDP erasure requests. |
+| `POST /erasure-requests` | Creates a DPDP erasure request for a borrower. |
+| `GET /erasure-requests/:id` | Reads one erasure request with computed retention-eligibility status. |
+| `POST /erasure-requests/:id/fulfillment` | Fulfils an eligible erasure request, redacting the borrower profile in place. |
+| `POST /erasure-requests/:id/rejection` | Rejects an erasure request still held by statutory retention. |
+| `GET /data-disclosures` | Lists third-party data-disclosure records (filterable by `borrowerId`). |
+| `POST /data-disclosures` | Records a third-party data disclosure, gated on active consent or a cited legal reference. |
 | `GET /regulated-entities` | Lists regulated entities. |
 | `POST /regulated-entities` | Creates or updates a regulated entity after compliance validation. |
 | `GET /regulated-entities/:id` | Reads one regulated entity. |
@@ -66,8 +99,8 @@ npm run dev:api
 | `GET /digital-lending-apps/:id` | Reads one digital lending app record. |
 | `GET /reporting/dla/cims` | Generates active DLA rows in RBI CIMS-ready reporting shape, optionally filtered by `regulatedEntityId`. |
 | `GET /products` | Lists product policies. |
-| `POST /products` | Creates or updates a product policy after compliance validation. |
-| `GET /products/:id` | Reads one product policy. |
+| `POST /products` | Creates or updates a product policy after compliance validation; a higher `version` publishes a new policy version, archiving the superseded one. |
+| `GET /products/:id` | Reads one product policy; `?asOf=` resolves the version governing a given date. |
 | `GET /borrowers` | Lists borrower profiles. |
 | `POST /borrowers` | Creates or updates a borrower profile after India/KYC/economic-profile validation. |
 | `GET /borrowers/:id` | Reads one borrower profile. |
@@ -87,7 +120,12 @@ npm run dev:api
 | `POST /complaints/:id/rbi-cms-escalation` | Records RBI CMS escalation reference and reason. |
 | `GET /ai/models` | Returns model registry and kill-switch state. |
 | `POST /ai/models` | Registers or updates a model in inventory. |
-| `POST /ai/models/:id/transitions` | Moves a model through its governed lifecycle (submit, approve validation, activate, suspend, reinstate, retire). |
+| `POST /ai/models/:id/transitions` | Moves a model through its governed lifecycle (submit, approve validation, activate, suspend, reinstate, retire); a generative model additionally requires adversarial (`redTeamRef`) and hallucination (`hallucinationTestRef`) evidence to approve validation. |
+| `POST /ai/models/:id/drift-observations` | Records a drift metric reading against an active model; a threshold breach auto-trips a model-scoped kill switch and opens an incident. |
+| `GET /ai/models/:id/disclosure` | Generates the mandated customer disclosure for a customer-facing, active model; blocked for back-office, inactive, or kill-switched models. |
+| `GET /ai/handoff-requests` | Lists AI-to-human handoff requests. |
+| `POST /ai/handoff-requests` | Requests a human handoff from an AI interaction. |
+| `POST /ai/handoff-requests/:id/resolution` | Resolves a handoff request, recording the named human agent who handled it. |
 | `POST /ai/kill-switch` | Triggers global or model-level kill switch. |
 | `POST /ai/incidents/:id/post-incident-review` | Records the post-incident review (root cause, remediation) for a kill-switch incident. |
 | `POST /ai/kill-switch/clear` | Clears global kill switch with approval reference, only after the incident's post-incident review. |
@@ -119,6 +157,10 @@ npm run dev:api
 | `GET /loan-accounts/:id/cic-snapshot` | Generates a CIC-ready internal reporting snapshot for one account. |
 | `GET /reporting/cic/snapshots` | Generates CIC-ready internal reporting snapshots for the portfolio. |
 | `POST /loan-accounts/:id/recovery-assignments` | Assigns a recovery agent only with borrower notice evidence. |
+| `POST /loan-accounts/:id/reminders` | Logs a collections reminder/notice, blocking voice-channel contact outside the RBI FPC 08:00-19:00 IST window. |
+| `POST /loan-accounts/:id/restructure` | Restructures a stressed loan under four-eyes approval (tenure extension and/or rate concession, re-amortized). |
+| `POST /loan-accounts/:id/settlement` | Closes a loan for less than outstanding under four-eyes approval, waiving the shortfall. |
+| `POST /loan-accounts/:id/write-off` | Marks a loan written off (book loss) while retaining the ledger dues. |
 | `POST /loan-accounts/:id/charges` | Assesses a KFS-disclosed charge. |
 | `POST /loan-accounts/:id/accruals` | Posts interest-accrual ledger events for installments due as of a date and returns the reconciled balance summary. |
 | `GET /loan-accounts/:id/foreclosure-quote` | Returns a foreclosure payoff quote (principal, due interest, charges, disclosed foreclosure charge) for an `asOf` date. |
@@ -139,17 +181,27 @@ npm run dev:api
 | Tenant authentication | Data-plane routes require a valid `x-api-key`/bearer token mapping to an active tenant; missing or invalid keys return 401. Only health and static reference routes are open. |
 | Tenant provisioning | The platform control plane mints tenants behind an admin key and returns a one-time api key stored only as a SHA-256 hash. |
 | Audit spine | Every save seals the tenant's events into an append-only SHA-256 hash chain with a tenant-bound genesis; `verifyAuditChain` detects any edit, drop, reorder, or genesis swap. |
+| Uniform audit provenance | Every event is stamped with an `actor`/`actorType`/`dataClass` envelope before sealing (tenant-attributed normally, platform-staff under break-glass), hashed into the chain. |
 | Evidence export | `GET /audit/export` emits an auditor-ready pack (genesis/head anchors, whole-chain integrity verdict, optionally filtered events) and 409s rather than release a broken chain. |
+| Tenant portability export | `GET /platform/tenants/:id/export` produces a reproducible export (control record, full data plane, audit evidence pack) from source-of-truth records. |
+| Tenant offboarding | `POST /platform/tenants/:id/offboarding` purges the data plane, revokes the api key, and retains a control-plane deletion attestation (erased event count, audit head hash, content digest, actor, reason); requires actor+reason and blocks re-offboarding. |
+| Sub-processor register | Platform admin registers sub-processors with a DPA and data-residency country; every tenant reads the register standing-disclosed, with cross-border processing flagged. |
+| Break-glass access | Platform admin mints a time-boxed, tenant-scoped credential; using it authenticates as that tenant and seals a `platform.break_glass.access` event into the tenant's own audit chain on every request. Tenants see every grant scoped to them; revoke and TTL expiry cut off auth. |
+| Incident notification | A tenant-scoped security/data incident runs an independent 6-hour reporting clock per authority (CERT-In and RBI); a duty unreported past 6 hours from detection surfaces `overdue`/`reporting_overdue`. |
 | India-only lending | Blocks non-IN borrower residency/address, non-INR currency, non-IN data storage. |
 | Regulated entity | Requires supported RE type and grievance officer. |
 | Regulated entity registry | Requires active India RE, website, privacy policy, grievance officer, data-residency posture, and board policy references. |
 | LSP registry | Requires active LSPs to reference an active RE, carry a clear agreement/scope, enhanced due-diligence evidence, periodic review evidence, portfolio monitoring, borrower-facing grievance/privacy disclosures, India data controls, RE-paid fee controls, and recovery-agent guidance where applicable. |
 | DLA registry and CIMS export | Requires active own/LSP DLA records to reference an active RE; LSP-owned DLAs must also reference an active LSP governed by the same RE. Active records must expose availability/link, grievance contact, privacy/disclosure URLs, India data controls, RE website linkage, and CCO/compliance attestation; active records export to RBI CIMS-ready rows. |
 | Product policy registry | Requires active product linked to an active RE, INR, amount/tenor bounds, APR, cooling-off, recovery mechanism, eligibility, board approval, and safe charge design. |
+| Product policy versioning | A product policy carries `version`/`effectiveFrom`/`effectiveTo`; a higher version publishes a new version and archives the superseded one into `priorVersions`; `selectProductPolicyVersion`/`?asOf=` resolve the version governing a given date. |
 | Registry-backed applications | Application can reference `regulatedEntityId` and `productId`/`productCode`; policy facts are resolved before preflight. |
 | Borrower profile registry | Requires active India borrower profile, contact channel, and economic profile for active borrowers. |
 | Consent ledger | Requires borrower-linked purpose, notice version, granted/revoked status, and evidence timestamps. |
+| Third-party data disclosure | Consent-basis (`consent`) disclosures are blocked without an active `third_party_sharing` consent; legal-obligation-basis disclosures (CIC/regulator) require a cited `legalReference`; both are logged as DPDP record-of-processing entries. |
+| DPDP right-to-erasure | An erasure request is held while the borrower has an active loan or any closed account is within the 5-year RBI/PMLA retention window; fulfilment redacts the borrower profile in place, retaining a skeleton for audit. |
 | KYC record registry | Requires borrower-linked KYC status, risk category, verified timestamp, V-CIP India storage, and no Aadhaar biometric/OTP/PID persistence. |
+| KYC periodic-review refresh | A verified KYC record past its RBI risk-based review cycle (high 2y / medium 8y / low 10y) reads as `refresh_required`; preflight blocks new sanction on a refresh-due or expired KYC record. |
 | Staff actor registry | Requires India-operational actors, active status, and recognized roles. |
 | Borrower-backed applications | Application can reference `borrowerId`; borrower, consent, KYC, and economic profile are resolved before preflight. |
 | LOS state machine | Tracks preflight, KFS issued/accepted, ready for decision, human review required, pending decision approval, approved/declined, and disbursed states. |
@@ -165,6 +217,9 @@ npm run dev:api
 | Execution document packet | Renders borrower-facing HTML/text KFS, sanction letter, agreement summary, and privacy notice with SHA-256 checksums and delivery evidence. |
 | LWS task queues | Derives active tasks for blocked compliance, KFS acceptance, credit decision, manual underwriting review for eligibility-referred applications, AI human review, checker approval (surfacing any manual underwriting override for the checker to review), document packet delivery, disbursement, recovery assignment, NPA review, complaint assignment, complaint resolution, and RBI CMS escalation. Each task includes SLA target, due time, and breach status. |
 | LWS task audit | Persists assignment, start, release, and comment events while the domain state remains the source of truth for task resolution. |
+| Fraud case module | Runs a tenant-scoped fraud case (`reported → under_investigation → show_cause_issued → classified_fraud/classified_not_fraud`). |
+| Natural justice and four-eyes fraud classification | An adverse (fraud) classification is blocked until a show-cause notice was issued (with delivery proof) and the borrower responded or the RBI FRM-2024 21-day window elapsed, and the classifier must be independent of the investigator. |
+| Fraud committee pack | A checksum-sealed, read-only pack assembling case facts, the natural-justice trail, the event timeline, and an explicit `classificationPermitted`/`blockers` verdict. |
 | Loan account opening | Disbursement opens an LMS loan account and creates a disbursement ledger event. |
 | Repayment schedule | Generates monthly reducing-balance amortization schedule from KFS/product terms. |
 | Loan ledger | Reconstructs principal, interest, paid amounts, outstanding balance, and next due from ledger and schedule. |
@@ -178,6 +233,9 @@ npm run dev:api
 | Charge controls | Blocks undisclosed charges and penal-interest/capitalizing charge designs. |
 | Waivers and reversals | Requires approval evidence for waivers and reversals, and prevents duplicate reversal of the same event. |
 | Delinquency buckets | Computes DPD bucket, earliest unpaid installment, and overdue amounts from schedule plus ledger. |
+| Collections reminder workflow | Logs each borrower reminder/notice (channel, stage, delinquency snapshot); voice-channel (call/IVR) contact outside the RBI FPC 08:00-19:00 IST window is blocked. |
+| Hardship restructure | Modifies a stressed active loan under four-eyes approval, extending tenure and/or conceding rate, and re-amortizes the remaining principal (past installments untouched); flags the account `restructured`. |
+| Settlement and write-off | `settleLoanAccount` closes a loan for less than outstanding under four-eyes approval via principal/interest waiver credits (`closureType: "settled"`); `writeOffLoanAccount` marks `written_off` as a book loss while retaining ledger dues; both surface in the CIC snapshot. |
 | Asset classification | Maps DPD to standard, SMA-0, SMA-1, SMA-2, and NPA classes. |
 | CIC snapshots | Produces account and portfolio reporting snapshots from schedule, ledger, borrower, RE, product, and asset-classification state. |
 | Recovery-agent notice | Recovery assignment requires delinquent account, agent details, borrower notice timestamp, and delivery reference. |
@@ -194,22 +252,26 @@ npm run dev:api
 | AI model inventory | Blocks model use if missing from inventory. |
 | AI model validation | Blocks active use without approved validation. |
 | AI kill switch | Blocks model use when global switch is active or model is suspended. |
+| AI drift monitoring | A drift metric reading breaching the model's threshold auto-trips a model-scoped kill switch, suspending the model and opening an incident that requires post-incident review before the model can run again. |
+| Generative-AI testing gate | A model registered `modelClass: "generative"` must additionally evidence adversarial (`redTeamRef`) and hallucination (`hallucinationTestRef`) testing before validation can be approved. |
+| Customer-facing AI disclosure | Generated only for a customer-facing, active model; blocked for back-office, inactive, or globally kill-switched models. |
+| AI human handoff | Handoff requests move `pending → handled` by a named human agent, sealing `ai.human_handoff.*` events into the audit spine. |
 | AI incident and clearance | A kill-switch trigger opens an incident; the global switch cannot be cleared until a post-incident review (root cause, remediation) is recorded, and clearance closes the incident while retaining the review evidence. |
 
 ## Known Limitations
 
 - Persistence is local JSON only (now tenant-partitioned), not a production database.
-- Tenant authentication is a static api key per tenant (hashed at rest); there is no human login/session, key rotation, or external IAM yet. Actor-level authorization remains API-level registry validation within a tenant.
-- The platform admin key is a single shared secret from env/option; no platform-staff identities, roles, or break-glass audit yet.
+- Tenant authentication is a static api key per tenant (hashed at rest); there is no human login/session or key rotation yet. Actor-level authorization remains API-level registry validation within a tenant.
+- The platform admin key is a single shared secret from env/option; break-glass access is audited, but there are no individual platform-staff identities/roles yet (break-glass grants are minted by whoever holds the shared admin key).
 - No real KYC, CKYC, bureau, payment, eSign, SMS, email, or CERSAI integrations yet.
 - Registries are file-backed and lack external IAM, maker-checker administration workflow, and periodic access review.
 - Borrower/consent/KYC records are file-backed and do not yet integrate CKYC, V-CIP providers, consent managers, or document stores.
 - Workflow is file-backed and does not yet include dashboard UI, notification dispatch, or outbound RBI CMS API integration.
-- LMS is early-stage: no NACH files, refunds, restructure, external CIC file/API submission, or full recovery contact logging yet.
+- LMS restructure/settlement/write-off and collections reminders have first slices; NACH files, refunds, external CIC file/API submission, and full multi-channel recovery contact logging are still planned.
 - Document packet renders HTML/text but does not yet create PDFs or eSign envelopes.
 - No UI yet.
-- AI governance is a runtime guard plus first lifecycle/incident slices, but does not yet include drift monitoring, recurring fairness reports, or sectoral incident pack generation.
-- The audit spine seals structural fields (tenant, sequence, hashes, timestamp) plus each handler's payload; uniform actor and data-class/consent/policy-version stamping across every emission, plus signed external anchoring, are follow-ons.
+- AI governance has first slices for lifecycle, validation gates (fairness/explainability/monitoring for high-risk, adversarial/hallucination for generative), drift-triggered kill switch, disclosure, and human handoff; recurring fairness reports and a sectoral incident-intelligence pack are still planned.
+- The audit spine stamps a uniform actor/actorType/dataClass envelope on every event at the seal seam; signed external anchoring is a follow-on.
 - Compliance docs are source-grounded but still require counsel/compliance review before production.
 
 ## Test Coverage
@@ -230,6 +292,17 @@ Current tests prove:
 - AI model kill switch blocks model-assisted underwriting.
 - Model lifecycle blocks illegal transitions and un-validated approval, and only a validated, activated model can be used; API drives draft → active.
 - A kill-switch trigger opens an incident, the global switch cannot be cleared before a recorded post-incident review, and clearance closes the incident while retaining the review evidence.
+- A generative model must evidence adversarial (red-team) and hallucination testing before validation approval; a drift observation breaching threshold trips a model-scoped kill switch and opens an incident.
+- The API discloses customer-facing AI (blocked for back-office/inactive/kill-switched models) and records a human-handoff request through to resolution by a named agent.
+- Product policy versioning retains a prior version's window when superseded and resolves the version governing a given `asOf` date.
+- A KYC record past its risk-based review cycle reads as `refresh_required` and blocks new sanction; the API surfaces refresh status and blocks on a refresh-due record.
+- Third-party data sharing is gated on active consent for consent-basis disclosures, requires a legal reference for legal-obligation-basis disclosures, and both are logged.
+- A DPDP erasure request is held by an active loan and by the 5-year statutory retention window, then redacts the borrower profile in place once eligible.
+- A fraud case's adverse classification is gated on natural justice (show-cause notice + response/21-day window) and four-eyes separation; the committee pack seals the case and states classification readiness.
+- A security/data incident's CERT-In/RBI reporting clock breaches after 6 hours undetected, and the API tracks the incident through report and notification.
+- Collections reminders enforce the RBI FPC contact-hours window; a hardship restructure re-amortizes under four-eyes approval; settlement and write-off both close a loan under four-eyes approval and surface on the CIC snapshot.
+- The platform can export a tenant (reproducible portability pack) and offboard it with evidenced deletion; break-glass access is time-boxed, tenant-visible, and seals an audit event on every use; the sub-processor register is disclosed to every tenant.
+- Every sealed audit event carries a uniform actor/actorType/dataClass provenance envelope, attributed to the tenant or to platform staff under break-glass.
 - API stores blocked compliance applications and supports lookup.
 - Regulated entity and product policy registries resolve an application.
 - Unsafe product penal-charge design is rejected.
