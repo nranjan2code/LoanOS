@@ -39,7 +39,7 @@ Tasks:
 - Cooling-off policy. Done.
 - Prepayment/foreclosure policy.
 - Floating-rate reset policy where applicable.
-- Policy versioning and effective dates. Planned.
+- Policy versioning and effective dates. First slice done: a product policy carries a `version` and `effectiveFrom`/`effectiveTo`; `upsertProductPolicy` publishes each material change as a new version (must increase and take effect after the current one), archiving the superseded version with its window closed in `priorVersions`. `selectProductPolicyVersion(product, asOf)` (and `GET /products/{id}?asOf=`) resolve the version governing a given date, so an application is always priced by the policy effective on its date.
 - Tests for missing policy, invalid cooling-off, undisclosed fee posting. Partial.
 
 Done when:

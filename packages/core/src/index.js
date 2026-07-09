@@ -67,6 +67,7 @@ export {
   normalizeProductPolicy,
   normalizeRegulatedEntity,
   resolveLoanApplicationReferences,
+  selectProductPolicyVersion,
   upsertDigitalLendingApp,
   upsertLendingServiceProvider,
   upsertProductPolicy,

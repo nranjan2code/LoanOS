@@ -47,6 +47,7 @@ import {
   upsertBorrowerProfile,
   upsertConsentRecord,
   upsertKycRecord,
+  selectProductPolicyVersion,
   upsertProductPolicy,
   upsertRegulatedEntity,
   validateKfs,
@@ -600,6 +601,55 @@ test("product policy rejects unsafe penal charge design", () => {
   assert(productResult.findings.some((finding) => finding.controlId === "RBI-FPC-PENAL"));
 });
 
+test("product policy versioning retains prior versions and resolves by effective date", () => {
+  const reResult = upsertRegulatedEntity({}, validRegulatedEntity());
+
+  // Version 1 effective from Jan 2026.
+  const v1 = upsertProductPolicy(
+    {},
+    merge(validProductPolicy(), { version: 1, effectiveFrom: "2026-01-01", annualInterestRateBps: 1800 }),
+    reResult.registry
+  );
+  assert.equal(v1.summary.status, "ready");
+  assert.equal(v1.product.version, 1);
+
+  // A new version must take effect after the current one.
+  const badBump = upsertProductPolicy(
+    v1.registry,
+    merge(validProductPolicy(), { version: 2, effectiveFrom: "2026-01-01", annualInterestRateBps: 2000 }),
+    reResult.registry
+  );
+  assert.equal(badBump.summary.status, "blocked");
+  assert(badBump.findings.some((finding) => finding.path === "effectiveFrom"));
+
+  // A version cannot go backwards.
+  const badVersion = upsertProductPolicy(
+    v1.registry,
+    merge(validProductPolicy(), { version: 1, effectiveFrom: "2026-06-01" }),
+    reResult.registry
+  );
+  // Same version is an in-place correction, not a decrease — allowed.
+  assert.equal(badVersion.summary.status, "ready");
+
+  // Version 2 effective from Jul 2026, archiving v1 with a closed window.
+  const v2 = upsertProductPolicy(
+    v1.registry,
+    merge(validProductPolicy(), { version: 2, effectiveFrom: "2026-07-01", annualInterestRateBps: 2000 }),
+    reResult.registry
+  );
+  assert.equal(v2.summary.status, "ready");
+  assert.equal(v2.product.version, 2);
+  assert.equal(v2.product.priorVersions.length, 1);
+  assert.equal(v2.product.priorVersions[0].version, 1);
+  assert.equal(v2.product.priorVersions[0].effectiveTo, "2026-07-01");
+
+  // Resolving by date returns the version governing that day.
+  assert.equal(selectProductPolicyVersion(v2.product, new Date("2026-03-01")).annualInterestRateBps, 1800);
+  assert.equal(selectProductPolicyVersion(v2.product, new Date("2026-09-01")).annualInterestRateBps, 2000);
+  // Before the earliest version, the earliest governing policy is returned.
+  assert.equal(selectProductPolicyVersion(v2.product, new Date("2025-01-01")).version, 1);
+});
+
 test("LSP registry enforces agreement, due diligence, review, data, and fee controls", () => {
   const reResult = upsertRegulatedEntity({}, validRegulatedEntity());
   assert.equal(reResult.summary.status, "ready");
@@ -949,6 +999,43 @@ test("API stores blocked compliance applications", async (t) => {
 
   const lookup = await apiFetch(`${base}/loans/applications/${body.applicationId}`);
   assert.equal(lookup.status, 200);
+});
+
+test("API versions a product policy and resolves it by effective date", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+
+  assert.equal((await postJson(`${base}/regulated-entities`, validRegulatedEntity())).status, 201);
+  assert.equal(
+    (await postJson(`${base}/products`, merge(validProductPolicy(), { version: 1, effectiveFrom: "2026-01-01", annualInterestRateBps: 1800 }))).status,
+    201
+  );
+  // Publish version 2 effective mid-year.
+  const v2 = await postJson(
+    `${base}/products`,
+    merge(validProductPolicy(), { version: 2, effectiveFrom: "2026-07-01", annualInterestRateBps: 2000 })
+  );
+  assert.equal(v2.status, 201);
+  assert.equal(v2.body.product.version, 2);
+  assert.equal(v2.body.product.priorVersions.length, 1);
+
+  // The current fetch returns v2; an asOf in H1 returns v1's pricing.
+  const current = await (await apiFetch(`${base}/products/prod_personal_loan`)).json();
+  assert.equal(current.annualInterestRateBps, 2000);
+  const asOfH1 = await (await apiFetch(`${base}/products/prod_personal_loan?asOf=2026-03-15`)).json();
+  assert.equal(asOfH1.annualInterestRateBps, 1800);
+  assert.equal(asOfH1.version, 1);
 });
 
 test("API supports RE and product policy backed loan applications", async (t) => {

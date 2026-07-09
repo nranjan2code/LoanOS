@@ -621,6 +621,13 @@ export function normalizeProductPolicy(input, now = new Date()) {
     productCode: input.productCode,
     productName: input.productName,
     productType: input.productType,
+    // Policy versioning: each material change publishes a new version effective
+    // from a stated date. Prior versions are retained so an application (and any
+    // loan it becomes) is always governed by the version effective on its date.
+    version: Number.isFinite(input.version) ? input.version : 1,
+    effectiveFrom: input.effectiveFrom ?? now.toISOString().slice(0, 10),
+    effectiveTo: input.effectiveTo ?? null,
+    priorVersions: Array.isArray(input.priorVersions) ? input.priorVersions : [],
     status: input.status ?? ACTIVE_STATUS,
     currency: input.currency ?? "INR",
     minAmount: input.minAmount,
@@ -654,22 +661,80 @@ export function normalizeProductPolicy(input, now = new Date()) {
   };
 }
 
+function stripVersionHistory(product) {
+  const { priorVersions, ...snapshot } = product;
+  return snapshot;
+}
+
+// Return the policy version effective at a given date, drawing on the retained
+// prior versions. Before the earliest effectiveFrom, the earliest version is
+// returned as the closest governing policy.
+export function selectProductPolicyVersion(product, asOf = new Date()) {
+  if (!product) {
+    return null;
+  }
+  const asOfDate = (asOf instanceof Date ? asOf : new Date(asOf)).toISOString().slice(0, 10);
+  const candidates = [...(product.priorVersions ?? []), stripVersionHistory(product)].sort(
+    (a, b) => (a.effectiveFrom ?? "") < (b.effectiveFrom ?? "") ? -1 : 1
+  );
+  const match = candidates.find(
+    (version) =>
+      (version.effectiveFrom ?? "") <= asOfDate && (!version.effectiveTo || asOfDate < version.effectiveTo)
+  );
+  return match ?? candidates[0] ?? null;
+}
+
 export function upsertProductPolicy(registry, input, regulatedEntities = {}, now = new Date()) {
+  const existing = (registry ?? {})[input?.productId] ?? null;
   const product = normalizeProductPolicy(input, now);
   const validation = validateProductPolicy(product, regulatedEntities);
+  const findings = [...validation.findings];
+
+  // A change to an existing product must publish a new version with a later
+  // effective date; the superseded version is retained with its window closed.
+  let stored = product;
+  if (existing) {
+    if (product.version < existing.version) {
+      findings.push(createFinding("error", "RBI-DL-2025", "Product policy version must not decrease.", "version"));
+    } else if (product.version > existing.version) {
+      if (product.effectiveFrom <= existing.effectiveFrom) {
+        findings.push(
+          createFinding("error", "RBI-DL-2025", "A new product policy version must take effect after the current one.", "effectiveFrom")
+        );
+      }
+      const archived = { ...stripVersionHistory(existing), effectiveTo: product.effectiveFrom };
+      stored = {
+        ...product,
+        createdAt: existing.createdAt ?? product.createdAt,
+        priorVersions: [...(existing.priorVersions ?? []), archived]
+      };
+    } else {
+      // Same version: an in-place correction that keeps the effective window and
+      // history of the current version.
+      stored = {
+        ...product,
+        version: existing.version,
+        effectiveFrom: existing.effectiveFrom,
+        createdAt: existing.createdAt ?? product.createdAt,
+        priorVersions: existing.priorVersions ?? []
+      };
+    }
+  }
+
+  const summary = summarizeFindings(findings);
   const nextRegistry =
-    validation.summary.status === "blocked"
+    summary.status === "blocked"
       ? registry ?? {}
       : {
           ...(registry ?? {}),
-          [product.productId]: product
+          [stored.productId]: stored
         };
 
   return {
     registry: nextRegistry,
-    product,
-    findings: validation.findings,
-    summary: validation.summary
+    product: stored,
+    findings,
+    summary
   };
 }
 

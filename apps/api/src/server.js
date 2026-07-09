@@ -58,6 +58,7 @@ import {
   releaseWorkflowTask,
   renderLoanStatementDocument,
   resolveComplaint,
+  selectProductPolicyVersion,
   resolveBorrowerApplicationReferences,
   resolveLoanApplicationReferences,
   summarizeFindings,
@@ -1030,6 +1031,12 @@ async function route(req, res, dataDir, platformAdminKey) {
     const product = state.productPolicies[decodeURIComponent(productMatch[1])];
     if (!product) {
       sendJson(res, 404, { error: { code: "not_found", message: "Product policy not found." } });
+      return;
+    }
+    // `asOf` returns the policy version effective on that date, drawn from the
+    // retained version history; without it the current version is returned.
+    if (url.searchParams.get("asOf")) {
+      sendJson(res, 200, selectProductPolicyVersion(product, new Date(url.searchParams.get("asOf"))));
       return;
     }
     sendJson(res, 200, product);
