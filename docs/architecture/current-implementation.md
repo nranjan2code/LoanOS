@@ -110,6 +110,9 @@ npm run dev:api
 | `POST /borrowers/:id/consents` | Creates or updates a borrower consent record. |
 | `GET /borrowers/:id/kyc-records` | Lists borrower KYC records. |
 | `POST /borrowers/:id/kyc-records` | Creates or updates a borrower KYC record. |
+| `POST /borrowers/:id/ckyc/search` | Searches the CKYC registry by identifier (PAN). |
+| `POST /borrowers/:id/ckyc/download` | Downloads and syncs a verified record from CKYC to borrower profile. |
+| `POST /borrowers/:id/ckyc/upload` | Uploads a local verified KYC record to CKYC registry. |
 | `GET /borrowers/:id/beneficial-owners` | Lists a legal-entity borrower's declared beneficial owners. |
 | `POST /borrowers/:id/beneficial-owners` | Declares or updates a beneficial owner (ownership/control/senior-managing-official) with identification and verification evidence. |
 | `GET /staff/actors` | Lists operational staff actors. |
