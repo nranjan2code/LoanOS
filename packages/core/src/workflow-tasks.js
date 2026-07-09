@@ -7,7 +7,8 @@ import { createLoanId } from "./loan-policy.js";
 export const WORKFLOW_TASK_STATUSES = {
   OPEN: "open",
   ASSIGNED: "assigned",
-  IN_PROGRESS: "in_progress"
+  IN_PROGRESS: "in_progress",
+  COMPLETED: "completed"
 };
 
 const TASK_STATUS_VALUES = new Set(Object.values(WORKFLOW_TASK_STATUSES));
@@ -159,6 +160,30 @@ export function commentOnWorkflowTask(taskStore, taskId, input, activeTasks, now
       type: "workflow.task.commented",
       actor: input.actor,
       comment: input.comment
+    }
+  }, now);
+}
+
+export function completeWorkflowTask(taskStore, taskId, input, activeTasks, now = new Date()) {
+  const findings = validateActiveTaskAction(taskId, input, activeTasks);
+  if (!input?.actor) {
+    findings.push(createFinding("error", "RBI-IT-GRC", "Task completion requires actor.", "actor"));
+  }
+
+  const summary = summarizeFindings(findings);
+  if (summary.status === "blocked") {
+    return blockedTaskResult(taskStore, taskId, findings);
+  }
+
+  const task = findActiveTask(activeTasks, taskId);
+  return updateTaskRecord(taskStore, task, {
+    status: WORKFLOW_TASK_STATUSES.COMPLETED,
+    completedBy: input.actor,
+    completedAt: now.toISOString(),
+    event: {
+      type: "workflow.task.completed",
+      actor: input.actor,
+      notes: input.notes ?? null
     }
   }, now);
 }

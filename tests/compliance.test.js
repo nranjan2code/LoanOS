@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -3471,6 +3471,8 @@ test("API routes a referred application to a manual underwriting task", async (t
   assert.equal(withoutOverride.body.error.code, "decision_blocked");
   assert(withoutOverride.body.findings.some((finding) => finding.path === "manualUnderwriting"));
 
+  await assignManualUnderwritingTask(base, application.applicationId, "credit-maker-1");
+
   const decision = await postJson(`${base}/loans/applications/${application.applicationId}/decision`, {
     status: "approved",
     proposedBy: "credit-maker-1",
@@ -3515,6 +3517,8 @@ test("API carries manual underwriting override into the approved decision", asyn
     ).status,
     201
   );
+
+  await assignManualUnderwritingTask(base, application.applicationId, "credit-maker-1");
 
   const decision = await postJson(`${base}/loans/applications/${application.applicationId}/decision`, {
     status: "approved",
@@ -3579,6 +3583,8 @@ test("API requires the manual underwriting override actor to be a credit officer
     ).status,
     201
   );
+
+  await assignManualUnderwritingTask(base, application.applicationId, "credit-maker-1");
 
   const overrideBody = {
     status: "approved",
@@ -3654,6 +3660,8 @@ test("API blocks a checker who is also the manual underwriting underwriter", asy
     ).status,
     201
   );
+
+  await assignManualUnderwritingTask(base, application.applicationId, "credit-dual-1");
 
   const decision = await postJson(`${base}/loans/applications/${application.applicationId}/decision`, {
     status: "approved",
@@ -6351,6 +6359,18 @@ async function createRegistryBackedApplication(base, overrides = {}) {
   return response.body;
 }
 
+async function assignManualUnderwritingTask(base, applicationId, assigneeId, assignerId = "credit-lead-1") {
+  const tasksRes = await (await apiFetch(`${base}/workflow/tasks?type=application.manual_underwriting`)).json();
+  const task = tasksRes.tasks.find(t => t.entity.id === applicationId);
+  if (task) {
+    const res = await postJson(`${base}/workflow/tasks/${encodeURIComponent(task.taskId)}/assignments`, {
+      assignedTo: assigneeId,
+      assignedBy: assignerId
+    });
+    assert.ok(res.status === 200 || res.status === 201);
+  }
+}
+
 async function seedOperationalActors(base) {
   for (const actor of operationalActors()) {
     const response = await postJson(`${base}/staff/actors`, actor);
@@ -8041,4 +8061,107 @@ test("API locks AI model-use evidence on decision and isolates from subsequent u
   const evidence = appData2.pendingDecision.aiDecision.modelEvidence;
   assert.equal(evidence.validationStatus, "approved"); // remains approved despite kill switch suspension
   assert.equal(evidence.driftStatus, "normal"); // unaffected by later drift/suspension
+});
+
+test("LWS manual underwriting task assignment gates and completes decision proposal", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-lws-underwriting-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const base = `http://127.0.0.1:${server.address().port}`;
+
+  // 1. Create a referred application using the helper
+  const app = await createRegistryBackedApplication(base, { requestedAmount: 360000 });
+
+  // Generate KFS and Accept
+  const kfsRes = await postJson(`${base}/loans/applications/${app.applicationId}/kfs`, {
+    acceptance: {
+      acceptedAt: "2026-07-08T07:00:00.000Z",
+      deliveryChannel: "email",
+      deliveryRef: "del_kfs_001"
+    }
+  });
+  assert.ok(kfsRes.status === 200 || kfsRes.status === 201);
+
+  // Register extra credit-maker-2 staff actor
+  await postJson(`${base}/staff/actors`, {
+    actorId: "credit-maker-2",
+    displayName: "Credit Maker 2",
+    roles: ["credit_officer"],
+    queues: ["credit_ops"]
+  });
+
+  // Get active workflow tasks
+  const tasksRes = await (await apiFetch(`${base}/workflow/tasks?type=application.manual_underwriting`)).json();
+  assert.equal(tasksRes.count, 1);
+  const taskId = tasksRes.tasks[0].taskId;
+
+  // 2. Try to propose approved decision without task assignment -> should fail (422)
+  const badDec1 = await postJson(`${base}/loans/applications/${app.applicationId}/decision`, {
+    status: "approved",
+    proposedBy: "credit-maker-1",
+    reason: "Looks affordable to me",
+    manualUnderwriting: {
+      underwriterId: "credit-maker-1",
+      reason: "Overrides standard limits",
+      policyReference: "board_underwriting_policy_v1"
+    }
+  });
+  assert.equal(badDec1.status, 422);
+  assert(badDec1.body.findings.some(f => f.message.includes("must be assigned")));
+
+  // 3. Assign task to credit-maker-2
+  const assignRes = await postJson(`${base}/workflow/tasks/${encodeURIComponent(taskId)}/assignments`, {
+    assignedTo: "credit-maker-2",
+    assignedBy: "credit-lead-1"
+  });
+  assert.ok(assignRes.status === 200 || assignRes.status === 201);
+
+  // 4. Try to propose approved decision as credit-maker-1 (not the assignee) -> should fail (422)
+  const badDec2 = await postJson(`${base}/loans/applications/${app.applicationId}/decision`, {
+    status: "approved",
+    proposedBy: "credit-maker-1",
+    reason: "Looks affordable to me",
+    manualUnderwriting: {
+      underwriterId: "credit-maker-1",
+      reason: "Overrides standard limits",
+      policyReference: "board_underwriting_policy_v1"
+    }
+  });
+  assert.equal(badDec2.status, 422);
+  assert(badDec2.body.findings.some(f => f.message.includes("must match the actor assigned")));
+
+  // 5. Propose approved decision as credit-maker-2 (the correct assignee) -> should succeed (202)
+  const goodDec = await postJson(`${base}/loans/applications/${app.applicationId}/decision`, {
+    status: "approved",
+    proposedBy: "credit-maker-2",
+    reason: "Looks affordable to me",
+    manualUnderwriting: {
+      underwriterId: "credit-maker-2",
+      reason: "Overrides standard limits",
+      policyReference: "board_underwriting_policy_v1"
+    }
+  });
+  assert.equal(goodDec.status, 202);
+
+  // 6. Verify that the task is completed and removed from active list
+  const activeTasks = await (await apiFetch(`${base}/workflow/tasks?type=application.manual_underwriting`)).json();
+  assert.equal(activeTasks.count, 0); // No longer active
+
+  // Verify LWS task registry record status is completed
+  const statePath = join(dataDir, "state.json");
+  const rawState = JSON.parse(await readFile(statePath, "utf-8"));
+  const tenantData = rawState.tenants["tnt_test_a"];
+  assert.ok(tenantData);
+  const taskData = tenantData.workflowTasks.records[taskId];
+  assert.ok(taskData);
+  assert.equal(taskData.status, "completed");
+  assert.ok(taskData.events.some(e => e.type === "workflow.task.completed"));
 });

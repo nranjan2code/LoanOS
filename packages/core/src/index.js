@@ -243,6 +243,7 @@ export {
   WORKFLOW_TASK_STATUSES,
   assignWorkflowTask,
   commentOnWorkflowTask,
+  completeWorkflowTask,
   deriveWorkflowTasks,
   normalizeWorkflowTaskStore,
   releaseWorkflowTask,

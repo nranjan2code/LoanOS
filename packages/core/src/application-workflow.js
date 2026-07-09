@@ -176,7 +176,7 @@ export function proposeDecision(application, input, findings = [], options = {},
   if (!["approved", "declined"].includes(input?.status)) {
     allFindings.push(createFinding("error", "RBI-DL-2025", "Decision status must be approved or declined.", "status"));
   }
-  allFindings.push(...manualUnderwritingFindings(application, input));
+  allFindings.push(...manualUnderwritingFindings(application, input, opts));
   allFindings.push(...declineReasonFindings(input));
 
   const hasHumanReviewWarning = allFindings.some((finding) => finding.path === "aiDecision.humanReviewRef");
@@ -429,7 +429,7 @@ function requiresManualUnderwriting(application, input) {
   return application.eligibility?.decision === "refer" && input?.status === "approved";
 }
 
-function manualUnderwritingFindings(application, input) {
+function manualUnderwritingFindings(application, input, options = {}) {
   if (!requiresManualUnderwriting(application, input)) {
     return [];
   }
@@ -456,6 +456,20 @@ function manualUnderwritingFindings(application, input) {
   if (!override.policyReference) {
     findings.push(createFinding("error", "RBI-DL-2025", "Manual underwriting override requires a policyReference.", "manualUnderwriting.policyReference"));
   }
+
+  if (Array.isArray(options.activeTasks)) {
+    const task = options.activeTasks.find((t) => t.entity.type === "loan_application" && t.entity.id === application.applicationId && t.type === "application.manual_underwriting");
+    if (task) {
+      if (!task.assignedTo) {
+        findings.push(createFinding("error", "RBI-DL-2025", "Manual underwriting task must be assigned before approval.", "manualUnderwriting"));
+      } else {
+        if (override.underwriterId && override.underwriterId !== task.assignedTo) {
+          findings.push(createFinding("error", "RBI-DL-2025", `Decision proposal underwriter ${override.underwriterId} must match the actor assigned to the manual underwriting task (${task.assignedTo}).`, "manualUnderwriting.underwriterId"));
+        }
+      }
+    }
+  }
+
   return findings;
 }
 

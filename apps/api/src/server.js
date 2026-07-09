@@ -20,6 +20,7 @@ import {
   classifyLoanAsset,
   clearGlobalKillSwitch,
   commentOnWorkflowTask,
+  completeWorkflowTask,
   createLoanAccountFromApplication,
   createLoanId,
   computeDelinquency,
@@ -2804,12 +2805,13 @@ async function route(req, res, dataDir, platformAdminKey) {
       });
       return;
     }
+    const activeTasks = deriveWorkflowTasks(state);
     const kfsCheck = validateKfsBeforeDecision(application);
     // An ineligible borrower cannot be approved; declines still proceed with the
     // assessment stored as evidence.
     const eligibilityFindings = body.status === "approved" ? eligibility.findings : [];
     const findings = [...preDecision.findings, ...kfsCheck.findings, ...eligibilityFindings];
-    const proposal = proposeDecision(decisionApplication, body, findings, { modelRegistry: state.modelRegistry });
+    const proposal = proposeDecision(decisionApplication, body, findings, { modelRegistry: state.modelRegistry, activeTasks });
     if (proposal.summary.status === "blocked" && !proposal.requiresHumanReview) {
       sendJson(res, 422, {
         error: {
@@ -2822,13 +2824,28 @@ async function route(req, res, dataDir, platformAdminKey) {
     }
 
     const stored = proposal.application;
+    let nextWorkflowTasks = state.workflowTasks;
+    const task = activeTasks.find((t) => t.entity.type === "loan_application" && t.entity.id === application.applicationId && t.type === "application.manual_underwriting");
+    if (task) {
+      const completeRes = completeWorkflowTask(
+        state.workflowTasks,
+        task.taskId,
+        { actor: body.proposedBy || body.decidedBy },
+        activeTasks
+      );
+      if (completeRes.summary.status !== "blocked") {
+        nextWorkflowTasks = completeRes.workflowTasks;
+      }
+    }
+
     const nextState = appendEvent(
       {
         ...state,
         loanApplications: {
           ...state.loanApplications,
           [stored.applicationId]: stored
-        }
+        },
+        workflowTasks: nextWorkflowTasks
       },
       {
         type: proposal.requiresHumanReview ? "loan.human_review.required" : "loan.decision.proposed",
