@@ -64,6 +64,16 @@ Useful data-plane endpoints (tenant api key required):
 - `GET /erasure-requests/:id`
 - `POST /erasure-requests/:id/fulfillment`
 - `POST /erasure-requests/:id/rejection`
+- `GET|POST /borrowers/:id/access-requests`
+- `POST /borrowers/:id/access-requests/:reqId/fulfillment`
+- `GET|POST /borrowers/:id/correction-requests`
+- `POST /borrowers/:id/correction-requests/:reqId/review`
+- `GET|POST /loan-accounts/:id/security-interests`
+- `POST /loan-accounts/:id/security-interests/:siId/(filing|registration|modification|satisfaction)`
+- `GET /cersai/search`
+- `GET|POST /fiu/reports`
+- `GET /fiu/reports/:id`
+- `POST /fiu/reports/:id/(review|filing)`
 - `GET /data-disclosures`
 - `POST /data-disclosures`
 - `GET /regulated-entities`
@@ -199,6 +209,9 @@ Phase 0 has a working executable foundation, and Epics 1-8 and 11 (S1-S6) each h
 - KYC record registry with V-CIP India-storage, Aadhaar prohibited-storage, and RBI risk-based periodic-review refresh gating on new sanction.
 - Legal-entity borrower types (company/partnership/llp/trust) with a PMLA beneficial-owner registry: sanction is blocked without a verified owner meeting the controlling-interest threshold (25% company, 15% partnership/llp/trust) or declared as control/senior-managing-official.
 - DPDP right-to-erasure workflow gated on statutory retention (active loan or the 5-year RBI/PMLA window), fulfilling by redacting the borrower profile in place.
+- DPDP data-principal access and correction rights: access requests assemble a portable data pack (profile, consent ledger, KYC summary, loan accounts, disclosures); correction requests apply or reject a field change (applied corrections propagate to the profile); both run under a 30-day SLA clock and derive LWS tasks.
+- CERSAI security-interest registration (SARFAESI): draft → filed → registered → modified → satisfied lifecycle with maker-checker modification, closure-gated satisfaction, prior-encumbrance search, and a `securedLoan` disbursement gate.
+- FIU-IND STR/CTR reporting (PMLA): draft → reviewed → filed → acknowledged lifecycle with a designated Principal Officer review gate, a ₹10 lakh CTR threshold, and a tipping-off guard against exposing reports to the subject.
 - Staff actor registry with India-only operational actors, roles, queue access, and assignment authority.
 - Complaint registry and grievance workflow with 30-day RBI Ombudsman clock and RBI CMS escalation evidence.
 - Borrower-backed application resolution through `borrowerId`.

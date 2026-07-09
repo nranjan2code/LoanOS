@@ -32,7 +32,15 @@ export class ExternalServiceManager {
 
       esignProvider: config.esignProvider ?? (typeof process !== "undefined" ? process.env.LOANOS_ESIGN_PROVIDER : "mock") ?? "mock",
       esignApiUrl: config.esignApiUrl ?? (typeof process !== "undefined" ? process.env.LOANOS_ESIGN_API_URL : "") ?? "",
-      esignApiKey: config.esignApiKey ?? (typeof process !== "undefined" ? process.env.LOANOS_ESIGN_API_KEY : "") ?? ""
+      esignApiKey: config.esignApiKey ?? (typeof process !== "undefined" ? process.env.LOANOS_ESIGN_API_KEY : "") ?? "",
+
+      cersaiProvider: config.cersaiProvider ?? (typeof process !== "undefined" ? process.env.LOANOS_CERSAI_PROVIDER : "mock") ?? "mock",
+      cersaiApiUrl: config.cersaiApiUrl ?? (typeof process !== "undefined" ? process.env.LOANOS_CERSAI_API_URL : "") ?? "",
+      cersaiApiKey: config.cersaiApiKey ?? (typeof process !== "undefined" ? process.env.LOANOS_CERSAI_API_KEY : "") ?? "",
+
+      fiuProvider: config.fiuProvider ?? (typeof process !== "undefined" ? process.env.LOANOS_FIU_PROVIDER : "mock") ?? "mock",
+      fiuApiUrl: config.fiuApiUrl ?? (typeof process !== "undefined" ? process.env.LOANOS_FIU_API_URL : "") ?? "",
+      fiuApiKey: config.fiuApiKey ?? (typeof process !== "undefined" ? process.env.LOANOS_FIU_API_KEY : "") ?? ""
     };
   }
 
@@ -166,6 +174,98 @@ export class ExternalServiceManager {
         signatureRef: `SIG-MOCK-${Date.now()}`,
         signedAt: new Date().toISOString(),
         esignProvider: "mock"
+      };
+    }
+  }
+
+  /**
+   * Files a security interest with CERSAI.
+   */
+  async fileCersaiSecurityInterest(securityInterestData) {
+    if (this.config.cersaiProvider === "real") {
+      if (!this.config.cersaiApiUrl || !this.config.cersaiApiKey) {
+        throw new Error("Real CERSAI provider configured but credentials missing.");
+      }
+      const res = await fetch(`${this.config.cersaiApiUrl}/security-interests`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${this.config.cersaiApiKey}`
+        },
+        body: JSON.stringify(securityInterestData)
+      });
+      if (!res.ok) {
+        throw new Error(`Real CERSAI service failed with status ${res.status}`);
+      }
+      return await res.json();
+    } else {
+      // Mock provider
+      return {
+        success: true,
+        provider: "mock",
+        cersaiTransactionId: `CERSAI-MOCK-${Date.now()}`,
+        cersaiRegistrationNumber: `REG-MOCK-${Date.now()}`,
+        filedAt: new Date().toISOString()
+      };
+    }
+  }
+
+  /**
+   * Searches CERSAI for existing charges on an asset.
+   */
+  async searchCersai(assetDescription) {
+    if (this.config.cersaiProvider === "real") {
+      if (!this.config.cersaiApiUrl || !this.config.cersaiApiKey) {
+        throw new Error("Real CERSAI provider configured but credentials missing.");
+      }
+      const res = await fetch(`${this.config.cersaiApiUrl}/search?asset=${encodeURIComponent(assetDescription)}`, {
+        headers: {
+          "Authorization": `Bearer ${this.config.cersaiApiKey}`
+        }
+      });
+      if (!res.ok) {
+        throw new Error(`Real CERSAI search failed with status ${res.status}`);
+      }
+      return await res.json();
+    } else {
+      // Mock provider — returns no existing charges
+      return {
+        success: true,
+        provider: "mock",
+        count: 0,
+        charges: [],
+        searchedAt: new Date().toISOString()
+      };
+    }
+  }
+
+  /**
+   * Files an STR/CTR with FIU-IND.
+   */
+  async fileFiuReport(reportData) {
+    if (this.config.fiuProvider === "real") {
+      if (!this.config.fiuApiUrl || !this.config.fiuApiKey) {
+        throw new Error("Real FIU-IND provider configured but credentials missing.");
+      }
+      const res = await fetch(`${this.config.fiuApiUrl}/reports`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${this.config.fiuApiKey}`
+        },
+        body: JSON.stringify(reportData)
+      });
+      if (!res.ok) {
+        throw new Error(`Real FIU-IND filing failed with status ${res.status}`);
+      }
+      return await res.json();
+    } else {
+      // Mock provider
+      return {
+        success: true,
+        provider: "mock",
+        fiuAcknowledgementId: `FIU-ACK-MOCK-${Date.now()}`,
+        filedAt: new Date().toISOString()
       };
     }
   }

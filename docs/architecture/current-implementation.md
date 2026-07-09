@@ -44,12 +44,16 @@ npm run dev:api
 | `packages/core/src/model-governance.js` | AI/model inventory (including generative model class), model status, governed lifecycle transitions with a validation gate (fairness/explainability/monitoring for high-risk, adversarial/hallucination testing for generative), drift monitoring with auto kill-switch, global/model kill switch, kill-switch incident and post-incident review workflow, runtime model-use evaluation. |
 | `packages/core/src/ai-interaction.js` | Customer-facing AI disclosure generation (blocked for back-office/inactive/kill-switched models) and human-handoff request/resolution workflow. |
 | `packages/core/src/incident-notification.js` | Tenant-scoped security/data incident tracking with an independent 6-hour reporting clock per authority (CERT-In and RBI), surfacing overdue reporting duties. |
-| `packages/core/src/workflow-tasks.js` | LWS task derivation from LOS/LMS state plus task assignment, start, release, and comment lifecycle. |
+| `packages/core/src/workflow-tasks.js` | LWS task derivation from LOS/LMS state (including pending DPDP access/correction requests) plus task assignment, start, release, and comment lifecycle. |
+| `packages/core/src/cersai.js` | CERSAI security-interest lifecycle (draft → filed → registered → modified → satisfied): maker-checker modification, closure-gated satisfaction, prior-encumbrance search, and a `securedLoan` disbursement gate (SARFAESI Act). |
+| `packages/core/src/data-principal-rights.js` | DPDP data-principal access requests (portable data pack assembly) and correction requests (apply/reject with profile propagation), both under a 30-day SLA clock with overdue detection. |
+| `packages/core/src/fiu-str.js` | FIU-IND STR/CTR/CCR lifecycle (draft → reviewed → filed → acknowledged): Principal Officer review gate, ₹10 lakh CTR threshold, and a tipping-off guard (PMLA). |
+| `packages/core/src/external-services.js` | Switchable `ExternalServiceManager` for external integrations (SMS, credit bureau, V-CIP, eSign, CERSAI, FIU-IND) with mock/real providers selected per integration. |
 | `packages/core/src/audit.js` | Tenant-scoped, append-only audit hash chain: tenant-bound genesis, canonical hashing, `sealAuditChain`/`verifyAuditChain`/`buildAuditEvidencePack`, plus uniform `stampAuditEvents`/`classifyAuditDataClass` actor/data-class provenance. |
 | `packages/core/src/index.js` | Public exports for core domain modules. |
 | `apps/api/src/file-store.js` | Local JSON state load/save helpers; control-plane tenant registry (api-key hashing, tenant resolution), sub-processor register, and break-glass grants; per-tenant data partitions and tenant-scoped accessors; `buildTenantExport`/`offboardTenant` for portability and evidenced deletion. |
-| `apps/api/src/server.js` | HTTP API: platform control plane (tenant minting, export, offboarding, break-glass, sub-processors), tenant-context resolution with break-glass fallback and 401 gate, tenant-scoped store with centralized audit stamping, plus endpoints for compliance controls, AI models, kill switch, workflow tasks, applications, loan accounts, fraud cases, erasure requests, data disclosures, and incidents. |
-| `tests/compliance.test.js` | Regression tests for the compliance gates (79 tests as of the latest commit). |
+| `apps/api/src/server.js` | HTTP API: platform control plane (tenant minting, export, offboarding, break-glass, sub-processors), tenant-context resolution with break-glass fallback and 401 gate, tenant-scoped store with centralized audit stamping, plus endpoints for compliance controls, AI models, kill switch, workflow tasks, applications, loan accounts, fraud cases, erasure requests, data disclosures, incidents, CERSAI security interests, DPDP access/correction requests, and FIU-IND reports. |
+| `tests/compliance.test.js` | Regression tests for the compliance gates (107 tests as of the latest commit). |
 
 ## Implemented API Endpoints
 
@@ -88,6 +92,24 @@ npm run dev:api
 | `GET /erasure-requests/:id` | Reads one erasure request with computed retention-eligibility status. |
 | `POST /erasure-requests/:id/fulfillment` | Fulfils an eligible erasure request, redacting the borrower profile in place. |
 | `POST /erasure-requests/:id/rejection` | Rejects an erasure request still held by statutory retention. |
+| `GET /borrowers/:id/access-requests` | Lists a borrower's DPDP data-principal access requests with SLA status. |
+| `POST /borrowers/:id/access-requests` | Creates a DPDP access request for a borrower. |
+| `POST /borrowers/:id/access-requests/:reqId/fulfillment` | Fulfils an access request, assembling and returning the portable data pack. |
+| `GET /borrowers/:id/correction-requests` | Lists a borrower's DPDP correction requests with SLA status. |
+| `POST /borrowers/:id/correction-requests` | Creates a DPDP correction request capturing current and proposed field values. |
+| `POST /borrowers/:id/correction-requests/:reqId/review` | Applies or rejects a correction request; applied corrections propagate into the borrower profile. |
+| `GET /loan-accounts/:id/security-interests` | Lists CERSAI security interests for a loan account. |
+| `POST /loan-accounts/:id/security-interests` | Creates a draft CERSAI security interest. |
+| `POST /loan-accounts/:id/security-interests/:siId/filing` | Files the security interest with CERSAI. |
+| `POST /loan-accounts/:id/security-interests/:siId/registration` | Records CERSAI registration of a filed security interest. |
+| `POST /loan-accounts/:id/security-interests/:siId/modification` | Files a maker-checker modification to a registered charge. |
+| `POST /loan-accounts/:id/security-interests/:siId/satisfaction` | Files satisfaction/release of a charge on loan closure. |
+| `GET /cersai/search` | Searches existing CERSAI charges on an asset (prior-encumbrance check). |
+| `GET /fiu/reports` | Lists FIU-IND STR/CTR reports (filterable by type, subject, status). |
+| `POST /fiu/reports` | Creates an STR or CTR (CTR enforces the ₹10 lakh threshold). |
+| `GET /fiu/reports/:id` | Reads one FIU-IND report. |
+| `POST /fiu/reports/:id/review` | Records the designated Principal Officer's review of an STR. |
+| `POST /fiu/reports/:id/filing` | Files the report with FIU-IND and records the acknowledgement. |
 | `GET /data-disclosures` | Lists third-party data-disclosure records (filterable by `borrowerId`). |
 | `POST /data-disclosures` | Records a third-party data disclosure, gated on active consent or a cited legal reference. |
 | `GET /regulated-entities` | Lists regulated entities. |

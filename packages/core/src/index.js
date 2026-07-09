@@ -248,3 +248,41 @@ export {
 export {
   ExternalServiceManager
 } from "./external-services.js";
+
+export {
+  ASSET_TYPES,
+  CHARGE_TYPES,
+  SECURITY_INTEREST_STATUSES,
+  createSecurityInterest,
+  enrichSecurityInterest,
+  fileSecurityInterest,
+  listSecurityInterests,
+  modifySecurityInterest,
+  registerSecurityInterest,
+  satisfySecurityInterest,
+  searchCersaiCharges,
+  validateCersaiForDisbursement
+} from "./cersai.js";
+
+export {
+  ACCESS_REQUEST_STATUSES,
+  CORRECTION_REQUEST_STATUSES,
+  createAccessRequest,
+  createCorrectionRequest,
+  enrichAccessRequest,
+  enrichCorrectionRequest,
+  fulfillAccessRequest,
+  reviewCorrectionRequest
+} from "./data-principal-rights.js";
+
+export {
+  CTR_THRESHOLD_INR,
+  REPORT_STATUSES,
+  REPORT_TYPES,
+  createFiuReport,
+  enrichFiuReport,
+  fileFiuReport,
+  isTippingOffRisk,
+  listFiuReports,
+  reviewFiuReport
+} from "./fiu-str.js";

@@ -73,7 +73,7 @@ Legend:
 | KYC periodic-review refresh | A verified KYC record past its RBI risk-based review cycle (high 2y / medium 8y / low 10y) reads as `refresh_required` and blocks new sanction. | Done |
 | CKYC search/upload | CKYC registry connector with search, download, and upload flows. | Done |
 | V-CIP evidence | V-CIP evidence vault validates video hash, liveness, face match score (>=0.8), India GPS coordinates, official actor role (kyc_officer/credit_officer), and digital signature. | Done |
-| FIU-IND reporting support | AML alerts and reporting pack. | Planned |
+| FIU-IND reporting support | `fiu-str.js` implements STR/CTR/CCR lifecycle (draft → reviewed → filed → acknowledged): STRs require designated Principal Officer review before filing, CTRs enforce the ₹10 lakh threshold, tipping-off exposure to the subject is guarded, and filing runs through `ExternalServiceManager` (mock/real `fiuProvider`). External FIU-IND submission format is mocked. | Partial |
 | Beneficial-owner checks for legal entities | A legal-entity (company/partnership/llp/trust) borrower's preflight is blocked without at least one verified beneficial owner meeting the PMLA controlling-interest threshold (25% company, 15% partnership/llp/trust) or declared as control/senior-managing-official. | Done |
 
 ## Aadhaar and UIDAI Constraints
@@ -91,7 +91,8 @@ Legend:
 | Notice and consent evidence | Consent timestamp and notice version required. | Done |
 | Consent revocation | Consent ledger with revocation workflow (revoked consent blocks borrower resolution). | Done |
 | Third-party disclosure record-of-processing | `data-sharing.js` logs every disclosure; consent-basis sharing requires an active `third_party_sharing` consent, legal-obligation-basis sharing requires a cited legal reference. | Done |
-| Data principal rights (erasure) | Right-to-erasure workflow (`data-retention.js`) gated on statutory retention (active loan or 5-year RBI/PMLA window); fulfilment redacts the borrower profile in place. Access/correction workflows planned. | Partial |
+| Data principal rights (erasure) | Right-to-erasure workflow (`data-retention.js`) gated on statutory retention (active loan or 5-year RBI/PMLA window); fulfilment redacts the borrower profile in place. | Done |
+| Data principal rights (access/correction) | `data-principal-rights.js` implements access requests (assemble a portable data pack: profile, consent ledger, KYC summary, loan accounts, disclosures) and correction requests (apply/reject a field change, applied corrections propagate to the borrower profile), both under a 30-day DPDP SLA clock with overdue detection and LWS task derivation. | Done |
 | Breach workflow | Incident tracking (`incident-notification.js`) with an independent 6-hour CERT-In/RBI reporting clock and overdue detection; DPBI-specific reporting evidence planned. | Partial |
 | Retention and deletion | Statutory-retention-gated erasure workflow implemented for borrower profiles; a general retention/deletion policy engine across all record types is planned. | Partial |
 
@@ -173,6 +174,7 @@ Legend:
 | SMA/NPA asset classification | Asset class maps DPD to standard, SMA-0, SMA-1, SMA-2, and NPA. | Done |
 | CIC-ready snapshots | Internal account-level and portfolio-level CIC reporting snapshots are generated from account lifecycle state. | Done |
 | External CIC submission | Provider-specific CIC file/API integration and acknowledgement handling. | Planned |
+| CERSAI security-interest registration (SARFAESI) | `cersai.js` runs the security-interest lifecycle (draft → filed → registered → modified → satisfied): create with asset/charge details, file and register with CERSAI (mock/real `cersaiProvider`), maker-checker modification, closure-gated satisfaction, and prior-encumbrance search. Disbursement of a `securedLoan` product is blocked until a registered charge exists on the account. External CERSAI submission format is mocked. | Partial |
 
 ## SaaS Vendor Posture and Tenant Isolation
 

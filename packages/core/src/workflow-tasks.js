@@ -24,7 +24,9 @@ const TASK_SLA_HOURS = {
   "loan_account.npa_review": 24,
   "complaint.assignment": 24,
   "complaint.resolution": 720,
-  "complaint.rbi_cms_escalation": 24
+  "complaint.rbi_cms_escalation": 24,
+  "data_principal.access_request": 720,
+  "data_principal.correction_request": 720
 };
 
 export function normalizeWorkflowTaskStore(store = {}) {
@@ -40,7 +42,8 @@ export function deriveWorkflowTasks(state, options = {}) {
   const tasks = [
     ...deriveApplicationTasks(Object.values(state?.loanApplications ?? {}), asOf),
     ...deriveLoanAccountTasks(Object.values(state?.loanAccounts ?? {}), asOf),
-    ...deriveComplaintTasks(Object.values(state?.complaints ?? {}), asOf)
+    ...deriveComplaintTasks(Object.values(state?.complaints ?? {}), asOf),
+    ...deriveDataPrincipalTasks(state, asOf)
   ]
     .map((task) => applyTaskRecord(task, taskStore.records[task.taskId]))
     .map((task) => withTaskSla(task, asOf));
@@ -487,6 +490,70 @@ function deriveComplaintTasks(complaints, asOf) {
     }
 
     return tasks;
+  });
+}
+
+function deriveDataPrincipalTasks(state, asOf) {
+  const tasks = [];
+
+  for (const request of Object.values(state?.accessRequests ?? {})) {
+    if (!request?.accessRequestId || request.status !== "requested") {
+      continue;
+    }
+    tasks.push(dataPrincipalTask("access_request", request.accessRequestId, request, {
+      type: "data_principal.access_request",
+      title: "Fulfil DPDP data-principal access request",
+      description: "Assemble and deliver the borrower's portable data pack within the 30-day DPDP SLA.",
+      queue: "privacy_ops",
+      role: "data_protection_officer",
+      priority: "high",
+      regulatoryRefs: ["DPDP-2023"],
+      openedAt: request.requestedAt ?? request.createdAt,
+      action: {
+        method: "POST",
+        path: `/borrowers/${request.borrowerId}/access-requests/${request.accessRequestId}/fulfillment`,
+        description: "Fulfil the access request and deliver the data pack."
+      },
+      context: { borrowerId: request.borrowerId }
+    }));
+  }
+
+  for (const request of Object.values(state?.correctionRequests ?? {})) {
+    if (!request?.correctionRequestId || request.status !== "requested") {
+      continue;
+    }
+    tasks.push(dataPrincipalTask("correction_request", request.correctionRequestId, request, {
+      type: "data_principal.correction_request",
+      title: "Review DPDP data-principal correction request",
+      description: "Review the requested correction and apply or reject it within the 30-day DPDP SLA.",
+      queue: "privacy_ops",
+      role: "data_protection_officer",
+      priority: "high",
+      regulatoryRefs: ["DPDP-2023"],
+      openedAt: request.requestedAt ?? request.createdAt,
+      action: {
+        method: "POST",
+        path: `/borrowers/${request.borrowerId}/correction-requests/${request.correctionRequestId}/review`,
+        description: "Apply or reject the correction request."
+      },
+      context: { borrowerId: request.borrowerId, fieldPath: request.fieldPath }
+    }));
+  }
+
+  return tasks;
+}
+
+function dataPrincipalTask(entityType, entityId, request, task) {
+  return baseTask({
+    ...task,
+    entity: {
+      type: `data_principal_${entityType}`,
+      id: entityId
+    },
+    sourceStatus: request.status,
+    borrowerId: request.borrowerId ?? null,
+    regulatedEntityId: null,
+    productId: null
   });
 }
 

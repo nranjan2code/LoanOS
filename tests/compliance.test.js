@@ -55,7 +55,23 @@ import {
   validateKfs,
   validateKfsBeforeDecision,
   validateMarketplaceNeutrality,
-  rankMarketplaceOffers
+  rankMarketplaceOffers,
+  createSecurityInterest,
+  fileSecurityInterest,
+  registerSecurityInterest,
+  modifySecurityInterest,
+  satisfySecurityInterest,
+  searchCersaiCharges,
+  validateCersaiForDisbursement,
+  createAccessRequest,
+  fulfillAccessRequest,
+  createCorrectionRequest,
+  reviewCorrectionRequest,
+  createFiuReport,
+  reviewFiuReport,
+  fileFiuReport,
+  isTippingOffRisk,
+  CTR_THRESHOLD_INR
 } from "../packages/core/src/index.js";
 import { createLoanOsServer } from "../apps/api/src/server.js";
 
@@ -5386,6 +5402,276 @@ function validApplication() {
     }
   };
 }
+
+test("CERSAI security interest runs create → file → register → modify → satisfy", () => {
+  const activeContext = { loanAccounts: { la_1: { loanAccountId: "la_1", status: "active" } } };
+
+  const created = createSecurityInterest(
+    {},
+    {
+      loanAccountId: "la_1",
+      assetType: "immovable",
+      assetDescription: "Flat 4B, Prestige Towers, Bengaluru",
+      chargeType: "mortgage",
+      chargeAmountInr: 5000000,
+      createdBy: "cersai-maker-1"
+    },
+    activeContext
+  );
+  assert.equal(created.summary.status, "ready");
+  assert.equal(created.securityInterest.status, "draft");
+
+  const filed = fileSecurityInterest(created.securityInterest, { actor: "cersai-maker-1" }, activeContext);
+  assert.equal(filed.summary.status, "ready");
+  assert.equal(filed.securityInterest.status, "filed");
+  assert.ok(filed.securityInterest.cersaiTransactionId);
+
+  const registered = registerSecurityInterest(
+    filed.securityInterest,
+    { actor: "cersai-maker-1", cersaiRegistrationNumber: "REG-001" },
+    activeContext
+  );
+  assert.equal(registered.securityInterest.status, "registered");
+
+  // Modification requires distinct maker and checker.
+  const sameActor = modifySecurityInterest(
+    registered.securityInterest,
+    { actor: "cersai-maker-1", approvedBy: "cersai-maker-1", reason: "increase", chargeAmountInr: 6000000 },
+    activeContext
+  );
+  assert.equal(sameActor.summary.status, "blocked");
+
+  const modified = modifySecurityInterest(
+    registered.securityInterest,
+    { actor: "cersai-maker-1", approvedBy: "cersai-checker-1", reason: "charge increase", chargeAmountInr: 6000000 },
+    activeContext
+  );
+  assert.equal(modified.summary.status, "ready");
+  assert.equal(modified.securityInterest.chargeAmountInr, 6000000);
+
+  // Satisfaction is gated on the loan account being closed or settled.
+  const blockedSat = satisfySecurityInterest(modified.securityInterest, { actor: "cersai-maker-1" }, activeContext);
+  assert.equal(blockedSat.summary.status, "blocked");
+
+  const closedContext = { loanAccounts: { la_1: { loanAccountId: "la_1", status: "closed" } } };
+  const satisfied = satisfySecurityInterest(modified.securityInterest, { actor: "cersai-maker-1" }, closedContext);
+  assert.equal(satisfied.summary.status, "ready");
+  assert.equal(satisfied.securityInterest.status, "satisfied");
+});
+
+test("CERSAI prior-encumbrance search finds existing unsatisfied charges", () => {
+  const securityInterests = {
+    si_1: {
+      securityInterestId: "si_1",
+      loanAccountId: "la_1",
+      assetDescription: "Flat 4B, Prestige Towers, Bengaluru",
+      chargeType: "mortgage",
+      chargeAmountInr: 5000000,
+      status: "registered",
+      cersaiRegistrationNumber: "REG-001"
+    },
+    si_2: {
+      securityInterestId: "si_2",
+      loanAccountId: "la_2",
+      assetDescription: "Flat 4B, Prestige Towers, Bengaluru",
+      chargeType: "mortgage",
+      chargeAmountInr: 3000000,
+      status: "satisfied"
+    }
+  };
+  const search = searchCersaiCharges("Flat 4B, Prestige Towers, Bengaluru", { securityInterests });
+  assert.equal(search.count, 1);
+  assert.equal(search.charges[0].securityInterestId, "si_1");
+});
+
+test("CERSAI disbursement gate blocks secured loans without a registered charge", () => {
+  const application = { applicationId: "app_1", productId: "prod_secured" };
+
+  const blocked = validateCersaiForDisbursement(application, {
+    productPolicies: { prod_secured: { productId: "prod_secured", securedLoan: true } },
+    securityInterests: {}
+  });
+  assert.equal(blocked.summary.status, "blocked");
+
+  // Unsecured products are not gated.
+  assert.equal(
+    validateCersaiForDisbursement(application, {
+      productPolicies: { prod_secured: { securedLoan: false } },
+      securityInterests: {}
+    }).summary.status,
+    "ready"
+  );
+
+  // A registered charge on the account clears the gate.
+  assert.equal(
+    validateCersaiForDisbursement(application, {
+      productPolicies: { prod_secured: { securedLoan: true } },
+      securityInterests: { si_1: { securityInterestId: "si_1", loanAccountId: "app_1", status: "registered" } }
+    }).summary.status,
+    "ready"
+  );
+});
+
+test("DPDP access request assembles a portable data pack under a 30-day SLA", () => {
+  const context = {
+    borrowerProfiles: { bor_1: { borrowerId: "bor_1", fullName: "Asha Sharma" } },
+    consentRecords: { c1: { consentId: "c1", borrowerId: "bor_1", purpose: "data_processing", status: "granted" } },
+    loanAccounts: { la_1: { loanAccountId: "la_1", borrowerId: "bor_1", status: "active", principalInr: 100000 } }
+  };
+  const created = createAccessRequest({}, { borrowerId: "bor_1", requestedBy: "bor_1" }, context);
+  assert.equal(created.summary.status, "ready");
+  assert.ok(created.request.slaDeadline);
+  assert.equal(created.request.slaOverdue, false);
+
+  const fulfilled = fulfillAccessRequest(created.request, { actor: "dpo-1" }, context);
+  assert.equal(fulfilled.summary.status, "ready");
+  assert.equal(fulfilled.request.status, "fulfilled");
+  assert.ok(fulfilled.request.dataPack.borrowerProfile);
+  assert.ok(fulfilled.request.dataPack.consentRecords);
+  assert.ok(fulfilled.request.dataPack.loanAccounts);
+});
+
+test("DPDP correction request applies a field change and rejects without a reason", () => {
+  const context = { borrowerProfiles: { bor_1: { borrowerId: "bor_1", contact: { email: "old@example.in" } } } };
+
+  const created = createCorrectionRequest(
+    {},
+    { borrowerId: "bor_1", requestedBy: "bor_1", fieldPath: "contact.email", proposedValue: "new@example.in" },
+    context
+  );
+  assert.equal(created.summary.status, "ready");
+  assert.equal(created.request.currentValue, "old@example.in");
+
+  const applied = reviewCorrectionRequest(created.request, { actor: "dpo-1", outcome: "applied" }, context);
+  assert.equal(applied.request.status, "applied");
+  assert.deepEqual(applied.profileUpdate, {
+    borrowerId: "bor_1",
+    fieldPath: "contact.email",
+    newValue: "new@example.in"
+  });
+
+  const created2 = createCorrectionRequest(
+    {},
+    { borrowerId: "bor_1", requestedBy: "bor_1", fieldPath: "fullName", proposedValue: "Asha S" },
+    context
+  );
+  const rejectedNoReason = reviewCorrectionRequest(created2.request, { actor: "dpo-1", outcome: "rejected" }, context);
+  assert.equal(rejectedNoReason.summary.status, "blocked");
+
+  const rejected = reviewCorrectionRequest(
+    created2.request,
+    { actor: "dpo-1", outcome: "rejected", reason: "could not verify identity" },
+    context
+  );
+  assert.equal(rejected.request.status, "rejected");
+});
+
+test("FIU-IND STR requires Principal Officer review before filing and blocks tipping-off", () => {
+  const context = { regulatedEntities: { re_1: { regulatedEntityId: "re_1" } } };
+  const created = createFiuReport(
+    {},
+    {
+      reportType: "suspicious_transaction",
+      regulatedEntityId: "re_1",
+      subjectBorrowerId: "bor_1",
+      createdBy: "aml-analyst-1",
+      suspicionGrounds: "structuring below CTR threshold",
+      transactionDetails: [{ amountInr: 900000, mode: "cash" }]
+    },
+    context
+  );
+  assert.equal(created.summary.status, "ready");
+
+  // Cannot file a draft STR before review.
+  assert.equal(fileFiuReport(created.report, { actor: "po-1" }, context).summary.status, "blocked");
+
+  // Review must be by a Principal Officer.
+  const badRole = reviewFiuReport(
+    created.report,
+    { actor: "aml-analyst-1", actorRole: "analyst", reviewNotes: "looks fine" },
+    context
+  );
+  assert.equal(badRole.summary.status, "blocked");
+
+  const reviewed = reviewFiuReport(
+    created.report,
+    { actor: "po-1", actorRole: "principal_officer", reviewNotes: "confirmed suspicious" },
+    context
+  );
+  assert.equal(reviewed.report.status, "reviewed");
+
+  const filed = fileFiuReport(reviewed.report, { actor: "po-1" }, context);
+  assert.equal(filed.report.status, "filed");
+  assert.ok(filed.report.fiuAcknowledgementId);
+
+  const registry = { [filed.report.reportId]: filed.report };
+  assert.equal(isTippingOffRisk(registry, "bor_1"), true);
+  assert.equal(isTippingOffRisk(registry, "bor_other"), false);
+});
+
+test("FIU-IND CTR enforces the ₹10 lakh threshold", () => {
+  const context = { regulatedEntities: { re_1: { regulatedEntityId: "re_1" } } };
+
+  const below = createFiuReport(
+    {},
+    { reportType: "cash_transaction", regulatedEntityId: "re_1", subjectBorrowerId: "bor_1", createdBy: "a", totalAmountInr: 500000 },
+    context
+  );
+  assert.equal(below.summary.status, "blocked");
+
+  const atThreshold = createFiuReport(
+    {},
+    { reportType: "cash_transaction", regulatedEntityId: "re_1", subjectBorrowerId: "bor_1", createdBy: "a", totalAmountInr: CTR_THRESHOLD_INR },
+    context
+  );
+  assert.equal(atThreshold.summary.status, "ready");
+});
+
+test("API serves DPDP access and correction requests over HTTP", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-dpdp-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const base = `http://127.0.0.1:${server.address().port}`;
+  assert.equal((await postJson(`${base}/borrowers`, validBorrowerProfile())).status, 201);
+
+  const accessCreate = await postJson(`${base}/borrowers/bor_001/access-requests`, { requestedBy: "bor_001" });
+  assert.equal(accessCreate.status, 201);
+  const accessRequestId = accessCreate.body.accessRequest.accessRequestId;
+
+  const fulfil = await postJson(
+    `${base}/borrowers/bor_001/access-requests/${accessRequestId}/fulfillment`,
+    { actor: "dpo-1" }
+  );
+  assert.equal(fulfil.status, 200);
+  assert.equal(fulfil.body.accessRequest.status, "fulfilled");
+  assert.ok(fulfil.body.accessRequest.dataPack.borrowerProfile);
+
+  const correctionCreate = await postJson(`${base}/borrowers/bor_001/correction-requests`, {
+    requestedBy: "bor_001",
+    fieldPath: "contact.email",
+    proposedValue: "corrected@example.in"
+  });
+  assert.equal(correctionCreate.status, 201);
+  const correctionRequestId = correctionCreate.body.correctionRequest.correctionRequestId;
+
+  const review = await postJson(
+    `${base}/borrowers/bor_001/correction-requests/${correctionRequestId}/review`,
+    { actor: "dpo-1", outcome: "applied" }
+  );
+  assert.equal(review.status, 200);
+  assert.equal(review.body.correctionRequest.status, "applied");
+
+  const borrower = await apiFetch(`${base}/borrowers/bor_001`).then((r) => r.json());
+  assert.equal(borrower.contact.email, "corrected@example.in");
+});
 
 function validBorrowerProfile() {
   return {

@@ -107,7 +107,8 @@ Exit criteria:
 
 Deliverables:
 
-- CERSAI (CKYC registry integration implemented in Phase 1).
+- CERSAI. First slice done: security-interest lifecycle (`cersai.js`) with a `securedLoan` disbursement gate and mock/real `cersaiProvider`; real CERSAI submission format pending.
+- FIU-IND STR/CTR reporting. First slice done: `fiu-str.js` with Principal Officer review, CTR threshold, tipping-off guard, and mock/real `fiuProvider`; real FIU-IND submission format pending.
 - Credit bureaus/CICs.
 - Bank account verification.
 - eSign/document vault.

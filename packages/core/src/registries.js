@@ -763,6 +763,9 @@ export function normalizeProductPolicy(input, now = new Date()) {
     priorVersions: Array.isArray(input.priorVersions) ? input.priorVersions : [],
     status: input.status ?? ACTIVE_STATUS,
     currency: input.currency ?? "INR",
+    // Secured loans (mortgage, hypothecation, etc.) require a CERSAI security
+    // interest to be registered before disbursement under the SARFAESI Act.
+    securedLoan: !!input.securedLoan,
     minAmount: input.minAmount,
     maxAmount: input.maxAmount,
     minTenorMonths: input.minTenorMonths,

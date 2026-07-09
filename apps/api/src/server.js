@@ -122,7 +122,27 @@ import {
   validateMarketplaceNeutrality,
   rankMarketplaceOffers,
   ExternalServiceManager,
-  signDocumentPacket
+  signDocumentPacket,
+  createSecurityInterest,
+  enrichSecurityInterest,
+  fileSecurityInterest,
+  listSecurityInterests,
+  modifySecurityInterest,
+  registerSecurityInterest,
+  satisfySecurityInterest,
+  searchCersaiCharges,
+  validateCersaiForDisbursement,
+  createAccessRequest,
+  fulfillAccessRequest,
+  enrichAccessRequest,
+  createCorrectionRequest,
+  reviewCorrectionRequest,
+  enrichCorrectionRequest,
+  createFiuReport,
+  reviewFiuReport,
+  fileFiuReport,
+  enrichFiuReport,
+  listFiuReports
 } from "../../../packages/core/src/index.js";
 import {
   AUDIT_ACTOR_TYPES,
@@ -3447,7 +3467,8 @@ async function route(req, res, dataDir, platformAdminKey) {
 
     const result = validateDisbursement(application, body);
     const documentPacketCheck = validateDocumentPacketBeforeDisbursement(application);
-    const findings = [...result.findings, ...documentPacketCheck.findings];
+    const cersaiCheck = validateCersaiForDisbursement(application, state);
+    const findings = [...result.findings, ...documentPacketCheck.findings, ...cersaiCheck.findings];
     const summary = summarizeFindings(findings);
     if (summary.status === "blocked") {
       sendJson(res, 422, {
@@ -3506,12 +3527,360 @@ async function route(req, res, dataDir, platformAdminKey) {
     return;
   }
 
+  // --- CERSAI security-interest registration (SARFAESI Act) ---
+  const securityInterestListMatch = path.match(/^\/loan-accounts\/([^/]+)\/security-interests$/);
+  if (method === "GET" && securityInterestListMatch) {
+    const state = await store.load();
+    const loanAccountId = decodeURIComponent(securityInterestListMatch[1]);
+    const now = new Date();
+    const securityInterests = listSecurityInterests(state.securityInterests, loanAccountId).map((si) =>
+      enrichSecurityInterest(si, now)
+    );
+    sendJson(res, 200, { count: securityInterests.length, securityInterests });
+    return;
+  }
+
+  if (method === "POST" && securityInterestListMatch) {
+    const body = await readJson(req);
+    const state = await store.load();
+    const loanAccountId = decodeURIComponent(securityInterestListMatch[1]);
+    const result = createSecurityInterest(state.securityInterests, { ...body, loanAccountId }, state);
+    if (result.summary.status === "blocked") {
+      sendJson(res, 422, {
+        error: { code: "security_interest_invalid", message: "Security interest is invalid." },
+        findings: result.findings
+      });
+      return;
+    }
+    const nextState = appendEvent(
+      { ...state, securityInterests: result.registry },
+      {
+        type: "cersai.security_interest.created",
+        securityInterestId: result.securityInterest.securityInterestId,
+        loanAccountId,
+        actor: body.createdBy ?? null
+      }
+    );
+    await store.save(nextState);
+    sendJson(res, 201, { securityInterest: result.securityInterest, event: result.event });
+    return;
+  }
+
+  const securityInterestActionMatch = path.match(
+    /^\/loan-accounts\/([^/]+)\/security-interests\/([^/]+)\/(filing|registration|modification|satisfaction)$/
+  );
+  if (method === "POST" && securityInterestActionMatch) {
+    const body = await readJson(req);
+    const state = await store.load();
+    const siId = decodeURIComponent(securityInterestActionMatch[2]);
+    const action = securityInterestActionMatch[3];
+    const si = state.securityInterests[siId];
+    if (!si) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Security interest not found." } });
+      return;
+    }
+    const now = new Date();
+    const result =
+      action === "filing"
+        ? fileSecurityInterest(si, body, state, now)
+        : action === "registration"
+          ? registerSecurityInterest(si, body, state, now)
+          : action === "modification"
+            ? modifySecurityInterest(si, body, state, now)
+            : satisfySecurityInterest(si, body, state, now);
+    if (result.summary.status === "blocked") {
+      sendJson(res, 422, {
+        error: { code: "security_interest_action_blocked", message: "Security interest action is blocked." },
+        findings: result.findings
+      });
+      return;
+    }
+    const stored = result.securityInterest;
+    const nextState = appendEvent(
+      { ...state, securityInterests: { ...state.securityInterests, [stored.securityInterestId]: stored } },
+      {
+        type: result.event.type,
+        securityInterestId: stored.securityInterestId,
+        loanAccountId: stored.loanAccountId,
+        actor: body.actor ?? null
+      }
+    );
+    await store.save(nextState);
+    sendJson(res, 200, { securityInterest: stored, event: result.event });
+    return;
+  }
+
+  if (method === "GET" && path === "/cersai/search") {
+    const state = await store.load();
+    const assetDescription = url.searchParams.get("asset") ?? "";
+    const search = searchCersaiCharges(assetDescription, state);
+    sendJson(res, 200, { assetDescription, ...search });
+    return;
+  }
+
+  // --- DPDP data-principal access and correction rights ---
+  const accessListMatch = path.match(/^\/borrowers\/([^/]+)\/access-requests$/);
+  if (method === "GET" && accessListMatch) {
+    const state = await store.load();
+    const borrowerId = decodeURIComponent(accessListMatch[1]);
+    const now = new Date();
+    const requests = Object.values(state.accessRequests)
+      .filter((r) => r.borrowerId === borrowerId)
+      .map((r) => enrichAccessRequest(r, state, now));
+    sendJson(res, 200, { count: requests.length, accessRequests: requests });
+    return;
+  }
+
+  if (method === "POST" && accessListMatch) {
+    const body = await readJson(req);
+    const state = await store.load();
+    const borrowerId = decodeURIComponent(accessListMatch[1]);
+    const result = createAccessRequest(state.accessRequests, { ...body, borrowerId }, state);
+    if (result.summary.status === "blocked") {
+      sendJson(res, 422, {
+        error: { code: "access_request_invalid", message: "Access request is invalid." },
+        findings: result.findings
+      });
+      return;
+    }
+    const nextState = appendEvent(
+      { ...state, accessRequests: result.registry },
+      {
+        type: "data_principal.access_request.created",
+        accessRequestId: result.request.accessRequestId,
+        borrowerId,
+        actor: body.requestedBy ?? null
+      }
+    );
+    await store.save(nextState);
+    sendJson(res, 201, { accessRequest: result.request, event: result.event });
+    return;
+  }
+
+  const accessFulfillMatch = path.match(/^\/borrowers\/([^/]+)\/access-requests\/([^/]+)\/fulfillment$/);
+  if (method === "POST" && accessFulfillMatch) {
+    const body = await readJson(req);
+    const state = await store.load();
+    const reqId = decodeURIComponent(accessFulfillMatch[2]);
+    const request = state.accessRequests[reqId];
+    if (!request) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Access request not found." } });
+      return;
+    }
+    const result = fulfillAccessRequest(request, body, state);
+    if (result.summary.status === "blocked") {
+      sendJson(res, 422, {
+        error: { code: "access_request_action_blocked", message: "Access request fulfilment is blocked." },
+        findings: result.findings
+      });
+      return;
+    }
+    const stored = result.request;
+    const nextState = appendEvent(
+      { ...state, accessRequests: { ...state.accessRequests, [stored.accessRequestId]: stored } },
+      {
+        type: "data_principal.access_request.fulfilled",
+        accessRequestId: stored.accessRequestId,
+        borrowerId: stored.borrowerId,
+        actor: body.actor ?? null
+      }
+    );
+    await store.save(nextState);
+    sendJson(res, 200, { accessRequest: stored, event: result.event });
+    return;
+  }
+
+  const correctionListMatch = path.match(/^\/borrowers\/([^/]+)\/correction-requests$/);
+  if (method === "GET" && correctionListMatch) {
+    const state = await store.load();
+    const borrowerId = decodeURIComponent(correctionListMatch[1]);
+    const now = new Date();
+    const requests = Object.values(state.correctionRequests)
+      .filter((r) => r.borrowerId === borrowerId)
+      .map((r) => enrichCorrectionRequest(r, now));
+    sendJson(res, 200, { count: requests.length, correctionRequests: requests });
+    return;
+  }
+
+  if (method === "POST" && correctionListMatch) {
+    const body = await readJson(req);
+    const state = await store.load();
+    const borrowerId = decodeURIComponent(correctionListMatch[1]);
+    const result = createCorrectionRequest(state.correctionRequests, { ...body, borrowerId }, state);
+    if (result.summary.status === "blocked") {
+      sendJson(res, 422, {
+        error: { code: "correction_request_invalid", message: "Correction request is invalid." },
+        findings: result.findings
+      });
+      return;
+    }
+    const nextState = appendEvent(
+      { ...state, correctionRequests: result.registry },
+      {
+        type: "data_principal.correction_request.created",
+        correctionRequestId: result.request.correctionRequestId,
+        borrowerId,
+        actor: body.requestedBy ?? null
+      }
+    );
+    await store.save(nextState);
+    sendJson(res, 201, { correctionRequest: result.request, event: result.event });
+    return;
+  }
+
+  const correctionReviewMatch = path.match(/^\/borrowers\/([^/]+)\/correction-requests\/([^/]+)\/review$/);
+  if (method === "POST" && correctionReviewMatch) {
+    const body = await readJson(req);
+    const state = await store.load();
+    const reqId = decodeURIComponent(correctionReviewMatch[2]);
+    const request = state.correctionRequests[reqId];
+    if (!request) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Correction request not found." } });
+      return;
+    }
+    const result = reviewCorrectionRequest(request, body, state);
+    if (result.summary.status === "blocked") {
+      sendJson(res, 422, {
+        error: { code: "correction_request_action_blocked", message: "Correction review is blocked." },
+        findings: result.findings
+      });
+      return;
+    }
+    const stored = result.request;
+    // When applied, propagate the corrected value into the borrower profile.
+    let borrowerProfiles = state.borrowerProfiles;
+    if (result.profileUpdate && state.borrowerProfiles[result.profileUpdate.borrowerId]) {
+      borrowerProfiles = {
+        ...state.borrowerProfiles,
+        [result.profileUpdate.borrowerId]: setFieldPath(
+          state.borrowerProfiles[result.profileUpdate.borrowerId],
+          result.profileUpdate.fieldPath,
+          result.profileUpdate.newValue
+        )
+      };
+    }
+    const nextState = appendEvent(
+      {
+        ...state,
+        borrowerProfiles,
+        correctionRequests: { ...state.correctionRequests, [stored.correctionRequestId]: stored }
+      },
+      {
+        type: result.event.type,
+        correctionRequestId: stored.correctionRequestId,
+        borrowerId: stored.borrowerId,
+        actor: body.actor ?? null
+      }
+    );
+    await store.save(nextState);
+    sendJson(res, 200, { correctionRequest: stored, event: result.event, profileUpdate: result.profileUpdate });
+    return;
+  }
+
+  // --- FIU-IND suspicious/cash transaction reporting (PMLA) ---
+  if (method === "GET" && path === "/fiu/reports") {
+    const state = await store.load();
+    const filters = {
+      reportType: url.searchParams.get("reportType") ?? undefined,
+      subjectBorrowerId: url.searchParams.get("subjectBorrowerId") ?? undefined,
+      status: url.searchParams.get("status") ?? undefined
+    };
+    const now = new Date();
+    const reports = listFiuReports(state.fiuReports, filters).map((r) => enrichFiuReport(r, now));
+    sendJson(res, 200, { count: reports.length, reports });
+    return;
+  }
+
+  if (method === "POST" && path === "/fiu/reports") {
+    const body = await readJson(req);
+    const state = await store.load();
+    const result = createFiuReport(state.fiuReports, body, state);
+    if (result.summary.status === "blocked") {
+      sendJson(res, 422, {
+        error: { code: "fiu_report_invalid", message: "FIU report is invalid." },
+        findings: result.findings
+      });
+      return;
+    }
+    const nextState = appendEvent(
+      { ...state, fiuReports: result.registry },
+      {
+        type: result.event.type,
+        reportId: result.report.reportId,
+        reportType: result.report.reportType,
+        actor: body.createdBy ?? null
+      }
+    );
+    await store.save(nextState);
+    sendJson(res, 201, { report: result.report, event: result.event });
+    return;
+  }
+
+  const fiuReportMatch = path.match(/^\/fiu\/reports\/([^/]+)$/);
+  if (method === "GET" && fiuReportMatch) {
+    const state = await store.load();
+    const report = state.fiuReports[decodeURIComponent(fiuReportMatch[1])];
+    if (!report) {
+      sendJson(res, 404, { error: { code: "not_found", message: "FIU report not found." } });
+      return;
+    }
+    sendJson(res, 200, enrichFiuReport(report, new Date()));
+    return;
+  }
+
+  const fiuReportActionMatch = path.match(/^\/fiu\/reports\/([^/]+)\/(review|filing)$/);
+  if (method === "POST" && fiuReportActionMatch) {
+    const body = await readJson(req);
+    const state = await store.load();
+    const reportId = decodeURIComponent(fiuReportActionMatch[1]);
+    const action = fiuReportActionMatch[2];
+    const report = state.fiuReports[reportId];
+    if (!report) {
+      sendJson(res, 404, { error: { code: "not_found", message: "FIU report not found." } });
+      return;
+    }
+    const now = new Date();
+    const result = action === "review" ? reviewFiuReport(report, body, state, now) : fileFiuReport(report, body, state, now);
+    if (result.summary.status === "blocked") {
+      sendJson(res, 422, {
+        error: { code: "fiu_report_action_blocked", message: "FIU report action is blocked." },
+        findings: result.findings
+      });
+      return;
+    }
+    const stored = result.report;
+    const nextState = appendEvent(
+      { ...state, fiuReports: { ...state.fiuReports, [stored.reportId]: stored } },
+      {
+        type: result.event.type,
+        reportId: stored.reportId,
+        actor: body.actor ?? null
+      }
+    );
+    await store.save(nextState);
+    sendJson(res, 200, { report: stored, event: result.event });
+    return;
+  }
+
   sendJson(res, 404, {
     error: {
       code: "not_found",
       message: "Route not found."
     }
   });
+}
+
+// Sets a (possibly dotted) field path on a shallow clone of an object.
+function setFieldPath(obj, path, value) {
+  const keys = String(path).split(".");
+  const root = { ...obj };
+  let cursor = root;
+  for (let i = 0; i < keys.length - 1; i += 1) {
+    cursor[keys[i]] = { ...(cursor[keys[i]] ?? {}) };
+    cursor = cursor[keys[i]];
+  }
+  cursor[keys[keys.length - 1]] = value;
+  return root;
 }
 
 function tenantApiKeyFromRequest(req) {

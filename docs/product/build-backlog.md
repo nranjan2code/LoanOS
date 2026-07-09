@@ -61,6 +61,7 @@ Tasks:
 - Consent grant/revoke ledger. Done.
 - Third-party sharing consent. First slice done: `packages/core/src/data-sharing.js` records every disclosure of borrower data to a third party as a DPDP record-of-processing entry. Consent-based sharing (`legalBasis: consent`) is blocked unless an active `third_party_sharing` consent stands; statutory sharing (`legal_obligation`, e.g. CIC/regulator reporting) is permitted without consent but must cite a `legalReference` and is still logged. `POST/GET /data-disclosures` drive it (filterable by borrowerId) and seal a `data_disclosure.recorded` audit event.
 - Data retention choice and deletion request workflow. First slice done: `packages/core/src/data-retention.js` runs a DPDP right-to-erasure request (`requested → fulfilled/rejected`) gated by statutory retention — `assessErasureEligibility` holds erasure while the borrower has an active loan relationship or any closed account is within the 5-year RBI/PMLA retention window (`retainUntil`). `POST/GET /erasure-requests`, `GET /erasure-requests/{id}`, and `POST /erasure-requests/{id}/(fulfillment|rejection)` drive it; fulfilment irreversibly redacts the borrower profile in place (`redactBorrowerProfile`) while retaining the request and its audit trail as evidence.
+- Data principal access and correction rights. First slice done: `packages/core/src/data-principal-rights.js` runs DPDP access requests (`requested → fulfilled`, assembling a portable data pack of profile, consent ledger, KYC summary, loan accounts, and disclosures) and correction requests (`requested → applied/rejected`, applied corrections propagate into the borrower profile), both under a 30-day SLA clock with overdue detection. `GET/POST /borrowers/{id}/access-requests`, `POST /borrowers/{id}/access-requests/{reqId}/fulfillment`, `GET/POST /borrowers/{id}/correction-requests`, and `POST /borrowers/{id}/correction-requests/{reqId}/review` drive it; pending requests derive LWS workflow tasks.
 - KYC state machine: created, pending, verified, rejected, expired, refresh_required. Done: `refresh_required` is a first-class status; `evaluateKycStatus`/`computeKycReviewDueAt` derive an effective status from the RBI risk-based periodic-review cycle (high 2y, medium 8y, low 10y) on top of the stored status and expiry. A verified record past its review-due date reads as `refresh_required`, and preflight (`resolveBorrowerApplicationReferences`) blocks new sanction on a refresh-due or expired KYC. `GET /borrowers/{id}/kyc-records` surfaces the effective status and `nextReviewDueAt`.
 - CKYC search/download/upload adapter boundary. Done.
 - V-CIP evidence vault: recording hash, timestamp, GPS boundaries check, PAN ref, liveness, facial match score (>=0.8), official digital signature, and actor role check. Done.
@@ -210,9 +211,9 @@ Tasks:
 
 - CIC reporting feed. Internal snapshot first slice done.
 - CKYC integration.
-- CERSAI security-interest registration, modification, satisfaction.
+- CERSAI security-interest registration, modification, satisfaction. First slice done: `cersai.js` runs draft → filed → registered → modified → satisfied with maker-checker modification, closure-gated satisfaction, prior-encumbrance search, and a `securedLoan` disbursement gate; filing runs through `ExternalServiceManager` (mock/real `cersaiProvider`).
 - DLA CIMS export.
-- FIU-IND suspicious transaction support.
+- FIU-IND suspicious transaction support. First slice done: `fiu-str.js` runs STR/CTR draft → reviewed → filed → acknowledged with Principal Officer review, ₹10 lakh CTR threshold, tipping-off guard, and filing via `ExternalServiceManager` (mock/real `fiuProvider`).
 - Payment integrations: NACH/UPI/bank account verification.
 - eSign/document vault.
 - SMS/email delivery provider.
