@@ -49,14 +49,17 @@ export class ExternalServiceManager {
       bureauProvider: config.bureauProvider ?? (typeof process !== "undefined" ? process.env.LOANOS_BUREAU_PROVIDER : "mock") ?? "mock",
       bureauApiUrl: config.bureauApiUrl ?? (typeof process !== "undefined" ? process.env.LOANOS_BUREAU_API_URL : "") ?? "",
       bureauApiKey: config.bureauApiKey ?? (typeof process !== "undefined" ? process.env.LOANOS_BUREAU_API_KEY : "") ?? "",
+      bureauDataResidencyCountry: config.bureauDataResidencyCountry ?? (typeof process !== "undefined" ? process.env.LOANOS_BUREAU_DATA_RESIDENCY_COUNTRY : "IN") ?? "IN",
 
       vcipProvider: config.vcipProvider ?? (typeof process !== "undefined" ? process.env.LOANOS_VCIP_PROVIDER : "mock") ?? "mock",
       vcipApiUrl: config.vcipApiUrl ?? (typeof process !== "undefined" ? process.env.LOANOS_VCIP_API_URL : "") ?? "",
       vcipApiKey: config.vcipApiKey ?? (typeof process !== "undefined" ? process.env.LOANOS_VCIP_API_KEY : "") ?? "",
+      vcipDataResidencyCountry: config.vcipDataResidencyCountry ?? (typeof process !== "undefined" ? process.env.LOANOS_VCIP_DATA_RESIDENCY_COUNTRY : "IN") ?? "IN",
 
       bankAccountProvider: config.bankAccountProvider ?? (typeof process !== "undefined" ? process.env.LOANOS_BANK_ACCOUNT_PROVIDER : "mock") ?? "mock",
       bankAccountApiUrl: config.bankAccountApiUrl ?? (typeof process !== "undefined" ? process.env.LOANOS_BANK_ACCOUNT_API_URL : "") ?? "",
       bankAccountApiKey: config.bankAccountApiKey ?? (typeof process !== "undefined" ? process.env.LOANOS_BANK_ACCOUNT_API_KEY : "") ?? "",
+      bankAccountDataResidencyCountry: config.bankAccountDataResidencyCountry ?? (typeof process !== "undefined" ? process.env.LOANOS_BANK_ACCOUNT_DATA_RESIDENCY_COUNTRY : "IN") ?? "IN",
 
       paymentRailProvider: config.paymentRailProvider ?? (typeof process !== "undefined" ? process.env.LOANOS_PAYMENT_RAIL_PROVIDER : "mock") ?? "mock",
       paymentRailApiUrl: config.paymentRailApiUrl ?? (typeof process !== "undefined" ? process.env.LOANOS_PAYMENT_RAIL_API_URL : "") ?? "",
@@ -66,14 +69,17 @@ export class ExternalServiceManager {
       esignProvider: config.esignProvider ?? (typeof process !== "undefined" ? process.env.LOANOS_ESIGN_PROVIDER : "mock") ?? "mock",
       esignApiUrl: config.esignApiUrl ?? (typeof process !== "undefined" ? process.env.LOANOS_ESIGN_API_URL : "") ?? "",
       esignApiKey: config.esignApiKey ?? (typeof process !== "undefined" ? process.env.LOANOS_ESIGN_API_KEY : "") ?? "",
+      esignDataResidencyCountry: config.esignDataResidencyCountry ?? (typeof process !== "undefined" ? process.env.LOANOS_ESIGN_DATA_RESIDENCY_COUNTRY : "IN") ?? "IN",
 
       cersaiProvider: config.cersaiProvider ?? (typeof process !== "undefined" ? process.env.LOANOS_CERSAI_PROVIDER : "mock") ?? "mock",
       cersaiApiUrl: config.cersaiApiUrl ?? (typeof process !== "undefined" ? process.env.LOANOS_CERSAI_API_URL : "") ?? "",
       cersaiApiKey: config.cersaiApiKey ?? (typeof process !== "undefined" ? process.env.LOANOS_CERSAI_API_KEY : "") ?? "",
+      cersaiDataResidencyCountry: config.cersaiDataResidencyCountry ?? (typeof process !== "undefined" ? process.env.LOANOS_CERSAI_DATA_RESIDENCY_COUNTRY : "IN") ?? "IN",
 
       fiuProvider: config.fiuProvider ?? (typeof process !== "undefined" ? process.env.LOANOS_FIU_PROVIDER : "mock") ?? "mock",
       fiuApiUrl: config.fiuApiUrl ?? (typeof process !== "undefined" ? process.env.LOANOS_FIU_API_URL : "") ?? "",
-      fiuApiKey: config.fiuApiKey ?? (typeof process !== "undefined" ? process.env.LOANOS_FIU_API_KEY : "") ?? ""
+      fiuApiKey: config.fiuApiKey ?? (typeof process !== "undefined" ? process.env.LOANOS_FIU_API_KEY : "") ?? "",
+      fiuDataResidencyCountry: config.fiuDataResidencyCountry ?? (typeof process !== "undefined" ? process.env.LOANOS_FIU_DATA_RESIDENCY_COUNTRY : "IN") ?? "IN"
     };
   }
 
@@ -216,6 +222,7 @@ export class ExternalServiceManager {
    * Queries Credit Bureau (CIBIL equivalent).
    */
   async queryCreditBureau(panNumber) {
+    ensureIndiaDataResidency("Credit Bureau", this.config.bureauDataResidencyCountry);
     if (this.config.bureauProvider === "real") {
       if (!this.config.bureauApiUrl || !this.config.bureauApiKey) {
         throw new Error("Real Credit Bureau provider configured but API credentials missing.");
@@ -240,6 +247,7 @@ export class ExternalServiceManager {
         activeAccounts: match.activeAccounts,
         defaultAccounts: match.defaultAccounts,
         enquiries30Days: match.enquiries30Days,
+        dataResidencyCountry: this.config.bureauDataResidencyCountry,
         timestamp: new Date().toISOString()
       };
     }
@@ -249,6 +257,7 @@ export class ExternalServiceManager {
    * Invokes V-CIP video analysis / facial match.
    */
   async analyzeVcipVideo(borrowerId, videoHash) {
+    ensureIndiaDataResidency("V-CIP", this.config.vcipDataResidencyCountry);
     if (this.config.vcipProvider === "real") {
       if (!this.config.vcipApiUrl || !this.config.vcipApiKey) {
         throw new Error("Real V-CIP provider configured but credentials missing.");
@@ -275,6 +284,7 @@ export class ExternalServiceManager {
         faceMatchScore: match.faceMatchScore,
         livenessConfirmed: match.livenessConfirmed,
         gps: match.location,
+        dataResidencyCountry: this.config.vcipDataResidencyCountry,
         verifiedAt: new Date().toISOString()
       };
     }
@@ -285,6 +295,7 @@ export class ExternalServiceManager {
    * the expected borrower or end-beneficiary name before funds move.
    */
   async verifyBankAccount({ accountNumber, ifsc, expectedHolderName } = {}) {
+    ensureIndiaDataResidency("Bank account verification", this.config.bankAccountDataResidencyCountry);
     const normalizedAccountNumber = String(accountNumber ?? "").trim();
     const normalizedIfsc = String(ifsc ?? "").trim().toUpperCase();
     if (!/^\d{6,18}$/.test(normalizedAccountNumber)) {
@@ -325,6 +336,7 @@ export class ExternalServiceManager {
         status: "not_found",
         ifsc: normalizedIfsc,
         accountNumberLast4,
+        dataResidencyCountry: this.config.bankAccountDataResidencyCountry,
         verifiedAt: new Date().toISOString()
       };
     }
@@ -350,6 +362,7 @@ export class ExternalServiceManager {
       accountHolderName: match.accountHolderName,
       expectedHolderName: expectedHolderName ?? null,
       nameMatch,
+      dataResidencyCountry: this.config.bankAccountDataResidencyCountry,
       verifiedAt: new Date().toISOString()
     };
   }
@@ -430,6 +443,7 @@ export class ExternalServiceManager {
    * Verifies Aadhaar-based eSign OTP.
    */
   async verifyEsignOtp(aadhaarNumber, otp, payloadHash) {
+    ensureIndiaDataResidency("eSign", this.config.esignDataResidencyCountry);
     if (!aadhaarNumber || aadhaarNumber.length !== 12 || !/^\d{12}$/.test(aadhaarNumber)) {
       throw new Error("Invalid Aadhaar number format. Must be 12 numeric digits.");
     }
@@ -459,7 +473,8 @@ export class ExternalServiceManager {
         provider: "mock",
         signatureRef: `SIG-MOCK-${Date.now()}`,
         signedAt: new Date().toISOString(),
-        esignProvider: "mock"
+        esignProvider: "mock",
+        dataResidencyCountry: this.config.esignDataResidencyCountry
       };
     }
   }
@@ -468,6 +483,7 @@ export class ExternalServiceManager {
    * Files a security interest with CERSAI.
    */
   async fileCersaiSecurityInterest(securityInterestData) {
+    ensureIndiaDataResidency("CERSAI", this.config.cersaiDataResidencyCountry);
     if (this.config.cersaiProvider === "real") {
       if (!this.config.cersaiApiUrl || !this.config.cersaiApiKey) {
         throw new Error("Real CERSAI provider configured but credentials missing.");
@@ -491,6 +507,7 @@ export class ExternalServiceManager {
         provider: "mock",
         cersaiTransactionId: `CERSAI-MOCK-${Date.now()}`,
         cersaiRegistrationNumber: `REG-MOCK-${Date.now()}`,
+        dataResidencyCountry: this.config.cersaiDataResidencyCountry,
         filedAt: new Date().toISOString()
       };
     }
@@ -500,6 +517,7 @@ export class ExternalServiceManager {
    * Searches CERSAI for existing charges on an asset.
    */
   async searchCersai(assetDescription) {
+    ensureIndiaDataResidency("CERSAI", this.config.cersaiDataResidencyCountry);
     if (this.config.cersaiProvider === "real") {
       if (!this.config.cersaiApiUrl || !this.config.cersaiApiKey) {
         throw new Error("Real CERSAI provider configured but credentials missing.");
@@ -520,6 +538,7 @@ export class ExternalServiceManager {
         provider: "mock",
         count: 0,
         charges: [],
+        dataResidencyCountry: this.config.cersaiDataResidencyCountry,
         searchedAt: new Date().toISOString()
       };
     }
@@ -529,6 +548,7 @@ export class ExternalServiceManager {
    * Files an STR/CTR with FIU-IND.
    */
   async fileFiuReport(reportData) {
+    ensureIndiaDataResidency("FIU-IND", this.config.fiuDataResidencyCountry);
     if (this.config.fiuProvider === "real") {
       if (!this.config.fiuApiUrl || !this.config.fiuApiKey) {
         throw new Error("Real FIU-IND provider configured but credentials missing.");
@@ -551,6 +571,7 @@ export class ExternalServiceManager {
         success: true,
         provider: "mock",
         fiuAcknowledgementId: `FIU-ACK-MOCK-${Date.now()}`,
+        dataResidencyCountry: this.config.fiuDataResidencyCountry,
         filedAt: new Date().toISOString()
       };
     }

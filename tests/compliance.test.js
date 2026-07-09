@@ -6984,3 +6984,148 @@ test("V-CIP Evidence Vault and validation checks", async (t) => {
   // 12. Reject official actor with wrong role (e.g. collections manager)
   await expectFailure({ officialActorId: "collections-manager-1" });
 });
+
+test("API integration endpoints enforce vendor data-residency checks", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-residency-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+
+  // 1. Credit Bureau integration endpoint
+  // Compliant (IN)
+  process.env.LOANOS_BUREAU_DATA_RESIDENCY_COUNTRY = "IN";
+  const bureauOk = await postJson(`${base}/integrations/credit-bureau`, { pan: "ABCDE1234F" });
+  assert.equal(bureauOk.status, 200);
+  assert.equal(bureauOk.body.report.dataResidencyCountry, "IN");
+
+  // Non-compliant (US)
+  process.env.LOANOS_BUREAU_DATA_RESIDENCY_COUNTRY = "US";
+  const bureauFail = await postJson(`${base}/integrations/credit-bureau`, { pan: "ABCDE1234F" });
+  assert.equal(bureauFail.status, 422);
+  assert.match(bureauFail.body.error.message, /Credit Bureau provider data residency country must be IN/);
+  delete process.env.LOANOS_BUREAU_DATA_RESIDENCY_COUNTRY;
+
+  // 2. V-CIP video analysis integration endpoint
+  // Compliant (IN)
+  process.env.LOANOS_VCIP_DATA_RESIDENCY_COUNTRY = "IN";
+  const vcipOk = await postJson(`${base}/integrations/vcip/video-analysis`, { borrowerId: "bor_001", videoHash: "somehash" });
+  assert.equal(vcipOk.status, 200);
+  assert.equal(vcipOk.body.analysis.dataResidencyCountry, "IN");
+
+  // Non-compliant (US)
+  process.env.LOANOS_VCIP_DATA_RESIDENCY_COUNTRY = "US";
+  const vcipFail = await postJson(`${base}/integrations/vcip/video-analysis`, { borrowerId: "bor_001", videoHash: "somehash" });
+  assert.equal(vcipFail.status, 422);
+  assert.match(vcipFail.body.error.message, /V-CIP provider data residency country must be IN/);
+  delete process.env.LOANOS_VCIP_DATA_RESIDENCY_COUNTRY;
+});
+
+test("API loan origination and eligibility assess enforce credit bureau residency checks", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-orig-residency-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+
+  // Seed required RE, product policy, borrower, consent, KYC
+  await seedOperationalActors(base);
+  await postJson(`${base}/regulated-entities`, validRegulatedEntity());
+  await postJson(`${base}/products`, validProductPolicy());
+  await postJson(`${base}/borrowers`, validBorrowerProfile());
+  await postJson(`${base}/borrowers/bor_001/consents`, validConsentRecord());
+  await postJson(`${base}/borrowers/bor_001/kyc-records`, validKycRecord());
+
+  // Set non-compliant credit bureau residency
+  process.env.LOANOS_BUREAU_DATA_RESIDENCY_COUNTRY = "US";
+
+  // Creating application should fail with 422 due to bureau data residency error
+  const appRes = await postJson(`${base}/loans/applications`, {
+    applicationId: "app_residency_test_001",
+    borrowerId: "bor_001",
+    regulatedEntityId: "re_001",
+    productId: "prod_001",
+    amount: 10000,
+    tenorMonths: 12
+  });
+  assert.equal(appRes.status, 422);
+  assert.match(appRes.body.error.message, /Credit Bureau provider data residency country must be IN/);
+
+  delete process.env.LOANOS_BUREAU_DATA_RESIDENCY_COUNTRY;
+});
+
+test("API CERSAI and FIU filing enforce residency checks", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-filing-residency-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+
+  // Seed everything and disburse to get a valid loanAccountId
+  const application = await approveAndDisburseApplication(base);
+  const loanAccountId = application.loanAccountId;
+
+  // Create a security interest
+  const createSi = await postJson(`${base}/loan-accounts/${loanAccountId}/security-interests`, {
+    assetType: "movable",
+    chargeType: "hypothecation",
+    assetDescription: "Car",
+    chargeAmountInr: 500000,
+    createdBy: "credit-officer-1"
+  });
+  assert.equal(createSi.status, 201);
+  const siId = createSi.body.securityInterest.securityInterestId;
+
+  // Set non-compliant CERSAI data residency
+  process.env.LOANOS_CERSAI_DATA_RESIDENCY_COUNTRY = "US";
+  const fileSiFail = await postJson(`${base}/loan-accounts/${loanAccountId}/security-interests/${siId}/filing`, {
+    actor: "credit-officer-1"
+  });
+  assert.equal(fileSiFail.status, 422);
+  assert.match(fileSiFail.body.error.message, /CERSAI provider data residency country must be IN/);
+  delete process.env.LOANOS_CERSAI_DATA_RESIDENCY_COUNTRY;
+
+  // 2. FIU Report Filing data-residency check
+  const createRep = await postJson(`${base}/fiu/reports`, {
+    reportType: "cash_transaction",
+    regulatedEntityId: application.regulatedEntityId,
+    subjectBorrowerId: application.borrowerId,
+    totalAmountInr: 1500000,
+    createdBy: "credit-officer-1"
+  });
+  assert.equal(createRep.status, 201);
+  const reportId = createRep.body.report.reportId;
+
+  // Set non-compliant FIU data residency
+  process.env.LOANOS_FIU_DATA_RESIDENCY_COUNTRY = "US";
+  const fileRepFail = await postJson(`${base}/fiu/reports/${reportId}/filing`, {
+    actor: "credit-officer-1"
+  });
+  assert.equal(fileRepFail.status, 422);
+  assert.match(fileRepFail.body.error.message, /FIU-IND provider data residency country must be IN/);
+  delete process.env.LOANOS_FIU_DATA_RESIDENCY_COUNTRY;
+});

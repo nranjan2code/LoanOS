@@ -217,7 +217,7 @@ Tasks:
 - Payment integrations: NACH/UPI/bank account verification. Bank-account verification first slice done: `ExternalServiceManager` provides mock/real provider switching, the tenant API returns sanitized active-account/name-match evidence, and disbursement is blocked without matching verified-account proof. NACH/UPI first slice done: `ExternalServiceManager` registers NACH mandates and creates UPI collect requests through mock/real payment rail providers with India residency enforcement; the tenant API stores masked/hash-only initiation evidence in `GET /payment-rails` and seals financial audit events. Live settlement files, reconciliation, refunds, and production provider onboarding remain planned.
 - eSign/document vault. First slice done: signed document packets are indexed into a tenant-scoped document vault with signature evidence, storage country, retention policy, per-document checksums, and manifest checksum. PDF generation and external eSign envelope storage remain planned.
 - SMS/email/WhatsApp delivery provider. First slice done: `ExternalServiceManager` supports SMS/email/WhatsApp mock/real provider switching with India data-residency enforcement, and the tenant API stores masked/hash-only communication dispatch evidence. Production vendor onboarding remains planned.
-- Vendor data-residency checks.
+- Vendor data-residency checks. Done: data-residency validation checks are implemented across all ten external service categories (Credit Bureau, V-CIP, Bank Account verification, eSign, CERSAI, FIU-IND, SMS, email, WhatsApp, and Payment rails) in ExternalServiceManager, throwing exceptions for non-IN residency configuration and tested at both integration and unit levels.
 
 Done when:
 

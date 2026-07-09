@@ -41,16 +41,17 @@ export const AUDIT_DATA_CLASSES = {
 
 export function classifyAuditDataClass(type) {
   const value = String(type ?? "");
-  if (/borrower|consent|kyc|complaint|grievance|communication/.test(value)) {
+  if (/borrower|consent|kyc|complaint|grievance|communication|vcip/.test(value)) {
     return AUDIT_DATA_CLASSES.PERSONAL;
   }
   if (
-    /^loan|^application|disburse|payment|charge|waiver|reversal|accrual|recovery|prepaid|prepay|foreclos|closure|npa|product_policy|bank_account|document_vault|payment_rail/.test(
+    /^loan|^application|disburse|payment|charge|waiver|reversal|accrual|recovery|prepaid|prepay|foreclos|closure|npa|product_policy|bank_account|document_vault|payment_rail|credit_bureau/.test(
       value
     ) ||
     value.includes("bank_account") ||
     value.includes("document_vault") ||
-    value.includes("payment_rail")
+    value.includes("payment_rail") ||
+    value.includes("credit_bureau")
   ) {
     return AUDIT_DATA_CLASSES.FINANCIAL;
   }

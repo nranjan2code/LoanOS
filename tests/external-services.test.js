@@ -187,3 +187,73 @@ test("ExternalServiceManager payment rail dispatch enforces India data residency
     /Payment rail provider data residency country must be IN/
   );
 });
+
+test("ExternalServiceManager Credit Bureau enforces India data residency", async () => {
+  const manager = new ExternalServiceManager({ bureauDataResidencyCountry: "US" });
+  await assert.rejects(
+    async () => {
+      await manager.queryCreditBureau("ABCDE1234F");
+    },
+    /Credit Bureau provider data residency country must be IN/
+  );
+});
+
+test("ExternalServiceManager V-CIP enforces India data residency", async () => {
+  const manager = new ExternalServiceManager({ vcipDataResidencyCountry: "US" });
+  await assert.rejects(
+    async () => {
+      await manager.analyzeVcipVideo("borrower_1", "vid_hash_123");
+    },
+    /V-CIP provider data residency country must be IN/
+  );
+});
+
+test("ExternalServiceManager bank account verification enforces India data residency", async () => {
+  const manager = new ExternalServiceManager({ bankAccountDataResidencyCountry: "US" });
+  await assert.rejects(
+    async () => {
+      await manager.verifyBankAccount({
+        accountNumber: "123456789012",
+        ifsc: "HDFC0000001",
+        expectedHolderName: "Asha Sharma"
+      });
+    },
+    /Bank account verification provider data residency country must be IN/
+  );
+});
+
+test("ExternalServiceManager eSign enforces India data residency", async () => {
+  const manager = new ExternalServiceManager({ esignDataResidencyCountry: "US" });
+  await assert.rejects(
+    async () => {
+      await manager.verifyEsignOtp("123456789012", "123456", "somehash");
+    },
+    /eSign provider data residency country must be IN/
+  );
+});
+
+test("ExternalServiceManager CERSAI enforces India data residency", async () => {
+  const manager = new ExternalServiceManager({ cersaiDataResidencyCountry: "US" });
+  await assert.rejects(
+    async () => {
+      await manager.fileCersaiSecurityInterest({ securityInterestId: "si_001" });
+    },
+    /CERSAI provider data residency country must be IN/
+  );
+  await assert.rejects(
+    async () => {
+      await manager.searchCersai("some asset description");
+    },
+    /CERSAI provider data residency country must be IN/
+  );
+});
+
+test("ExternalServiceManager FIU-IND enforces India data residency", async () => {
+  const manager = new ExternalServiceManager({ fiuDataResidencyCountry: "US" });
+  await assert.rejects(
+    async () => {
+      await manager.fileFiuReport({ reportId: "rep_001" });
+    },
+    /FIU-IND provider data residency country must be IN/
+  );
+});

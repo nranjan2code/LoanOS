@@ -611,6 +611,83 @@ async function route(req, res, dataDir, platformAdminKey) {
     return;
   }
 
+  if (method === "POST" && path === "/integrations/credit-bureau") {
+    const body = await readJson(req);
+    const pan = body.pan;
+    if (!pan) {
+      sendJson(res, 400, { error: { code: "bad_request", message: "pan is required." } });
+      return;
+    }
+    const manager = new ExternalServiceManager();
+    let report = null;
+    try {
+      report = await manager.queryCreditBureau(pan);
+    } catch (err) {
+      sendJson(res, 422, {
+        error: {
+          code: "credit_bureau_query_failed",
+          message: err.message
+        }
+      });
+      return;
+    }
+
+    const state = await store.load();
+    const nextState = appendEvent(
+      state,
+      {
+        type: "integration.credit_bureau.query_completed",
+        provider: report.provider,
+        score: report.score,
+        activeAccounts: report.activeAccounts,
+        defaultAccounts: report.defaultAccounts,
+        dataResidencyCountry: report.dataResidencyCountry
+      }
+    );
+    await store.save(nextState);
+    sendJson(res, 200, { report });
+    return;
+  }
+
+  if (method === "POST" && path === "/integrations/vcip/video-analysis") {
+    const body = await readJson(req);
+    const { borrowerId, videoHash } = body;
+    if (!borrowerId || !videoHash) {
+      sendJson(res, 400, { error: { code: "bad_request", message: "borrowerId and videoHash are required." } });
+      return;
+    }
+    const manager = new ExternalServiceManager();
+    let analysis = null;
+    try {
+      analysis = await manager.analyzeVcipVideo(borrowerId, videoHash);
+    } catch (err) {
+      sendJson(res, 422, {
+        error: {
+          code: "vcip_video_analysis_failed",
+          message: err.message
+        }
+      });
+      return;
+    }
+
+    const state = await store.load();
+    const nextState = appendEvent(
+      state,
+      {
+        type: "integration.vcip.video_analyzed",
+        borrowerId: analysis.borrowerId,
+        provider: analysis.provider,
+        faceMatchScore: analysis.faceMatchScore,
+        livenessConfirmed: analysis.livenessConfirmed,
+        gps: analysis.gps,
+        dataResidencyCountry: analysis.dataResidencyCountry
+      }
+    );
+    await store.save(nextState);
+    sendJson(res, 200, { analysis });
+    return;
+  }
+
   if (method === "GET" && path === "/staff/actors") {
     const state = await store.load();
     sendJson(res, 200, {
@@ -2235,7 +2312,16 @@ async function route(req, res, dataDir, platformAdminKey) {
     try {
       bureauReport = await manager.queryCreditBureau(pan);
     } catch (err) {
-      // Ignore
+      if (err.message.includes("data residency") || err.message.includes("residency")) {
+        sendJson(res, 422, {
+          error: {
+            code: "credit_bureau_query_failed",
+            message: err.message
+          }
+        });
+        return;
+      }
+      // Ignore other query errors (thin-file behavior)
     }
     const application = {
       ...body,
@@ -2374,6 +2460,15 @@ async function route(req, res, dataDir, platformAdminKey) {
     try {
       bureauReport = await manager.queryCreditBureau(pan);
     } catch (err) {
+      if (err.message.includes("data residency") || err.message.includes("residency")) {
+        sendJson(res, 422, {
+          error: {
+            code: "credit_bureau_query_failed",
+            message: err.message
+          }
+        });
+        return;
+      }
       // Allow query failures to fall back to a null report (thin-file behavior)
     }
     const appWithBureau = {
@@ -3837,10 +3932,32 @@ async function route(req, res, dataDir, platformAdminKey) {
       sendJson(res, 404, { error: { code: "not_found", message: "Security interest not found." } });
       return;
     }
+    let externalResult = {};
+    if (action === "filing") {
+      const manager = new ExternalServiceManager();
+      try {
+        externalResult = await manager.fileCersaiSecurityInterest({
+          securityInterestId: si.securityInterestId,
+          loanAccountId: si.loanAccountId,
+          assetType: si.assetType,
+          chargeType: si.chargeType,
+          chargeAmountInr: si.chargeAmountInr
+        });
+      } catch (err) {
+        sendJson(res, 422, {
+          error: {
+            code: "security_interest_action_blocked",
+            message: `CERSAI filing failed: ${err.message}`
+          }
+        });
+        return;
+      }
+    }
+
     const now = new Date();
     const result =
       action === "filing"
-        ? fileSecurityInterest(si, body, state, now)
+        ? fileSecurityInterest(si, { ...body, cersaiTransactionId: externalResult.cersaiTransactionId }, state, now)
         : action === "registration"
           ? registerSecurityInterest(si, body, state, now)
           : action === "modification"
@@ -4097,8 +4214,31 @@ async function route(req, res, dataDir, platformAdminKey) {
       sendJson(res, 404, { error: { code: "not_found", message: "FIU report not found." } });
       return;
     }
+    let externalResult = {};
+    if (action === "filing") {
+      const manager = new ExternalServiceManager();
+      try {
+        externalResult = await manager.fileFiuReport({
+          reportId: report.reportId,
+          reportType: report.reportType,
+          subjectBorrowerId: report.subjectBorrowerId,
+          totalAmountInr: report.totalAmountInr
+        });
+      } catch (err) {
+        sendJson(res, 422, {
+          error: {
+            code: "fiu_report_action_blocked",
+            message: `FIU-IND filing failed: ${err.message}`
+          }
+        });
+        return;
+      }
+    }
+
     const now = new Date();
-    const result = action === "review" ? reviewFiuReport(report, body, state, now) : fileFiuReport(report, body, state, now);
+    const result = action === "review"
+      ? reviewFiuReport(report, body, state, now)
+      : fileFiuReport(report, { ...body, fiuAcknowledgementId: externalResult.fiuAcknowledgementId }, state, now);
     if (result.summary.status === "blocked") {
       sendJson(res, 422, {
         error: { code: "fiu_report_action_blocked", message: "FIU report action is blocked." },

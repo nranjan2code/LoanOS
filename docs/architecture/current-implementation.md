@@ -49,7 +49,7 @@ npm run dev:api
 | `packages/core/src/cersai.js` | CERSAI security-interest lifecycle (draft → filed → registered → modified → satisfied): maker-checker modification, closure-gated satisfaction, prior-encumbrance search, and a `securedLoan` disbursement gate (SARFAESI Act). |
 | `packages/core/src/data-principal-rights.js` | DPDP data-principal access requests (portable data pack assembly) and correction requests (apply/reject with profile propagation), both under a 30-day SLA clock with overdue detection. |
 | `packages/core/src/fiu-str.js` | FIU-IND STR/CTR/CCR lifecycle (draft → reviewed → filed → acknowledged): Principal Officer review gate, ₹10 lakh CTR threshold, and a tipping-off guard (PMLA). |
-| `packages/core/src/external-services.js` | Switchable `ExternalServiceManager` for external integrations (SMS, email, WhatsApp, credit bureau, V-CIP, bank-account verification, NACH/UPI payment rails, eSign, CERSAI, FIU-IND) with mock/real providers selected per integration and India data-residency checks for communications/payment rails. |
+| `packages/core/src/external-services.js` | Switchable `ExternalServiceManager` for external integrations (SMS, email, WhatsApp, credit bureau, V-CIP, bank-account verification, NACH/UPI payment rails, eSign, CERSAI, FIU-IND) with mock/real providers selected per integration and India data-residency checks enforced across all external services. |
 | `packages/core/src/audit.js` | Tenant-scoped, append-only audit hash chain: tenant-bound genesis, canonical hashing, `sealAuditChain`/`verifyAuditChain`/`buildAuditEvidencePack`, plus uniform `stampAuditEvents`/`classifyAuditDataClass` actor/data-class provenance. |
 | `packages/core/src/index.js` | Public exports for core domain modules. |
 | `apps/api/src/file-store.js` | Local JSON state load/save helpers; control-plane tenant registry (api-key hashing, tenant resolution), sub-processor register, and break-glass grants; per-tenant data partitions and tenant-scoped accessors; `buildTenantExport`/`offboardTenant` for portability and evidenced deletion. |
@@ -86,6 +86,8 @@ npm run dev:api
 | `POST /integrations/payment-rails/nach-mandates` | Registers a NACH mandate through `ExternalServiceManager`, stores sanitized mandate evidence (account last-four/hash, provider ref, amount/frequency, consent/bank-verification refs), and seals the initiation into the tenant audit chain. |
 | `POST /integrations/payment-rails/upi-collects` | Creates a UPI collect request through `ExternalServiceManager`, stores masked/hash-only VPA evidence with provider/status data, and seals the initiation into the tenant audit chain. |
 | `POST /integrations/bank-account-verification` | Verifies a borrower/end-beneficiary bank account through `ExternalServiceManager`, returning sanitized evidence (`verificationRef`, IFSC, last four digits, status/name match) and sealing the attempt into the tenant audit chain. |
+| `POST /integrations/credit-bureau` | Queries Credit Bureau (CIBIL equivalent) score for a given PAN; enforces data residency and returns the bureau report. |
+| `POST /integrations/vcip/video-analysis` | Invokes V-CIP video analysis / facial match; enforces data residency and returns V-CIP verification outcome. |
 | `GET /incidents` | Lists tenant security/data incidents with computed CERT-In/RBI reporting-clock status. |
 | `POST /incidents` | Creates a tenant security/data incident, starting the 6-hour reporting clock. |
 | `GET /incidents/:id` | Reads one incident with computed reporting-clock status. |
