@@ -12,9 +12,13 @@ import {
   computeDelinquency,
   computeIncidentReportingClock,
   classifyAuditDataClass,
+  classifyFraudCase,
+  createFraudCase,
   createIncident,
   createModelRegistryState,
   evaluateKycStatus,
+  issueShowCauseNotice,
+  recordFraudResponse,
   recordIncidentNotification,
   stampAuditEvents,
   recordPostIncidentReview,
@@ -2858,6 +2862,74 @@ test("API seals events into an audit chain and exports a verifiable evidence pac
   assert.equal(bEvents.chainValid, true);
 });
 
+test("fraud classification is gated on natural justice and four-eyes approval", () => {
+  const created = createFraudCase(
+    {},
+    {
+      category: "diversion_of_funds",
+      summary: "Loan proceeds routed to an unrelated third party",
+      subjectBorrowerId: "bor_001",
+      reportedBy: "fraud-analyst-1"
+    }
+  );
+  assert.equal(created.summary.status, "ready");
+  const fraudCase = created.fraudCase;
+
+  // Classifying as fraud before any show-cause notice is blocked (natural justice).
+  const premature = classifyFraudCase(fraudCase, {
+    classification: "fraud",
+    actor: "fraud-committee-1",
+    reason: "Funds diverted"
+  });
+  assert.equal(premature.summary.status, "blocked");
+  assert(premature.findings.some((finding) => finding.message.includes("show-cause notice")));
+
+  // Issue the show-cause notice; the borrower gets a 21-day response window.
+  const noticed = issueShowCauseNotice(
+    fraudCase,
+    {
+      actor: "fraud-analyst-1",
+      noticeReference: "SCN-001",
+      deliveryRef: "email-ack-001",
+      issuedAt: "2026-06-01T00:00:00.000Z"
+    },
+    new Date("2026-06-01T00:00:00.000Z")
+  );
+  assert.equal(noticed.summary.status, "ready");
+  assert.equal(noticed.fraudCase.naturalJustice.responseDueBy, "2026-06-22T00:00:00.000Z");
+
+  // Within the window and with no response, classification is still blocked.
+  const tooSoon = classifyFraudCase(
+    noticed.fraudCase,
+    { classification: "fraud", actor: "fraud-committee-1", reason: "Funds diverted" },
+    new Date("2026-06-10T00:00:00.000Z")
+  );
+  assert.equal(tooSoon.summary.status, "blocked");
+
+  // Once the borrower responds, the four-eyes rule still applies.
+  const responded = recordFraudResponse(
+    noticed.fraudCase,
+    { actor: "fraud-analyst-1", summary: "Borrower denies diversion", receivedAt: "2026-06-08T00:00:00.000Z" },
+    new Date("2026-06-08T00:00:00.000Z")
+  );
+  const sameActor = classifyFraudCase(
+    responded.fraudCase,
+    { classification: "fraud", actor: "fraud-analyst-1", reason: "Rejecting representation" },
+    new Date("2026-06-09T00:00:00.000Z")
+  );
+  assert.equal(sameActor.summary.status, "blocked");
+  assert(sameActor.findings.some((finding) => finding.message.includes("other than the investigator")));
+
+  // An independent authority can now classify the case.
+  const classified = classifyFraudCase(
+    responded.fraudCase,
+    { classification: "fraud", actor: "fraud-committee-1", reason: "Representation rejected", committeeRef: "FC-2026-01" },
+    new Date("2026-06-09T00:00:00.000Z")
+  );
+  assert.equal(classified.summary.status, "ready");
+  assert.equal(classified.fraudCase.status, "classified_fraud");
+});
+
 test("incident reporting clock breaches after the 6-hour CERT-In/RBI window", () => {
   const detectedAt = "2026-07-09T00:00:00.000Z";
   const created = createIncident(
@@ -2975,6 +3047,89 @@ test("API tracks a security incident and its 6-hour reporting duties", async (t)
   // Incidents are tenant-scoped: tenant B sees none of tenant A's incidents.
   const bIncidents = await (await apiFetch(`${base}/incidents`, {}, TENANT_B.apiKey)).json();
   assert.equal(bIncidents.count, 0);
+});
+
+test("API runs a fraud case through the natural-justice classification gate", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A, TENANT_B] });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+
+  assert.equal((await postJson(`${base}/borrowers`, validBorrowerProfile())).status, 201);
+
+  // A fraud case referencing an unregistered subject is rejected.
+  const invalid = await postJson(`${base}/fraud-cases`, {
+    category: "document_forgery",
+    summary: "Forged salary slips",
+    subjectBorrowerId: "bor_unknown",
+    reportedBy: "fraud-analyst-1"
+  });
+  assert.equal(invalid.status, 422);
+
+  const created = await postJson(`${base}/fraud-cases`, {
+    category: "document_forgery",
+    summary: "Forged salary slips",
+    subjectBorrowerId: "bor_001",
+    reportedBy: "fraud-analyst-1"
+  });
+  assert.equal(created.status, 201);
+  const fraudCaseId = created.body.fraudCase.fraudCaseId;
+
+  // Classifying as fraud without a show-cause notice is blocked.
+  const premature = await postJson(`${base}/fraud-cases/${fraudCaseId}/classification`, {
+    classification: "fraud",
+    actor: "fraud-committee-1",
+    reason: "Forgery confirmed"
+  });
+  assert.equal(premature.status, 422);
+
+  // Issue the notice, record the borrower response, then classify independently.
+  assert.equal(
+    (await postJson(`${base}/fraud-cases/${fraudCaseId}/show-cause-notice`, {
+      actor: "fraud-analyst-1",
+      noticeReference: "SCN-9",
+      deliveryRef: "post-ack-9"
+    })).status,
+    200
+  );
+  assert.equal(
+    (await postJson(`${base}/fraud-cases/${fraudCaseId}/responses`, {
+      actor: "fraud-analyst-1",
+      summary: "Borrower could not explain the discrepancy"
+    })).status,
+    200
+  );
+  // Four-eyes: the investigator cannot classify.
+  const sameActor = await postJson(`${base}/fraud-cases/${fraudCaseId}/classification`, {
+    classification: "fraud",
+    actor: "fraud-analyst-1",
+    reason: "Rejecting representation"
+  });
+  assert.equal(sameActor.status, 422);
+
+  const classified = await postJson(`${base}/fraud-cases/${fraudCaseId}/classification`, {
+    classification: "fraud",
+    actor: "fraud-committee-1",
+    reason: "Representation rejected",
+    committeeRef: "FC-2026-9"
+  });
+  assert.equal(classified.status, 200);
+  assert.equal(classified.body.fraudCase.status, "classified_fraud");
+
+  // Events sealed into the audit spine; fraud cases are tenant-isolated.
+  const events = await (await apiFetch(`${base}/audit/events`)).json();
+  assert.ok(events.events.some((event) => event.type === "fraud_case.classified"));
+  const bCases = await (await apiFetch(`${base}/fraud-cases`, {}, TENANT_B.apiKey)).json();
+  assert.equal(bCases.count, 0);
 });
 
 test("platform can export a tenant and offboard it with evidenced deletion", async (t) => {

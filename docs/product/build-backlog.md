@@ -152,7 +152,7 @@ Done when:
 
 ## Epic 7: LWS Compliance Operations
 
-Status: first executable slice complete.
+Status: first executable slice complete; fraud case module + natural-justice fraud classification first slice complete.
 
 Goal: compliance work is native workflow, not spreadsheets.
 
@@ -165,8 +165,8 @@ Tasks:
 - NPA review queue. First slice done from asset classification.
 - Override approval with reason and evidence. First slice done: manual underwriting override on a refer-band approval captures underwriter, reason, and policy reference, flows into the final decision evidence, and enforces four-eyes separation (the checker cannot be the underwriter).
 - Grievance module and 30-day RBI CMS escalation clock. First slice done.
-- Fraud case module.
-- Natural justice notice and response workflow.
+- Fraud case module. First slice done: `packages/core/src/fraud-case.js` runs a tenant-scoped fraud case (`reported → under_investigation → show_cause_issued → classified_fraud/classified_not_fraud`). `POST/GET /fraud-cases`, `GET /fraud-cases/{id}`, and `POST /fraud-cases/{id}/(show-cause-notice|responses|classification)` drive it; every action seals into the audit spine.
+- Natural justice notice and response workflow. First slice done (fraud path): an adverse (fraud) classification is blocked until a show-cause notice has been issued (with delivery proof) and either the borrower has responded or the RBI FRM-2024 21-day response window has elapsed, and the classifying authority must be independent of the investigator (four-eyes).
 - Committee pack generator.
 - Audit export.
 - Tests for LWS approval, recovery queues, wrong-role assignment, and SLA metadata. First slice done.

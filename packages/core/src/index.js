@@ -142,6 +142,17 @@ export {
 } from "./grievance.js";
 
 export {
+  FRAUD_CASE_STATUSES,
+  FRAUD_CATEGORIES,
+  NATURAL_JUSTICE_RESPONSE_DAYS,
+  classifyFraudCase,
+  createFraudCase,
+  enrichFraudCase,
+  issueShowCauseNotice,
+  recordFraudResponse
+} from "./fraud-case.js";
+
+export {
   INCIDENT_CATEGORIES,
   INCIDENT_REPORTING_TARGETS,
   INCIDENT_SEVERITIES,

@@ -17,12 +17,17 @@ import {
   createLoanId,
   computeDelinquency,
   createComplaint,
+  createFraudCase,
   createIncident,
+  classifyFraudCase,
   DECLINE_REASON_CODES,
   deriveWorkflowTasks,
   forecloseLoanAccount,
   enrichComplaint,
+  enrichFraudCase,
   enrichIncident,
+  issueShowCauseNotice,
+  recordFraudResponse,
   recordIncidentNotification,
   escalateComplaintToRbiCms,
   evaluateEligibility,
@@ -495,6 +500,93 @@ async function route(req, res, dataDir, platformAdminKey) {
     );
     await store.save(nextState);
     sendJson(res, 200, { incident: stored, event: result.event });
+    return;
+  }
+
+  // --- Fraud case module (RBI FRM 2024 + natural-justice classification) ---
+  if (method === "GET" && path === "/fraud-cases") {
+    const state = await store.load();
+    const asOf = url.searchParams.get("asOf") ? new Date(url.searchParams.get("asOf")) : new Date();
+    const fraudCases = Object.values(state.fraudCases)
+      .map((fraudCase) => enrichFraudCase(fraudCase, asOf))
+      .filter((fraudCase) => fraudCaseMatchesFilters(fraudCase, url));
+    sendJson(res, 200, { asOf: asOf.toISOString(), count: fraudCases.length, fraudCases });
+    return;
+  }
+
+  if (method === "POST" && path === "/fraud-cases") {
+    const body = await readJson(req);
+    const state = await store.load();
+    const result = createFraudCase(state.fraudCases, body, state);
+    if (result.summary.status === "blocked") {
+      sendJson(res, 422, {
+        error: { code: "fraud_case_invalid", message: "Fraud case is invalid." },
+        findings: result.findings
+      });
+      return;
+    }
+    const nextState = appendEvent(
+      { ...state, fraudCases: result.registry },
+      {
+        type: "fraud_case.reported",
+        fraudCaseId: result.fraudCase.fraudCaseId,
+        category: result.fraudCase.category,
+        actor: body.reportedBy ?? null
+      }
+    );
+    await store.save(nextState);
+    sendJson(res, 201, { fraudCase: result.fraudCase, event: result.event });
+    return;
+  }
+
+  const fraudCaseMatch = path.match(/^\/fraud-cases\/([^/]+)$/);
+  if (method === "GET" && fraudCaseMatch) {
+    const state = await store.load();
+    const fraudCase = state.fraudCases[decodeURIComponent(fraudCaseMatch[1])];
+    if (!fraudCase) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Fraud case not found." } });
+      return;
+    }
+    const asOf = url.searchParams.get("asOf") ? new Date(url.searchParams.get("asOf")) : new Date();
+    sendJson(res, 200, enrichFraudCase(fraudCase, asOf));
+    return;
+  }
+
+  const fraudCaseActionMatch = path.match(/^\/fraud-cases\/([^/]+)\/(show-cause-notice|responses|classification)$/);
+  if (method === "POST" && fraudCaseActionMatch) {
+    const body = await readJson(req);
+    const state = await store.load();
+    const fraudCaseId = decodeURIComponent(fraudCaseActionMatch[1]);
+    const action = fraudCaseActionMatch[2];
+    const fraudCase = state.fraudCases[fraudCaseId];
+    if (!fraudCase) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Fraud case not found." } });
+      return;
+    }
+    const actionResult =
+      action === "show-cause-notice"
+        ? issueShowCauseNotice(fraudCase, body)
+        : action === "responses"
+          ? recordFraudResponse(fraudCase, body)
+          : classifyFraudCase(fraudCase, body);
+    if (actionResult.summary.status === "blocked") {
+      sendJson(res, 422, {
+        error: { code: "fraud_case_action_blocked", message: "Fraud case action is blocked by natural-justice or workflow findings." },
+        findings: actionResult.findings
+      });
+      return;
+    }
+    const stored = actionResult.fraudCase;
+    const nextState = appendEvent(
+      { ...state, fraudCases: { ...state.fraudCases, [stored.fraudCaseId]: stored } },
+      {
+        type: actionResult.event.type,
+        fraudCaseId: stored.fraudCaseId,
+        actor: body.actor ?? null
+      }
+    );
+    await store.save(nextState);
+    sendJson(res, 200, { fraudCase: stored, event: actionResult.event });
     return;
   }
 
@@ -2585,6 +2677,28 @@ function incidentMatchesFilters(incident, url) {
     return false;
   }
   if (filters.reportingStatus && incident.reportingStatus !== filters.reportingStatus) {
+    return false;
+  }
+  return true;
+}
+
+function fraudCaseMatchesFilters(fraudCase, url) {
+  const filters = {
+    status: url.searchParams.get("status"),
+    category: url.searchParams.get("category"),
+    subjectBorrowerId: url.searchParams.get("subjectBorrowerId"),
+    subjectLoanAccountId: url.searchParams.get("subjectLoanAccountId")
+  };
+  if (filters.status && fraudCase.status !== filters.status) {
+    return false;
+  }
+  if (filters.category && fraudCase.category !== filters.category) {
+    return false;
+  }
+  if (filters.subjectBorrowerId && fraudCase.subjectBorrowerId !== filters.subjectBorrowerId) {
+    return false;
+  }
+  if (filters.subjectLoanAccountId && fraudCase.subjectLoanAccountId !== filters.subjectLoanAccountId) {
     return false;
   }
   return true;
