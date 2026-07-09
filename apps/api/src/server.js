@@ -164,6 +164,9 @@ import {
   listBreakGlassGrants,
   listSubProcessors,
   listTenants,
+  listSandboxes,
+  resetSandbox,
+  deleteSandbox,
   loadState as loadWholeState,
   offboardTenant,
   publicBreakGlassGrant,
@@ -294,6 +297,27 @@ async function route(req, res, dataDir, platformAdminKey) {
       }
     });
     return;
+  }
+
+  // Resolve sandbox via x-sandbox-name header if called using parent's production API key
+  if (tenant && !tenant.isSandbox) {
+    const sandboxNameHeader = req.headers["x-sandbox-name"];
+    const sandboxName = Array.isArray(sandboxNameHeader) ? sandboxNameHeader[0] : sandboxNameHeader;
+    if (sandboxName) {
+      const sandboxId = `${tenant.tenantId}_sandbox_${sandboxName}`;
+      const sandboxRecord = wholeState.controlPlane.tenants[sandboxId];
+      if (sandboxRecord && sandboxRecord.status === "active") {
+        tenant = sandboxRecord;
+      } else {
+        sendJson(res, 404, {
+          error: {
+            code: "sandbox_not_found",
+            message: `The sandbox environment "${sandboxName}" was not found or is inactive.`
+          }
+        });
+        return;
+      }
+    }
   }
 
   // The store hands each handler ONLY this tenant's partition. There is no code
@@ -437,7 +461,7 @@ async function route(req, res, dataDir, platformAdminKey) {
       return;
     }
 
-    const manager = new ExternalServiceManager();
+    const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox });
     let dispatch = null;
     try {
       dispatch = await manager.sendCommunication(payload);
@@ -492,7 +516,7 @@ async function route(req, res, dataDir, platformAdminKey) {
 
   if (method === "POST" && path === "/integrations/payment-rails/nach-mandates") {
     const body = await readJson(req);
-    const manager = new ExternalServiceManager();
+    const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox });
     let providerResult = null;
     try {
       providerResult = await manager.createNachMandate(body);
@@ -536,7 +560,7 @@ async function route(req, res, dataDir, platformAdminKey) {
 
   if (method === "POST" && path === "/integrations/payment-rails/upi-collects") {
     const body = await readJson(req);
-    const manager = new ExternalServiceManager();
+    const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox });
     let providerResult = null;
     try {
       providerResult = await manager.createUpiCollect(body);
@@ -580,7 +604,7 @@ async function route(req, res, dataDir, platformAdminKey) {
 
   if (method === "POST" && path === "/integrations/bank-account-verification") {
     const body = await readJson(req);
-    const manager = new ExternalServiceManager();
+    const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox });
     let verification = null;
     try {
       verification = await manager.verifyBankAccount(body);
@@ -618,7 +642,7 @@ async function route(req, res, dataDir, platformAdminKey) {
       sendJson(res, 400, { error: { code: "bad_request", message: "pan is required." } });
       return;
     }
-    const manager = new ExternalServiceManager();
+    const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox });
     let report = null;
     try {
       report = await manager.queryCreditBureau(pan);
@@ -656,7 +680,7 @@ async function route(req, res, dataDir, platformAdminKey) {
       sendJson(res, 400, { error: { code: "bad_request", message: "borrowerId and videoHash are required." } });
       return;
     }
-    const manager = new ExternalServiceManager();
+    const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox });
     let analysis = null;
     try {
       analysis = await manager.analyzeVcipVideo(borrowerId, videoHash);
@@ -685,6 +709,112 @@ async function route(req, res, dataDir, platformAdminKey) {
     );
     await store.save(nextState);
     sendJson(res, 200, { analysis });
+    return;
+  }
+
+  if (method === "GET" && path === "/sandbox-environments") {
+    if (tenant.isSandbox) {
+      sendJson(res, 403, {
+        error: { code: "sandbox_forbidden", message: "This operation is not permitted within a sandbox environment." }
+      });
+      return;
+    }
+    const list = listSandboxes(wholeState, tenant.tenantId);
+    sendJson(res, 200, { sandboxes: list });
+    return;
+  }
+
+  if (method === "POST" && path === "/sandbox-environments") {
+    if (tenant.isSandbox) {
+      sendJson(res, 403, {
+        error: { code: "sandbox_forbidden", message: "This operation is not permitted within a sandbox environment." }
+      });
+      return;
+    }
+    const body = await readJson(req);
+    const sandboxName = body.sandboxName;
+    if (!sandboxName || !/^[a-zA-Z0-9_-]+$/.test(sandboxName)) {
+      sendJson(res, 422, {
+        error: {
+          code: "sandbox_name_invalid",
+          message: "A valid sandboxName containing only alphanumeric characters, hyphens, or underscores is required."
+        }
+      });
+      return;
+    }
+    const sandboxId = `${tenant.tenantId}_sandbox_${sandboxName}`;
+    if (wholeState.controlPlane.tenants[sandboxId]) {
+      sendJson(res, 409, {
+        error: { code: "sandbox_exists", message: "A sandbox environment with this name already exists." }
+      });
+      return;
+    }
+
+    const apiKey = generateApiKey(true);
+    const nextState = registerTenant(wholeState, {
+      tenantId: sandboxId,
+      name: `${tenant.name} (${sandboxName} Sandbox)`,
+      apiKey,
+      isolationTier: tenant.isolationTier,
+      status: "active",
+      isSandbox: true,
+      parentTenantId: tenant.tenantId,
+      sandboxName
+    });
+    await saveWholeState(nextState, dataDir);
+    sendJson(res, 201, {
+      sandbox: publicTenant(nextState.controlPlane.tenants[sandboxId]),
+      apiKey
+    });
+    return;
+  }
+
+  const sandboxResetMatch = path.match(/^\/sandbox-environments\/([^/]+)\/reset$/);
+  if (method === "POST" && sandboxResetMatch) {
+    if (tenant.isSandbox) {
+      sendJson(res, 403, {
+        error: { code: "sandbox_forbidden", message: "This operation is not permitted within a sandbox environment." }
+      });
+      return;
+    }
+    const sandboxName = decodeURIComponent(sandboxResetMatch[1]);
+    const sandboxId = `${tenant.tenantId}_sandbox_${sandboxName}`;
+    const sandboxRecord = wholeState.controlPlane.tenants[sandboxId];
+    if (!sandboxRecord || sandboxRecord.status === "offboarded") {
+      sendJson(res, 404, { error: { code: "not_found", message: "Sandbox environment not found." } });
+      return;
+    }
+    const body = await readJson(req);
+    const preserveConfig = !!body.preserveConfig;
+    const nextState = resetSandbox(wholeState, sandboxId, preserveConfig);
+    await saveWholeState(nextState, dataDir);
+    sendJson(res, 200, {
+      message: `Sandbox environment "${sandboxName}" has been reset.`,
+      preserveConfig
+    });
+    return;
+  }
+
+  const sandboxDeleteMatch = path.match(/^\/sandbox-environments\/([^/]+)$/);
+  if (method === "DELETE" && sandboxDeleteMatch) {
+    if (tenant.isSandbox) {
+      sendJson(res, 403, {
+        error: { code: "sandbox_forbidden", message: "This operation is not permitted within a sandbox environment." }
+      });
+      return;
+    }
+    const sandboxName = decodeURIComponent(sandboxDeleteMatch[1]);
+    const sandboxId = `${tenant.tenantId}_sandbox_${sandboxName}`;
+    const sandboxRecord = wholeState.controlPlane.tenants[sandboxId];
+    if (!sandboxRecord || sandboxRecord.status === "offboarded") {
+      sendJson(res, 404, { error: { code: "not_found", message: "Sandbox environment not found." } });
+      return;
+    }
+    const nextState = deleteSandbox(wholeState, sandboxId);
+    await saveWholeState(nextState, dataDir);
+    sendJson(res, 200, {
+      message: `Sandbox environment "${sandboxName}" has been deleted.`
+    });
     return;
   }
 
@@ -1749,7 +1879,7 @@ async function route(req, res, dataDir, platformAdminKey) {
   if (method === "POST" && path === "/borrowers") {
     const body = await readJson(req);
     const state = await store.load();
-    const result = upsertBorrowerProfile(state.borrowerProfiles, body);
+    const result = upsertBorrowerProfile(state.borrowerProfiles, body, new Date(), { isSandbox: tenant.isSandbox });
     const nextState =
       result.summary.status === "blocked"
         ? state
@@ -1839,7 +1969,7 @@ async function route(req, res, dataDir, platformAdminKey) {
       if (result.summary.status !== "blocked" && isPending) {
         const borrower = state.borrowerProfiles[borrowerId];
         const phone = borrower?.contact?.mobile || "+919999999999";
-        const manager = new ExternalServiceManager();
+        const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox });
         try {
           await manager.sendSms(phone, `Your LoanOS Consent Verification OTP is ${otp}`);
         } catch (err) {
@@ -2099,7 +2229,7 @@ async function route(req, res, dataDir, platformAdminKey) {
         primaryAddress: record.address,
         contact: record.contact,
         status: "active"
-      });
+      }, new Date(), { isSandbox: tenant.isSandbox });
 
       const syncKycResult = upsertKycRecord(
         state.kycRecords,
@@ -2307,7 +2437,7 @@ async function route(req, res, dataDir, platformAdminKey) {
     const state = await store.load();
     const borrower = state.borrowerProfiles?.[body.borrowerId];
     const pan = borrower?.pan || "ABCDE1234F";
-    const manager = new ExternalServiceManager();
+    const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox });
     let bureauReport = null;
     try {
       bureauReport = await manager.queryCreditBureau(pan);
@@ -2455,7 +2585,7 @@ async function route(req, res, dataDir, platformAdminKey) {
     }
     const borrower = state.borrowerProfiles?.[application.borrowerId];
     const pan = borrower?.pan || "ABCDE1234F";
-    const manager = new ExternalServiceManager();
+    const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox });
     let bureauReport = null;
     try {
       bureauReport = await manager.queryCreditBureau(pan);
@@ -2874,7 +3004,7 @@ async function route(req, res, dataDir, platformAdminKey) {
       return;
     }
 
-    const manager = new ExternalServiceManager();
+    const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox });
     let esignResult = null;
     try {
       const payloadHash = (application.documentPacket?.documents ?? []).map(d => d.checksumSha256).join(",");
@@ -3934,7 +4064,7 @@ async function route(req, res, dataDir, platformAdminKey) {
     }
     let externalResult = {};
     if (action === "filing") {
-      const manager = new ExternalServiceManager();
+      const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox });
       try {
         externalResult = await manager.fileCersaiSecurityInterest({
           securityInterestId: si.securityInterestId,
@@ -4216,7 +4346,7 @@ async function route(req, res, dataDir, platformAdminKey) {
     }
     let externalResult = {};
     if (action === "filing") {
-      const manager = new ExternalServiceManager();
+      const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox });
       try {
         externalResult = await manager.fileFiuReport({
           reportId: report.reportId,

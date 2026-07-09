@@ -81,6 +81,19 @@ export class ExternalServiceManager {
       fiuApiKey: config.fiuApiKey ?? (typeof process !== "undefined" ? process.env.LOANOS_FIU_API_KEY : "") ?? "",
       fiuDataResidencyCountry: config.fiuDataResidencyCountry ?? (typeof process !== "undefined" ? process.env.LOANOS_FIU_DATA_RESIDENCY_COUNTRY : "IN") ?? "IN"
     };
+
+    if (config.isSandbox) {
+      this.config.smsProvider = "mock";
+      this.config.emailProvider = "mock";
+      this.config.whatsappProvider = "mock";
+      this.config.bureauProvider = "mock";
+      this.config.vcipProvider = "mock";
+      this.config.bankAccountProvider = "mock";
+      this.config.paymentRailProvider = "mock";
+      this.config.esignProvider = "mock";
+      this.config.cersaiProvider = "mock";
+      this.config.fiuProvider = "mock";
+    }
   }
 
   /**

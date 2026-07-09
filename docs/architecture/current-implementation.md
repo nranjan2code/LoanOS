@@ -92,6 +92,10 @@ npm run dev:api
 | `POST /incidents` | Creates a tenant security/data incident, starting the 6-hour reporting clock. |
 | `GET /incidents/:id` | Reads one incident with computed reporting-clock status. |
 | `POST /incidents/:id/notifications` | Records a regulator notification (CERT-In/RBI) against an incident. |
+| `GET /sandbox-environments` | Lists all sandbox environments created by the tenant. |
+| `POST /sandbox-environments` | Creates a new isolated sandbox environment partition and generates a test API key. |
+| `POST /sandbox-environments/:name/reset` | Resets a sandbox environment state; optionally preserves configuration parameters. |
+| `DELETE /sandbox-environments/:name` | Deletes a sandbox environment and purges its data partition. |
 | `GET /fraud-cases` | Lists fraud cases. |
 | `POST /fraud-cases` | Creates a fraud case (reported → under_investigation). |
 | `GET /fraud-cases/:id` | Reads one fraud case. |

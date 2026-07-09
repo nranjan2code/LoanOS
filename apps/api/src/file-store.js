@@ -170,8 +170,9 @@ export function hashApiKey(apiKey) {
   return createHash("sha256").update(String(apiKey)).digest("hex");
 }
 
-export function generateApiKey() {
-  return `lsk_${randomBytes(24).toString("hex")}`;
+export function generateApiKey(isSandbox = false) {
+  const prefix = isSandbox ? "lsk_test" : "lsk";
+  return `${prefix}_${randomBytes(24).toString("hex")}`;
 }
 
 export function registerTenant(state, tenant, now = new Date()) {
@@ -186,6 +187,9 @@ export function registerTenant(state, tenant, now = new Date()) {
     apiKeyHash: tenant.apiKey ? hashApiKey(tenant.apiKey) : existing?.apiKeyHash ?? null,
     isolationTier: tenant.isolationTier ?? existing?.isolationTier ?? "pooled",
     status: tenant.status ?? existing?.status ?? "active",
+    isSandbox: tenant.isSandbox ?? existing?.isSandbox ?? false,
+    parentTenantId: tenant.parentTenantId ?? existing?.parentTenantId ?? null,
+    sandboxName: tenant.sandboxName ?? existing?.sandboxName ?? null,
     createdAt: existing?.createdAt ?? now.toISOString(),
     updatedAt: now.toISOString()
   };
@@ -207,6 +211,64 @@ export function registerTenant(state, tenant, now = new Date()) {
 
 export function listTenants(state) {
   return Object.values(state.controlPlane.tenants).map(publicTenant);
+}
+
+export function listSandboxes(state, parentTenantId) {
+  return Object.values(state.controlPlane.tenants)
+    .filter((t) => t.isSandbox && t.parentTenantId === parentTenantId && t.status !== "offboarded")
+    .map(publicTenant);
+}
+
+export function resetSandbox(state, sandboxId, preserveConfig = false) {
+  const tenantData = state.tenants[sandboxId];
+  if (!tenantData) {
+    return state;
+  }
+  let newTenantData;
+  if (preserveConfig) {
+    newTenantData = {
+      ...createEmptyTenantData(),
+      regulatedEntities: tenantData.regulatedEntities ?? {},
+      lendingServiceProviders: tenantData.lendingServiceProviders ?? {},
+      digitalLendingApps: tenantData.digitalLendingApps ?? {},
+      productPolicies: tenantData.productPolicies ?? {},
+      staffActors: tenantData.staffActors ?? {},
+      recoveryAgents: tenantData.recoveryAgents ?? {},
+    };
+  } else {
+    newTenantData = createEmptyTenantData();
+  }
+  return {
+    ...state,
+    tenants: {
+      ...state.tenants,
+      [sandboxId]: newTenantData
+    }
+  };
+}
+
+export function deleteSandbox(state, sandboxId, now = new Date()) {
+  const record = state.controlPlane.tenants[sandboxId];
+  if (!record || !record.isSandbox) {
+    return state;
+  }
+  const nextTenants = { ...state.tenants };
+  delete nextTenants[sandboxId];
+  return {
+    ...state,
+    controlPlane: {
+      ...state.controlPlane,
+      tenants: {
+        ...state.controlPlane.tenants,
+        [sandboxId]: {
+          ...record,
+          status: "offboarded",
+          updatedAt: now.toISOString()
+        }
+      }
+    },
+    tenants: nextTenants
+  };
 }
 
 export function publicTenant(record) {

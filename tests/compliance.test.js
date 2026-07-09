@@ -7129,3 +7129,185 @@ test("API CERSAI and FIU filing enforce residency checks", async (t) => {
   assert.match(fileRepFail.body.error.message, /FIU-IND provider data residency country must be IN/);
   delete process.env.LOANOS_FIU_DATA_RESIDENCY_COUNTRY;
 });
+
+test("API serves tenant sandbox environments and enforces synthetic bounds", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-sandbox-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const base = `http://127.0.0.1:${server.address().port}`;
+
+  // 1. Create a sandbox environment
+  const createRes = await postJson(`${base}/sandbox-environments`, { sandboxName: "dev" });
+  assert.equal(createRes.status, 201);
+  const sandboxKey = createRes.body.apiKey;
+  assert.ok(sandboxKey.startsWith("lsk_test_"));
+  assert.equal(createRes.body.sandbox.sandboxName, "dev");
+  assert.equal(createRes.body.sandbox.isSandbox, true);
+  assert.equal(createRes.body.sandbox.parentTenantId, TENANT_A.tenantId);
+
+  // 2. Listing sandboxes
+  const listRes = await apiFetch(`${base}/sandbox-environments`);
+  assert.equal(listRes.status, 200);
+  const listBody = await listRes.json();
+  assert.equal(listBody.sandboxes.length, 1);
+  assert.equal(listBody.sandboxes[0].sandboxName, "dev");
+
+  // 3. Prevent duplicate sandbox creation
+  const dupRes = await postJson(`${base}/sandbox-environments`, { sandboxName: "dev" });
+  assert.equal(dupRes.status, 409);
+
+  // 4. Reject invalid sandbox name
+  const invRes = await postJson(`${base}/sandbox-environments`, { sandboxName: "dev@invalid!" });
+  assert.equal(invRes.status, 422);
+
+  // 5. Block sandbox actions from within sandbox API key
+  const nestedRes = await postJson(`${base}/sandbox-environments`, { sandboxName: "nested" }, sandboxKey);
+  assert.equal(nestedRes.status, 403);
+  assert.equal(nestedRes.body.error.code, "sandbox_forbidden");
+
+  // 6. Partition isolation and synthetic borrower validation
+  // Production profile: non-synthetic
+  const prodBorrower = {
+    borrowerId: "bor_prod_1",
+    borrowerType: "individual",
+    fullName: "Asha Production",
+    dateOfBirth: "1990-01-01",
+    residencyCountry: "IN",
+    primaryAddressCountry: "IN",
+    primaryAddress: "Mumbai, IN",
+    contact: { mobile: "+919999999901" },
+    economicProfile: { occupation: "salaried", monthlyIncome: 80000 },
+    isSynthetic: false
+  };
+
+  // Creating non-synthetic borrower on production should succeed
+  const prodBorrowerRes = await postJson(`${base}/borrowers`, prodBorrower);
+  assert.equal(prodBorrowerRes.status, 201);
+
+  // Creating non-synthetic borrower on sandbox should fail
+  const sandboxFailRes = await postJson(`${base}/borrowers`, prodBorrower, sandboxKey);
+  assert.equal(sandboxFailRes.status, 422);
+  assert.equal(sandboxFailRes.body.findings[0].controlId, "SANDBOX-COMPLIANCE");
+
+  // Creating synthetic borrower on sandbox (explicitly synthetic) should succeed
+  const sandBorrowerSynthetic = {
+    ...prodBorrower,
+    borrowerId: "bor_sand_1",
+    fullName: "Asha Sandbox Synthetic",
+    isSynthetic: true
+  };
+  const sandBorrowerSyntheticRes = await postJson(`${base}/borrowers`, sandBorrowerSynthetic, sandboxKey);
+  assert.equal(sandBorrowerSyntheticRes.status, 201);
+
+  // Creating borrower on sandbox without isSynthetic should auto-default to synthetic and succeed
+  const sandBorrowerDefault = {
+    ...prodBorrower,
+    borrowerId: "bor_sand_2",
+    fullName: "Asha Sandbox Auto-Default",
+    isSynthetic: undefined
+  };
+  const sandBorrowerDefaultRes = await postJson(`${base}/borrowers`, sandBorrowerDefault, sandboxKey);
+  assert.equal(sandBorrowerDefaultRes.status, 201);
+  assert.equal(sandBorrowerDefaultRes.body.borrower.isSynthetic, true);
+
+  // 7. Verify routing via x-sandbox-name header
+  // Fetching borrowers using production key + x-sandbox-name: dev
+  const headerFetch = await apiFetch(`${base}/borrowers`, {
+    headers: {
+      "authorization": `Bearer ${TENANT_A.apiKey}`,
+      "x-sandbox-name": "dev"
+    }
+  });
+  assert.equal(headerFetch.status, 200);
+  const headerBody = await headerFetch.json();
+  // Should see the two sandbox borrowers we created
+  const borrowerIds = headerBody.borrowers.map((b) => b.borrowerId);
+  assert.ok(borrowerIds.includes("bor_sand_1"));
+  assert.ok(borrowerIds.includes("bor_sand_2"));
+  assert.ok(!borrowerIds.includes("bor_prod_1"));
+
+  // Fetching borrowers using production key without header
+  const prodFetch = await apiFetch(`${base}/borrowers`);
+  assert.equal(prodFetch.status, 200);
+  const prodBody = await prodFetch.json();
+  const prodIds = prodBody.borrowers.map((b) => b.borrowerId);
+  // Should see production borrower and NOT sandbox borrowers
+  assert.ok(prodIds.includes("bor_prod_1"));
+  assert.ok(!prodIds.includes("bor_sand_1"));
+
+  // Fetching with non-existent sandbox name should return 404
+  const badHeaderFetch = await apiFetch(`${base}/borrowers`, {
+    headers: {
+      "authorization": `Bearer ${TENANT_A.apiKey}`,
+      "x-sandbox-name": "non_existent"
+    }
+  });
+  assert.equal(badHeaderFetch.status, 404);
+
+  // 8. Forced mock overrides
+  // Temporarily set real bureau provider configuration in environment variables
+  process.env.LOANOS_BUREAU_PROVIDER = "real";
+  // Attempt a bureau query. Under production, this would fail because credentials are empty.
+  // But under sandbox (sandboxKey), it is forced to mock, which succeeds!
+  const queryRes = await postJson(`${base}/integrations/credit-bureau`, { pan: "ABCDE1234F" }, sandboxKey);
+  assert.equal(queryRes.status, 200);
+  assert.equal(queryRes.body.report.provider, "mock"); // Verify it used mock!
+  delete process.env.LOANOS_BUREAU_PROVIDER;
+
+  // 9. Resetting sandbox
+  // Seed Regulated Entity configuration in sandbox
+  await postJson(`${base}/regulated-entities`, validRegulatedEntity(), sandboxKey);
+
+  // Reset sandbox with preserveConfig = true
+  const resetPreserveRes = await postJson(`${base}/sandbox-environments/dev/reset`, { preserveConfig: true });
+  assert.equal(resetPreserveRes.status, 200);
+
+  // Check that Regulated Entity configuration is preserved
+  const getReRes = await apiFetch(`${base}/regulated-entities`, {
+    headers: { "x-sandbox-name": "dev", "authorization": `Bearer ${TENANT_A.apiKey}` }
+  });
+  assert.equal(getReRes.status, 200);
+  const reBody = await getReRes.json();
+  assert.equal(reBody.regulatedEntities.length, 1);
+
+  // Check that transaction data (borrower profiles) has been cleared
+  const getBorrowerRes = await apiFetch(`${base}/borrowers`, {
+    headers: { "x-sandbox-name": "dev", "authorization": `Bearer ${TENANT_A.apiKey}` }
+  });
+  assert.equal(getBorrowerRes.status, 200);
+  const getBorrowerBody = await getBorrowerRes.json();
+  assert.equal(getBorrowerBody.borrowers.length, 0);
+
+  // Reset sandbox with preserveConfig = false
+  const resetAllRes = await postJson(`${base}/sandbox-environments/dev/reset`, { preserveConfig: false });
+  assert.equal(resetAllRes.status, 200);
+
+  // Regulated entity config should be gone now
+  const getReRes2 = await apiFetch(`${base}/regulated-entities`, {
+    headers: { "x-sandbox-name": "dev", "authorization": `Bearer ${TENANT_A.apiKey}` }
+  });
+  assert.equal(getReRes2.status, 200);
+  const reBody2 = await getReRes2.json();
+  assert.equal(reBody2.regulatedEntities.length, 0);
+
+  // 10. Deleting sandbox
+  const deleteRes = await apiFetch(`${base}/sandbox-environments/dev`, { method: "DELETE" });
+  assert.equal(deleteRes.status, 200);
+
+  // Subsequent requests to sandbox should return 401 (via key) or 404 (via header)
+  const deadKeyRes = await apiFetch(`${base}/borrowers`, {}, sandboxKey);
+  assert.equal(deadKeyRes.status, 401);
+
+  const deadHeaderRes = await apiFetch(`${base}/borrowers`, {
+    headers: { "authorization": `Bearer ${TENANT_A.apiKey}`, "x-sandbox-name": "dev" }
+  });
+  assert.equal(deadHeaderRes.status, 404);
+});

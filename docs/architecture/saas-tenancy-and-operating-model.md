@@ -86,8 +86,8 @@ Whether LoanOS also constitutes a lending service provider (LSP) under the Digit
 1. **Tenant context groundwork.** *Done.* State is partitioned into a control plane (tenant registry) and per-tenant data planes in `apps/api/src/file-store.js`; a tenant-scoped store in `apps/api/src/server.js` hands each request only its own partition.
 2. **API authentication.** *Done.* Every data-plane route resolves a tenant from `x-api-key`/bearer and returns 401 without a valid key. Tenants are minted through `POST /platform/tenants` behind a platform admin key; api keys are stored only as hashes. Platform-staff identities and human login are still to come.
 3. **Cross-tenant isolation tests.** *Done.* A regression suite provisions two tenants and proves tenant B cannot read or mutate tenant A's records across resource types, plus 401 on missing/invalid keys.
-4. **Audit spine.** *Planned.* Hash-chained, tenant-scoped audit event module; migrate module event emission onto it; build the first export pack.
-5. **Tenant lifecycle.** *Planned.* Onboarding/offboarding workflows, sandbox environments, exit export.
-6. **Vendor posture pack.** *Planned.* Due-diligence pack, incident-notification workflow, BCP/DR runbooks, sub-processor register, certification program.
+4. **Audit spine.** *Done.* Every save seals tenant events into a tamper-evident SHA-256 chain; `GET /audit/events` reports chain validity, and `GET /audit/export` produces a verifiable evidence pack.
+5. **Tenant lifecycle.** *Done.* `GET /platform/tenants/:id/export` produces a reproducible portability pack; `POST /platform/tenants/:id/offboarding` performs evidenced deletion; sandbox environments can be provisioned, reset, and deleted with synthetic-only borrower checks and automatic mock overrides.
+6. **Vendor posture pack.** *Done.* CERT-In/RBI 6-hour incident clock is tracked in `GET`/`POST /incidents`; sub-processor register is active in `GET`/`POST /platform/sub-processors`; platform staff break-glass is active, time-boxed, and sealed into tenant audit chains.
 
-Steps 1–3 are complete, so tenant isolation is enforced and tested before further feature slices land. Steps 4–6 remain.
+Steps 1–5 are complete, and Step 6 is partially complete (incident notification, sub-processor register, and break-glass are implemented; contract terms and certifications remain).

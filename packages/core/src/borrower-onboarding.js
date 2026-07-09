@@ -40,8 +40,12 @@ export function evaluateKycStatus(record, now = new Date()) {
   return { effectiveStatus, expired, reviewDue, nextReviewDueAt };
 }
 
-export function validateBorrowerProfile(profile, now = new Date()) {
+export function validateBorrowerProfile(profile, now = new Date(), options = {}) {
   const findings = [];
+
+  if (options.isSandbox && !profile?.isSynthetic) {
+    findings.push(createFinding("error", "SANDBOX-COMPLIANCE", "Sandbox environments only allow synthetic borrowers.", "isSynthetic"));
+  }
 
   if (!profile?.borrowerId) {
     findings.push(createFinding("error", "RBI-KYC-2016", "borrowerId is required.", "borrowerId"));
@@ -90,7 +94,7 @@ export function validateBorrowerProfile(profile, now = new Date()) {
   };
 }
 
-export function normalizeBorrowerProfile(input, now = new Date()) {
+export function normalizeBorrowerProfile(input, now = new Date(), options = {}) {
   return {
     borrowerId: input.borrowerId,
     borrowerType: input.borrowerType ?? "individual",
@@ -111,14 +115,15 @@ export function normalizeBorrowerProfile(input, now = new Date()) {
       employerName: input.economicProfile?.employerName ?? null,
       incomeEvidenceRef: input.economicProfile?.incomeEvidenceRef ?? null
     },
+    isSynthetic: input.isSynthetic === true || (options.isSandbox && input.isSynthetic !== false),
     createdAt: input.createdAt ?? now.toISOString(),
     updatedAt: now.toISOString()
   };
 }
 
-export function upsertBorrowerProfile(registry, input, now = new Date()) {
-  const borrower = normalizeBorrowerProfile(input, now);
-  const validation = validateBorrowerProfile(borrower, now);
+export function upsertBorrowerProfile(registry, input, now = new Date(), options = {}) {
+  const borrower = normalizeBorrowerProfile(input, now, options);
+  const validation = validateBorrowerProfile(borrower, now, options);
   const nextRegistry =
     validation.summary.status === "blocked"
       ? registry ?? {}
