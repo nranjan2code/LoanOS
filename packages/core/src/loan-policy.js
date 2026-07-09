@@ -330,14 +330,24 @@ export function validateDisbursement(application, disbursement) {
 }
 
 function checkTenant(application, findings) {
+  if (!application.regulatedEntityId) {
+    findings.push(createFinding("error", "RBI-DL-2025", "regulatedEntityId is required.", "regulatedEntityId"));
+  }
   const tenant = application.tenant;
-  if (!tenant?.regulatedEntityName) {
+  if (!tenant) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Tenant (regulated entity) details are missing.", "tenant"));
+    return;
+  }
+  if (!tenant.regulatedEntityName) {
     findings.push(createFinding("error", "RBI-DL-2025", "regulatedEntityName is required.", "tenant.regulatedEntityName"));
   }
-  if (!tenant?.regulatedEntityType || !ALLOWED_RE_TYPES.has(tenant.regulatedEntityType)) {
+  if (!tenant.regulatedEntityType || !ALLOWED_RE_TYPES.has(tenant.regulatedEntityType)) {
     findings.push(createFinding("error", "RBI-DL-2025", "regulatedEntityType must be an RBI-covered RE type.", "tenant.regulatedEntityType"));
   }
-  if (!tenant?.grievanceOfficer?.name || !tenant?.grievanceOfficer?.email) {
+  if (!tenant.rbiRegistrationNumber || typeof tenant.rbiRegistrationNumber !== "string" || tenant.rbiRegistrationNumber.trim() === "") {
+    findings.push(createFinding("error", "RBI-DL-2025", "rbiRegistrationNumber is required and cannot be empty.", "tenant.rbiRegistrationNumber"));
+  }
+  if (!tenant.grievanceOfficer?.name || !tenant.grievanceOfficer?.email) {
     findings.push(createFinding("error", "RBI-DL-2025", "Tenant must configure grievance officer name and email.", "tenant.grievanceOfficer"));
   }
 }

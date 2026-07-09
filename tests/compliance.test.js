@@ -663,6 +663,75 @@ test("regulated entity and product registries resolve an application", () => {
   assert.equal(resolution.application.product.requestedAmount, 150000);
 });
 
+test("regulated entity validation hardening rejects missing/invalid RE metadata", () => {
+  // 1. validateRegulatedEntity rejects registration without rbiRegistrationNumber
+  const invalidReInput = {
+    ...validRegulatedEntity(),
+    rbiRegistrationNumber: ""
+  };
+  const reResult = upsertRegulatedEntity({}, invalidReInput);
+  assert.equal(reResult.summary.status, "blocked");
+  assert(reResult.findings.some(f => f.path === "rbiRegistrationNumber" && f.message.includes("is required")));
+
+  // 2. resolveLoanApplicationReferences blocks missing regulatedEntityId
+  const appWithoutReId = {
+    ...validApplication(),
+    regulatedEntityId: undefined
+  };
+  const resolution1 = resolveLoanApplicationReferences(appWithoutReId, {});
+  assert.equal(resolution1.summary.status, "blocked");
+  assert(resolution1.findings.some(f => f.path === "regulatedEntityId" && f.message.includes("is required")));
+
+  // 3. evaluateLoanApplication blocks missing regulatedEntityId / tenant details
+  const eval1 = evaluateLoanApplication(appWithoutReId);
+  assert.equal(eval1.summary.status, "blocked");
+  assert(eval1.findings.some(f => f.path === "regulatedEntityId" && f.message.includes("is required")));
+
+  const appWithoutTenant = {
+    ...validApplication(),
+    tenant: undefined
+  };
+  const eval2 = evaluateLoanApplication(appWithoutTenant);
+  assert.equal(eval2.summary.status, "blocked");
+  assert(eval2.findings.some(f => f.path === "tenant" && f.message.includes("details are missing")));
+
+  // 4. evaluateLoanApplication blocks missing rbiRegistrationNumber
+  const appWithoutRegNum = {
+    ...validApplication(),
+    tenant: {
+      ...validApplication().tenant,
+      rbiRegistrationNumber: ""
+    }
+  };
+  const eval3 = evaluateLoanApplication(appWithoutRegNum);
+  assert.equal(eval3.summary.status, "blocked");
+  assert(eval3.findings.some(f => f.path === "tenant.rbiRegistrationNumber" && f.message.includes("cannot be empty")));
+
+  // 5. evaluateLoanApplication blocks unsupported RE type
+  const appWithBadReType = {
+    ...validApplication(),
+    tenant: {
+      ...validApplication().tenant,
+      regulatedEntityType: "not_a_bank"
+    }
+  };
+  const eval4 = evaluateLoanApplication(appWithBadReType);
+  assert.equal(eval4.summary.status, "blocked");
+  assert(eval4.findings.some(f => f.path === "tenant.regulatedEntityType" && f.message.includes("must be an RBI-covered RE type")));
+
+  // 6. evaluateLoanApplication blocks missing grievance officer name/email
+  const appWithoutGovName = {
+    ...validApplication(),
+    tenant: {
+      ...validApplication().tenant,
+      grievanceOfficer: { name: "", email: "grievance@example.in" }
+    }
+  };
+  const eval5 = evaluateLoanApplication(appWithoutGovName);
+  assert.equal(eval5.summary.status, "blocked");
+  assert(eval5.findings.some(f => f.path === "tenant.grievanceOfficer" && f.message.includes("grievance officer name and email")));
+});
+
 test("product policy rejects unsafe penal charge design", () => {
   const reResult = upsertRegulatedEntity({}, validRegulatedEntity());
   const productResult = upsertProductPolicy(
@@ -4846,9 +4915,11 @@ function eligibilityApplication(overrides = {}) {
 
 function validApplication() {
   return {
+    regulatedEntityId: "re_example_nbfc",
     tenant: {
       regulatedEntityName: "Example India NBFC Ltd",
       regulatedEntityType: "nbfc",
+      rbiRegistrationNumber: "B-00.00000",
       grievanceOfficer: {
         name: "Nodal Officer",
         email: "grievance@example.in"

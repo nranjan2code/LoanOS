@@ -62,6 +62,9 @@ export function validateRegulatedEntity(entity) {
   if (!entity?.regulatedEntityType || !ALLOWED_RE_TYPES.has(entity.regulatedEntityType)) {
     findings.push(createFinding("error", "RBI-DL-2025", "regulatedEntityType must be an RBI-covered RE type.", "regulatedEntityType"));
   }
+  if (!entity?.rbiRegistrationNumber || typeof entity.rbiRegistrationNumber !== "string" || entity.rbiRegistrationNumber.trim() === "") {
+    findings.push(createFinding("error", "RBI-DL-2025", "rbiRegistrationNumber is required and cannot be empty.", "rbiRegistrationNumber"));
+  }
   if ((entity?.country ?? "IN") !== "IN") {
     findings.push(createFinding("error", "RBI-DL-2025", "Regulated entity country must be IN.", "country"));
   }
@@ -840,7 +843,9 @@ export function resolveLoanApplicationReferences(application, registries = {}) {
   const findings = [];
   let resolved = { ...application };
 
-  if (application.regulatedEntityId) {
+  if (!application.regulatedEntityId) {
+    findings.push(createFinding("error", "RBI-DL-2025", "regulatedEntityId is required.", "regulatedEntityId"));
+  } else {
     const entity = registries.regulatedEntities?.[application.regulatedEntityId];
     if (!entity) {
       findings.push(createFinding("error", "RBI-DL-2025", "regulatedEntityId does not match an existing RE.", "regulatedEntityId"));
@@ -852,6 +857,7 @@ export function resolveLoanApplicationReferences(application, registries = {}) {
         tenant: {
           regulatedEntityName: entity.regulatedEntityName,
           regulatedEntityType: entity.regulatedEntityType,
+          rbiRegistrationNumber: entity.rbiRegistrationNumber,
           grievanceOfficer: entity.grievanceOfficer,
           privacyPolicyUrl: entity.privacyPolicyUrl,
           websiteUrl: entity.websiteUrl,
