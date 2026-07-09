@@ -52,6 +52,7 @@ import {
   upsertProductPolicy,
   upsertRecoveryAgent,
   upsertRegulatedEntity,
+  validateDisbursement,
   validateKfs,
   validateKfsBeforeDecision,
   validateMarketplaceNeutrality,
@@ -210,6 +211,51 @@ test("KFS acceptance and delivery evidence gates sanction readiness", () => {
 
   assert.equal(validateKfsBeforeDecision(withoutAcceptance).summary.status, "blocked");
   assert.equal(validateKfsBeforeDecision(withAcceptance).summary.status, "ready");
+});
+
+test("bank account verification evidence gates disbursement readiness", () => {
+  const app = validApplication();
+  const kfs = buildKeyFactStatement(app, {
+    principalAmount: 100000,
+    tenorMonths: 12,
+    annualInterestRateBps: 1800,
+    aprBps: 2100,
+    coolingOffDays: 1,
+    recoveryMechanism: "NACH debit to RE account"
+  });
+  const approved = {
+    ...attachKfs(app, kfs, {
+      acceptedAt: "2026-07-08T07:00:00.000Z",
+      deliveryChannel: "email",
+      deliveryRef: "email_msg_123"
+    }),
+    status: "approved"
+  };
+
+  const missingVerification = validateDisbursement(approved, {
+    destinationAccount: {
+      country: "IN",
+      ifsc: "HDFC0000001",
+      ownerRole: "borrower"
+    }
+  });
+  assert.equal(missingVerification.summary.status, "blocked");
+  assert(missingVerification.findings.some((finding) => finding.path === "destinationAccount.bankAccountVerification"));
+
+  const mismatchVerification = validateDisbursement(approved, {
+    destinationAccount: merge(validApplication().disbursement.destinationAccount, {
+      bankAccountVerification: {
+        ...validApplication().disbursement.destinationAccount.bankAccountVerification,
+        status: "name_mismatch",
+        nameMatch: false
+      }
+    })
+  });
+  assert.equal(mismatchVerification.summary.status, "blocked");
+  assert(mismatchVerification.findings.some((finding) => finding.path === "destinationAccount.bankAccountVerification.nameMatch"));
+
+  const ready = validateDisbursement(approved, validApplication().disbursement);
+  assert.equal(ready.summary.status, "ready");
 });
 
 test("repayment schedule amortizes principal over tenor", () => {
@@ -5236,6 +5282,7 @@ test("audit events carry a uniform actor/actorType/dataClass provenance envelope
   assert.equal(classifyAuditDataClass("borrower_profile.upserted"), "personal_data");
   assert.equal(classifyAuditDataClass("complaint.received"), "personal_data");
   assert.equal(classifyAuditDataClass("loan.disbursement.recorded"), "financial");
+  assert.equal(classifyAuditDataClass("integration.bank_account.verification_completed"), "financial");
   assert.equal(classifyAuditDataClass("model.transitioned"), "model_governance");
   assert.equal(classifyAuditDataClass("platform.break_glass.access"), "platform");
   assert.equal(classifyAuditDataClass("regulated_entity.upserted"), "operational");
@@ -5286,6 +5333,46 @@ test("API stamps every sealed audit event with tenant provenance", async (t) => 
   assert.equal(borrowerEvent.dataClass, "personal_data");
   const disbursement = events.events.find((event) => event.type === "loan.disbursement.recorded");
   assert.equal(disbursement.dataClass, "financial");
+});
+
+test("API verifies bank accounts and seals tenant audit evidence", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-bank-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+
+  const verified = await postJson(`${base}/integrations/bank-account-verification`, {
+    accountNumber: "123456789012",
+    ifsc: "HDFC0000001",
+    expectedHolderName: "Asha Sharma"
+  });
+  assert.equal(verified.status, 200);
+  assert.equal(verified.body.verification.status, "verified");
+  assert.equal(verified.body.verification.accountNumberLast4, "9012");
+  assert.equal(Object.hasOwn(verified.body.verification, "accountNumber"), false);
+
+  const mismatch = await postJson(`${base}/integrations/bank-account-verification`, {
+    accountNumber: "123456789012",
+    ifsc: "HDFC0000001",
+    expectedHolderName: "Wrong Name"
+  });
+  assert.equal(mismatch.status, 422);
+  assert.equal(mismatch.body.verification.status, "name_mismatch");
+
+  const events = await (await apiFetch(`${base}/audit/events?type=integration.bank_account.verification_completed`)).json();
+  assert.equal(events.chainValid, true);
+  assert.equal(events.count, 2);
+  assert(events.events.every((event) => event.accountNumberLast4 === "9012"));
+  assert(events.events.every((event) => event.dataClass === "financial"));
 });
 
 function eligibilityApplication(overrides = {}) {
@@ -5389,7 +5476,19 @@ function validApplication() {
       destinationAccount: {
         country: "IN",
         ifsc: "HDFC0000001",
-        ownerRole: "borrower"
+        ownerRole: "borrower",
+        accountNumberLast4: "9012",
+        bankAccountVerification: {
+          provider: "mock",
+          status: "verified",
+          verificationRef: "BANK-VERIFY-MOCK-001",
+          verifiedAt: "2026-07-08T06:45:00.000Z",
+          accountStatus: "active",
+          ifsc: "HDFC0000001",
+          accountNumberLast4: "9012",
+          accountHolderName: "Asha Sharma",
+          nameMatch: true
+        }
       }
     },
     repayment: {
@@ -6726,5 +6825,3 @@ test("V-CIP Evidence Vault and validation checks", async (t) => {
   // 12. Reject official actor with wrong role (e.g. collections manager)
   await expectFailure({ officialActorId: "collections-manager-1" });
 });
-
-

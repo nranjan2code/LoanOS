@@ -45,3 +45,48 @@ test("ExternalServiceManager V-CIP mock provider returns simulated face match", 
   assert.strictEqual(result.livenessConfirmed, true);
   assert.strictEqual(result.gps.country, "IN");
 });
+
+test("ExternalServiceManager bank account mock verifies active borrower account", async () => {
+  const manager = new ExternalServiceManager();
+  const result = await manager.verifyBankAccount({
+    accountNumber: "123456789012",
+    ifsc: "hdfc0000001",
+    expectedHolderName: "Asha Sharma"
+  });
+
+  assert.strictEqual(result.success, true);
+  assert.strictEqual(result.provider, "mock");
+  assert.strictEqual(result.status, "verified");
+  assert.strictEqual(result.accountStatus, "active");
+  assert.strictEqual(result.ifsc, "HDFC0000001");
+  assert.strictEqual(result.accountNumberLast4, "9012");
+  assert.strictEqual(result.nameMatch, true);
+  assert.match(result.verificationRef, /^BANK-VERIFY-MOCK-/);
+});
+
+test("ExternalServiceManager bank account mock flags name mismatch", async () => {
+  const manager = new ExternalServiceManager();
+  const result = await manager.verifyBankAccount({
+    accountNumber: "123456789012",
+    ifsc: "HDFC0000001",
+    expectedHolderName: "Someone Else"
+  });
+
+  assert.strictEqual(result.success, false);
+  assert.strictEqual(result.status, "name_mismatch");
+  assert.strictEqual(result.nameMatch, false);
+});
+
+test("ExternalServiceManager bank account real provider fails without credentials", async () => {
+  const manager = new ExternalServiceManager({ bankAccountProvider: "real" });
+  await assert.rejects(
+    async () => {
+      await manager.verifyBankAccount({
+        accountNumber: "123456789012",
+        ifsc: "HDFC0000001",
+        expectedHolderName: "Asha Sharma"
+      });
+    },
+    /Real bank account verification provider configured but credentials missing/
+  );
+});

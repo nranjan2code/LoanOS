@@ -311,6 +311,7 @@ export function validateDisbursement(application, disbursement) {
   } else {
     checkAccountIndia("RBI-DL-2025", "Disbursement destination account", destination, "destinationAccount", findings);
     checkNoProhibitedFundControl(destination.ownerRole, "destinationAccount.ownerRole", findings);
+    checkDisbursementAccountVerification(destination, "destinationAccount", findings);
     if (!ALLOWED_ACCOUNT_ROLES_FOR_DISBURSEMENT.has(destination.ownerRole)) {
       findings.push(
         createFinding(
@@ -529,6 +530,96 @@ function checkAiDecision(application, findings, modelRegistry) {
   }
   const modelResult = evaluateModelUse(modelRegistry, application.aiDecision);
   findings.push(...modelResult.findings);
+}
+
+function checkDisbursementAccountVerification(account, path, findings) {
+  const verification = account.bankAccountVerification ?? account.verification;
+  if (!verification) {
+    findings.push(
+      createFinding(
+        "error",
+        "RBI-DL-2025",
+        "Disbursement destination account requires bank account verification evidence.",
+        `${path}.bankAccountVerification`
+      )
+    );
+    return;
+  }
+
+  if (verification.status !== "verified") {
+    findings.push(
+      createFinding(
+        "error",
+        "RBI-DL-2025",
+        "Disbursement destination bank account must be verified before funds move.",
+        `${path}.bankAccountVerification.status`
+      )
+    );
+  }
+  if (!verification.verificationRef) {
+    findings.push(
+      createFinding(
+        "error",
+        "RBI-DL-2025",
+        "Bank account verification evidence must include verificationRef.",
+        `${path}.bankAccountVerification.verificationRef`
+      )
+    );
+  }
+  if (!verification.verifiedAt) {
+    findings.push(
+      createFinding(
+        "error",
+        "RBI-DL-2025",
+        "Bank account verification evidence must include verifiedAt.",
+        `${path}.bankAccountVerification.verifiedAt`
+      )
+    );
+  }
+  if (verification.accountStatus && verification.accountStatus !== "active") {
+    findings.push(
+      createFinding(
+        "error",
+        "RBI-DL-2025",
+        "Disbursement destination bank account must be active.",
+        `${path}.bankAccountVerification.accountStatus`
+      )
+    );
+  }
+  if (verification.nameMatch === false) {
+    findings.push(
+      createFinding(
+        "error",
+        "RBI-DL-2025",
+        "Disbursement destination bank account holder must match borrower or permitted end-beneficiary evidence.",
+        `${path}.bankAccountVerification.nameMatch`
+      )
+    );
+  }
+  if (verification.ifsc && account.ifsc && verification.ifsc.toUpperCase() !== account.ifsc.toUpperCase()) {
+    findings.push(
+      createFinding(
+        "error",
+        "RBI-DL-2025",
+        "Bank account verification IFSC must match the disbursement destination account.",
+        `${path}.bankAccountVerification.ifsc`
+      )
+    );
+  }
+  if (
+    verification.accountNumberLast4 &&
+    account.accountNumberLast4 &&
+    verification.accountNumberLast4 !== account.accountNumberLast4
+  ) {
+    findings.push(
+      createFinding(
+        "error",
+        "RBI-DL-2025",
+        "Bank account verification account suffix must match the disbursement destination account.",
+        `${path}.bankAccountVerification.accountNumberLast4`
+      )
+    );
+  }
 }
 
 function checkAccountIndia(controlId, label, account, path, findings) {

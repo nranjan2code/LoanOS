@@ -11,6 +11,19 @@ const MOCK_VCIP_RECORDS = {
   "borrower_1": { faceMatchScore: 0.92, livenessConfirmed: true, location: { lat: 12.9716, lng: 77.5946, country: "IN" } }
 };
 
+const MOCK_BANK_ACCOUNTS = {
+  "HDFC0000001:123456789012": {
+    accountHolderName: "Asha Sharma",
+    accountStatus: "active",
+    bankName: "HDFC Bank"
+  },
+  "ICIC0000002:987654321098": {
+    accountHolderName: "Rajesh Kumar",
+    accountStatus: "active",
+    bankName: "ICICI Bank"
+  }
+};
+
 /**
  * Service Manager to switch between mock and real integrations.
  * Anchored to the user requirement of toggleable mock/real external connectors.
@@ -29,6 +42,10 @@ export class ExternalServiceManager {
       vcipProvider: config.vcipProvider ?? (typeof process !== "undefined" ? process.env.LOANOS_VCIP_PROVIDER : "mock") ?? "mock",
       vcipApiUrl: config.vcipApiUrl ?? (typeof process !== "undefined" ? process.env.LOANOS_VCIP_API_URL : "") ?? "",
       vcipApiKey: config.vcipApiKey ?? (typeof process !== "undefined" ? process.env.LOANOS_VCIP_API_KEY : "") ?? "",
+
+      bankAccountProvider: config.bankAccountProvider ?? (typeof process !== "undefined" ? process.env.LOANOS_BANK_ACCOUNT_PROVIDER : "mock") ?? "mock",
+      bankAccountApiUrl: config.bankAccountApiUrl ?? (typeof process !== "undefined" ? process.env.LOANOS_BANK_ACCOUNT_API_URL : "") ?? "",
+      bankAccountApiKey: config.bankAccountApiKey ?? (typeof process !== "undefined" ? process.env.LOANOS_BANK_ACCOUNT_API_KEY : "") ?? "",
 
       esignProvider: config.esignProvider ?? (typeof process !== "undefined" ? process.env.LOANOS_ESIGN_PROVIDER : "mock") ?? "mock",
       esignApiUrl: config.esignApiUrl ?? (typeof process !== "undefined" ? process.env.LOANOS_ESIGN_API_URL : "") ?? "",
@@ -138,6 +155,80 @@ export class ExternalServiceManager {
         verifiedAt: new Date().toISOString()
       };
     }
+  }
+
+  /**
+   * Verifies that a disbursement bank account exists, is active, and matches
+   * the expected borrower or end-beneficiary name before funds move.
+   */
+  async verifyBankAccount({ accountNumber, ifsc, expectedHolderName } = {}) {
+    const normalizedAccountNumber = String(accountNumber ?? "").trim();
+    const normalizedIfsc = String(ifsc ?? "").trim().toUpperCase();
+    if (!/^\d{6,18}$/.test(normalizedAccountNumber)) {
+      throw new Error("Invalid bank account number format. Must be 6 to 18 numeric digits.");
+    }
+    if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(normalizedIfsc)) {
+      throw new Error("Invalid IFSC format.");
+    }
+
+    if (this.config.bankAccountProvider === "real") {
+      if (!this.config.bankAccountApiUrl || !this.config.bankAccountApiKey) {
+        throw new Error("Real bank account verification provider configured but credentials missing.");
+      }
+      const res = await fetch(this.config.bankAccountApiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${this.config.bankAccountApiKey}`
+        },
+        body: JSON.stringify({
+          accountNumber: normalizedAccountNumber,
+          ifsc: normalizedIfsc,
+          expectedHolderName
+        })
+      });
+      if (!res.ok) {
+        throw new Error(`Real bank account verification failed with status ${res.status}`);
+      }
+      return await res.json();
+    }
+
+    const accountNumberLast4 = normalizedAccountNumber.slice(-4);
+    const match = MOCK_BANK_ACCOUNTS[`${normalizedIfsc}:${normalizedAccountNumber}`] ?? null;
+    if (!match) {
+      return {
+        success: false,
+        provider: "mock",
+        status: "not_found",
+        ifsc: normalizedIfsc,
+        accountNumberLast4,
+        verifiedAt: new Date().toISOString()
+      };
+    }
+
+    const nameMatch = expectedHolderName
+      ? normalizeName(expectedHolderName) === normalizeName(match.accountHolderName)
+      : true;
+    const status = match.accountStatus !== "active"
+      ? "inactive"
+      : nameMatch
+        ? "verified"
+        : "name_mismatch";
+
+    return {
+      success: status === "verified",
+      provider: "mock",
+      verificationRef: `BANK-VERIFY-MOCK-${Date.now()}`,
+      status,
+      accountStatus: match.accountStatus,
+      bankName: match.bankName,
+      ifsc: normalizedIfsc,
+      accountNumberLast4,
+      accountHolderName: match.accountHolderName,
+      expectedHolderName: expectedHolderName ?? null,
+      nameMatch,
+      verifiedAt: new Date().toISOString()
+    };
   }
 
   /**
@@ -269,4 +360,8 @@ export class ExternalServiceManager {
       };
     }
   }
+}
+
+function normalizeName(value) {
+  return String(value ?? "").trim().replace(/\s+/g, " ").toLowerCase();
 }

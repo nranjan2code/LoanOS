@@ -932,8 +932,27 @@ function renderActionForm(task) {
       <form class="resolution-form" id="form-disburse">
         <h5>Disbursement Fund Flow Verification</h5>
         <p style="font-size:0.8rem; color:var(--color-secondary); margin-bottom: 0.5rem">
-          Disbursement can only route directly to the borrower or designated beneficiary account. LSP pass-through pools are strictly blocked.
+          Disbursement can only route directly to a verified borrower or designated beneficiary account. LSP pass-through pools are strictly blocked.
         </p>
+        <div class="field-group">
+          <label>Account Holder Name</label>
+          <input type="text" id="disb-holder-name" required value="Asha Sharma">
+        </div>
+        <div class="field-group">
+          <label>Destination Account Number</label>
+          <input type="text" id="disb-account-number" required value="123456789012">
+        </div>
+        <div class="field-group">
+          <label>IFSC</label>
+          <input type="text" id="disb-ifsc" required value="HDFC0000001">
+        </div>
+        <div class="field-group">
+          <label>Owner Role</label>
+          <select id="disb-owner-role" required>
+            <option value="borrower">Borrower</option>
+            <option value="end_beneficiary">End Beneficiary</option>
+          </select>
+        </div>
         <div class="field-group">
           <label>Fund Transfer Transaction Hash / Reference</label>
           <input type="text" id="disb-ref" required value="IMPS-REF-${Math.floor(Math.random()*800000+100000)}">
@@ -946,12 +965,31 @@ function renderActionForm(task) {
       e.preventDefault();
       try {
         const ref = document.getElementById('disb-ref').value;
+        const accountNumber = document.getElementById('disb-account-number').value.trim();
+        const ifsc = document.getElementById('disb-ifsc').value.trim().toUpperCase();
+        const expectedHolderName = document.getElementById('disb-holder-name').value.trim();
+        const ownerRole = document.getElementById('disb-owner-role').value;
+        const verificationResponse = await apiFetch('/integrations/bank-account-verification', {
+          method: 'POST',
+          body: JSON.stringify({
+            accountNumber,
+            ifsc,
+            expectedHolderName
+          })
+        });
         await apiFetch(`/loans/applications/${encodeURIComponent(appId)}/disbursement`, {
           method: 'POST',
           body: JSON.stringify({
             maker: apiState.currentActorId,
             disbursementId: ref,
-            disbursedAt: new Date(apiState.simulationDate).toISOString()
+            disbursedAt: new Date(apiState.simulationDate).toISOString(),
+            destinationAccount: {
+              country: 'IN',
+              ifsc,
+              ownerRole,
+              accountNumberLast4: accountNumber.slice(-4),
+              bankAccountVerification: verificationResponse.verification
+            }
           })
         });
         showToast('Disbursement completed & Loan Account opened!', 'success');

@@ -381,6 +381,39 @@ async function route(req, res, dataDir, platformAdminKey) {
     return;
   }
 
+  if (method === "POST" && path === "/integrations/bank-account-verification") {
+    const body = await readJson(req);
+    const manager = new ExternalServiceManager();
+    let verification = null;
+    try {
+      verification = await manager.verifyBankAccount(body);
+    } catch (err) {
+      sendJson(res, 422, {
+        error: {
+          code: "bank_account_verification_failed",
+          message: err.message
+        }
+      });
+      return;
+    }
+
+    const state = await store.load();
+    const nextState = appendEvent(
+      state,
+      {
+        type: "integration.bank_account.verification_completed",
+        provider: verification.provider,
+        status: verification.status,
+        verificationRef: verification.verificationRef ?? null,
+        ifsc: verification.ifsc ?? null,
+        accountNumberLast4: verification.accountNumberLast4 ?? null
+      }
+    );
+    await store.save(nextState);
+    sendJson(res, verification.success ? 200 : 422, { verification });
+    return;
+  }
+
   if (method === "GET" && path === "/staff/actors") {
     const state = await store.load();
     sendJson(res, 200, {

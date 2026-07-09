@@ -48,12 +48,12 @@ npm run dev:api
 | `packages/core/src/cersai.js` | CERSAI security-interest lifecycle (draft → filed → registered → modified → satisfied): maker-checker modification, closure-gated satisfaction, prior-encumbrance search, and a `securedLoan` disbursement gate (SARFAESI Act). |
 | `packages/core/src/data-principal-rights.js` | DPDP data-principal access requests (portable data pack assembly) and correction requests (apply/reject with profile propagation), both under a 30-day SLA clock with overdue detection. |
 | `packages/core/src/fiu-str.js` | FIU-IND STR/CTR/CCR lifecycle (draft → reviewed → filed → acknowledged): Principal Officer review gate, ₹10 lakh CTR threshold, and a tipping-off guard (PMLA). |
-| `packages/core/src/external-services.js` | Switchable `ExternalServiceManager` for external integrations (SMS, credit bureau, V-CIP, eSign, CERSAI, FIU-IND) with mock/real providers selected per integration. |
+| `packages/core/src/external-services.js` | Switchable `ExternalServiceManager` for external integrations (SMS, credit bureau, V-CIP, bank-account verification, eSign, CERSAI, FIU-IND) with mock/real providers selected per integration. |
 | `packages/core/src/audit.js` | Tenant-scoped, append-only audit hash chain: tenant-bound genesis, canonical hashing, `sealAuditChain`/`verifyAuditChain`/`buildAuditEvidencePack`, plus uniform `stampAuditEvents`/`classifyAuditDataClass` actor/data-class provenance. |
 | `packages/core/src/index.js` | Public exports for core domain modules. |
 | `apps/api/src/file-store.js` | Local JSON state load/save helpers; control-plane tenant registry (api-key hashing, tenant resolution), sub-processor register, and break-glass grants; per-tenant data partitions and tenant-scoped accessors; `buildTenantExport`/`offboardTenant` for portability and evidenced deletion. |
-| `apps/api/src/server.js` | HTTP API: platform control plane (tenant minting, export, offboarding, break-glass, sub-processors), tenant-context resolution with break-glass fallback and 401 gate, tenant-scoped store with centralized audit stamping, plus endpoints for compliance controls, AI models, kill switch, workflow tasks, applications, loan accounts, fraud cases, erasure requests, data disclosures, incidents, CERSAI security interests, DPDP access/correction requests, and FIU-IND reports. |
-| `tests/compliance.test.js` | Regression tests for the compliance gates (107 tests as of the latest commit). |
+| `apps/api/src/server.js` | HTTP API: platform control plane (tenant minting, export, offboarding, break-glass, sub-processors), tenant-context resolution with break-glass fallback and 401 gate, tenant-scoped store with centralized audit stamping, plus endpoints for compliance controls, AI models, kill switch, workflow tasks, applications, loan accounts, fraud cases, erasure requests, data disclosures, incidents, bank-account verification, CERSAI security interests, DPDP access/correction requests, and FIU-IND reports. |
+| `tests/compliance.test.js` | Regression tests for the compliance gates (112 tests as of the latest commit). |
 
 ## Implemented API Endpoints
 
@@ -76,6 +76,7 @@ npm run dev:api
 | `GET /audit/export` | Produces an integrity-attested evidence pack from the tenant's audit chain; 409 if the chain fails verification. |
 | `GET /sub-processors` | Standing disclosure of the sub-processor register to every authenticated tenant, flagging cross-border processing. |
 | `GET /break-glass-grants` | Lists every break-glass grant scoped to the calling tenant, with effective status. |
+| `POST /integrations/bank-account-verification` | Verifies a borrower/end-beneficiary bank account through `ExternalServiceManager`, returning sanitized evidence (`verificationRef`, IFSC, last four digits, status/name match) and sealing the attempt into the tenant audit chain. |
 | `GET /incidents` | Lists tenant security/data incidents with computed CERT-In/RBI reporting-clock status. |
 | `POST /incidents` | Creates a tenant security/data incident, starting the 6-hour reporting clock. |
 | `GET /incidents/:id` | Reads one incident with computed reporting-clock status. |
@@ -288,7 +289,8 @@ npm run dev:api
 | KFS | Requires APR, amount, tenor, cooling-off, recovery mechanism, grievance details, charge structure. |
 | Penal charges | Blocks penal interest and capitalization of penal charges. |
 | Fund flow | Blocks LSP, DLA, pass-through, and pool account fund control. |
-| Disbursement | Requires approved loan, valid KFS, delivered document packet, and borrower/end-beneficiary account. |
+| Bank-account verification | `ExternalServiceManager.verifyBankAccount` supports mock/real providers; the API returns sanitized verification evidence and seals each attempt into the tenant audit chain. |
+| Disbursement | Requires approved loan, valid KFS, signed and delivered document packet, registered CERSAI charge when applicable, verified borrower/end-beneficiary bank account evidence, and direct borrower/end-beneficiary account ownership. |
 | Model lifecycle | Governed transitions (draft → validation_pending → approved → active, plus suspend/reinstate/retire) with legal state guards. Approving validation requires independent validation evidence, an approver independent of the owner, and — for high-risk models — fairness, explainability, and monitoring evidence; a model reaches `active` only through this path. |
 | AI model inventory | Blocks model use if missing from inventory. |
 | AI model validation | Blocks active use without approved validation. |
@@ -304,13 +306,13 @@ npm run dev:api
 - Persistence is local JSON only (now tenant-partitioned), not a production database.
 - Tenant authentication is a static api key per tenant (hashed at rest); there is no human login/session or key rotation yet. Actor-level authorization remains API-level registry validation within a tenant.
 - The platform admin key is a single shared secret from env/option; break-glass access is audited, but there are no individual platform-staff identities/roles yet (break-glass grants are minted by whoever holds the shared admin key).
-- No real KYC, CKYC, bureau, payment, eSign, SMS, email, or CERSAI integrations yet.
+- No real KYC, CKYC, bureau, bank-account, payment, eSign, SMS, email, or CERSAI integrations yet.
 - Registries are file-backed and lack external IAM, maker-checker administration workflow, and periodic access review.
 - Borrower/consent/KYC records are file-backed, but support CKYC registry and V-CIP evidence vault validation boundaries.
-- Workflow is file-backed and does not yet include dashboard UI, notification dispatch, or outbound RBI CMS API integration.
+- Workflow is file-backed; the local dashboard is not a production workflow UI and notification dispatch/outbound RBI CMS API integration are still planned.
 - LMS restructure/settlement/write-off and collections reminders have first slices; NACH files, refunds, external CIC file/API submission, and full multi-channel recovery contact logging are still planned.
 - Document packet renders HTML/text but does not yet create PDFs or eSign envelopes.
-- No UI yet.
+- UI is limited to the local operations dashboard; there is no production borrower/admin application yet.
 - AI governance has first slices for lifecycle, validation gates (fairness/explainability/monitoring for high-risk, adversarial/hallucination for generative), drift-triggered kill switch, disclosure, and human handoff; recurring fairness reports and a sectoral incident-intelligence pack are still planned.
 - The audit spine stamps a uniform actor/actorType/dataClass envelope on every event at the seal seam; signed external anchoring is a follow-on.
 - Compliance docs are source-grounded but still require counsel/compliance review before production.
@@ -367,6 +369,7 @@ Current tests prove:
 - API blocks a declined decision without a valid decline-reason code and carries the coded reason into the final decision.
 - API requires maker-checker approval before disbursement.
 - API blocks disbursement until the execution document packet is generated and delivered.
+- API verifies borrower/end-beneficiary bank accounts through the integration boundary, seals sanitized evidence in the audit chain, and blocks disbursement without verified account proof.
 - API routes material AI decisions to human review before decision proposal.
 - API stores staff actors and enforces role/queue checks on regulated workflow actions.
 - API exposes LWS task queues with SLA status and persists task assignment/start audit.

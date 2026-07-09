@@ -48,6 +48,7 @@ Useful data-plane endpoints (tenant api key required):
 - `GET /audit/export`
 - `GET /sub-processors`
 - `GET /break-glass-grants`
+- `POST /integrations/bank-account-verification`
 - `GET /incidents`
 - `POST /incidents`
 - `GET /incidents/:id`
@@ -212,6 +213,7 @@ Phase 0 has a working executable foundation, and Epics 1-8 and 11 (S1-S6) each h
 - DPDP data-principal access and correction rights: access requests assemble a portable data pack (profile, consent ledger, KYC summary, loan accounts, disclosures); correction requests apply or reject a field change (applied corrections propagate to the profile); both run under a 30-day SLA clock and derive LWS tasks.
 - CERSAI security-interest registration (SARFAESI): draft → filed → registered → modified → satisfied lifecycle with maker-checker modification, closure-gated satisfaction, prior-encumbrance search, and a `securedLoan` disbursement gate.
 - FIU-IND STR/CTR reporting (PMLA): draft → reviewed → filed → acknowledged lifecycle with a designated Principal Officer review gate, a ₹10 lakh CTR threshold, and a tipping-off guard against exposing reports to the subject.
+- Bank-account verification first slice: a tenant-authenticated mock/real connector verifies active borrower/end-beneficiary account evidence, and disbursement is blocked without matching verified-account proof.
 - Staff actor registry with India-only operational actors, roles, queue access, and assignment authority.
 - Complaint registry and grievance workflow with 30-day RBI Ombudsman clock and RBI CMS escalation evidence.
 - Borrower-backed application resolution through `borrowerId`.

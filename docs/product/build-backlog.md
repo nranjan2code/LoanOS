@@ -214,7 +214,7 @@ Tasks:
 - CERSAI security-interest registration, modification, satisfaction. First slice done: `cersai.js` runs draft → filed → registered → modified → satisfied with maker-checker modification, closure-gated satisfaction, prior-encumbrance search, and a `securedLoan` disbursement gate; filing runs through `ExternalServiceManager` (mock/real `cersaiProvider`).
 - DLA CIMS export.
 - FIU-IND suspicious transaction support. First slice done: `fiu-str.js` runs STR/CTR draft → reviewed → filed → acknowledged with Principal Officer review, ₹10 lakh CTR threshold, tipping-off guard, and filing via `ExternalServiceManager` (mock/real `fiuProvider`).
-- Payment integrations: NACH/UPI/bank account verification.
+- Payment integrations: NACH/UPI/bank account verification. Bank-account verification first slice done: `ExternalServiceManager` provides mock/real provider switching, the tenant API returns sanitized active-account/name-match evidence, and disbursement is blocked without matching verified-account proof. NACH/UPI rails remain planned.
 - eSign/document vault.
 - SMS/email delivery provider.
 - Vendor data-residency checks.

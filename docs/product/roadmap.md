@@ -110,7 +110,7 @@ Deliverables:
 - CERSAI. First slice done: security-interest lifecycle (`cersai.js`) with a `securedLoan` disbursement gate and mock/real `cersaiProvider`; real CERSAI submission format pending.
 - FIU-IND STR/CTR reporting. First slice done: `fiu-str.js` with Principal Officer review, CTR threshold, tipping-off guard, and mock/real `fiuProvider`; real FIU-IND submission format pending.
 - Credit bureaus/CICs.
-- Bank account verification.
+- Bank account verification. First slice done: `ExternalServiceManager` supports mock/real bank-account verification, `POST /integrations/bank-account-verification` returns sanitized verification evidence, and disbursement is blocked without verified active account proof matching the destination account.
 - eSign/document vault.
 - NACH/UPI/payment rails.
 - SMS/email/WhatsApp provider with India data posture.

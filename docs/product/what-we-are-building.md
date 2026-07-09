@@ -167,6 +167,7 @@ The current codebase contains Phase 0 executable controls:
 - Economic profile checks.
 - Data residency checks.
 - Direct fund-flow checks.
+- Bank-account verification evidence before disbursement.
 - KFS generator and validator.
 - Sanction readiness gate requiring KFS acceptance and digital delivery evidence.
 - Execution document packet renderer for KFS, sanction letter, agreement summary, privacy notice, checksums, and delivery evidence.
