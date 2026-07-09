@@ -7,10 +7,14 @@ export {
 } from "./compliance-controls.js";
 
 export {
+  AUDIT_ACTOR_TYPES,
+  AUDIT_DATA_CLASSES,
   auditGenesisHash,
   buildAuditEvidencePack,
+  classifyAuditDataClass,
   computeAuditHash,
   sealAuditChain,
+  stampAuditEvents,
   verifyAuditChain
 } from "./audit.js";
 

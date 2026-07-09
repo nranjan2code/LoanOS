@@ -83,8 +83,10 @@ import {
   waiveLoanAccountCharge
 } from "../../../packages/core/src/index.js";
 import {
+  AUDIT_ACTOR_TYPES,
   buildAuditEvidencePack,
-  sealAuditChain
+  sealAuditChain,
+  stampAuditEvents
 } from "../../../packages/core/src/index.js";
 import {
   appendEvent,
@@ -200,12 +202,20 @@ async function route(req, res, dataDir, platformAdminKey) {
   // audit events are sealed into an append-only hash chain, so the persisted
   // record is tamper-evident by construction.
   let scopedWholeState = wholeState;
+  // Every event gets a uniform provenance envelope (actor / actorType /
+  // dataClass) stamped centrally before sealing, so no handler can persist an
+  // unclassified event. Break-glass requests stamp platform-staff provenance;
+  // ordinary requests attribute to the tenant.
+  const auditActor = breakGlass
+    ? { actor: `platform:${breakGlass.staffId}`, actorType: AUDIT_ACTOR_TYPES.PLATFORM_STAFF }
+    : { actor: tenant.tenantId, actorType: AUDIT_ACTOR_TYPES.TENANT };
   const store = {
     load: async () => getTenantData(scopedWholeState, tenant.tenantId) ?? createEmptyTenantData(),
     save: async (tenantData) => {
+      const stamped = stampAuditEvents(tenantData.events, auditActor);
       const sealed = {
         ...tenantData,
-        events: sealAuditChain(tenantData.events, tenant.tenantId)
+        events: sealAuditChain(stamped, tenant.tenantId)
       };
       scopedWholeState = setTenantData(scopedWholeState, tenant.tenantId, sealed);
       await saveWholeState(scopedWholeState, dataDir);

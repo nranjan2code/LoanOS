@@ -11,9 +11,11 @@ import {
   clearGlobalKillSwitch,
   computeDelinquency,
   computeIncidentReportingClock,
+  classifyAuditDataClass,
   createIncident,
   createModelRegistryState,
   recordIncidentNotification,
+  stampAuditEvents,
   recordPostIncidentReview,
   ELIGIBILITY_DECISIONS,
   estimateEmi,
@@ -3149,6 +3151,63 @@ test("platform maintains a sub-processor register disclosed to every tenant", as
 
   // The disclosure requires a tenant context.
   assert.equal((await rawFetch(`${base}/sub-processors`)).status, 401);
+});
+
+test("audit events carry a uniform actor/actorType/dataClass provenance envelope", () => {
+  // Classification is by event type.
+  assert.equal(classifyAuditDataClass("borrower_profile.upserted"), "personal_data");
+  assert.equal(classifyAuditDataClass("complaint.received"), "personal_data");
+  assert.equal(classifyAuditDataClass("loan.disbursement.recorded"), "financial");
+  assert.equal(classifyAuditDataClass("model.transitioned"), "model_governance");
+  assert.equal(classifyAuditDataClass("platform.break_glass.access"), "platform");
+  assert.equal(classifyAuditDataClass("regulated_entity.upserted"), "operational");
+
+  // Stamping fills the envelope but never overrides explicit values.
+  const stamped = stampAuditEvents(
+    [
+      { type: "loan.application.created" },
+      { type: "platform.break_glass.access", actor: "platform:sre-1", actorType: "platform_staff", dataClass: "tenant_scoped" }
+    ],
+    { actor: "tnt_x", actorType: "tenant" }
+  );
+  assert.equal(stamped[0].actor, "tnt_x");
+  assert.equal(stamped[0].actorType, "tenant");
+  assert.equal(stamped[0].dataClass, "financial");
+  assert.equal(stamped[1].actor, "platform:sre-1");
+  assert.equal(stamped[1].dataClass, "tenant_scoped");
+});
+
+test("API stamps every sealed audit event with tenant provenance", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+
+  await approveAndDisburseApplication(base);
+
+  const events = await (await apiFetch(`${base}/audit/events`)).json();
+  assert.equal(events.chainValid, true);
+  // Every event carries the full envelope, attributed to the tenant.
+  assert.ok(
+    events.events.every(
+      (event) => event.actorType && event.dataClass && Object.hasOwn(event, "actor")
+    )
+  );
+  assert.ok(events.events.every((event) => event.actorType === "tenant"));
+  // A borrower event is personal data; a disbursement is financial.
+  const borrowerEvent = events.events.find((event) => event.type === "borrower_profile.upserted");
+  assert.equal(borrowerEvent.dataClass, "personal_data");
+  const disbursement = events.events.find((event) => event.type === "loan.disbursement.recorded");
+  assert.equal(disbursement.dataClass, "financial");
 });
 
 function eligibilityApplication(overrides = {}) {

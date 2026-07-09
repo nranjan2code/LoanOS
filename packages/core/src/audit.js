@@ -19,6 +19,64 @@ const RESERVED_FIELDS = new Set([
   "at"
 ]);
 
+// Every sealed event carries a uniform provenance envelope: who acted
+// (`actor`), in what capacity (`actorType`), and the sensitivity of the data it
+// touched (`dataClass`). Stamping is centralized at the seal seam so no handler
+// can emit an unclassified event, and the fields are hashed into the chain like
+// any other payload.
+
+export const AUDIT_ACTOR_TYPES = {
+  TENANT: "tenant",
+  PLATFORM_STAFF: "platform_staff",
+  SYSTEM: "system"
+};
+
+export const AUDIT_DATA_CLASSES = {
+  PERSONAL: "personal_data",
+  FINANCIAL: "financial",
+  MODEL_GOVERNANCE: "model_governance",
+  PLATFORM: "platform",
+  OPERATIONAL: "operational"
+};
+
+export function classifyAuditDataClass(type) {
+  const value = String(type ?? "");
+  if (/borrower|consent|kyc|complaint|grievance/.test(value)) {
+    return AUDIT_DATA_CLASSES.PERSONAL;
+  }
+  if (
+    /^loan|^application|disburse|payment|charge|waiver|reversal|accrual|recovery|prepaid|prepay|foreclos|closure|npa|product_policy/.test(
+      value
+    )
+  ) {
+    return AUDIT_DATA_CLASSES.FINANCIAL;
+  }
+  if (/^model|^api\.ai|kill_switch/.test(value)) {
+    return AUDIT_DATA_CLASSES.MODEL_GOVERNANCE;
+  }
+  if (/^platform/.test(value)) {
+    return AUDIT_DATA_CLASSES.PLATFORM;
+  }
+  return AUDIT_DATA_CLASSES.OPERATIONAL;
+}
+
+// Fill the provenance envelope on any not-yet-sealed event, never overriding a
+// value a handler set explicitly (e.g. break-glass stamps its own actor).
+export function stampAuditEvents(events, { actor = null, actorType = AUDIT_ACTOR_TYPES.SYSTEM } = {}) {
+  const source = Array.isArray(events) ? events : [];
+  return source.map((event) => {
+    if (event.hash) {
+      return event;
+    }
+    return {
+      ...event,
+      actor: event.actor ?? actor,
+      actorType: event.actorType ?? actorType,
+      dataClass: event.dataClass ?? classifyAuditDataClass(event.type)
+    };
+  });
+}
+
 export function auditGenesisHash(tenantId) {
   return createHash("sha256").update(`${GENESIS_PREFIX}${tenantId ?? ""}`).digest("hex");
 }
