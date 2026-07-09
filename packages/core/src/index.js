@@ -85,6 +85,7 @@ export {
   normalizeBorrowerProfile,
   normalizeConsentRecord,
   normalizeKycRecord,
+  redactBorrowerProfile,
   resolveBorrowerApplicationReferences,
   upsertBorrowerProfile,
   upsertConsentRecord,
@@ -93,6 +94,16 @@ export {
   validateConsentRecord,
   validateKycRecord
 } from "./borrower-onboarding.js";
+
+export {
+  ERASURE_REQUEST_STATUSES,
+  STATUTORY_RETENTION_YEARS,
+  assessErasureEligibility,
+  createErasureRequest,
+  enrichErasureRequest,
+  fulfillErasureRequest,
+  rejectErasureRequest
+} from "./data-retention.js";
 
 export {
   APPLICATION_STATUSES,

@@ -59,7 +59,7 @@ Tasks:
 - Consent notice model. Done.
 - Consent grant/revoke ledger. Done.
 - Third-party sharing consent.
-- Data retention choice and deletion request workflow.
+- Data retention choice and deletion request workflow. First slice done: `packages/core/src/data-retention.js` runs a DPDP right-to-erasure request (`requested → fulfilled/rejected`) gated by statutory retention — `assessErasureEligibility` holds erasure while the borrower has an active loan relationship or any closed account is within the 5-year RBI/PMLA retention window (`retainUntil`). `POST/GET /erasure-requests`, `GET /erasure-requests/{id}`, and `POST /erasure-requests/{id}/(fulfillment|rejection)` drive it; fulfilment irreversibly redacts the borrower profile in place (`redactBorrowerProfile`) while retaining the request and its audit trail as evidence.
 - KYC state machine: created, pending, verified, rejected, expired, refresh_required. Done: `refresh_required` is a first-class status; `evaluateKycStatus`/`computeKycReviewDueAt` derive an effective status from the RBI risk-based periodic-review cycle (high 2y, medium 8y, low 10y) on top of the stored status and expiry. A verified record past its review-due date reads as `refresh_required`, and preflight (`resolveBorrowerApplicationReferences`) blocks new sanction on a refresh-due or expired KYC. `GET /borrowers/{id}/kyc-records` surfaces the effective status and `nextReviewDueAt`.
 - CKYC search/download/upload adapter boundary.
 - V-CIP evidence object. Partial.

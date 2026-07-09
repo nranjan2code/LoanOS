@@ -399,6 +399,28 @@ export function resolveBorrowerApplicationReferences(application, registries = {
   };
 }
 
+// DPDP erasure: irreversibly redact a borrower's personal data while keeping the
+// non-identifying skeleton (id, type, timestamps) so the record's existence and
+// erasure remain auditable. Structural, non-PII fields are retained.
+export function redactBorrowerProfile(profile, now = new Date()) {
+  return {
+    borrowerId: profile.borrowerId,
+    borrowerType: profile.borrowerType,
+    status: "erased",
+    fullName: null,
+    legalName: null,
+    dateOfBirth: null,
+    residencyCountry: profile.residencyCountry ?? "IN",
+    primaryAddressCountry: profile.primaryAddressCountry ?? "IN",
+    primaryAddress: null,
+    contact: { mobile: null, email: null },
+    economicProfile: { occupation: null, monthlyIncome: null, employerName: null, incomeEvidenceRef: null },
+    createdAt: profile.createdAt ?? now.toISOString(),
+    updatedAt: now.toISOString(),
+    erasedAt: now.toISOString()
+  };
+}
+
 export function listBorrowerConsents(consentRecords, borrowerId) {
   return Object.values(consentRecords ?? {}).filter((record) => record.borrowerId === borrowerId);
 }

@@ -13,10 +13,13 @@ import {
   computeIncidentReportingClock,
   classifyAuditDataClass,
   classifyFraudCase,
+  assessErasureEligibility,
+  createErasureRequest,
   createFraudCase,
   createIncident,
   createModelRegistryState,
   evaluateKycStatus,
+  fulfillErasureRequest,
   issueShowCauseNotice,
   recordFraudResponse,
   recordIncidentNotification,
@@ -2862,6 +2865,61 @@ test("API seals events into an audit chain and exports a verifiable evidence pac
   assert.equal(bEvents.chainValid, true);
 });
 
+test("DPDP erasure is held by an active loan and by statutory retention", () => {
+  // Active loan relationship blocks erasure outright.
+  const active = assessErasureEligibility(
+    "bor_001",
+    { loanAccounts: { acct_1: { loanAccountId: "acct_1", borrowerId: "bor_001", status: "active" } } },
+    new Date("2026-07-09T00:00:00.000Z")
+  );
+  assert.equal(active.eligible, false);
+  assert(active.holds.some((hold) => hold.code === "active_loan_relationship"));
+
+  // A recently closed loan is within the 5-year statutory retention window.
+  const recentlyClosed = assessErasureEligibility(
+    "bor_001",
+    {
+      loanAccounts: {
+        acct_1: { loanAccountId: "acct_1", borrowerId: "bor_001", status: "closed", closedAt: "2024-01-01T00:00:00.000Z" }
+      }
+    },
+    new Date("2026-07-09T00:00:00.000Z")
+  );
+  assert.equal(recentlyClosed.eligible, false);
+  assert.equal(recentlyClosed.retainUntil, "2029-01-01T00:00:00.000Z");
+
+  // Past the retention window, erasure is eligible.
+  const longClosed = assessErasureEligibility(
+    "bor_001",
+    {
+      loanAccounts: {
+        acct_1: { loanAccountId: "acct_1", borrowerId: "bor_001", status: "closed", closedAt: "2018-01-01T00:00:00.000Z" }
+      }
+    },
+    new Date("2026-07-09T00:00:00.000Z")
+  );
+  assert.equal(longClosed.eligible, true);
+
+  // Fulfilment is blocked while a retention hold stands.
+  const created = createErasureRequest(
+    {},
+    { borrowerId: "bor_001", requestedBy: "dpo-1" },
+    { borrowerProfiles: { bor_001: { borrowerId: "bor_001" } } }
+  );
+  assert.equal(created.summary.status, "ready");
+  const blocked = fulfillErasureRequest(
+    created.request,
+    { actor: "dpo-1", confirmationRef: "ERASE-1" },
+    {
+      loanAccounts: {
+        acct_1: { loanAccountId: "acct_1", borrowerId: "bor_001", status: "closed", closedAt: "2024-01-01T00:00:00.000Z" }
+      }
+    },
+    new Date("2026-07-09T00:00:00.000Z")
+  );
+  assert.equal(blocked.summary.status, "blocked");
+});
+
 test("fraud classification is gated on natural justice and four-eyes approval", () => {
   const created = createFraudCase(
     {},
@@ -3130,6 +3188,77 @@ test("API runs a fraud case through the natural-justice classification gate", as
   assert.ok(events.events.some((event) => event.type === "fraud_case.classified"));
   const bCases = await (await apiFetch(`${base}/fraud-cases`, {}, TENANT_B.apiKey)).json();
   assert.equal(bCases.count, 0);
+});
+
+test("API holds a DPDP erasure request until retention clears, then redacts the borrower", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+
+  // Drive a full origination so the borrower has an active loan account.
+  await approveAndDisburseApplication(base);
+
+  const created = await postJson(`${base}/erasure-requests`, {
+    borrowerId: "bor_001",
+    requestedBy: "dpo-1",
+    requestChannel: "email"
+  });
+  assert.equal(created.status, 201);
+  const requestId = created.body.erasureRequest.erasureRequestId;
+  // The active loan relationship makes the request ineligible.
+  assert.equal(created.body.erasureRequest.eligibility.eligible, false);
+  assert.ok(
+    created.body.erasureRequest.eligibility.holds.some((hold) => hold.code === "active_loan_relationship")
+  );
+
+  // Fulfilment is blocked while the loan is active.
+  const blocked = await postJson(`${base}/erasure-requests/${requestId}/fulfillment`, {
+    actor: "dpo-1",
+    confirmationRef: "ERASE-9"
+  });
+  assert.equal(blocked.status, 422);
+
+  // Foreclose the loan so it closes; then age the record past retention via asOf.
+  const account = (await (await apiFetch(`${base}/loan-accounts`)).json()).loanAccounts[0];
+  const quote = await (await apiFetch(`${base}/loan-accounts/${account.loanAccountId}/foreclosure-quote`)).json();
+  const foreclosed = await postJson(`${base}/loan-accounts/${account.loanAccountId}/foreclosure`, {
+    amount: quote.payoffAmount,
+    paymentRef: "pay-foreclose-1",
+    actor: "ops-1"
+  });
+  assert.equal(foreclosed.status, 200);
+
+  // Ten years on, the statutory retention window has cleared and erasure fulfils.
+  const asOf = new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000).toISOString();
+  const eligible = await (
+    await apiFetch(`${base}/erasure-requests/${requestId}?asOf=${encodeURIComponent(asOf)}`)
+  ).json();
+  assert.equal(eligible.eligibility.eligible, true);
+
+  const fulfilled = await postJson(`${base}/erasure-requests/${requestId}/fulfillment`, {
+    actor: "dpo-1",
+    confirmationRef: "ERASE-9",
+    asOf
+  });
+  assert.equal(fulfilled.status, 200);
+  assert.equal(fulfilled.body.erasureRequest.status, "fulfilled");
+
+  // The borrower's personal data is redacted in place; the record skeleton stays.
+  const borrower = await (await apiFetch(`${base}/borrowers/bor_001`)).json();
+  assert.equal(borrower.status, "erased");
+  assert.equal(borrower.fullName, null);
+  assert.equal(borrower.contact.mobile, null);
+  assert.ok(borrower.erasedAt);
 });
 
 test("platform can export a tenant and offboard it with evidenced deletion", async (t) => {
