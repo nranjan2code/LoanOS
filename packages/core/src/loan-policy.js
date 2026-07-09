@@ -11,6 +11,26 @@ export const ALLOWED_RE_TYPES = new Set([
   "all_india_financial_institution"
 ]);
 
+export const ALLOWED_CHARGE_TYPES = new Set([
+  "processing_fee",
+  "verification_charge",
+  "maintenance_charge",
+  "documentation_charge",
+  "stamp_duty",
+  "legal_charge",
+  "insurance_premium",
+  "valuation_fee",
+  "contingent_charge",
+  "penal_charge",
+  "prepayment_charge",
+  "foreclosure_charge",
+  "late_payment_penalty",
+  "other",
+  // Compatibility fallbacks
+  "fixed",
+  "bps"
+]);
+
 const ALLOWED_LOAN_CURRENCIES = new Set(["INR"]);
 const ALLOWED_ACCOUNT_ROLES_FOR_DISBURSEMENT = new Set(["borrower", "end_beneficiary"]);
 const PROHIBITED_FUND_CONTROL_ROLES = new Set(["lsp", "dla", "pass_through", "pool_account"]);
@@ -159,6 +179,11 @@ export function validateKfs(kfs) {
   for (const charge of [...(kfs.charges ?? []), ...(kfs.penalCharges ?? [])]) {
     if (!charge.name || !charge.reason) {
       findings.push(createFinding("error", "RBI-KFS-2024", "Each KFS charge must include name and reason.", "kfs.charges"));
+    }
+    if (!charge.type) {
+      findings.push(createFinding("error", "RBI-KFS-2024", "Each KFS charge must include a type.", "kfs.charges"));
+    } else if (!ALLOWED_CHARGE_TYPES.has(charge.type)) {
+      findings.push(createFinding("error", "RBI-KFS-2024", "KFS charge type is invalid.", "kfs.charges"));
     }
     if (charge.type === "penal_interest") {
       findings.push(createFinding("error", "RBI-FPC-PENAL", "Penalties must not be represented as penal interest.", "kfs.penalCharges"));
@@ -350,6 +375,29 @@ function checkTenant(application, findings) {
   }
   if (!tenant.grievanceOfficer?.name || !tenant.grievanceOfficer?.email) {
     findings.push(createFinding("error", "RBI-DL-2025", "Tenant must configure grievance officer name and email.", "tenant.grievanceOfficer"));
+  }
+
+  // Validate licenseMetadata in preflight
+  if (!tenant.licenseMetadata || typeof tenant.licenseMetadata !== "object") {
+    findings.push(createFinding("error", "RBI-DL-2025", "Tenant license metadata is required.", "tenant.licenseMetadata"));
+  } else {
+    if (!tenant.licenseMetadata.category || typeof tenant.licenseMetadata.category !== "string" || tenant.licenseMetadata.category.trim() === "") {
+      findings.push(createFinding("error", "RBI-DL-2025", "Tenant license category is required.", "tenant.licenseMetadata.category"));
+    }
+    if (!tenant.licenseMetadata.licenseNumber || typeof tenant.licenseMetadata.licenseNumber !== "string" || tenant.licenseMetadata.licenseNumber.trim() === "") {
+      findings.push(createFinding("error", "RBI-DL-2025", "Tenant license number is required.", "tenant.licenseMetadata.licenseNumber"));
+    }
+    if (!tenant.licenseMetadata.issuingAuthority || typeof tenant.licenseMetadata.issuingAuthority !== "string" || tenant.licenseMetadata.issuingAuthority.trim() === "") {
+      findings.push(createFinding("error", "RBI-DL-2025", "Tenant license issuing authority is required.", "tenant.licenseMetadata.issuingAuthority"));
+    }
+    if (!tenant.licenseMetadata.issueDate || isNaN(Date.parse(tenant.licenseMetadata.issueDate))) {
+      findings.push(createFinding("error", "RBI-DL-2025", "Tenant license issue date must be a valid date.", "tenant.licenseMetadata.issueDate"));
+    } else if (new Date(tenant.licenseMetadata.issueDate) > new Date()) {
+      findings.push(createFinding("error", "RBI-DL-2025", "Tenant license issue date cannot be in the future.", "tenant.licenseMetadata.issueDate"));
+    }
+    if (!tenant.licenseMetadata.status || !["active", "valid"].includes(tenant.licenseMetadata.status)) {
+      findings.push(createFinding("error", "RBI-DL-2025", "Tenant license status must be 'active' or 'valid'.", "tenant.licenseMetadata.status"));
+    }
   }
 }
 

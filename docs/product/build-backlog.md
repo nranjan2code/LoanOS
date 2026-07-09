@@ -11,14 +11,14 @@ Goal: every loan runs under a clearly identified regulated entity.
 Tasks:
 
 - Create tenant/RE data model. Done.
-- Add supported RE categories and license metadata. Partial.
+- Add supported RE categories and license metadata. Done: validateRegulatedEntity checks licenseMetadata (category, issueDate, status, licenseNumber, issuingAuthority) and preflight evaluates them.
 - Add RE public website disclosure fields. Done.
 - Add grievance officer registry. Done.
 - Add board-approved policy references. Done.
 - Add LSP registry with RE agreement, due diligence, periodic review, data, recovery, and fee-control evidence. Done.
 - Add DLA registry for own and LSP apps/websites. Done.
 - Add CIMS export shape for DLA reporting. Done.
-- Add tests for missing RE, missing grievance officer, and unsupported RE type. Partial.
+- Add tests for missing RE, missing grievance officer, and unsupported RE type. Done: tests verify validateRegulatedEntity, resolveLoanApplicationReferences, and API endpoints POST /regulated-entities and POST /loans/applications block invalid or missing RE setups.
 
 Done when:
 
@@ -34,7 +34,7 @@ Goal: no loan product exists without approved policy, fees, and compliance confi
 Tasks:
 
 - Product model: product code, borrower segment, loan type, min/max amount, min/max tenor. Done.
-- Pricing model: interest method, APR components, processing fees, verification charges, maintenance charges. Partial.
+- Pricing model: interest method, APR components, processing fees, verification charges, maintenance charges. Done: validateCharges and validateKfs validate that each charge belongs to ALLOWED_CHARGE_TYPES (representing upfront and recurring APR components: processing_fee, verification_charge, maintenance_charge, etc.) and enforces name, reason, and limit checks.
 - Penal-charge policy model. Done.
 - Cooling-off policy. Done.
 - Prepayment/foreclosure policy. Done: product policy validates allowability, lock-in period, and blocks fees on floating-rate individual retail loans; quoteForeclosure and prepayLoanAccount enforce these checks at transaction level.

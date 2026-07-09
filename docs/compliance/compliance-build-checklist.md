@@ -61,7 +61,7 @@ Legend:
 | Penal charges, not penal interest | KFS validator blocks `penal_interest`. | Done |
 | No capitalization of penal charges | KFS validator blocks capitalizing penal charges. | Done |
 | Reasonable and non-discriminatory policy | Product policy registry and board-approved policy. | Planned |
-| Upfront disclosure | KFS charge reason/name required. | Partial |
+| Upfront disclosure | KFS charge name, reason, and type validation are enforced. | Done |
 | Product-level penal-charge safety | Product policy rejects penal interest and capitalization for penal charges. | Done |
 
 ## KYC, AML, CFT

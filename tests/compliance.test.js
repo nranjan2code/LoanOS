@@ -937,6 +937,57 @@ test("regulated entity validation hardening rejects missing/invalid RE metadata"
   const eval5 = evaluateLoanApplication(appWithoutGovName);
   assert.equal(eval5.summary.status, "blocked");
   assert(eval5.findings.some(f => f.path === "tenant.grievanceOfficer" && f.message.includes("grievance officer name and email")));
+
+  // 7. validateRegulatedEntity rejects registration without licenseMetadata category
+  const invalidReInput2 = {
+    ...validRegulatedEntity(),
+    licenseMetadata: {
+      category: "",
+      licenseNumber: "RBI-LIC-2026-999",
+      issuingAuthority: "Reserve Bank of India",
+      issueDate: "2026-01-01",
+      status: "active"
+    }
+  };
+  const reResult2 = upsertRegulatedEntity({}, invalidReInput2);
+  assert.equal(reResult2.summary.status, "blocked");
+  assert(reResult2.findings.some(f => f.path === "licenseMetadata.category" && f.message.includes("category is required")));
+
+  // 8. validateRegulatedEntity rejects future issueDate
+  const invalidReInput3 = {
+    ...validRegulatedEntity(),
+    licenseMetadata: {
+      category: "NBFC-ICC",
+      licenseNumber: "RBI-LIC-2026-999",
+      issuingAuthority: "Reserve Bank of India",
+      issueDate: "2030-01-01", // Future date
+      status: "active"
+    }
+  };
+  const reResult3 = upsertRegulatedEntity({}, invalidReInput3);
+  assert.equal(reResult3.summary.status, "blocked");
+  assert(reResult3.findings.some(f => f.path === "licenseMetadata.issueDate" && f.message.includes("cannot be in the future")));
+
+  // 9. resolveLoanApplicationReferences blocks non-existent RE
+  const appWithUnknownRe = {
+    ...validApplication(),
+    regulatedEntityId: "re_ghost"
+  };
+  const resolution2 = resolveLoanApplicationReferences(appWithUnknownRe, { regulatedEntities: {} });
+  assert.equal(resolution2.summary.status, "blocked");
+  assert(resolution2.findings.some(f => f.path === "regulatedEntityId" && f.message.includes("does not match an existing RE")));
+
+  // 10. evaluateLoanApplication blocks missing or invalid licenseMetadata
+  const appWithoutLicenseMetadata = {
+    ...validApplication(),
+    tenant: {
+      ...validApplication().tenant,
+      licenseMetadata: undefined
+    }
+  };
+  const eval6 = evaluateLoanApplication(appWithoutLicenseMetadata);
+  assert.equal(eval6.summary.status, "blocked");
+  assert(eval6.findings.some(f => f.path === "tenant.licenseMetadata" && f.message.includes("license metadata is required")));
 });
 
 test("product policy rejects unsafe penal charge design", () => {
@@ -5592,7 +5643,14 @@ function validApplication() {
         name: "Nodal Officer",
         email: "grievance@example.in"
       },
-      privacyPolicyUrl: "https://example.in/privacy"
+      privacyPolicyUrl: "https://example.in/privacy",
+      licenseMetadata: {
+        category: "NBFC-ICC",
+        licenseNumber: "RBI-LIC-2026-999",
+        issuingAuthority: "Reserve Bank of India",
+        issueDate: "2026-01-01",
+        status: "active"
+      }
     },
     borrower: {
       borrowerId: "bor_001",
@@ -6018,6 +6076,13 @@ function validRegulatedEntity() {
       penalChargesPolicyRef: "board_penal_charges_policy_v1",
       outsourcingPolicyRef: "board_outsourcing_policy_v1",
       grievancePolicyRef: "board_grievance_policy_v1"
+    },
+    licenseMetadata: {
+      category: "NBFC-ICC",
+      licenseNumber: "RBI-LIC-2026-999",
+      issuingAuthority: "Reserve Bank of India",
+      issueDate: "2026-01-01",
+      status: "active"
     }
   };
 }
@@ -7740,4 +7805,56 @@ test("API supports complete erasure fulfillment and automated data-retention cle
   assert.equal(profileBGet.status, 200);
   const profileB = await profileBGet.json();
   assert.equal(profileB.fullName, "Keep Me");
+});
+
+test("API blocks invalid RE license metadata and product policy invalid charges", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-re-pricing-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const base = `http://127.0.0.1:${server.address().port}`;
+
+  // 1. POST /regulated-entities fails without licenseMetadata
+  const invalidReInput = {
+    ...validRegulatedEntity(),
+    licenseMetadata: undefined
+  };
+  const reRes1 = await postJson(`${base}/regulated-entities`, invalidReInput);
+  assert.equal(reRes1.status, 422);
+
+  // 2. POST /regulated-entities fails with invalid licenseMetadata category
+  const invalidReInput2 = {
+    ...validRegulatedEntity(),
+    licenseMetadata: {
+      category: "",
+      licenseNumber: "RBI-LIC-123",
+      issuingAuthority: "Reserve Bank of India",
+      issueDate: "2026-01-01",
+      status: "active"
+    }
+  };
+  const reRes2 = await postJson(`${base}/regulated-entities`, invalidReInput2);
+  assert.equal(reRes2.status, 422);
+
+  // 3. POST /products fails with invalid charge type
+  const invalidProductInput = {
+    ...validProductPolicy(),
+    charges: [
+      {
+        name: "Processing fee",
+        reason: "Disclosed fee",
+        amount: 500,
+        type: "invalid_charge_type_here"
+      }
+    ]
+  };
+  const prodRes = await postJson(`${base}/products`, invalidProductInput);
+  assert.equal(prodRes.status, 422);
 });

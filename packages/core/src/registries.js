@@ -1,5 +1,5 @@
 import { createFinding, summarizeFindings } from "./compliance-controls.js";
-import { ALLOWED_RE_TYPES } from "./loan-policy.js";
+import { ALLOWED_RE_TYPES, ALLOWED_CHARGE_TYPES } from "./loan-policy.js";
 
 const ACTIVE_STATUS = "active";
 const ALLOWED_PRODUCT_TYPES = new Set([
@@ -50,7 +50,7 @@ const DLA_CIMS_COLUMNS = [
   { key: "reWebsite", label: "Website of RE" }
 ];
 
-export function validateRegulatedEntity(entity) {
+export function validateRegulatedEntity(entity, now = new Date()) {
   const findings = [];
 
   if (!entity?.regulatedEntityId) {
@@ -103,6 +103,29 @@ export function validateRegulatedEntity(entity) {
     findings.push(createFinding("error", "RBI-PAY-DATA", "RE payment data storage country must be IN.", "dataResidency.paymentDataStorageCountry"));
   }
 
+  // Validate licenseMetadata
+  if (!entity?.licenseMetadata || typeof entity.licenseMetadata !== "object") {
+    findings.push(createFinding("error", "RBI-DL-2025", "License metadata is required.", "licenseMetadata"));
+  } else {
+    if (!entity.licenseMetadata.category || typeof entity.licenseMetadata.category !== "string" || entity.licenseMetadata.category.trim() === "") {
+      findings.push(createFinding("error", "RBI-DL-2025", "License category is required.", "licenseMetadata.category"));
+    }
+    if (!entity.licenseMetadata.licenseNumber || typeof entity.licenseMetadata.licenseNumber !== "string" || entity.licenseMetadata.licenseNumber.trim() === "") {
+      findings.push(createFinding("error", "RBI-DL-2025", "License number is required.", "licenseMetadata.licenseNumber"));
+    }
+    if (!entity.licenseMetadata.issuingAuthority || typeof entity.licenseMetadata.issuingAuthority !== "string" || entity.licenseMetadata.issuingAuthority.trim() === "") {
+      findings.push(createFinding("error", "RBI-DL-2025", "License issuing authority is required.", "licenseMetadata.issuingAuthority"));
+    }
+    if (!entity.licenseMetadata.issueDate || isNaN(Date.parse(entity.licenseMetadata.issueDate))) {
+      findings.push(createFinding("error", "RBI-DL-2025", "License issue date must be a valid date.", "licenseMetadata.issueDate"));
+    } else if (new Date(entity.licenseMetadata.issueDate) > now) {
+      findings.push(createFinding("error", "RBI-DL-2025", "License issue date cannot be in the future.", "licenseMetadata.issueDate"));
+    }
+    if (!entity.licenseMetadata.status || !["active", "valid"].includes(entity.licenseMetadata.status)) {
+      findings.push(createFinding("error", "RBI-DL-2025", "License status must be 'active' or 'valid'.", "licenseMetadata.status"));
+    }
+  }
+
   return {
     findings,
     summary: summarizeFindings(findings)
@@ -139,6 +162,13 @@ export function normalizeRegulatedEntity(input, now = new Date()) {
       modelRiskPolicyRef: input.boardPolicyRefs?.modelRiskPolicyRef ?? null,
       grievancePolicyRef: input.boardPolicyRefs?.grievancePolicyRef ?? null
     },
+    licenseMetadata: {
+      category: input.licenseMetadata?.category ?? null,
+      licenseNumber: input.licenseMetadata?.licenseNumber ?? null,
+      issuingAuthority: input.licenseMetadata?.issuingAuthority ?? "Reserve Bank of India",
+      issueDate: input.licenseMetadata?.issueDate ?? null,
+      status: input.licenseMetadata?.status ?? null
+    },
     publicDisclosures: {
       sachetPortalUrl: input.publicDisclosures?.sachetPortalUrl ?? "https://sachet.rbi.org.in/",
       rbiCmsUrl: input.publicDisclosures?.rbiCmsUrl ?? "https://cms.rbi.org.in/"
@@ -150,7 +180,7 @@ export function normalizeRegulatedEntity(input, now = new Date()) {
 
 export function upsertRegulatedEntity(registry, input, now = new Date()) {
   const entity = normalizeRegulatedEntity(input, now);
-  const validation = validateRegulatedEntity(entity);
+  const validation = validateRegulatedEntity(entity, now);
   const nextRegistry =
     validation.summary.status === "blocked"
       ? registry ?? {}
@@ -925,7 +955,8 @@ export function resolveLoanApplicationReferences(application, registries = {}, n
           grievanceOfficer: entity.grievanceOfficer,
           privacyPolicyUrl: entity.privacyPolicyUrl,
           websiteUrl: entity.websiteUrl,
-          boardPolicyRefs: entity.boardPolicyRefs
+          boardPolicyRefs: entity.boardPolicyRefs,
+          licenseMetadata: entity.licenseMetadata
         },
         dataResidency: {
           ...entity.dataResidency,
@@ -1232,6 +1263,11 @@ function validateCharges(path, charges, findings, options = {}) {
     }
     if (!charge.reason) {
       findings.push(createFinding("error", "RBI-KFS-2024", "Charge reason is required.", `${path}.${index}.reason`));
+    }
+    if (!charge.type) {
+      findings.push(createFinding("error", "RBI-KFS-2024", "Charge type is required.", `${path}.${index}.type`));
+    } else if (!ALLOWED_CHARGE_TYPES.has(charge.type)) {
+      findings.push(createFinding("error", "RBI-KFS-2024", "Charge type is invalid.", `${path}.${index}.type`));
     }
     if (options.penal && charge.type === "penal_interest") {
       findings.push(createFinding("error", "RBI-FPC-PENAL", "Penalties must not be configured as penal interest.", `${path}.${index}.type`));
