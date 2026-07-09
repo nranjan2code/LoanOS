@@ -243,3 +243,7 @@ export {
   validateMarketplaceNeutrality,
   rankMarketplaceOffers
 } from "./offer-marketplace.js";
+
+export {
+  ExternalServiceManager
+} from "./external-services.js";
