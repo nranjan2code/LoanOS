@@ -87,7 +87,7 @@ Tasks:
 - Underwriting policy rules. First slice done: approving a refer-band application requires a recorded manual underwriting override (underwriter, reason, policy reference), the named underwriter must be a registered, active credit officer, and a declined decision must cite a coded reason from the decline-reason taxonomy.
 - Manual review queue. Partial. Eligibility `refer` outcomes route to a manual underwriting LWS task, and that task's approval is gated on a manual underwriting override captured as decision evidence.
 - Maker-checker decision approval. Done.
-- AI model-use evidence on decision. Partial.
+- AI model-use evidence on decision. Done: proposeDecision retrieves model details from the registry and records a locked modelEvidence snapshot (version, validation refs, risk parameters) in the proposed decision.
 - Offer generation and neutrality. Done: validateMarketplaceNeutrality and rankMarketplaceOffers implement multi-lender offer marketplace checks, dark-pattern prevention, partner completeness, and objective sorting.
 - KFS generation from product policy. Done.
 - Document packet model: KFS, sanction letter, agreement summary, privacy policy. First execution packet slice done.

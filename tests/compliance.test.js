@@ -7858,3 +7858,187 @@ test("API blocks invalid RE license metadata and product policy invalid charges"
   const prodRes = await postJson(`${base}/products`, invalidProductInput);
   assert.equal(prodRes.status, 422);
 });
+
+test("API locks AI model-use evidence on decision and isolates from subsequent updates", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-model-locking-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const base = `http://127.0.0.1:${server.address().port}`;
+
+  // 1. Emplace a valid active model in the inventory
+  const modelRes = await postJson(`${base}/ai/models`, {
+    modelId: "uw_score_v1",
+    name: "Underwriting Score",
+    purpose: "Decision helper",
+    version: 1,
+    status: "draft",
+    validationStatus: "unapproved",
+    riskTier: "high",
+    materialDecision: true,
+    customerFacing: true,
+    owner: "credit-risk"
+  });
+  assert.equal(modelRes.status, 201);
+
+  // validation requires explainability assessment, fairness assessment, and monitoring plan for high-risk models
+  const modelRes2 = await postJson(`${base}/ai/models`, {
+    modelId: "uw_score_v1",
+    name: "Underwriting Score",
+    purpose: "Decision helper",
+    version: 1,
+    status: "draft",
+    validationStatus: "unapproved",
+    riskTier: "high",
+    materialDecision: true,
+    customerFacing: true,
+    owner: "credit-risk",
+    independentValidationRef: "val_ref_001",
+    fairnessAssessmentRef: "fair_ref_001",
+    fairnessAssessmentHash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    fairnessReport: {
+      disparateImpactRatio: 0.95,
+      demographicParityDifference: 0.05,
+      protectedAttributes: ["gender"]
+    },
+    explainabilityRef: "exp_ref_001",
+    explainabilityHash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    explainabilityReport: {
+      explainabilityMethod: "shap",
+      featureImportance: { monthlyIncome: 0.7 }
+    },
+    monitoringPlanRef: "mon_ref_001",
+    monitoringThresholdBps: 1000
+  });
+  assert.equal(modelRes2.status, 201);
+
+  // Transition to approved/active
+  const trans0 = await postJson(`${base}/ai/models/uw_score_v1/transitions`, {
+    action: "submit_for_validation",
+    actor: "risk-owner",
+    evidenceRef: "evidence_submit_001"
+  });
+  assert.equal(trans0.status, 200);
+
+  const trans1 = await postJson(`${base}/ai/models/uw_score_v1/transitions`, {
+    action: "approve_validation",
+    actor: "validation-officer-1",
+    evidenceRef: "evidence_val_001"
+  });
+  assert.equal(trans1.status, 200);
+
+  const trans2 = await postJson(`${base}/ai/models/uw_score_v1/transitions`, {
+    action: "activate",
+    actor: "risk-officer-1",
+    evidenceRef: "evidence_act_001"
+  });
+  assert.equal(trans2.status, 200);
+
+  // 2. Create a borrower, RE, and product
+  await postJson(`${base}/regulated-entities`, validRegulatedEntity());
+  await postJson(`${base}/products`, validProductPolicy());
+  await postJson(`${base}/staff/actors`, {
+    actorId: "credit-maker-1",
+    displayName: "Credit Maker",
+    roles: ["credit_officer"],
+    queues: ["credit_ops"]
+  });
+  await postJson(`${base}/borrowers`, {
+    borrowerId: "bor_model_test",
+    borrowerType: "individual",
+    fullName: "AI Borrower",
+    legalName: "AI Borrower",
+    dateOfBirth: "1990-01-01",
+    residencyCountry: "IN",
+    primaryAddressCountry: "IN",
+    primaryAddress: "Delhi, India",
+    contact: { email: "ai@individual.in", mobile: "9876543211" },
+    economicProfile: { occupation: "salaried", monthlyIncome: 80000 }
+  });
+
+  // Seed KYC & Consent
+  await postJson(`${base}/borrowers/bor_model_test/kyc-records`, {
+    kycRecordId: "kyc_model_test",
+    status: "verified",
+    method: "v_cip",
+    riskCategory: "low",
+    verifiedAt: "2026-07-08T00:00:00.000Z",
+    expiresAt: "2027-07-08T00:00:00.000Z",
+    ckycRef: "ckyc_model_001"
+  });
+
+  await postJson(`${base}/borrowers/bor_model_test/consents`, {
+    ...validConsentRecord(),
+    borrowerId: "bor_model_test"
+  });
+
+  // 3. Create loan application with AI decision
+  const appRes = await postJson(`${base}/loans/applications`, {
+    applicationId: "app_model_test",
+    borrowerId: "bor_model_test",
+    regulatedEntityId: "re_example_nbfc",
+    productId: "prod_personal_loan",
+    requestedAmount: 100000,
+    requestedTenorMonths: 12,
+    aiDecision: {
+      modelId: "uw_score_v1",
+      score: 0.92,
+      decisionRecommendation: "approve",
+      customerDisclosureRef: "disclosure_001",
+      humanReviewRef: "review_001"
+    }
+  });
+  assert.equal(appRes.status, 201);
+
+  // Generate KFS and Accept
+  const kfsRes = await postJson(`${base}/loans/applications/app_model_test/kfs`, {
+    acceptance: {
+      acceptedAt: "2026-07-08T07:00:00.000Z",
+      deliveryChannel: "email",
+      deliveryRef: "del_kfs_001"
+    }
+  });
+  assert.ok(kfsRes.status === 200 || kfsRes.status === 201);
+
+  const decRes = await postJson(`${base}/loans/applications/app_model_test/decision`, {
+    status: "approved",
+    proposedBy: "credit-maker-1",
+    reason: "Looks highly affordable"
+  });
+  if (decRes.status !== 201 && decRes.status !== 202) {
+    console.error("DECRES FAILED:", JSON.stringify(decRes.body, null, 2));
+  }
+  assert.ok(decRes.status === 201 || decRes.status === 202);
+
+  // Verify proposed decision aiDecision locks modelEvidence
+  const appGet1 = await apiFetch(`${base}/loans/applications/app_model_test`);
+  const appData1 = await appGet1.json();
+  assert.ok(appData1.pendingDecision.aiDecision.modelEvidence);
+  assert.equal(appData1.pendingDecision.aiDecision.modelEvidence.modelId, "uw_score_v1");
+  assert.equal(appData1.pendingDecision.aiDecision.modelEvidence.version, 1);
+  assert.equal(appData1.pendingDecision.aiDecision.modelEvidence.riskTier, "high");
+  assert.equal(appData1.pendingDecision.aiDecision.modelEvidence.validationStatus, "approved");
+
+  // 5. Suspend or clear model registry state
+  const killSwitchRes = await postJson(`${base}/ai/kill-switch`, {
+    scope: "model",
+    modelId: "uw_score_v1",
+    reason: "Ad-hoc compliance drift",
+    actor: "risk-officer-1"
+  });
+  assert.equal(killSwitchRes.status, 200);
+
+  // Verify the already proposed decision's modelEvidence is immune and unchanged
+  const appGet2 = await apiFetch(`${base}/loans/applications/app_model_test`);
+  const appData2 = await appGet2.json();
+  const evidence = appData2.pendingDecision.aiDecision.modelEvidence;
+  assert.equal(evidence.validationStatus, "approved"); // remains approved despite kill switch suspension
+  assert.equal(evidence.driftStatus, "normal"); // unaffected by later drift/suspension
+});

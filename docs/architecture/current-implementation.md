@@ -12,7 +12,7 @@ The current implementation is intentionally small:
 - Multi-tenant: every data-plane request runs inside exactly one tenant, resolved from an `x-api-key`/bearer token; cross-tenant access is impossible by construction because each request only ever receives its own tenant's partition.
 - Core domain logic in `packages/core/src`.
 - API wrapper in `apps/api/src`.
-- Automated tests in `tests/` (133 tests as of the latest commit).
+- Automated tests in `tests/` (134 tests as of the latest commit).
 
 Run it:
 

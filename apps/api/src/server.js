@@ -2809,7 +2809,7 @@ async function route(req, res, dataDir, platformAdminKey) {
     // assessment stored as evidence.
     const eligibilityFindings = body.status === "approved" ? eligibility.findings : [];
     const findings = [...preDecision.findings, ...kfsCheck.findings, ...eligibilityFindings];
-    const proposal = proposeDecision(decisionApplication, body, findings);
+    const proposal = proposeDecision(decisionApplication, body, findings, { modelRegistry: state.modelRegistry });
     if (proposal.summary.status === "blocked" && !proposal.requiresHumanReview) {
       sendJson(res, 422, {
         error: {

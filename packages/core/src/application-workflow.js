@@ -1,5 +1,6 @@
 import { createFinding, summarizeFindings } from "./compliance-controls.js";
 import { createLoanId, validateKfsBeforeDecision } from "./loan-policy.js";
+import { normalizeModelRegistryState } from "./model-governance.js";
 
 export const APPLICATION_STATUSES = {
   BLOCKED_COMPLIANCE: "blocked_compliance",
@@ -150,7 +151,13 @@ export function recordHumanReview(application, input, now = new Date()) {
   };
 }
 
-export function proposeDecision(application, input, findings = [], now = new Date()) {
+export function proposeDecision(application, input, findings = [], options = {}, now = new Date()) {
+  let opts = options;
+  let date = now;
+  if (options instanceof Date) {
+    date = options;
+    opts = {};
+  }
   const allFindings = [...findings];
 
   if (!DECISION_READY_STATUSES.has(application.status)) {
@@ -187,7 +194,7 @@ export function proposeDecision(application, input, findings = [], now = new Dat
         type: "application.human_review.required",
         status: APPLICATION_STATUSES.HUMAN_REVIEW_REQUIRED
       },
-      now
+      date
     );
 
     return {
@@ -208,15 +215,42 @@ export function proposeDecision(application, input, findings = [], now = new Dat
     };
   }
 
+  const inputAi = input.aiDecision ?? application.aiDecision ?? null;
+  let lockedAiDecision = null;
+  if (inputAi && inputAi.modelId) {
+    lockedAiDecision = { ...inputAi };
+    if (opts.modelRegistry) {
+      const registry = normalizeModelRegistryState(opts.modelRegistry);
+      const model = registry.models[inputAi.modelId];
+      if (model) {
+        lockedAiDecision.modelEvidence = {
+          modelId: model.modelId,
+          version: model.version,
+          riskTier: model.riskTier,
+          validationStatus: model.validationStatus,
+          materialDecision: model.materialDecision,
+          customerFacing: model.customerFacing,
+          independentValidationRef: model.independentValidationRef ?? null,
+          fairnessAssessmentRef: model.fairnessAssessmentRef ?? null,
+          explainabilityRef: model.explainabilityRef ?? null,
+          adversarialTestRef: model.adversarialTestRef ?? null,
+          hallucinationTestRef: model.hallucinationTestRef ?? null,
+          driftThreshold: model.driftThreshold ?? null,
+          driftStatus: model.driftStatus ?? "normal"
+        };
+      }
+    }
+  }
+
   const proposal = {
     proposalId: input.proposalId ?? createLoanId("decision"),
     status: input.status,
     proposedBy: input.proposedBy ?? input.decidedBy,
-    proposedAt: now.toISOString(),
+    proposedAt: date.toISOString(),
     reason: input.reason ?? null,
-    manualUnderwriting: manualUnderwritingEvidence(application, input, now),
+    manualUnderwriting: manualUnderwritingEvidence(application, input, date),
     declineReason: declineReasonEvidence(input),
-    aiDecision: input.aiDecision ?? application.aiDecision ?? null
+    aiDecision: lockedAiDecision
   };
 
   const updated = withWorkflowEvent(
