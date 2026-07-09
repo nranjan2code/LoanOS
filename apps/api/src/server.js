@@ -434,6 +434,51 @@ async function route(req, res, dataDir, platformAdminKey) {
     return;
   }
 
+  const documentVaultDownloadMatch = path.match(/^\/document-vault\/([^/]+)\/documents\/([^/]+)$/);
+  if (method === "GET" && documentVaultDownloadMatch) {
+    const state = await store.load();
+    const vaultRecordId = decodeURIComponent(documentVaultDownloadMatch[1]);
+    const documentId = decodeURIComponent(documentVaultDownloadMatch[2]);
+    const record = state.documentVault?.[vaultRecordId];
+    if (!record) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Document vault record not found." } });
+      return;
+    }
+    const application = state.loanApplications?.[record.applicationId];
+    if (!application) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Source loan application not found." } });
+      return;
+    }
+    const fullDoc = (application.documentPacket?.documents ?? []).find(d => d.documentId === documentId);
+    if (!fullDoc) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Document not found in packet." } });
+      return;
+    }
+
+    const format = url.searchParams.get("format") || req.headers["accept"] || "application/json";
+    if (format.includes("application/pdf")) {
+      const pdfBuffer = Buffer.from(fullDoc.pdf, "base64");
+      res.writeHead(200, {
+        "Content-Type": "application/pdf",
+        "Content-Length": pdfBuffer.length,
+        "Content-Disposition": `attachment; filename="${fullDoc.type}.pdf"`
+      });
+      res.end(pdfBuffer);
+      return;
+    } else if (format.includes("text/html")) {
+      res.writeHead(200, {
+        "Content-Type": "text/html",
+        "Content-Length": Buffer.byteLength(fullDoc.html),
+        "Content-Disposition": `inline; filename="${fullDoc.type}.html"`
+      });
+      res.end(fullDoc.html);
+      return;
+    }
+
+    sendJson(res, 200, fullDoc);
+    return;
+  }
+
   if (method === "GET" && path === "/communications") {
     const state = await store.load();
     const communications = Object.values(state.communications ?? {}).filter((record) =>
@@ -3031,7 +3076,9 @@ async function route(req, res, dataDir, platformAdminKey) {
       aadhaarNumber,
       signerName,
       signatureRef: esignResult.signatureRef,
-      esignProvider: esignResult.esignProvider
+      esignProvider: esignResult.esignProvider,
+      envelopeId: esignResult.envelopeId,
+      externalEnvelopeStorageUrl: esignResult.externalEnvelopeStorageUrl
     });
 
     if (signResult.summary.status === "blocked") {

@@ -259,7 +259,9 @@ export function signDocumentPacket(application, input = {}, now = new Date()) {
       signerName: input.signerName,
       aadhaarMasked: "XXXX-XXXX-" + input.aadhaarNumber.slice(-4),
       signatureRef: input.signatureRef,
-      esignProvider: input.esignProvider ?? "mock"
+      esignProvider: input.esignProvider ?? "mock",
+      envelopeId: input.envelopeId ?? null,
+      externalEnvelopeStorageUrl: input.externalEnvelopeStorageUrl ?? null
     }
   };
 
@@ -345,7 +347,7 @@ function document(type, title, body, generatedAt, regulatoryRefs) {
     "<!doctype html>",
     "<html>",
     "<head>",
-    `<meta charset=\"utf-8\"><title>${escapeHtml(title)}</title>`,
+    `<meta charset="utf-8"><title>${escapeHtml(title)}</title>`,
     "</head>",
     "<body>",
     `<h1>${escapeHtml(title)}</h1>`,
@@ -355,6 +357,8 @@ function document(type, title, body, generatedAt, regulatoryRefs) {
     "</html>"
   ].join("\n");
   const text = htmlToText(html);
+  const pdfString = generateMockPdfString(title, text, generatedAt);
+  const pdfChecksum = createHash("sha256").update(pdfString).digest("hex");
   return {
     documentId: createLoanId("doc"),
     type,
@@ -365,8 +369,46 @@ function document(type, title, body, generatedAt, regulatoryRefs) {
     regulatoryRefs,
     checksumSha256: createHash("sha256").update(html).digest("hex"),
     html,
-    text
+    text,
+    pdfMimeType: "application/pdf",
+    pdfChecksumSha256: pdfChecksum,
+    pdf: Buffer.from(pdfString).toString("base64")
   };
+}
+
+function generateMockPdfString(title, textSummary, generatedAt) {
+  const streamText = `BT /F1 12 Tf 70 700 Td (${title}) Tj 70 680 Td (Generated at: ${generatedAt}) Tj 70 640 Td (${textSummary.slice(0, 60)}) Tj ET`;
+  const streamLength = Buffer.byteLength(streamText);
+  return [
+    "%PDF-1.4",
+    "1 0 obj",
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "endobj",
+    "2 0 obj",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "endobj",
+    "3 0 obj",
+    `<< /Type /Page /Parent 2 0 R /Resources << >> /MediaBox [0 0 612 792] /Contents 4 0 R >>`,
+    "endobj",
+    "4 0 obj",
+    `<< /Length ${streamLength} >>`,
+    "stream",
+    streamText,
+    "endstream",
+    "endobj",
+    "xref",
+    "0 5",
+    "0000000000 65535 f",
+    "0000000009 00000 n",
+    "0000000058 00000 n",
+    "0000000115 00000 n",
+    "0000000222 00000 n",
+    "trailer",
+    "<< /Size 5 /Root 1 0 R >>",
+    "startxref",
+    "321",
+    "%%EOF"
+  ].join("\n");
 }
 
 function tableHtml(rows) {

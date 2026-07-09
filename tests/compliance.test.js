@@ -7425,3 +7425,128 @@ test("API resolves product policy version effective on the application date", as
   assert.equal(appV2Res.body.product.version, 2);
   assert.equal(appV2Res.body.product.annualInterestRateBps, 1800);
 });
+
+test("API supports eSign envelope storage, PDF generation, and document vault downloads", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-docvault-pdf-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const base = `http://127.0.0.1:${server.address().port}`;
+
+  // 1. Setup application, approve it, and generate document packet
+  const application = await createRegistryBackedApplication(base);
+  
+  // Accept KFS
+  await postJson(`${base}/loans/applications/${application.applicationId}/kfs`, {
+    acceptance: {
+      acceptedAt: "2026-07-08T07:00:00.000Z",
+      deliveryChannel: "email",
+      deliveryRef: "email_msg_123"
+    }
+  });
+
+  // Proposal
+  await postJson(`${base}/loans/applications/${application.applicationId}/decision`, {
+    status: "approved",
+    proposedBy: "credit-maker-1",
+    reason: "Policy checks passed"
+  });
+
+  // Approved decision
+  await postJson(`${base}/loans/applications/${application.applicationId}/approvals`, {
+    outcome: "approved",
+    approvedBy: "credit-checker-1",
+    approvalRef: "approval_002"
+  });
+
+  // Generate packet
+  const genRes = await postJson(`${base}/loans/applications/${application.applicationId}/document-packet`, {
+    actor: "loan-officer-1"
+  });
+  assert.equal(genRes.status, 201);
+  const packet = genRes.body;
+  assert.equal(packet.status, "generated");
+  
+  // Verify PDF fields are generated on documents
+  for (const doc of packet.documents) {
+    assert.equal(doc.pdfMimeType, "application/pdf");
+    assert.ok(/^[a-f0-9]{64}$/.test(doc.pdfChecksumSha256));
+    assert.ok(doc.pdf); // base64 string exists
+  }
+
+  // Deliver packet
+  const delRes = await postJson(`${base}/loans/applications/${application.applicationId}/document-packet/delivery`, {
+    deliveryChannel: "email",
+    deliveryRef: "del_ref_123",
+    deliveredTo: "asha@example.in",
+    actor: "loan-officer-1"
+  });
+  assert.equal(delRes.status, 200);
+
+  // Sign packet (eSign)
+  const signRes = await postJson(`${base}/loans/applications/${application.applicationId}/document-packet/esign`, {
+    aadhaarNumber: "123412341234",
+    otp: "123456",
+    signerName: "Asha Sharma"
+  });
+  assert.equal(signRes.status, 200);
+  assert.equal(signRes.body.status, "signed");
+  
+  // Verify mock eSign envelope fields are present in signature block
+  const signature = signRes.body.signature;
+  assert.ok(signature.envelopeId.startsWith("env_esign_"));
+  assert.equal(signature.externalEnvelopeStorageUrl, `https://esign-provider.mock/envelopes/${signature.envelopeId}`);
+
+  // 2. Fetch vault records to verify indexing
+  const vaultListRes = await apiFetch(`${base}/document-vault?applicationId=${application.applicationId}`);
+  assert.equal(vaultListRes.status, 200);
+  const vaultList = await vaultListRes.json();
+  assert.equal(vaultList.count, 1);
+  
+  const vaultRecord = vaultList.records[0];
+  assert.equal(vaultRecord.status, "vaulted");
+  assert.equal(vaultRecord.signature.envelopeId, signature.envelopeId);
+  assert.equal(vaultRecord.signature.externalEnvelopeStorageUrl, signature.externalEnvelopeStorageUrl);
+
+  // Check each document in vault metadata has PDF fields
+  for (const doc of vaultRecord.documents) {
+    assert.equal(doc.pdfMimeType, "application/pdf");
+    assert.ok(/^[a-f0-9]{64}$/.test(doc.pdfChecksumSha256));
+  }
+
+  // 3. Verify download sub-resource endpoint
+  const testDoc = vaultRecord.documents[0];
+
+  // Accept HTML format download
+  const htmlRes = await apiFetch(`${base}/document-vault/${vaultRecord.vaultRecordId}/documents/${testDoc.documentId}`, {
+    headers: { "accept": "text/html" }
+  });
+  assert.equal(htmlRes.status, 200);
+  assert.equal(htmlRes.headers.get("content-type"), "text/html");
+  const htmlText = await htmlRes.text();
+  assert.ok(htmlText.includes("<!doctype html>"));
+
+  // Accept PDF format download
+  const pdfRes = await apiFetch(`${base}/document-vault/${vaultRecord.vaultRecordId}/documents/${testDoc.documentId}`, {
+    headers: { "accept": "application/pdf" }
+  });
+  assert.equal(pdfRes.status, 200);
+  assert.equal(pdfRes.headers.get("content-type"), "application/pdf");
+  const pdfBuffer = await pdfRes.arrayBuffer();
+  const pdfString = Buffer.from(pdfBuffer).toString();
+  assert.ok(pdfString.startsWith("%PDF-1.4"));
+
+  // Default JSON format download
+  const jsonRes = await apiFetch(`${base}/document-vault/${vaultRecord.vaultRecordId}/documents/${testDoc.documentId}`);
+  assert.equal(jsonRes.status, 200);
+  const jsonBody = await jsonRes.json();
+  assert.equal(jsonBody.documentId, testDoc.documentId);
+  assert.ok(jsonBody.html);
+});

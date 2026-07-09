@@ -39,6 +39,8 @@ export function vaultDocumentPacket(registry = {}, application, packet = applica
     title: document.title,
     mimeType: document.mimeType,
     checksumSha256: document.checksumSha256,
+    pdfMimeType: document.pdfMimeType ?? "application/pdf",
+    pdfChecksumSha256: document.pdfChecksumSha256 ?? null,
     generatedAt: document.generatedAt,
     regulatoryRefs: document.regulatoryRefs ?? []
   }));
@@ -69,7 +71,9 @@ export function vaultDocumentPacket(registry = {}, application, packet = applica
       signedAt: packet.signature.signedAt,
       signerName: packet.signature.signerName,
       aadhaarMasked: packet.signature.aadhaarMasked,
-      esignProvider: packet.signature.esignProvider
+      esignProvider: packet.signature.esignProvider,
+      envelopeId: packet.signature.envelopeId ?? null,
+      externalEnvelopeStorageUrl: packet.signature.externalEnvelopeStorageUrl ?? null
     },
     documents,
     documentCount: documents.length,
@@ -127,6 +131,9 @@ function validateVaultInput(application, packet, input) {
     }
     if (!/^[a-f0-9]{64}$/.test(document.checksumSha256 ?? "")) {
       findings.push(createFinding("error", "RBI-DL-2025", "Vaulted document requires a SHA-256 checksum.", "documentPacket.documents.checksumSha256"));
+    }
+    if (!/^[a-f0-9]{64}$/.test(document.pdfChecksumSha256 ?? "")) {
+      findings.push(createFinding("error", "RBI-DL-2025", "Vaulted document requires a PDF SHA-256 checksum.", "documentPacket.documents.pdfChecksumSha256"));
     }
   }
   const storageCountry = input.storageCountry ?? application?.dataResidency?.primaryStorageCountry ?? "IN";

@@ -80,6 +80,7 @@ npm run dev:api
 | `GET /break-glass-grants` | Lists every break-glass grant scoped to the calling tenant, with effective status. |
 | `GET /document-vault` | Lists signed document-vault receipts, filterable by `applicationId`, `borrowerId`, or `packetId`. |
 | `GET /document-vault/:id` | Reads a document-vault receipt by id. |
+| `GET /document-vault/:id/documents/:docId` | Downloads a specific document from the vault by ID, supporting content negotiation (JSON, HTML, or binary PDF). |
 | `GET /communications` | Lists tenant communication dispatch receipts, filterable by channel, purpose, borrower, application, or loan account. |
 | `POST /integrations/communications` | Dispatches SMS/email/WhatsApp through `ExternalServiceManager`, stores a masked/hash-only communication receipt, and seals the attempt into the tenant audit chain. |
 | `GET /payment-rails` | Lists NACH/UPI payment rail initiation receipts, filterable by type, channel, status, borrower, application, loan account, or provider reference. |

@@ -481,13 +481,16 @@ export class ExternalServiceManager {
       if (otp !== "123456") {
         throw new Error("Invalid eSign OTP. Mock provider expects OTP '123456'.");
       }
+      const envelopeId = `env_esign_${Date.now()}`;
       return {
         success: true,
         provider: "mock",
         signatureRef: `SIG-MOCK-${Date.now()}`,
         signedAt: new Date().toISOString(),
         esignProvider: "mock",
-        dataResidencyCountry: this.config.esignDataResidencyCountry
+        dataResidencyCountry: this.config.esignDataResidencyCountry,
+        envelopeId,
+        externalEnvelopeStorageUrl: `https://esign-provider.mock/envelopes/${envelopeId}`
       };
     }
   }
