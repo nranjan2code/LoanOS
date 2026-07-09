@@ -65,7 +65,8 @@ export function createEmptyState() {
   return {
     version: STATE_VERSION,
     controlPlane: {
-      tenants: {}
+      tenants: {},
+      subProcessors: {}
     },
     tenants: {}
   };
@@ -79,7 +80,8 @@ function normalizeState(state) {
   return {
     version: STATE_VERSION,
     controlPlane: {
-      tenants: state?.controlPlane?.tenants ?? {}
+      tenants: state?.controlPlane?.tenants ?? {},
+      subProcessors: state?.controlPlane?.subProcessors ?? {}
     },
     tenants
   };
@@ -170,6 +172,94 @@ export function resolveTenantByApiKey(state, apiKey) {
       (tenant) => tenant.apiKeyHash === hash && tenant.status === "active"
     ) ?? null
   );
+}
+
+// --- Sub-processor register (control plane, disclosed to every tenant) -----
+
+// LoanOS is itself an IT service provider inside each RE's regulatory perimeter,
+// so every downstream sub-processor it uses must be disclosed to tenant REs
+// (RBI IT-Outsourcing MD 2023; DPDP data-processor duties). The register lives
+// in the control plane — it is platform-wide, not tenant-scoped — and read
+// access is exposed to every authenticated tenant as a standing disclosure.
+
+const SUB_PROCESSOR_STATUSES = new Set(["active", "retired"]);
+
+export function validateSubProcessor(input) {
+  const findings = [];
+  if (!input?.subProcessorId) {
+    findings.push({ code: "sub_processor_id_required", message: "A subProcessorId is required." });
+  }
+  if (!input?.name) {
+    findings.push({ code: "sub_processor_name_required", message: "A sub-processor name is required." });
+  }
+  if (!input?.purpose) {
+    findings.push({ code: "sub_processor_purpose_required", message: "A processing purpose is required." });
+  }
+  if (!input?.dataResidencyCountry) {
+    findings.push({
+      code: "sub_processor_residency_required",
+      message: "A data-residency country is required to disclose cross-border processing."
+    });
+  }
+  // RBI outsourcing requires a governing contract with every service provider.
+  if (input?.dpaInPlace !== true) {
+    findings.push({
+      code: "sub_processor_dpa_required",
+      message: "A data-processing agreement must be in place before a sub-processor is registered."
+    });
+  }
+  if (input?.status && !SUB_PROCESSOR_STATUSES.has(input.status)) {
+    findings.push({
+      code: "sub_processor_status_invalid",
+      message: `status must be one of: ${[...SUB_PROCESSOR_STATUSES].join(", ")}.`
+    });
+  }
+  return findings;
+}
+
+export function publicSubProcessor(record) {
+  if (!record) {
+    return null;
+  }
+  return {
+    ...record,
+    // A disclosed, derived fact so tenant REs can see cross-border processing
+    // without reasoning about country codes themselves.
+    crossBorder: record.dataResidencyCountry !== "IN"
+  };
+}
+
+export function registerSubProcessor(state, input, now = new Date()) {
+  const { subProcessorId } = input;
+  const existing = state.controlPlane.subProcessors?.[subProcessorId] ?? null;
+  const record = {
+    subProcessorId,
+    name: input.name ?? existing?.name ?? subProcessorId,
+    purpose: input.purpose ?? existing?.purpose ?? null,
+    dataCategories: Array.isArray(input.dataCategories)
+      ? input.dataCategories
+      : existing?.dataCategories ?? [],
+    dataResidencyCountry: input.dataResidencyCountry ?? existing?.dataResidencyCountry ?? null,
+    contractReference: input.contractReference ?? existing?.contractReference ?? null,
+    dpaInPlace: input.dpaInPlace ?? existing?.dpaInPlace ?? false,
+    status: input.status ?? existing?.status ?? "active",
+    createdAt: existing?.createdAt ?? now.toISOString(),
+    updatedAt: now.toISOString()
+  };
+  return {
+    ...state,
+    controlPlane: {
+      ...state.controlPlane,
+      subProcessors: {
+        ...state.controlPlane.subProcessors,
+        [subProcessorId]: record
+      }
+    }
+  };
+}
+
+export function listSubProcessors(state) {
+  return Object.values(state.controlPlane.subProcessors ?? {}).map(publicSubProcessor);
 }
 
 // --- Tenant-scoped data accessors (the isolation seam) --------------------

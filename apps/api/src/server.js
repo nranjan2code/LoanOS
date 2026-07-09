@@ -89,14 +89,18 @@ import {
   ensureBootstrapTenants,
   generateApiKey,
   getTenantData,
+  listSubProcessors,
   listTenants,
   loadState as loadWholeState,
   offboardTenant,
+  publicSubProcessor,
   publicTenant,
+  registerSubProcessor,
   registerTenant,
   resolveTenantByApiKey,
   saveState as saveWholeState,
-  setTenantData
+  setTenantData,
+  validateSubProcessor
 } from "./file-store.js";
 
 const DEFAULT_PORT = Number(process.env.PORT || 3040);
@@ -150,9 +154,9 @@ async function route(req, res, dataDir, platformAdminKey) {
     return;
   }
 
-  // --- Platform control plane: mints and lists tenants, gated on the platform
-  // admin key (never a tenant api key). ---
-  if (path === "/platform/tenants" || path.startsWith("/platform/tenants/")) {
+  // --- Platform control plane: administers tenants and the sub-processor
+  // register, gated on the platform admin key (never a tenant api key). ---
+  if (path === "/platform" || path.startsWith("/platform/")) {
     await routePlatform(req, res, { dataDir, platformAdminKey, method, path, url });
     return;
   }
@@ -209,6 +213,15 @@ async function route(req, res, dataDir, platformAdminKey) {
     // The evidence pack is only handed out when the chain verifies; a broken
     // chain surfaces a 409 so an auditor never receives a silently-tampered pack.
     sendJson(res, pack.integrity.valid ? 200 : 409, pack);
+    return;
+  }
+
+  // Standing sub-processor disclosure: every authenticated tenant RE can read
+  // the platform-wide register of LoanOS sub-processors that apply to it.
+  if (method === "GET" && path === "/sub-processors") {
+    sendJson(res, 200, {
+      subProcessors: listSubProcessors(wholeState)
+    });
     return;
   }
 
@@ -2132,6 +2145,33 @@ async function routePlatform(req, res, { dataDir, platformAdminKey, method, path
         code: "platform_admin_forbidden",
         message: "A valid platform admin key is required for tenant administration."
       }
+    });
+    return;
+  }
+
+  // Sub-processor register administration (platform admin only). The register is
+  // control-plane state; tenants read it through GET /sub-processors.
+  if (method === "GET" && path === "/platform/sub-processors") {
+    const state = await loadWholeState(dataDir);
+    sendJson(res, 200, { subProcessors: listSubProcessors(state) });
+    return;
+  }
+
+  if (method === "POST" && path === "/platform/sub-processors") {
+    const body = await readJson(req);
+    const findings = validateSubProcessor(body);
+    if (findings.length > 0) {
+      sendJson(res, 422, {
+        error: { code: "sub_processor_invalid", message: "Sub-processor registration is invalid." },
+        findings
+      });
+      return;
+    }
+    const state = await loadWholeState(dataDir);
+    const nextState = registerSubProcessor(state, body);
+    await saveWholeState(nextState, dataDir);
+    sendJson(res, 201, {
+      subProcessor: publicSubProcessor(nextState.controlPlane.subProcessors[body.subProcessorId])
     });
     return;
   }

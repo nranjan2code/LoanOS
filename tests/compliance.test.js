@@ -2847,6 +2847,100 @@ test("platform can export a tenant and offboard it with evidenced deletion", asy
   assert.equal(again.status, 409);
 });
 
+test("platform maintains a sub-processor register disclosed to every tenant", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const adminKey = "platform-admin-secret";
+  const server = createLoanOsServer({
+    dataDir,
+    bootstrapTenants: [TENANT_A, TENANT_B],
+    platformAdminKey: adminKey
+  });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+  const adminHeaders = { "content-type": "application/json", "x-platform-admin-key": adminKey };
+
+  // Writing the register requires the platform admin key, not a tenant key.
+  const forbidden = await rawFetch(`${base}/platform/sub-processors`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ subProcessorId: "sp_kyc" })
+  });
+  assert.equal(forbidden.status, 403);
+
+  // A sub-processor without a data-processing agreement is rejected.
+  const noDpa = await rawFetch(`${base}/platform/sub-processors`, {
+    method: "POST",
+    headers: adminHeaders,
+    body: JSON.stringify({
+      subProcessorId: "sp_kyc",
+      name: "CKYC Gateway Pvt Ltd",
+      purpose: "KYC verification",
+      dataResidencyCountry: "IN",
+      dpaInPlace: false
+    })
+  });
+  assert.equal(noDpa.status, 422);
+  const noDpaBody = await noDpa.json();
+  assert.ok(noDpaBody.findings.some((finding) => finding.code === "sub_processor_dpa_required"));
+
+  // A compliant sub-processor registers and reports its residency posture.
+  const created = await rawFetch(`${base}/platform/sub-processors`, {
+    method: "POST",
+    headers: adminHeaders,
+    body: JSON.stringify({
+      subProcessorId: "sp_kyc",
+      name: "CKYC Gateway Pvt Ltd",
+      purpose: "KYC verification",
+      dataCategories: ["identity", "contact"],
+      dataResidencyCountry: "IN",
+      contractReference: "DPA-2026-001",
+      dpaInPlace: true
+    })
+  });
+  assert.equal(created.status, 201);
+  const createdBody = await created.json();
+  assert.equal(createdBody.subProcessor.subProcessorId, "sp_kyc");
+  assert.equal(createdBody.subProcessor.crossBorder, false);
+
+  // A cross-border sub-processor is disclosed as such.
+  const crossBorder = await rawFetch(`${base}/platform/sub-processors`, {
+    method: "POST",
+    headers: adminHeaders,
+    body: JSON.stringify({
+      subProcessorId: "sp_notify",
+      name: "Global Notify Inc",
+      purpose: "Transactional email delivery",
+      dataResidencyCountry: "US",
+      contractReference: "DPA-2026-002",
+      dpaInPlace: true
+    })
+  });
+  assert.equal(crossBorder.status, 201);
+  assert.equal((await crossBorder.json()).subProcessor.crossBorder, true);
+
+  // Every authenticated tenant sees the same standing disclosure.
+  for (const tenant of [TENANT_A, TENANT_B]) {
+    const disclosure = await apiFetch(`${base}/sub-processors`, {}, tenant.apiKey);
+    assert.equal(disclosure.status, 200);
+    const body = await disclosure.json();
+    assert.equal(body.subProcessors.length, 2);
+    const notify = body.subProcessors.find((sp) => sp.subProcessorId === "sp_notify");
+    assert.equal(notify.crossBorder, true);
+  }
+
+  // The disclosure requires a tenant context.
+  assert.equal((await rawFetch(`${base}/sub-processors`)).status, 401);
+});
+
 function eligibilityApplication(overrides = {}) {
   const base = {
     borrower: {
