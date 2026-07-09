@@ -9,6 +9,7 @@ import {
   assignRecoveryAgent,
   assignWorkflowTask,
   assessChargeToLoanAccount,
+  buildAiDisclosure,
   buildKeyFactStatement,
   classifyLoanAsset,
   clearGlobalKillSwitch,
@@ -57,6 +58,9 @@ import {
   recordDocumentPacketDelivery,
   recordDocumentPacketGenerated,
   recordPostIncidentReview,
+  requestHumanHandoff,
+  resolveHumanHandoff,
+  listHumanHandoffRequests,
   releaseWorkflowTask,
   renderLoanStatementDocument,
   resolveComplaint,
@@ -1154,6 +1158,86 @@ async function route(req, res, dataDir, platformAdminKey) {
     );
     await store.save(nextState);
     sendJson(res, 200, result);
+    return;
+  }
+
+  // Customer-facing AI disclosure and human handoff (RBI DL / FREE-AI).
+  const modelDisclosureMatch = path.match(/^\/ai\/models\/([^/]+)\/disclosure$/);
+  if (method === "GET" && modelDisclosureMatch) {
+    const state = await store.load();
+    const modelId = decodeURIComponent(modelDisclosureMatch[1]);
+    const result = buildAiDisclosure(state.modelRegistry, { modelId });
+    if (result.summary.status === "blocked") {
+      sendJson(res, 422, {
+        error: { code: "ai_disclosure_unavailable", message: "AI disclosure is unavailable for this model." },
+        findings: result.findings
+      });
+      return;
+    }
+    sendJson(res, 200, result.disclosure);
+    return;
+  }
+
+  if (method === "GET" && path === "/ai/handoff-requests") {
+    const state = await store.load();
+    const requests = listHumanHandoffRequests(state.aiHandoffRequests, {
+      status: url.searchParams.get("status") ?? undefined,
+      borrowerId: url.searchParams.get("borrowerId") ?? undefined
+    });
+    sendJson(res, 200, { count: requests.length, handoffRequests: requests });
+    return;
+  }
+
+  if (method === "POST" && path === "/ai/handoff-requests") {
+    const body = await readJson(req);
+    const state = await store.load();
+    const result = requestHumanHandoff(state.aiHandoffRequests, body, state);
+    if (result.summary.status === "blocked") {
+      sendJson(res, 422, {
+        error: { code: "handoff_invalid", message: "Human handoff request is invalid." },
+        findings: result.findings
+      });
+      return;
+    }
+    const nextState = appendEvent(
+      { ...state, aiHandoffRequests: result.registry },
+      {
+        type: "ai.human_handoff.requested",
+        handoffId: result.request.handoffId,
+        borrowerId: result.request.borrowerId,
+        modelId: result.request.modelId
+      }
+    );
+    await store.save(nextState);
+    sendJson(res, 201, { handoffRequest: result.request, event: result.event });
+    return;
+  }
+
+  const handoffResolutionMatch = path.match(/^\/ai\/handoff-requests\/([^/]+)\/resolution$/);
+  if (method === "POST" && handoffResolutionMatch) {
+    const body = await readJson(req);
+    const state = await store.load();
+    const handoffId = decodeURIComponent(handoffResolutionMatch[1]);
+    const request = state.aiHandoffRequests[handoffId];
+    if (!request) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Handoff request not found." } });
+      return;
+    }
+    const result = resolveHumanHandoff(request, body);
+    if (result.summary.status === "blocked") {
+      sendJson(res, 422, {
+        error: { code: "handoff_resolution_blocked", message: "Handoff resolution is blocked by findings." },
+        findings: result.findings
+      });
+      return;
+    }
+    const stored = result.request;
+    const nextState = appendEvent(
+      { ...state, aiHandoffRequests: { ...state.aiHandoffRequests, [stored.handoffId]: stored } },
+      { type: "ai.human_handoff.handled", handoffId: stored.handoffId, handledBy: stored.handledBy }
+    );
+    await store.save(nextState);
+    sendJson(res, 200, { handoffRequest: stored, event: result.event });
     return;
   }
 

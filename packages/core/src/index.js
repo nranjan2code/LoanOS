@@ -36,6 +36,14 @@ export {
 } from "./access-control.js";
 
 export {
+  HANDOFF_STATUSES,
+  buildAiDisclosure,
+  listHumanHandoffRequests,
+  requestHumanHandoff,
+  resolveHumanHandoff
+} from "./ai-interaction.js";
+
+export {
   MODEL_STATUSES,
   createModelRegistryState,
   normalizeModelRegistryState,

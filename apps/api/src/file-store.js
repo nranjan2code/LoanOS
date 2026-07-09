@@ -42,6 +42,7 @@ export function createEmptyTenantData() {
     loanAccounts: {},
     workflowTasks: normalizeWorkflowTaskStore(),
     modelRegistry: createModelRegistryState(),
+    aiHandoffRequests: {},
     events: []
   };
 }
@@ -65,6 +66,7 @@ function normalizeTenantData(data) {
     loanAccounts: data?.loanAccounts ?? {},
     workflowTasks: normalizeWorkflowTaskStore(data?.workflowTasks),
     modelRegistry: normalizeModelRegistryState(data?.modelRegistry),
+    aiHandoffRequests: data?.aiHandoffRequests ?? {},
     events: Array.isArray(data?.events) ? data.events : []
   };
 }

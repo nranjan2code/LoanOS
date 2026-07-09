@@ -457,6 +457,86 @@ test("API drives the model lifecycle from draft to active", async (t) => {
   assert.ok(events.events.some((event) => event.type === "api.ai.model.drift_observed"));
 });
 
+test("API discloses customer-facing AI and records a human handoff", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+
+  // A back-office (non customer-facing) model has no customer disclosure.
+  assert.equal(
+    (await postJson(`${base}/ai/models`, {
+      modelId: "score_bo",
+      name: "Back-office score",
+      owner: "risk-owner",
+      purpose: "credit_scoring",
+      riskTier: "medium",
+      validationStatus: "approved",
+      customerFacing: false,
+      actor: "model-risk"
+    })).status,
+    201
+  );
+  const noDisclosure = await apiFetch(`${base}/ai/models/score_bo/disclosure`);
+  assert.equal(noDisclosure.status, 422);
+
+  // A customer-facing active model yields the mandated disclosure.
+  assert.equal(
+    (await postJson(`${base}/ai/models`, {
+      modelId: "chat_v1",
+      name: "Loan assistant",
+      owner: "risk-owner",
+      purpose: "customer support",
+      riskTier: "medium",
+      validationStatus: "approved",
+      customerFacing: true,
+      actor: "model-risk"
+    })).status,
+    201
+  );
+  const disclosure = await (await apiFetch(`${base}/ai/models/chat_v1/disclosure`)).json();
+  assert.equal(disclosure.aiAssisted, true);
+  assert.equal(disclosure.humanHandoffAvailable, true);
+  assert.ok(disclosure.statement.includes("Loan assistant"));
+
+  // A borrower requests a human; a support agent then resolves it.
+  const handoff = await postJson(`${base}/ai/handoff-requests`, {
+    borrowerId: "bor_001",
+    modelId: "chat_v1",
+    reason: "wants to discuss hardship options"
+  });
+  assert.equal(handoff.status, 201);
+  assert.equal(handoff.body.handoffRequest.status, "pending");
+  const handoffId = handoff.body.handoffRequest.handoffId;
+
+  // Resolution requires a human agent.
+  assert.equal(
+    (await postJson(`${base}/ai/handoff-requests/${handoffId}/resolution`, {})).status,
+    422
+  );
+  const resolved = await postJson(`${base}/ai/handoff-requests/${handoffId}/resolution`, {
+    handledBy: "support-agent-1",
+    resolutionNotes: "Discussed restructure; case opened"
+  });
+  assert.equal(resolved.status, 200);
+  assert.equal(resolved.body.handoffRequest.status, "handled");
+
+  const pending = await (await apiFetch(`${base}/ai/handoff-requests?status=pending`)).json();
+  assert.equal(pending.count, 0);
+  const events = await (await apiFetch(`${base}/audit/events`)).json();
+  assert.ok(events.events.some((event) => event.type === "ai.human_handoff.requested"));
+  assert.ok(events.events.some((event) => event.type === "ai.human_handoff.handled"));
+});
+
 test("kill-switch clearance requires a post-incident review", () => {
   const base = createModelRegistryState();
   const killed = triggerKillSwitch(base, {
