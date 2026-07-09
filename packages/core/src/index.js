@@ -135,6 +135,17 @@ export {
 } from "./grievance.js";
 
 export {
+  INCIDENT_CATEGORIES,
+  INCIDENT_REPORTING_TARGETS,
+  INCIDENT_SEVERITIES,
+  INCIDENT_STATUSES,
+  computeIncidentReportingClock,
+  createIncident,
+  enrichIncident,
+  recordIncidentNotification
+} from "./incident-notification.js";
+
+export {
   generateDocumentPacket,
   recordDocumentPacketDelivery,
   renderLoanStatementDocument,

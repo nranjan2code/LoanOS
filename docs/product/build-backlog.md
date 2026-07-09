@@ -247,7 +247,7 @@ Done when:
 
 ## Epic 11: SaaS Tenancy and Platform Isolation
 
-Status: S1–S6 first slice complete (tenant partitioning, tenant-scoped auth, isolation suite, hash-chained audit spine + evidence export, tenant portability export + evidenced offboarding, disclosed sub-processor register); remaining tasks planned.
+Status: S1–S6 first slice complete (tenant partitioning, tenant-scoped auth, isolation suite, hash-chained audit spine + evidence export, tenant portability export + evidenced offboarding, disclosed sub-processor register, 6-hour incident-notification workflow); remaining tasks planned.
 
 Goal: LoanOS runs as a multi-tenant SaaS where cross-tenant access is impossible by construction and the platform satisfies RE outsourcing obligations.
 
@@ -263,7 +263,7 @@ Tasks:
 - Hash-chained, tenant-scoped audit event module; migrate module event emission onto it. Done: `packages/core/src/audit.js` seals each tenant's events into a tamper-evident SHA-256 chain on every save.
 - Evidence export pack generated from the audit spine. Done: `GET /audit/export` (integrity-attested, filterable) and `GET /audit/events` (chain + validity verdict).
 - Tenant onboarding/offboarding workflow with exit/portability export and evidenced deletion. First slice done: `GET /platform/tenants/{id}/export` returns a reproducible portability pack (control record + full data plane + audit evidence pack), and `POST /platform/tenants/{id}/offboarding` performs evidenced deletion — purging the data plane, revoking the api key, and retaining a control-plane deletion attestation (erased event count, audit head hash, content digest, actor, reason).
-- Incident notification workflow supporting RE 6-hour RBI reporting and CERT-In duties. Planned.
+- Incident notification workflow supporting RE 6-hour RBI reporting and CERT-In duties. First slice done: `packages/core/src/incident-notification.js` records a tenant-scoped security/data incident and runs an independent 6-hour reporting clock per authority (CERT-In 2022 and RBI). `POST/GET /incidents`, `GET /incidents/{id}`, and `POST /incidents/{id}/notifications` capture reports and regulator acknowledgements; a duty unreported past 6 hours from detection surfaces as `overdue`/`reporting_overdue`, and every report and notification is sealed into the audit spine.
 - Sub-processor register. First slice done: `POST/GET /platform/sub-processors` (platform admin) maintains a control-plane register requiring a data-processing agreement and a declared data-residency country per sub-processor; `GET /sub-processors` exposes it to every authenticated tenant as a standing disclosure, flagging cross-border processing.
 
 Done when:

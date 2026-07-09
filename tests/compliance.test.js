@@ -10,7 +10,10 @@ import {
   classifyLoanAsset,
   clearGlobalKillSwitch,
   computeDelinquency,
+  computeIncidentReportingClock,
+  createIncident,
   createModelRegistryState,
+  recordIncidentNotification,
   recordPostIncidentReview,
   ELIGIBILITY_DECISIONS,
   estimateEmi,
@@ -2756,6 +2759,125 @@ test("API seals events into an audit chain and exports a verifiable evidence pac
   const bEvents = await (await apiFetch(`${base}/audit/events`, {}, TENANT_B.apiKey)).json();
   assert.equal(bEvents.count, 0);
   assert.equal(bEvents.chainValid, true);
+});
+
+test("incident reporting clock breaches after the 6-hour CERT-In/RBI window", () => {
+  const detectedAt = "2026-07-09T00:00:00.000Z";
+  const created = createIncident(
+    {},
+    {
+      category: "data_breach",
+      severity: "high",
+      summary: "Unauthorized access to a KYC datastore",
+      detectedAt,
+      actor: "ciso"
+    },
+    new Date(detectedAt)
+  );
+  assert.equal(created.summary.status, "ready");
+  const incident = created.incident;
+  // Reportable to both authorities by default, each on a 6-hour clock.
+  assert.deepEqual(
+    incident.reporting.map((clock) => clock.authority).sort(),
+    ["cert_in", "rbi"]
+  );
+
+  // Within the window, unreported, the clock is on track.
+  const inWindow = computeIncidentReportingClock(incident, "cert_in", new Date("2026-07-09T03:00:00.000Z"));
+  assert.equal(inWindow.breached, false);
+  assert.equal(inWindow.status, "on_track");
+
+  // Past 6 hours with no notification, the duty is overdue.
+  const overdue = computeIncidentReportingClock(incident, "cert_in", new Date("2026-07-09T07:00:00.000Z"));
+  assert.equal(overdue.breached, true);
+  assert.equal(overdue.status, "overdue");
+
+  // A missing acknowledgement reference or authority blocks the notification.
+  const blocked = recordIncidentNotification(incident, { authority: "cert_in", actor: "ciso" });
+  assert.equal(blocked.summary.status, "blocked");
+
+  // Reporting inside the window records the acknowledgement and stops the clock.
+  const reported = recordIncidentNotification(
+    incident,
+    { authority: "cert_in", actor: "ciso", referenceNumber: "CERTIN-ACK-1", notifiedAt: "2026-07-09T04:00:00.000Z" },
+    new Date("2026-07-09T04:00:00.000Z")
+  );
+  assert.equal(reported.summary.status, "ready");
+  const certInClock = reported.incident.reporting.find((clock) => clock.authority === "cert_in");
+  assert.equal(certInClock.notified, true);
+  assert.equal(certInClock.status, "reported_in_time");
+  assert.equal(certInClock.referenceNumber, "CERTIN-ACK-1");
+  // The RBI duty is still outstanding, so the incident is not fully reported.
+  assert.equal(reported.incident.fullyReported, false);
+});
+
+test("API tracks a security incident and its 6-hour reporting duties", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A, TENANT_B] });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+
+  // An incident without a valid category/severity is rejected.
+  const invalid = await postJson(`${base}/incidents`, { summary: "vague" });
+  assert.equal(invalid.status, 422);
+
+  // Report an incident detected 7 hours ago: past the CERT-In/RBI window.
+  const detectedAt = new Date(Date.now() - 7 * 60 * 60 * 1000).toISOString();
+  const created = await postJson(`${base}/incidents`, {
+    category: "unauthorized_access",
+    severity: "critical",
+    summary: "Suspicious admin login from an unrecognized ASN",
+    detectedAt,
+    reportableTo: ["cert_in", "rbi"],
+    actor: "ciso"
+  });
+  assert.equal(created.status, 201);
+  const incidentId = created.body.incident.incidentId;
+  assert.equal(created.body.incident.reportingStatus, "reporting_overdue");
+
+  // The overdue duties surface in a filtered list view.
+  const overdueList = await (
+    await apiFetch(`${base}/incidents?reportingStatus=reporting_overdue`)
+  ).json();
+  assert.equal(overdueList.count, 1);
+  assert.equal(overdueList.incidents[0].incidentId, incidentId);
+
+  // Record the CERT-In acknowledgement; only that authority's clock stops.
+  const notified = await postJson(`${base}/incidents/${incidentId}/notifications`, {
+    authority: "cert_in",
+    referenceNumber: "CERTIN-ACK-9",
+    actor: "ciso"
+  });
+  assert.equal(notified.status, 200);
+  const certIn = notified.body.incident.reporting.find((clock) => clock.authority === "cert_in");
+  assert.equal(certIn.notified, true);
+  assert.equal(notified.body.incident.fullyReported, false);
+
+  // Notifying an authority the incident is not reportable to is rejected.
+  const wrongAuthority = await postJson(`${base}/incidents/${incidentId}/notifications`, {
+    authority: "not_an_authority",
+    referenceNumber: "X",
+    actor: "ciso"
+  });
+  assert.equal(wrongAuthority.status, 422);
+
+  // The incident and its reporting events are sealed into the audit spine.
+  const events = await (await apiFetch(`${base}/audit/events`)).json();
+  assert.ok(events.events.some((event) => event.type === "incident.reported"));
+  assert.ok(events.events.some((event) => event.type === "incident.authority_notified"));
+
+  // Incidents are tenant-scoped: tenant B sees none of tenant A's incidents.
+  const bIncidents = await (await apiFetch(`${base}/incidents`, {}, TENANT_B.apiKey)).json();
+  assert.equal(bIncidents.count, 0);
 });
 
 test("platform can export a tenant and offboard it with evidenced deletion", async (t) => {
