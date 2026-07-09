@@ -23,6 +23,7 @@ import {
   evaluateKycStatus,
   fulfillErasureRequest,
   issueShowCauseNotice,
+  recordDriftObservation,
   recordFraudResponse,
   recordIncidentNotification,
   stampAuditEvents,
@@ -429,6 +430,30 @@ test("API drives the model lifecycle from draft to active", async (t) => {
   const badActivate = await postJson(`${base}/ai/models/col_llm_v1/transitions`, { action: "activate", actor: "model-risk" });
   assert.equal(badActivate.status, 422);
   assert.equal(badActivate.body.error.code, "model_transition_blocked");
+
+  // Drift monitoring on the active model: a breach auto-suspends it.
+  const stable = await postJson(`${base}/ai/models/col_llm_v1/drift-observations`, {
+    metric: "psi",
+    value: 0.1,
+    threshold: 0.25,
+    actor: "monitor"
+  });
+  assert.equal(stable.status, 200);
+  assert.equal(stable.body.breached, false);
+
+  const breach = await postJson(`${base}/ai/models/col_llm_v1/drift-observations`, {
+    metric: "psi",
+    value: 0.4,
+    threshold: 0.25,
+    actor: "monitor"
+  });
+  assert.equal(breach.status, 200);
+  assert.equal(breach.body.breached, true);
+  assert.equal(breach.body.model.status, "suspended");
+  assert.ok(breach.body.incident.incidentId);
+
+  const events = await (await apiFetch(`${base}/audit/events`)).json();
+  assert.ok(events.events.some((event) => event.type === "api.ai.model.drift_observed"));
 });
 
 test("kill-switch clearance requires a post-incident review", () => {
@@ -3069,6 +3094,57 @@ test("DPDP erasure is held by an active loan and by statutory retention", () => 
     new Date("2026-07-09T00:00:00.000Z")
   );
   assert.equal(blocked.summary.status, "blocked");
+});
+
+test("model drift monitoring trips a kill switch on a threshold breach", () => {
+  // An approved model registers straight into active with a drift threshold.
+  const registered = registerModel(createModelRegistryState(), {
+    modelId: "score_v1",
+    name: "Behaviour score",
+    owner: "risk-owner",
+    purpose: "credit_scoring",
+    riskTier: "high",
+    validationStatus: "approved",
+    driftThreshold: 0.2,
+    actor: "model-risk"
+  });
+  assert.equal(registered.model.status, "active");
+
+  // Drift monitoring rejects a reading with no numeric value.
+  const invalid = recordDriftObservation(registered.registry, { modelId: "score_v1", metric: "psi", actor: "monitor" });
+  assert.equal(invalid.summary.status, "blocked");
+
+  // A within-threshold reading is recorded and leaves the model active.
+  const stable = recordDriftObservation(registered.registry, {
+    modelId: "score_v1",
+    metric: "psi",
+    value: 0.12,
+    actor: "monitor"
+  });
+  assert.equal(stable.breached, false);
+  assert.equal(stable.model.status, "active");
+  assert.equal(stable.model.driftObservations.length, 1);
+
+  // A breaching reading trips the model kill switch: suspended + incident opened.
+  const breach = recordDriftObservation(stable.registry, {
+    modelId: "score_v1",
+    metric: "psi",
+    value: 0.35,
+    actor: "monitor"
+  });
+  assert.equal(breach.breached, true);
+  assert.equal(breach.model.status, "suspended");
+  assert.ok(breach.incident);
+  assert.equal(breach.incident.scope, "model");
+  assert.equal(breach.incident.status, "open");
+  // A suspended model no longer accepts drift observations.
+  const afterSuspend = recordDriftObservation(breach.registry, {
+    modelId: "score_v1",
+    metric: "psi",
+    value: 0.1,
+    actor: "monitor"
+  });
+  assert.equal(afterSuspend.summary.status, "blocked");
 });
 
 test("fraud classification is gated on natural justice and four-eyes approval", () => {

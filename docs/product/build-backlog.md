@@ -179,7 +179,7 @@ Done when:
 
 ## Epic 8: AI Governance and Model Risk
 
-Status: first executable slice complete.
+Status: first executable slice complete; drift monitoring first slice complete.
 
 Goal: all model-assisted decisions are inventoried, validated, monitored, and kill-switchable.
 
@@ -190,7 +190,7 @@ Tasks:
 - High-risk model approval workflow. First slice done: high-risk approval additionally requires fairness, explainability, and monitoring evidence.
 - Bias/fairness evidence.
 - Explainability evidence.
-- Drift monitoring.
+- Drift monitoring. First slice done: `recordDriftObservation` (`packages/core/src/model-governance.js`) records a drift metric reading against an active model (against a `driftThreshold` set on the model or the observation); a reading that breaches the threshold auto-trips a model-scoped kill switch — suspending the model and opening an incident that must be reviewed before the model runs again. `POST /ai/models/{id}/drift-observations` drives it and seals the event into the audit spine.
 - Hallucination and adversarial testing for generative AI.
 - Customer-facing AI disclosure and human handoff.
 - AI incident workflow. First slice done: a kill-switch trigger opens an incident record tracking scope, reason, trigger actor, and status.

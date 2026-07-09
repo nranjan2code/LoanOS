@@ -118,6 +118,8 @@ export function registerModel(state, input, now = new Date()) {
     fairnessAssessmentRef: input.fairnessAssessmentRef ?? null,
     explainabilityRef: input.explainabilityRef ?? null,
     redTeamRef: input.redTeamRef ?? null,
+    driftThreshold: Number.isFinite(input.driftThreshold) ? input.driftThreshold : null,
+    driftObservations: [],
     status: input.status ?? (input.validationStatus === "approved" ? "active" : "draft"),
     statusReason: input.statusReason ?? null,
     createdAt: registry.models[input.modelId]?.createdAt ?? now.toISOString(),
@@ -353,6 +355,96 @@ export function triggerKillSwitch(state, input, now = new Date()) {
       events: [...registry.events, event]
     },
     incident,
+    findings,
+    summary
+  };
+}
+
+// Drift monitoring: record a metric reading (e.g. PSI, population stability, or
+// a performance measure) against an active model. A reading that breaches the
+// model's drift threshold is a monitoring failure, so it auto-trips a
+// model-scoped kill switch — suspending the model and opening an incident that
+// must be reviewed before the model can run again.
+export function recordDriftObservation(state, input, now = new Date()) {
+  const registry = normalizeModelRegistryState(state);
+  const model = registry.models[input?.modelId] ?? null;
+  const findings = [];
+
+  if (!model) {
+    findings.push(createFinding("error", "RBI-MRM-DRAFT-2026", "Drift observation requires an existing modelId.", "modelId"));
+  }
+  if (!input?.metric) {
+    findings.push(createFinding("error", "RBI-MRM-DRAFT-2026", "Drift observation requires a metric.", "metric"));
+  }
+  if (!Number.isFinite(input?.value)) {
+    findings.push(createFinding("error", "RBI-MRM-DRAFT-2026", "Drift observation value must be a number.", "value"));
+  }
+  if (!input?.actor) {
+    findings.push(createFinding("error", "RBI-MRM-DRAFT-2026", "Drift observation requires an actor.", "actor"));
+  }
+  const threshold = Number.isFinite(input?.threshold) ? input.threshold : model?.driftThreshold;
+  if (model && !Number.isFinite(threshold)) {
+    findings.push(
+      createFinding("error", "RBI-MRM-DRAFT-2026", "A drift threshold is required (on the observation or the model).", "threshold")
+    );
+  }
+  if (model && ![MODEL_STATUSES.ACTIVE].includes(model.status)) {
+    findings.push(createFinding("error", "RBI-MRM-DRAFT-2026", "Drift monitoring applies only to active models.", "status"));
+  }
+
+  const summary = summarizeFindings(findings);
+  if (summary.status === "blocked") {
+    return { registry, model, observation: null, breached: false, incident: null, findings, summary };
+  }
+
+  const at = now.toISOString();
+  const breached = input.value > threshold;
+  const observation = {
+    observationId: createGovernanceId("drift"),
+    metric: input.metric,
+    value: input.value,
+    threshold,
+    breached,
+    observedAt: input.observedAt ?? at,
+    actor: input.actor
+  };
+  const withObservation = {
+    ...registry,
+    models: {
+      ...registry.models,
+      [model.modelId]: {
+        ...model,
+        driftObservations: [...(model.driftObservations ?? []), observation],
+        updatedAt: at
+      }
+    },
+    events: [
+      ...registry.events,
+      { type: "model.drift.observed", modelId: model.modelId, metric: observation.metric, value: observation.value, breached, actor: input.actor, at }
+    ]
+  };
+
+  if (!breached) {
+    return { registry: withObservation, model: withObservation.models[model.modelId], observation, breached: false, incident: null, findings, summary };
+  }
+
+  // A breach trips the model kill switch, reusing the governed suspension path.
+  const killed = triggerKillSwitch(
+    withObservation,
+    {
+      scope: "model",
+      modelId: model.modelId,
+      reason: `Drift breach on ${observation.metric}: ${observation.value} > ${threshold}`,
+      actor: input.actor
+    },
+    now
+  );
+  return {
+    registry: killed.registry,
+    model: killed.registry.models[model.modelId],
+    observation,
+    breached: true,
+    incident: killed.incident,
     findings,
     summary
   };

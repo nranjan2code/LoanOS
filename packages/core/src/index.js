@@ -40,6 +40,7 @@ export {
   createModelRegistryState,
   normalizeModelRegistryState,
   registerModel,
+  recordDriftObservation,
   recordPostIncidentReview,
   transitionModel,
   triggerKillSwitch,

@@ -49,6 +49,7 @@ import {
   listBorrowerKycRecords,
   listRegulatoryControls,
   registerModel,
+  recordDriftObservation,
   recordHumanReview,
   recordDocumentPacketDelivered,
   recordDocumentPacketDelivery,
@@ -1076,6 +1077,34 @@ async function route(req, res, dataDir, platformAdminKey) {
         type: "api.ai.model.transitioned",
         modelId,
         action: body.action ?? null,
+        actor: body.actor ?? null
+      }
+    );
+    await store.save(nextState);
+    sendJson(res, 200, result);
+    return;
+  }
+
+  const modelDriftMatch = path.match(/^\/ai\/models\/([^/]+)\/drift-observations$/);
+  if (method === "POST" && modelDriftMatch) {
+    const body = await readJson(req);
+    const state = await store.load();
+    const modelId = decodeURIComponent(modelDriftMatch[1]);
+    const result = recordDriftObservation(state.modelRegistry, { ...body, modelId });
+    if (result.summary.status === "blocked") {
+      sendJson(res, 422, {
+        error: { code: "drift_observation_blocked", message: "Drift observation is blocked by governance findings." },
+        findings: result.findings
+      });
+      return;
+    }
+    const nextState = appendEvent(
+      { ...state, modelRegistry: result.registry },
+      {
+        type: "api.ai.model.drift_observed",
+        modelId,
+        metric: result.observation.metric,
+        breached: result.breached,
         actor: body.actor ?? null
       }
     );
