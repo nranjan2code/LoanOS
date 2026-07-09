@@ -1,5 +1,11 @@
 import { createServer } from "node:http";
 import { randomBytes } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 import {
   accrueInterest,
   attachKfs,
@@ -197,6 +203,41 @@ async function route(req, res, dataDir, platformAdminKey) {
     sendJson(res, 200, {
       declineReasons: Object.entries(DECLINE_REASON_CODES).map(([code, label]) => ({ code, label }))
     });
+    return;
+  }
+
+  if (method === "GET" && (path === "/dashboard" || path.startsWith("/dashboard/"))) {
+    try {
+      if (path === "/dashboard") {
+        res.writeHead(301, { Location: "/dashboard/" });
+        res.end();
+        return;
+      }
+      let fileSubpath = path.slice("/dashboard/".length);
+      if (fileSubpath === "" || fileSubpath === "index.html") {
+        fileSubpath = "index.html";
+      }
+
+      if (fileSubpath.includes("..")) {
+        res.writeHead(403);
+        res.end("Forbidden");
+        return;
+      }
+
+      const filePath = join(__dirname, "dashboard", fileSubpath);
+      const content = await readFile(filePath);
+
+      let contentType = "text/plain";
+      if (fileSubpath.endsWith(".html")) contentType = "text/html; charset=utf-8";
+      else if (fileSubpath.endsWith(".css")) contentType = "text/css; charset=utf-8";
+      else if (fileSubpath.endsWith(".js")) contentType = "application/javascript; charset=utf-8";
+
+      res.writeHead(200, { "Content-Type": contentType });
+      res.end(content);
+    } catch (err) {
+      res.writeHead(404);
+      res.end("Not Found");
+    }
     return;
   }
 

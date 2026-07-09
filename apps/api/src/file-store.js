@@ -434,6 +434,176 @@ export async function ensureBootstrapTenants(dataDir, bootstrapTenants = []) {
       state = registerTenant(state, tenant);
       changed = true;
     }
+
+    if (tenant.tenantId === "dev" && state.tenants["dev"]) {
+      const devData = state.tenants["dev"];
+      if (!devData.loanApplications || Object.keys(devData.loanApplications).length === 0) {
+        devData.regulatedEntities = {
+          "re_1": {
+            regulatedEntityId: "re_1",
+            name: "India Retail Lending Corp",
+            entityType: "nbfc",
+            country: "IN",
+            website: "https://irlc.co.in",
+            privacyPolicyUrl: "https://irlc.co.in/privacy",
+            grievanceOfficerName: "Grievance Officer Alpha",
+            grievanceOfficerEmail: "grievance@irlc.co.in",
+            boardApprovedPolicies: ["credit_policy", "data_retention_policy"],
+            dataResidencyPosture: "IN",
+            status: "active"
+          }
+        };
+
+        devData.productPolicies = {
+          "prod_1": {
+            productId: "prod_1",
+            productCode: "RETAIL_PERSONAL_LOAN",
+            regulatedEntityId: "re_1",
+            currency: "INR",
+            minAmount: 10000,
+            maxAmount: 100000,
+            minTenorMonths: 3,
+            maxTenorMonths: 12,
+            annualInterestRateBps: 1500,
+            aprBps: 1800,
+            interestCalcMethod: "reducing_balance",
+            pricingPolicyRef: "BOARD-PRICING-2026-V1",
+            eligibilityRules: { minAge: 18, maxAge: 65, minIncome: 15000 },
+            coolingOffDays: 3,
+            recoveryMechanism: "authorized_agency_only",
+            status: "active",
+            version: 1,
+            effectiveFrom: "2026-01-01T00:00:00.000Z",
+            effectiveTo: null
+          }
+        };
+
+        devData.borrowerProfiles = {
+          "borrower_1": {
+            borrowerId: "borrower_1",
+            name: "Rajesh Kumar",
+            residencyCountry: "IN",
+            address: "123, MG Road, Bangalore, KA, India",
+            email: "rajesh@example.com",
+            phone: "+919876543210",
+            occupation: "salaried",
+            monthlyIncome: 45000,
+            status: "active"
+          }
+        };
+
+        devData.kycRecords = {
+          "kyc_1": {
+            kycRecordId: "kyc_1",
+            borrowerId: "borrower_1",
+            status: "verified",
+            riskCategory: "medium",
+            verifiedAt: "2026-01-10T10:00:00.000Z",
+            reviewDueAt: "2034-01-10T10:00:00.000Z"
+          }
+        };
+
+        devData.consentRecords = {
+          "consent_1": {
+            consentId: "consent_1",
+            borrowerId: "borrower_1",
+            purpose: "credit_assessment",
+            noticeVersion: "v1.0",
+            status: "accepted",
+            grantedAt: "2026-07-01T12:00:00.000Z"
+          }
+        };
+
+        devData.loanApplications = {
+          "app_compliance_blocked": {
+            applicationId: "app_compliance_blocked",
+            borrowerId: "borrower_1",
+            productId: "prod_1",
+            regulatedEntityId: "re_1",
+            amount: 25000,
+            tenorMonths: 6,
+            status: "blocked_compliance",
+            createdAt: "2026-07-09T08:00:00.000Z",
+            updatedAt: "2026-07-09T08:00:00.000Z",
+            compliance: {
+              summary: { status: "blocked", findingsCount: 1 },
+              findings: [{ severity: "error", code: "RBI-DL-2025", message: "Non-India borrower residency blocks preflight.", field: "residencyCountry" }]
+            },
+            workflow: []
+          },
+          "app_kfs_issued": {
+            applicationId: "app_kfs_issued",
+            borrowerId: "borrower_1",
+            productId: "prod_1",
+            regulatedEntityId: "re_1",
+            amount: 30000,
+            tenorMonths: 6,
+            status: "kfs_issued",
+            createdAt: "2026-07-09T08:15:00.000Z",
+            updatedAt: "2026-07-09T08:15:00.000Z",
+            kfs: { kfsId: "kfs_102", principal: 30000, tenorMonths: 6, aprBps: 1800 },
+            kfsReadiness: { status: "ready" },
+            workflow: [{ type: "application.kfs.issued", actor: "system", occurredAt: "2026-07-09T08:16:00.000Z" }]
+          },
+          "app_refer_underwrite": {
+            applicationId: "app_refer_underwrite",
+            borrowerId: "borrower_1",
+            productId: "prod_1",
+            regulatedEntityId: "re_1",
+            amount: 50000,
+            tenorMonths: 12,
+            status: "ready_for_decision",
+            createdAt: "2026-07-09T08:30:00.000Z",
+            updatedAt: "2026-07-09T08:30:00.000Z",
+            eligibility: { decision: "refer", reason: "FOIR ratio near threshold limit", foirPercent: 42 },
+            workflow: [{ type: "application.kfs.accepted", actor: "borrower_1", occurredAt: "2026-07-09T08:32:00.000Z" }]
+          },
+          "app_pending_approval": {
+            applicationId: "app_pending_approval",
+            borrowerId: "borrower_1",
+            productId: "prod_1",
+            regulatedEntityId: "re_1",
+            amount: 20000,
+            tenorMonths: 6,
+            status: "pending_decision_approval",
+            createdAt: "2026-07-09T08:45:00.000Z",
+            updatedAt: "2026-07-09T08:45:00.000Z",
+            pendingDecision: { decision: "approved", proposedBy: "credit_officer_1", proposedAt: "2026-07-09T09:00:00.000Z" },
+            workflow: [
+              { type: "application.kfs.accepted", actor: "borrower_1", occurredAt: "2026-07-09T08:47:00.000Z" },
+              { type: "application.decision.proposed", actor: "credit_officer_1", occurredAt: "2026-07-09T09:00:00.000Z" }
+            ]
+          },
+          "app_disbursement_ready": {
+            applicationId: "app_disbursement_ready",
+            borrowerId: "borrower_1",
+            productId: "prod_1",
+            regulatedEntityId: "re_1",
+            amount: 40000,
+            tenorMonths: 8,
+            status: "approved",
+            createdAt: "2026-07-09T09:00:00.000Z",
+            updatedAt: "2026-07-09T09:00:00.000Z",
+            documentPacket: { delivery: { deliveryRef: "MSG-100234", deliveredAt: "2026-07-09T09:10:00.000Z" } },
+            workflow: [
+              { type: "application.decision.approved", actor: "credit_checker_1", occurredAt: "2026-07-09T09:05:00.000Z" }
+            ]
+          }
+        };
+
+        devData.complaints = {
+          "complaint_1": {
+            complaintId: "complaint_1",
+            borrowerId: "borrower_1",
+            category: "delay_in_disbursement",
+            summary: "Loan approved yesterday but funds have not cleared in bank account.",
+            status: "received",
+            receivedAt: "2026-07-09T09:15:00.000Z"
+          }
+        };
+        changed = true;
+      }
+    }
   }
   if (changed) {
     await saveState(state, dataDir);

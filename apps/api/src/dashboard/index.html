@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LoanOS India - Loan Officer Workspace (LWS)</title>
+  <!-- SEO Meta -->
+  <meta name="description" content="Manage compliance, credit underwriting, grievances, and loan actions in a secure, multi-tenant workspace.">
+  
+  <!-- Inter Font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="/dashboard/index.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="brand">
+        <span class="logo-icon">▲</span>
+        <div class="brand-text">
+          <h1>LoanOS India</h1>
+          <span class="sub-brand">Loan Officer Workspace</span>
+        </div>
+      </div>
+
+      <!-- Config & Status -->
+      <div class="header-controls">
+        <div class="control-group">
+          <label for="config-api-key">Tenant API Key</label>
+          <input type="password" id="config-api-key" placeholder="Enter x-api-key..." autocomplete="off">
+        </div>
+        
+        <div class="control-group">
+          <label for="current-actor-select">Acting User</label>
+          <select id="current-actor-select">
+            <option value="">-- Set API Key First --</option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label for="time-as-of">Simulation Date</label>
+          <input type="datetime-local" id="time-as-of">
+        </div>
+
+        <button id="btn-refresh" class="btn btn-secondary">
+          <span class="btn-icon">⟳</span> Refresh
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <div class="workspace-layout">
+      <!-- Sidebar / Filters -->
+      <aside class="sidebar">
+        <!-- Dashboard Summary Mini-Widget -->
+        <section class="summary-widget">
+          <h3>Overview</h3>
+          <div class="metrics-grid">
+            <div class="metric-card" id="metric-total">
+              <span class="metric-val">0</span>
+              <span class="metric-lbl">Total Tasks</span>
+            </div>
+            <div class="metric-card danger" id="metric-breached">
+              <span class="metric-val">0</span>
+              <span class="metric-lbl">Breached</span>
+            </div>
+            <div class="metric-card warning" id="metric-due-soon">
+              <span class="metric-val">0</span>
+              <span class="metric-lbl">Due Soon</span>
+            </div>
+            <div class="metric-card info" id="metric-assigned">
+              <span class="metric-val">0</span>
+              <span class="metric-lbl">Assigned</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Queue Filters -->
+        <nav class="queue-nav">
+          <h3>Work Queues</h3>
+          <ul id="queue-list">
+            <li class="queue-item active" data-queue="all">
+              <span class="queue-name">All Queues</span>
+              <span class="queue-count badge" id="count-all">0</span>
+            </li>
+            <li class="queue-item" data-queue="compliance_ops">
+              <span class="queue-name">Compliance Ops</span>
+              <span class="queue-count badge" id="count-compliance_ops">0</span>
+            </li>
+            <li class="queue-item" data-queue="loan_ops">
+              <span class="queue-name">Loan Operations</span>
+              <span class="queue-count badge" id="count-loan_ops">0</span>
+            </li>
+            <li class="queue-item" data-queue="credit_ops">
+              <span class="queue-name">Credit Decisioning</span>
+              <span class="queue-count badge" id="count-credit_ops">0</span>
+            </li>
+            <li class="queue-item" data-queue="credit_checker">
+              <span class="queue-name">Checker Approvals</span>
+              <span class="queue-count badge" id="count-credit_checker">0</span>
+            </li>
+            <li class="queue-item" data-queue="disbursement_ops">
+              <span class="queue-name">Disbursements</span>
+              <span class="queue-count badge" id="count-disbursement_ops">0</span>
+            </li>
+            <li class="queue-item" data-queue="collections_ops">
+              <span class="queue-name">Collections & Recovery</span>
+              <span class="queue-count badge" id="count-collections_ops">0</span>
+            </li>
+            <li class="queue-item" data-queue="risk_ops">
+              <span class="queue-name">Risk Management</span>
+              <span class="queue-count badge" id="count-risk_ops">0</span>
+            </li>
+            <li class="queue-item" data-queue="grievance_ops">
+              <span class="queue-name">Grievance Escalations</span>
+              <span class="queue-count badge" id="count-grievance_ops">0</span>
+            </li>
+            <li class="queue-item" data-queue="model_risk">
+              <span class="queue-name">Model Governance</span>
+              <span class="queue-count badge" id="count-model_risk">0</span>
+            </li>
+          </ul>
+        </nav>
+
+        <!-- Status Filter -->
+        <div class="filter-section">
+          <h3>Task Status</h3>
+          <select id="filter-status">
+            <option value="">All Statuses</option>
+            <option value="open">Open</option>
+            <option value="assigned">Assigned</option>
+            <option value="in_progress">In Progress</option>
+          </select>
+        </div>
+      </aside>
+
+      <!-- Task List Area -->
+      <main class="tasks-panel">
+        <div class="search-bar-container">
+          <input type="text" id="task-search" placeholder="Search tasks by ID, name, borrower or loan account...">
+        </div>
+
+        <div class="tasks-list-scroll">
+          <div class="empty-state" id="tasks-empty-state">
+            <div class="empty-icon">📂</div>
+            <p>No active tasks found in the selected queue.</p>
+          </div>
+          <div class="tasks-grid" id="tasks-grid-list">
+            <!-- Dynamic task items go here -->
+          </div>
+        </div>
+      </main>
+
+      <!-- Detail Panel -->
+      <section class="detail-panel" id="task-detail-container">
+        <div class="empty-state" id="detail-empty-state">
+          <div class="empty-icon">🔍</div>
+          <p>Select a task from the list to view compliance context and run actions.</p>
+        </div>
+
+        <div class="task-details hidden" id="task-details-content">
+          <!-- Header Area -->
+          <div class="detail-header">
+            <div class="detail-title-row">
+              <span class="priority-badge" id="detail-priority">High</span>
+              <h2 id="detail-title">Task Title</h2>
+            </div>
+            <p class="detail-desc" id="detail-description">Task description details go here.</p>
+            
+            <div class="detail-meta-grid">
+              <div class="meta-item">
+                <span class="meta-label">Task ID</span>
+                <span class="meta-value code" id="detail-task-id">task-id</span>
+              </div>
+              <div class="meta-item">
+                <span class="meta-label">Required Role</span>
+                <span class="meta-value code" id="detail-role">role</span>
+              </div>
+              <div class="meta-item">
+                <span class="meta-label">SLA Status</span>
+                <span class="meta-value" id="detail-sla-status">Within SLA</span>
+              </div>
+              <div class="meta-item">
+                <span class="meta-label">Due At</span>
+                <span class="meta-value" id="detail-due-at">-</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Compliance Framework Reference -->
+          <div class="compliance-refs-box hidden" id="detail-regulatory-box">
+            <h4>Regulatory Compliance Anchor</h4>
+            <div class="ref-tags" id="detail-regulatory-tags">
+              <!-- Regulatory markers -->
+            </div>
+          </div>
+
+          <!-- Task Assignment & State Mutation Operations -->
+          <div class="operations-box">
+            <h4>Task Control Actions</h4>
+            
+            <div class="operations-grid">
+              <!-- Assign Form -->
+              <div class="op-card" id="op-assign-card">
+                <h5>Assign Task</h5>
+                <div class="form-row">
+                  <select id="op-assign-to-select">
+                    <option value="">-- Select Actor --</option>
+                  </select>
+                  <button id="btn-op-assign" class="btn btn-primary btn-sm">Assign</button>
+                </div>
+              </div>
+
+              <!-- Start / Progress Form -->
+              <div class="op-card" id="op-start-card">
+                <h5>Work Status</h5>
+                <div class="op-buttons">
+                  <button id="btn-op-start" class="btn btn-success btn-sm">Start Task</button>
+                  <button id="btn-op-release" class="btn btn-warning btn-sm">Release to Queue</button>
+                </div>
+              </div>
+
+              <!-- Comment Form -->
+              <div class="op-card span-all">
+                <h5>Audit Trail Comment</h5>
+                <div class="form-row">
+                  <input type="text" id="op-comment-text" placeholder="Add an official audit comment...">
+                  <button id="btn-op-comment" class="btn btn-secondary btn-sm">Post Comment</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Action Resolution Area (Dynamic Forms per Task Type) -->
+          <div class="resolution-box">
+            <h4>Action Panel</h4>
+            <div class="resolution-card" id="resolution-forms-container">
+              <!-- Dynamic resolve actions form based on type -->
+            </div>
+          </div>
+
+          <!-- Task Timeline Events / History -->
+          <div class="timeline-box">
+            <h4>Audit History Trail</h4>
+            <div class="timeline" id="detail-timeline-events">
+              <!-- Event rows -->
+            </div>
+          </div>
+
+          <!-- Raw Task Context (Collapsible for developers) -->
+          <details class="context-details">
+            <summary>View Structured Context JSON</summary>
+            <pre><code id="detail-context-json">{}</code></pre>
+          </details>
+
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+  <!-- Notification Toast Container -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <script src="/dashboard/index.js"></script>
+</body>
+</html>
