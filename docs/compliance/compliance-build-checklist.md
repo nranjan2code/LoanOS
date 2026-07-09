@@ -127,7 +127,7 @@ Legend:
 | Human handoff from AI interaction | `POST/GET /ai/handoff-requests` and resolution endpoint track pending → handled handoff by a named human agent. | Done |
 | Global kill switch | Implemented. | Done |
 | Model-level kill switch | Implemented. | Done |
-| Bias/fairness and explainability evidence | High-risk models require `fairnessAssessmentRef` and `explainabilityRef` (plus `monitoringPlanRef`) to approve validation. | Done |
+| Bias/fairness and explainability evidence | High-risk models require `fairnessAssessmentRef` and `explainabilityRef` (plus `monitoringPlanRef`) along with valid file hashes (`fairnessAssessmentHash`/`explainabilityHash`) and structured reports (`fairnessReport`/`explainabilityReport`) to approve validation. | Done |
 | Red-teaming, adversarial, and hallucination tests for generative models | A `modelClass: "generative"` model requires `redTeamRef` and `hallucinationTestRef` to approve validation. | Done |
 | Drift monitoring | `recordDriftObservation` records a metric against an active model; a threshold breach auto-trips a model-scoped kill switch and opens an incident. | Done |
 | AI incident reporting | Kill-switch incident record and post-incident review first slice implemented; sectoral incident pack planned. | Partial |

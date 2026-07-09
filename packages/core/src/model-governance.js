@@ -66,6 +66,68 @@ export function normalizeModelRegistryState(state) {
   };
 }
 
+export function validateAIEvidence(model, input, findings) {
+  const fairnessAssessmentHash = input?.fairnessAssessmentHash ?? model?.fairnessAssessmentHash;
+  const explainabilityHash = input?.explainabilityHash ?? model?.explainabilityHash;
+  const fairnessReport = input?.fairnessReport ?? model?.fairnessReport;
+  const explainabilityReport = input?.explainabilityReport ?? model?.explainabilityReport;
+  const riskTier = input?.riskTier ?? model?.riskTier;
+
+  if (riskTier === "high") {
+    // 1. Verify Hashes
+    if (!fairnessAssessmentHash) {
+      findings.push(createFinding("error", "RBI-MRM-BIAS-2026", "High-risk model validation requires fairnessAssessmentHash.", "fairnessAssessmentHash"));
+    } else if (typeof fairnessAssessmentHash !== "string" || !/^[a-fA-F0-9]{64}$/.test(fairnessAssessmentHash)) {
+      findings.push(createFinding("error", "RBI-MRM-BIAS-2026", "fairnessAssessmentHash must be a valid 64-character SHA-256 hex string.", "fairnessAssessmentHash"));
+    }
+
+    if (!explainabilityHash) {
+      findings.push(createFinding("error", "RBI-MRM-BIAS-2026", "High-risk model validation requires explainabilityHash.", "explainabilityHash"));
+    } else if (typeof explainabilityHash !== "string" || !/^[a-fA-F0-9]{64}$/.test(explainabilityHash)) {
+      findings.push(createFinding("error", "RBI-MRM-BIAS-2026", "explainabilityHash must be a valid 64-character SHA-256 hex string.", "explainabilityHash"));
+    }
+
+    // 2. Verify Fairness Report
+    if (!fairnessReport) {
+      findings.push(createFinding("error", "RBI-MRM-BIAS-2026", "High-risk model validation requires structured fairnessReport.", "fairnessReport"));
+    } else if (typeof fairnessReport !== "object") {
+      findings.push(createFinding("error", "RBI-MRM-BIAS-2026", "fairnessReport must be a structured object.", "fairnessReport"));
+    } else {
+      const { disparateImpactRatio, demographicParityDifference, protectedAttributes } = fairnessReport;
+      if (!Number.isFinite(disparateImpactRatio)) {
+        findings.push(createFinding("error", "RBI-MRM-BIAS-2026", "fairnessReport.disparateImpactRatio must be a number.", "fairnessReport.disparateImpactRatio"));
+      } else if (disparateImpactRatio < 0.8 || disparateImpactRatio > 1.25) {
+        findings.push(createFinding("error", "RBI-MRM-BIAS-2026", `Disparate impact ratio ${disparateImpactRatio} violates the acceptable compliance corridor (0.8 - 1.25).`, "fairnessReport.disparateImpactRatio"));
+      }
+
+      if (!Number.isFinite(demographicParityDifference) || demographicParityDifference < 0 || demographicParityDifference > 1) {
+        findings.push(createFinding("error", "RBI-MRM-BIAS-2026", "fairnessReport.demographicParityDifference must be a number between 0 and 1.", "fairnessReport.demographicParityDifference"));
+      }
+
+      if (!Array.isArray(protectedAttributes) || protectedAttributes.length === 0 || !protectedAttributes.every(attr => typeof attr === "string")) {
+        findings.push(createFinding("error", "RBI-MRM-BIAS-2026", "fairnessReport.protectedAttributes must be a non-empty array of strings.", "fairnessReport.protectedAttributes"));
+      }
+    }
+
+    // 3. Verify Explainability Report
+    if (!explainabilityReport) {
+      findings.push(createFinding("error", "RBI-MRM-BIAS-2026", "High-risk model validation requires structured explainabilityReport.", "explainabilityReport"));
+    } else if (typeof explainabilityReport !== "object") {
+      findings.push(createFinding("error", "RBI-MRM-BIAS-2026", "explainabilityReport must be a structured object.", "explainabilityReport"));
+    } else {
+      const { explainabilityMethod, featureImportance } = explainabilityReport;
+      const validMethods = ["shap", "lime", "integrated_gradients", "tree_interpreter"];
+      if (typeof explainabilityMethod !== "string" || !validMethods.includes(explainabilityMethod.toLowerCase())) {
+        findings.push(createFinding("error", "RBI-MRM-BIAS-2026", `explainabilityReport.explainabilityMethod must be one of: ${validMethods.join(", ")}.`, "explainabilityReport.explainabilityMethod"));
+      }
+
+      if (!featureImportance || typeof featureImportance !== "object" || Object.keys(featureImportance).length === 0 || !Object.values(featureImportance).every(val => Number.isFinite(val))) {
+        findings.push(createFinding("error", "RBI-MRM-BIAS-2026", "explainabilityReport.featureImportance must be a non-empty object mapping features to importance weights.", "explainabilityReport.featureImportance"));
+      }
+    }
+  }
+}
+
 export function registerModel(state, input, now = new Date()) {
   const registry = normalizeModelRegistryState(state);
   const findings = [];
@@ -90,6 +152,23 @@ export function registerModel(state, input, now = new Date()) {
   }
   if (input?.status && DISABLED_STATUSES.has(input.status) && !input.statusReason) {
     findings.push(createFinding("warning", "RBI-MRM-DRAFT-2026", "Disabled models should include statusReason.", "statusReason"));
+  }
+
+  const derivedStatus = input?.status ?? (input?.validationStatus === "approved" ? "active" : "draft");
+  if (input?.riskTier === "high" && (derivedStatus === "active" || input?.validationStatus === "approved")) {
+    if (!input.independentValidationRef) {
+      findings.push(createFinding("error", "RBI-MRM-DRAFT-2026", "High-risk model requires independentValidationRef.", "independentValidationRef"));
+    }
+    if (!input.fairnessAssessmentRef) {
+      findings.push(createFinding("error", "RBI-MRM-DRAFT-2026", "High-risk model requires fairnessAssessmentRef.", "fairnessAssessmentRef"));
+    }
+    if (!input.explainabilityRef) {
+      findings.push(createFinding("error", "RBI-MRM-DRAFT-2026", "High-risk model requires explainabilityRef.", "explainabilityRef"));
+    }
+    if (!input.monitoringPlanRef) {
+      findings.push(createFinding("error", "RBI-MRM-DRAFT-2026", "High-risk model requires monitoringPlanRef.", "monitoringPlanRef"));
+    }
+    validateAIEvidence(null, input, findings);
   }
 
   const summary = summarizeFindings(findings);
@@ -119,11 +198,15 @@ export function registerModel(state, input, now = new Date()) {
     monitoringPlanRef: input.monitoringPlanRef ?? null,
     fairnessAssessmentRef: input.fairnessAssessmentRef ?? null,
     explainabilityRef: input.explainabilityRef ?? null,
+    fairnessAssessmentHash: input.fairnessAssessmentHash ?? null,
+    explainabilityHash: input.explainabilityHash ?? null,
+    fairnessReport: input.fairnessReport ?? null,
+    explainabilityReport: input.explainabilityReport ?? null,
     redTeamRef: input.redTeamRef ?? null,
     hallucinationTestRef: input.hallucinationTestRef ?? null,
     driftThreshold: Number.isFinite(input.driftThreshold) ? input.driftThreshold : null,
     driftObservations: [],
-    status: input.status ?? (input.validationStatus === "approved" ? "active" : "draft"),
+    status: derivedStatus,
     statusReason: input.statusReason ?? null,
     createdAt: registry.models[input.modelId]?.createdAt ?? now.toISOString(),
     updatedAt: now.toISOString()
@@ -203,6 +286,7 @@ export function transitionModel(state, input, now = new Date()) {
       if (!monitoringPlanRef) {
         findings.push(createFinding("error", "RBI-MRM-DRAFT-2026", "High-risk validation requires monitoringPlanRef.", "monitoringPlanRef"));
       }
+      validateAIEvidence(model, input, findings);
     }
     // A generative model must additionally evidence adversarial (red-team) and
     // hallucination testing before it can be validated for use.
@@ -220,11 +304,19 @@ export function transitionModel(state, input, now = new Date()) {
       fairnessAssessmentRef: fairnessAssessmentRef ?? null,
       explainabilityRef: explainabilityRef ?? null,
       monitoringPlanRef: monitoringPlanRef ?? null,
+      fairnessAssessmentHash: input.fairnessAssessmentHash ?? model.fairnessAssessmentHash ?? null,
+      explainabilityHash: input.explainabilityHash ?? model.explainabilityHash ?? null,
+      fairnessReport: input.fairnessReport ?? model.fairnessReport ?? null,
+      explainabilityReport: input.explainabilityReport ?? model.explainabilityReport ?? null,
       redTeamRef: redTeamRef ?? null,
       hallucinationTestRef: hallucinationTestRef ?? null,
       validatedBy: input.actor,
       validatedAt: now.toISOString()
     };
+  }
+
+  if (input?.action === "activate" && model && model.riskTier === "high") {
+    validateAIEvidence(model, {}, findings);
   }
 
   const summary = summarizeFindings(findings);

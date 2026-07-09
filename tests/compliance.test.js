@@ -271,6 +271,13 @@ test("AI model kill switch blocks credit-impacting model use", () => {
     riskTier: "high",
     validationStatus: "approved",
     independentValidationRef: "ivr_001",
+    fairnessAssessmentRef: "fair_ks1",
+    explainabilityRef: "xai_ks1",
+    monitoringPlanRef: "mon_ks1",
+    fairnessAssessmentHash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    explainabilityHash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    fairnessReport: { disparateImpactRatio: 0.95, demographicParityDifference: 0.04, protectedAttributes: ["gender"] },
+    explainabilityReport: { explainabilityMethod: "shap", featureImportance: { monthlyIncome: 0.6 } },
     materialDecision: true,
     actor: "model-risk"
   });
@@ -355,6 +362,68 @@ test("model lifecycle enforces validation before a model can be used", () => {
   assert.equal(missingHighRisk.summary.status, "blocked");
   assert(missingHighRisk.findings.some((finding) => finding.path === "fairnessAssessmentRef"));
 
+  const validHash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+  const validFairnessReport = {
+    disparateImpactRatio: 0.95,
+    demographicParityDifference: 0.05,
+    protectedAttributes: ["gender", "age"]
+  };
+  const validExplainabilityReport = {
+    explainabilityMethod: "shap",
+    featureImportance: { monthlyIncome: 0.45, ageYears: 0.20 }
+  };
+
+  // Reject validation approval if hashes are invalid
+  const invalidHash = transitionModel(submitted.registry, {
+    modelId: "uw_llm_v2",
+    action: "approve_validation",
+    actor: "validator-1",
+    independentValidationRef: "ivr_9",
+    fairnessAssessmentRef: "fair_9",
+    explainabilityRef: "xai_9",
+    monitoringPlanRef: "mon_9",
+    fairnessAssessmentHash: "badhash",
+    explainabilityHash: validHash,
+    fairnessReport: validFairnessReport,
+    explainabilityReport: validExplainabilityReport
+  });
+  assert.equal(invalidHash.summary.status, "blocked");
+  assert(invalidHash.findings.some(f => f.path === "fairnessAssessmentHash"));
+
+  // Reject validation approval if disparate impact ratio is outside compliance corridor
+  const badImpactReport = transitionModel(submitted.registry, {
+    modelId: "uw_llm_v2",
+    action: "approve_validation",
+    actor: "validator-1",
+    independentValidationRef: "ivr_9",
+    fairnessAssessmentRef: "fair_9",
+    explainabilityRef: "xai_9",
+    monitoringPlanRef: "mon_9",
+    fairnessAssessmentHash: validHash,
+    explainabilityHash: validHash,
+    fairnessReport: { ...validFairnessReport, disparateImpactRatio: 0.75 },
+    explainabilityReport: validExplainabilityReport
+  });
+  assert.equal(badImpactReport.summary.status, "blocked");
+  assert(badImpactReport.findings.some(f => f.path === "fairnessReport.disparateImpactRatio"));
+
+  // Reject validation approval if explainability method is invalid
+  const badXaiReport = transitionModel(submitted.registry, {
+    modelId: "uw_llm_v2",
+    action: "approve_validation",
+    actor: "validator-1",
+    independentValidationRef: "ivr_9",
+    fairnessAssessmentRef: "fair_9",
+    explainabilityRef: "xai_9",
+    monitoringPlanRef: "mon_9",
+    fairnessAssessmentHash: validHash,
+    explainabilityHash: validHash,
+    fairnessReport: validFairnessReport,
+    explainabilityReport: { ...validExplainabilityReport, explainabilityMethod: "magic" }
+  });
+  assert.equal(badXaiReport.summary.status, "blocked");
+  assert(badXaiReport.findings.some(f => f.path === "explainabilityReport.explainabilityMethod"));
+
   const approved = transitionModel(submitted.registry, {
     modelId: "uw_llm_v2",
     action: "approve_validation",
@@ -362,7 +431,11 @@ test("model lifecycle enforces validation before a model can be used", () => {
     independentValidationRef: "ivr_9",
     fairnessAssessmentRef: "fair_9",
     explainabilityRef: "xai_9",
-    monitoringPlanRef: "mon_9"
+    monitoringPlanRef: "mon_9",
+    fairnessAssessmentHash: validHash,
+    explainabilityHash: validHash,
+    fairnessReport: validFairnessReport,
+    explainabilityReport: validExplainabilityReport
   });
   assert.equal(approved.summary.status, "ready");
   assert.equal(approved.model.status, "approved");
@@ -459,6 +532,77 @@ test("API drives the model lifecycle from draft to active", async (t) => {
 
   const events = await (await apiFetch(`${base}/audit/events`)).json();
   assert.ok(events.events.some((event) => event.type === "api.ai.model.drift_observed"));
+
+  // High-Risk Credit-Scoring Model API lifecycle transition test
+  const registerHighRisk = await postJson(`${base}/ai/models`, {
+    modelId: "credit_score_high_risk",
+    name: "Credit scoring model",
+    owner: "risk-owner",
+    purpose: "credit_scoring",
+    riskTier: "high",
+    validationStatus: "pending",
+    actor: "model-risk"
+  });
+  assert.equal(registerHighRisk.status, 201);
+  assert.equal(registerHighRisk.body.model.status, "draft");
+
+  assert.equal(
+    (await postJson(`${base}/ai/models/credit_score_high_risk/transitions`, { action: "submit_for_validation", actor: "risk-owner" })).status,
+    200
+  );
+
+  // Fails approve_validation without reports and hashes
+  const badApprove = await postJson(`${base}/ai/models/credit_score_high_risk/transitions`, {
+    action: "approve_validation",
+    actor: "validator-1",
+    independentValidationRef: "ivr_1"
+  });
+  assert.equal(badApprove.status, 422);
+  assert.equal(badApprove.body.error.code, "model_transition_blocked");
+  assert(badApprove.body.findings.some(f => f.path === "fairnessAssessmentRef"));
+
+  // Fails approve_validation when refs are present but reports/hashes are missing
+  const badApprove2 = await postJson(`${base}/ai/models/credit_score_high_risk/transitions`, {
+    action: "approve_validation",
+    actor: "validator-1",
+    independentValidationRef: "ivr_1",
+    fairnessAssessmentRef: "fair_1",
+    explainabilityRef: "xai_1",
+    monitoringPlanRef: "mon_1"
+  });
+  assert.equal(badApprove2.status, 422);
+  assert(badApprove2.body.findings.some(f => f.path === "fairnessAssessmentHash"));
+
+  // Succeeds approve_validation with correct parameters
+  const goodApprove = await postJson(`${base}/ai/models/credit_score_high_risk/transitions`, {
+    action: "approve_validation",
+    actor: "validator-1",
+    independentValidationRef: "ivr_1",
+    fairnessAssessmentRef: "fair_1",
+    explainabilityRef: "xai_1",
+    monitoringPlanRef: "mon_1",
+    fairnessAssessmentHash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    explainabilityHash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    fairnessReport: {
+      disparateImpactRatio: 1.02,
+      demographicParityDifference: 0.02,
+      protectedAttributes: ["gender"]
+    },
+    explainabilityReport: {
+      explainabilityMethod: "shap",
+      featureImportance: { monthlyIncome: 0.8 }
+    }
+  });
+  assert.equal(goodApprove.status, 200);
+  assert.equal(goodApprove.body.model.status, "approved");
+
+  // Succeeds activate transition
+  const goodActivate = await postJson(`${base}/ai/models/credit_score_high_risk/transitions`, {
+    action: "activate",
+    actor: "model-risk"
+  });
+  assert.equal(goodActivate.status, 200);
+  assert.equal(goodActivate.body.model.status, "active");
 });
 
 test("API discloses customer-facing AI and records a human handoff", async (t) => {
@@ -2879,6 +3023,13 @@ test("API routes material AI decisions to human review before proposal", async (
         riskTier: "high",
         validationStatus: "approved",
         independentValidationRef: "ivr_001",
+        fairnessAssessmentRef: "fair_mat1",
+        explainabilityRef: "xai_mat1",
+        monitoringPlanRef: "mon_mat1",
+        fairnessAssessmentHash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        explainabilityHash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        fairnessReport: { disparateImpactRatio: 1.0, demographicParityDifference: 0.02, protectedAttributes: ["gender"] },
+        explainabilityReport: { explainabilityMethod: "shap", featureImportance: { monthlyIncome: 0.6 } },
         materialDecision: true,
         actor: "model-risk"
       })
@@ -4032,6 +4183,14 @@ test("model drift monitoring trips a kill switch on a threshold breach", () => {
     purpose: "credit_scoring",
     riskTier: "high",
     validationStatus: "approved",
+    independentValidationRef: "ivr_drift1",
+    fairnessAssessmentRef: "fair_drift1",
+    explainabilityRef: "xai_drift1",
+    monitoringPlanRef: "mon_drift1",
+    fairnessAssessmentHash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    explainabilityHash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    fairnessReport: { disparateImpactRatio: 1.0, demographicParityDifference: 0.03, protectedAttributes: ["age"] },
+    explainabilityReport: { explainabilityMethod: "shap", featureImportance: { monthlyIncome: 0.7 } },
     driftThreshold: 0.2,
     actor: "model-risk"
   });
