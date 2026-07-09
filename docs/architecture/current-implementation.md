@@ -36,6 +36,7 @@ npm run dev:api
 | `packages/core/src/data-sharing.js` | Third-party data-disclosure ledger: consent-gated `consent`-basis sharing, `legal_obligation`-basis sharing requiring a legal reference, both logged as DPDP record-of-processing entries. |
 | `packages/core/src/data-retention.js` | DPDP right-to-erasure workflow: `assessErasureEligibility` holds erasure while a statutory retention window (active loan, or a closed account inside the 5-year RBI/PMLA window) applies; fulfilment redacts the borrower profile in place. |
 | `packages/core/src/fraud-case.js` | Fraud case module: natural-justice gate (show-cause notice + response or 21-day RBI FRM-2024 window) and four-eyes classification, plus a checksum-sealed committee pack generator. |
+| `packages/core/src/recovery-agent.js` | Recovery-agent empanelment registry: an active agent requires due-diligence/police-verification, training certification, code-of-conduct acknowledgment, and authorization-letter/ID-card evidence, referencing an active regulated entity. |
 | `packages/core/src/application-workflow.js` | LOS application state machine, KFS workflow, human review, decision proposal, manual underwriting override gate for referred applications, coded decline-reason taxonomy, maker-checker approval, disbursement transition. |
 | `packages/core/src/loan-account.js` | LMS loan account creation, amortization schedule, ledger balance reconstruction, interest accrual, payment posting, part-prepayment re-amortization, foreclosure quote and payoff, closure No-Objection Certificate, statements, charges, waivers, reversals, delinquency, collections reminders (RBI FPC contact-hours gate), recovery controls, hardship restructure, settlement/write-off, asset classification, and CIC snapshots. |
 | `packages/core/src/loan-policy.js` | India-only loan validation, KFS validation, sanction readiness, disbursement checks. |
@@ -47,7 +48,7 @@ npm run dev:api
 | `packages/core/src/index.js` | Public exports for core domain modules. |
 | `apps/api/src/file-store.js` | Local JSON state load/save helpers; control-plane tenant registry (api-key hashing, tenant resolution), sub-processor register, and break-glass grants; per-tenant data partitions and tenant-scoped accessors; `buildTenantExport`/`offboardTenant` for portability and evidenced deletion. |
 | `apps/api/src/server.js` | HTTP API: platform control plane (tenant minting, export, offboarding, break-glass, sub-processors), tenant-context resolution with break-glass fallback and 401 gate, tenant-scoped store with centralized audit stamping, plus endpoints for compliance controls, AI models, kill switch, workflow tasks, applications, loan accounts, fraud cases, erasure requests, data disclosures, and incidents. |
-| `tests/compliance.test.js` | Regression tests for the compliance gates (76 tests as of the latest commit). |
+| `tests/compliance.test.js` | Regression tests for the compliance gates (77 tests as of the latest commit). |
 
 ## Implemented API Endpoints
 
@@ -111,6 +112,9 @@ npm run dev:api
 | `GET /staff/actors` | Lists operational staff actors. |
 | `POST /staff/actors` | Creates or updates an operational actor with roles, queues, and assignment authority. |
 | `GET /staff/actors/:id` | Reads one operational staff actor. |
+| `GET /recovery-agents` | Lists empanelled recovery agents. |
+| `POST /recovery-agents` | Registers or updates a recovery agent; an active agent requires due-diligence, training, code-of-conduct, and authorization evidence. |
+| `GET /recovery-agents/:id` | Reads one recovery agent. |
 | `GET /complaints` | Lists complaints with computed SLA and effective status. |
 | `POST /complaints` | Creates a borrower complaint with acknowledgement evidence. |
 | `GET /complaints/:id` | Reads one complaint with computed SLA and effective status. |
@@ -238,7 +242,8 @@ npm run dev:api
 | Settlement and write-off | `settleLoanAccount` closes a loan for less than outstanding under four-eyes approval via principal/interest waiver credits (`closureType: "settled"`); `writeOffLoanAccount` marks `written_off` as a book loss while retaining ledger dues; both surface in the CIC snapshot. |
 | Asset classification | Maps DPD to standard, SMA-0, SMA-1, SMA-2, and NPA classes. |
 | CIC snapshots | Produces account and portfolio reporting snapshots from schedule, ledger, borrower, RE, product, and asset-classification state. |
-| Recovery-agent notice | Recovery assignment requires delinquent account, agent details, borrower notice timestamp, and delivery reference. |
+| Recovery-agent registry | An active recovery agent must reference an active regulated entity and carry due-diligence/police-verification, training-certification, code-of-conduct, and authorization-letter/ID-card evidence. |
+| Recovery-agent notice | Recovery assignment requires delinquent account, an empanelled active recovery agent, borrower notice timestamp, and delivery reference. |
 | Cash recovery posting | Cash recovery requires active noticed assignment and same-India-day posting to borrower account. |
 | Consent | Requires data-processing evidence and notice version. |
 | KYC | Requires `verified` KYC state and risk category validation. |
@@ -303,6 +308,7 @@ Current tests prove:
 - Collections reminders enforce the RBI FPC contact-hours window; a hardship restructure re-amortizes under four-eyes approval; settlement and write-off both close a loan under four-eyes approval and surface on the CIC snapshot.
 - The platform can export a tenant (reproducible portability pack) and offboard it with evidenced deletion; break-glass access is time-boxed, tenant-visible, and seals an audit event on every use; the sub-processor register is disclosed to every tenant.
 - Every sealed audit event carries a uniform actor/actorType/dataClass provenance envelope, attributed to the tenant or to platform staff under break-glass.
+- Recovery-agent empanelment requires training, authorization, and code-of-conduct evidence for an active agent (and blocks an unknown regulated entity); a recovery assignment is blocked unless it names a registered, active recovery agent.
 - API stores blocked compliance applications and supports lookup.
 - Regulated entity and product policy registries resolve an application.
 - Unsafe product penal-charge design is rejected.

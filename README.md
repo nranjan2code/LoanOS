@@ -89,6 +89,9 @@ Useful data-plane endpoints (tenant api key required):
 - `GET /staff/actors`
 - `POST /staff/actors`
 - `GET /staff/actors/:id`
+- `GET /recovery-agents`
+- `POST /recovery-agents`
+- `GET /recovery-agents/:id`
 - `GET /complaints`
 - `POST /complaints`
 - `GET /complaints/:id`
@@ -202,7 +205,7 @@ Phase 0 has a working executable foundation, and Epics 1-8 and 11 (S1-S6) each h
 - LMS loan account creation on disbursement with repayment schedule, ledger, balance summary, interest accrual, payment posting, part-prepayment, foreclosure, and closure NOC.
 - LMS hardship restructure (four-eyes tenure/rate concession with re-amortization) and settlement/write-off (four-eyes below-par closure and book-loss marking).
 - LMS borrower statement and rendered statement-document generation plus disclosed-charge, waiver, and reversal ledger controls.
-- LMS delinquency buckets, collections reminder workflow enforcing RBI FPC contact hours, noticed recovery-agent assignment, and same-day cash recovery posting.
+- LMS delinquency buckets, collections reminder workflow enforcing RBI FPC contact hours, an empanelled recovery-agent registry (due diligence, training, code of conduct, authorization), noticed recovery-agent assignment restricted to registered active agents, and same-day cash recovery posting.
 - LMS SMA/NPA asset classification and CIC-ready reporting snapshots from account state.
 - India-only loan application preflight.
 - KFS generation and sanction readiness checks.

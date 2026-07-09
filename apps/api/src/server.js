@@ -90,6 +90,7 @@ import {
   upsertConsentRecord,
   upsertKycRecord,
   upsertProductPolicy,
+  upsertRecoveryAgent,
   upsertRegulatedEntity,
   upsertStaffActor,
   validateDisbursement,
@@ -794,6 +795,53 @@ async function route(req, res, dataDir, platformAdminKey) {
       return;
     }
     sendJson(res, 200, actor);
+    return;
+  }
+
+  // Recovery-agent registry: empanelment evidence (due diligence, training,
+  // code-of-conduct, authorization) an active agent must carry before a
+  // recovery assignment can name them.
+  if (method === "GET" && path === "/recovery-agents") {
+    const state = await store.load();
+    sendJson(res, 200, {
+      recoveryAgents: Object.values(state.recoveryAgents)
+    });
+    return;
+  }
+
+  if (method === "POST" && path === "/recovery-agents") {
+    const body = await readJson(req);
+    const state = await store.load();
+    const result = upsertRecoveryAgent(state.recoveryAgents, body, state.regulatedEntities);
+    const nextState =
+      result.summary.status === "blocked"
+        ? state
+        : appendEvent(
+            {
+              ...state,
+              recoveryAgents: result.registry
+            },
+            {
+              type: "recovery_agent.upserted",
+              recoveryAgentId: result.recoveryAgent.recoveryAgentId,
+              regulatedEntityId: result.recoveryAgent.regulatedEntityId,
+              status: result.recoveryAgent.status
+            }
+          );
+    await store.save(nextState);
+    sendJson(res, result.summary.status === "blocked" ? 422 : 201, result);
+    return;
+  }
+
+  const recoveryAgentMatch = path.match(/^\/recovery-agents\/([^/]+)$/);
+  if (method === "GET" && recoveryAgentMatch) {
+    const state = await store.load();
+    const recoveryAgent = state.recoveryAgents[decodeURIComponent(recoveryAgentMatch[1])];
+    if (!recoveryAgent) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Recovery agent not found." } });
+      return;
+    }
+    sendJson(res, 200, recoveryAgent);
     return;
   }
 
@@ -2041,7 +2089,7 @@ async function route(req, res, dataDir, platformAdminKey) {
       return;
     }
 
-    const result = assignRecoveryAgent(loanAccount, body);
+    const result = assignRecoveryAgent(loanAccount, body, state.recoveryAgents);
     if (result.summary.status === "blocked") {
       sendJson(res, 422, {
         error: {

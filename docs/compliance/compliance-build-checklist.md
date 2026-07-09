@@ -159,7 +159,8 @@ Legend:
 | Reversals | Reversal endpoint requires original event, approval evidence, reason, and blocks duplicate reversal. | Done |
 | Delinquency buckets | DPD bucket, earliest unpaid installment, and overdue amounts are computed from schedule and ledger. | Done |
 | Collections reminder/notice workflow | Reminder logging requires channel/stage evidence; voice-channel (call/IVR) contact outside the RBI FPC 08:00-19:00 IST window is blocked. | Done |
-| Recovery-agent notice | Recovery assignment requires borrower notice timestamp and delivery reference before active assignment. | Done |
+| Recovery-agent empanelment | An active recovery agent must reference an active regulated entity and carry due-diligence/police-verification, training-certification, code-of-conduct, and authorization-letter/ID-card evidence. | Done |
+| Recovery-agent notice | Recovery assignment requires an empanelled active recovery agent, borrower notice timestamp, and delivery reference before active assignment. | Done |
 | Cash recovery same-day posting | Cash recovery requires active noticed recovery assignment and same-India-day account posting. | Done |
 | Hardship restructure | Four-eyes tenure extension and/or rate concession, re-amortizing the remaining principal. | Done |
 | Settlement and write-off | Four-eyes below-par closure via waiver credits (settlement) or book-loss marking retaining ledger dues (write-off); both surface on the CIC snapshot. | Done |

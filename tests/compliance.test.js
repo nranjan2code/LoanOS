@@ -49,6 +49,7 @@ import {
   upsertKycRecord,
   selectProductPolicyVersion,
   upsertProductPolicy,
+  upsertRecoveryAgent,
   upsertRegulatedEntity,
   validateKfs,
   validateKfsBeforeDecision
@@ -807,6 +808,48 @@ test("LSP registry enforces agreement, due diligence, review, data, and fee cont
   );
   assert.equal(unknownLspDla.summary.status, "blocked");
   assert(unknownLspDla.findings.some((finding) => finding.path === "lspId"));
+});
+
+test("recovery-agent registry requires empanelment evidence for an active agent", () => {
+  const reResult = upsertRegulatedEntity({}, validRegulatedEntity());
+  assert.equal(reResult.summary.status, "ready");
+
+  const missingTraining = upsertRecoveryAgent(
+    {},
+    merge(validRecoveryAgent(), { training: { certificationRef: null } }),
+    reResult.registry
+  );
+  assert.equal(missingTraining.summary.status, "blocked");
+  assert(missingTraining.findings.some((finding) => finding.path === "training.certificationRef"));
+
+  const missingAuthorization = upsertRecoveryAgent(
+    {},
+    merge(validRecoveryAgent(), { authorization: { letterRef: null, idCardRef: null } }),
+    reResult.registry
+  );
+  assert.equal(missingAuthorization.summary.status, "blocked");
+  assert(missingAuthorization.findings.some((finding) => finding.path === "authorization.letterRef"));
+  assert(missingAuthorization.findings.some((finding) => finding.path === "authorization.idCardRef"));
+
+  const suspendedAgentIsPermitted = upsertRecoveryAgent(
+    {},
+    merge(validRecoveryAgent(), { status: "suspended", training: { certificationRef: null, certifiedAt: null } }),
+    reResult.registry
+  );
+  assert.equal(suspendedAgentIsPermitted.summary.status, "ready");
+  assert.equal(suspendedAgentIsPermitted.recoveryAgent.status, "suspended");
+
+  const agentResult = upsertRecoveryAgent({}, validRecoveryAgent(), reResult.registry);
+  assert.equal(agentResult.summary.status, "ready");
+  assert.equal(agentResult.recoveryAgent.status, "active");
+
+  const unknownRe = upsertRecoveryAgent(
+    {},
+    merge(validRecoveryAgent(), { recoveryAgentId: "agent_orphan", regulatedEntityId: "missing_re" }),
+    reResult.registry
+  );
+  assert.equal(unknownRe.summary.status, "blocked");
+  assert(unknownRe.findings.some((finding) => finding.path === "regulatedEntityId"));
 });
 
 test("DLA registry exports own and LSP apps in CIMS-ready shape", () => {
@@ -2111,6 +2154,18 @@ test("API enforces recovery-agent notice and same-day cash recovery posting", as
   const delinquency = await delinquencyResponse.json();
   assert.equal(delinquency.bucket, "dpd_1_30");
 
+  const unregisteredAgent = await postJson(`${base}/loan-accounts/${account.loanAccountId}/recovery-assignments`, {
+    recoveryAgentId: "agent_001",
+    recoveryAgentName: "Ravi Collector",
+    assignedBy: "collections-manager-1",
+    assignedAt: `${overdueDate}T10:00:00.000Z`,
+    noticeSentAt: `${overdueDate}T09:00:00.000Z`,
+    noticeDeliveryRef: "sms_notice_001"
+  });
+  assert.equal(unregisteredAgent.status, 422);
+
+  assert.equal((await postJson(`${base}/recovery-agents`, validRecoveryAgent())).status, 201);
+
   const missingNotice = await postJson(`${base}/loan-accounts/${account.loanAccountId}/recovery-assignments`, {
     recoveryAgentId: "agent_001",
     recoveryAgentName: "Ravi Collector",
@@ -2756,6 +2811,11 @@ test("API exposes LWS recovery task until noticed recovery assignment is recorde
   });
   assert.equal(assignment.status, 201);
   assert.equal(assignment.body.task.status, "assigned");
+
+  assert.equal(
+    (await postJson(`${base}/recovery-agents`, validRecoveryAgent({ recoveryAgentId: "agent_002", name: "Meera Collector" }))).status,
+    201
+  );
 
   const recoveryAssignment = await postJson(`${base}/loan-accounts/${account.loanAccountId}/recovery-assignments`, {
     recoveryAgentId: "agent_002",
@@ -4560,6 +4620,33 @@ function validProductPolicy() {
       penalChargesPolicyRef: "board_penal_charges_policy_v1"
     }
   };
+}
+
+function validRecoveryAgent(overrides = {}) {
+  const base = {
+    recoveryAgentId: "agent_001",
+    regulatedEntityId: "re_example_nbfc",
+    name: "Ravi Collector",
+    agencyName: "Example Recovery Services",
+    dueDiligence: {
+      policeVerificationRef: "police_verification_001",
+      verifiedAt: "2026-01-01T00:00:00.000Z",
+      verifiedBy: "compliance-analyst-1"
+    },
+    training: {
+      certificationRef: "iibf_cert_001",
+      certifiedAt: "2026-01-05T00:00:00.000Z"
+    },
+    codeOfConduct: {
+      acknowledgmentRef: "coc_ack_001",
+      acknowledgedAt: "2026-01-05T00:00:00.000Z"
+    },
+    authorization: {
+      letterRef: "auth_letter_001",
+      idCardRef: "id_card_001"
+    }
+  };
+  return merge(base, overrides);
 }
 
 function merge(base, patch) {

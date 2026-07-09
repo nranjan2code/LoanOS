@@ -370,11 +370,12 @@ export function generateCicSnapshot(account, asOf = new Date()) {
   };
 }
 
-export function assignRecoveryAgent(account, input, now = new Date()) {
+export function assignRecoveryAgent(account, input, recoveryAgents = {}, now = new Date()) {
   const findings = [];
   const assignedAt = input?.assignedAt ? new Date(input.assignedAt) : now;
   const noticeSentAt = input?.noticeSentAt ? new Date(input.noticeSentAt) : null;
   const delinquency = account ? computeDelinquency(account, assignedAt) : null;
+  const agent = input?.recoveryAgentId ? recoveryAgents[input.recoveryAgentId] : null;
 
   if (!account) {
     findings.push(createFinding("error", "RBI-DL-2025", "Loan account is required.", "loanAccount"));
@@ -387,6 +388,10 @@ export function assignRecoveryAgent(account, input, now = new Date()) {
   }
   if (!input?.recoveryAgentId) {
     findings.push(createFinding("error", "RBI-DL-2025", "recoveryAgentId is required.", "recoveryAgentId"));
+  } else if (!agent) {
+    findings.push(createFinding("error", "RBI-DL-2025", "recoveryAgentId must reference an empanelled recovery agent.", "recoveryAgentId"));
+  } else if (agent.status !== "active") {
+    findings.push(createFinding("error", "RBI-DL-2025", "Recovery agent must be active to receive an assignment.", "recoveryAgentId"));
   }
   if (!input?.recoveryAgentName) {
     findings.push(createFinding("error", "RBI-DL-2025", "recoveryAgentName is required.", "recoveryAgentName"));

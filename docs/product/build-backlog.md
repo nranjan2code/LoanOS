@@ -129,7 +129,7 @@ Done when:
 
 ## Epic 6: Collections, Recovery, and Delinquency
 
-Status: first executable slice complete; hardship restructure and settlement/write-off first slices complete.
+Status: first executable slice complete; hardship restructure, settlement/write-off, and recovery-agent registry first slices complete.
 
 Goal: manage overdue accounts without violating borrower protection and recovery rules.
 
@@ -137,7 +137,7 @@ Tasks:
 
 - Delinquency buckets. Done.
 - Reminder and notice workflow. First slice done: `recordCollectionsReminder` (`packages/core/src/loan-account.js`) logs each borrower reminder/notice (channel, stage, delinquency state at the time) and enforces the RBI Fair Practices Code contact window — voice-channel (call/IVR) recovery contact outside 08:00–19:00 IST is blocked; asynchronous channels are unrestricted. `POST /loan-accounts/{id}/reminders` drives it and seals a `loan_account.reminder_sent` event into the audit spine.
-- Recovery-agent registry. Partial.
+- Recovery-agent registry. Done: `packages/core/src/recovery-agent.js` empanels a recovery agent against an active regulated entity, requiring (for `active` status) due-diligence/police-verification evidence, a training-certification reference, a signed code-of-conduct acknowledgment, and an authorization-letter/ID-card reference. `POST/GET /recovery-agents`, `GET /recovery-agents/{id}` drive it; `assignRecoveryAgent` now blocks a recovery assignment unless `recoveryAgentId` names a registered, active agent.
 - Recovery-agent assignment notice before contact. Done.
 - Cash recovery exception workflow. Partial.
 - Same-day cash recovery posting. Done.

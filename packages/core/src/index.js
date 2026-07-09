@@ -161,6 +161,12 @@ export {
 } from "./loan-account.js";
 
 export {
+  normalizeRecoveryAgent,
+  upsertRecoveryAgent,
+  validateRecoveryAgent
+} from "./recovery-agent.js";
+
+export {
   COMPLAINT_CATEGORIES,
   COMPLAINT_EFFECTIVE_STATUSES,
   COMPLAINT_STATUSES,
