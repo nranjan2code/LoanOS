@@ -247,7 +247,7 @@ Done when:
 
 ## Epic 11: SaaS Tenancy and Platform Isolation
 
-Status: S1–S4 first slice complete (tenant partitioning, tenant-scoped auth, isolation suite, hash-chained audit spine + evidence export); remaining tasks planned.
+Status: S1–S5 first slice complete (tenant partitioning, tenant-scoped auth, isolation suite, hash-chained audit spine + evidence export, tenant portability export + evidenced offboarding); remaining tasks planned.
 
 Goal: LoanOS runs as a multi-tenant SaaS where cross-tenant access is impossible by construction and the platform satisfies RE outsourcing obligations.
 
@@ -262,7 +262,7 @@ Tasks:
 - Platform-staff break-glass access with audit and tenant reporting. Planned.
 - Hash-chained, tenant-scoped audit event module; migrate module event emission onto it. Done: `packages/core/src/audit.js` seals each tenant's events into a tamper-evident SHA-256 chain on every save.
 - Evidence export pack generated from the audit spine. Done: `GET /audit/export` (integrity-attested, filterable) and `GET /audit/events` (chain + validity verdict).
-- Tenant onboarding/offboarding workflow with exit/portability export and evidenced deletion. Planned.
+- Tenant onboarding/offboarding workflow with exit/portability export and evidenced deletion. First slice done: `GET /platform/tenants/{id}/export` returns a reproducible portability pack (control record + full data plane + audit evidence pack), and `POST /platform/tenants/{id}/offboarding` performs evidenced deletion — purging the data plane, revoking the api key, and retaining a control-plane deletion attestation (erased event count, audit head hash, content digest, actor, reason).
 - Incident notification workflow supporting RE 6-hour RBI reporting and CERT-In duties. Planned.
 - Sub-processor register. Planned.
 
@@ -270,4 +270,4 @@ Done when:
 
 - No API call executes without an authenticated tenant context. Done.
 - The isolation suite proves two provisioned tenants cannot touch each other's data. Done.
-- A full tenant export is reproducible from source-of-truth records. Planned.
+- A full tenant export is reproducible from source-of-truth records. Done.

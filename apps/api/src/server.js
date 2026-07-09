@@ -84,12 +84,14 @@ import {
 } from "../../../packages/core/src/index.js";
 import {
   appendEvent,
+  buildTenantExport,
   createEmptyTenantData,
   ensureBootstrapTenants,
   generateApiKey,
   getTenantData,
   listTenants,
   loadState as loadWholeState,
+  offboardTenant,
   publicTenant,
   registerTenant,
   resolveTenantByApiKey,
@@ -2168,6 +2170,60 @@ async function routePlatform(req, res, { dataDir, platformAdminKey, method, path
     sendJson(res, 201, {
       tenant: publicTenant(nextState.controlPlane.tenants[body.tenantId]),
       apiKey
+    });
+    return;
+  }
+
+  // Portability export: a full, reproducible pack of a tenant's source-of-truth
+  // records plus its audit evidence pack. Given to an exiting regulated entity.
+  const tenantExportMatch = path.match(/^\/platform\/tenants\/([^/]+)\/export$/);
+  if (method === "GET" && tenantExportMatch) {
+    const state = await loadWholeState(dataDir);
+    const tenantId = decodeURIComponent(tenantExportMatch[1]);
+    const exportPack = buildTenantExport(state, tenantId);
+    if (!exportPack) {
+      sendJson(res, 404, {
+        error: { code: "not_found", message: "Tenant not found or already offboarded." }
+      });
+      return;
+    }
+    sendJson(res, 200, exportPack);
+    return;
+  }
+
+  // Evidenced deletion: purge the data plane, retain a deletion attestation, and
+  // revoke access. Requires an actor and reason for the audit trail.
+  const tenantOffboardMatch = path.match(/^\/platform\/tenants\/([^/]+)\/offboarding$/);
+  if (method === "POST" && tenantOffboardMatch) {
+    const body = await readJson(req);
+    if (!body.actor || !body.reason) {
+      sendJson(res, 422, {
+        error: {
+          code: "offboarding_invalid",
+          message: "Offboarding requires an actor and a reason."
+        }
+      });
+      return;
+    }
+    const state = await loadWholeState(dataDir);
+    const tenantId = decodeURIComponent(tenantOffboardMatch[1]);
+    const existing = state.controlPlane.tenants[tenantId];
+    if (!existing) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Tenant not found." } });
+      return;
+    }
+    if (existing.status === "offboarded") {
+      sendJson(res, 409, {
+        error: { code: "tenant_offboarded", message: "Tenant is already offboarded." },
+        offboarding: existing.offboarding ?? null
+      });
+      return;
+    }
+    const result = offboardTenant(state, tenantId, { actor: body.actor, reason: body.reason });
+    await saveWholeState(result.state, dataDir);
+    sendJson(res, 200, {
+      tenant: publicTenant(result.state.controlPlane.tenants[tenantId]),
+      offboarding: result.attestation
     });
     return;
   }

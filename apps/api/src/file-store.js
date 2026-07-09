@@ -2,9 +2,11 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { createHash, randomBytes } from "node:crypto";
 import { dirname, join } from "node:path";
 import {
+  buildAuditEvidencePack,
   createModelRegistryState,
   normalizeModelRegistryState,
-  normalizeWorkflowTaskStore
+  normalizeWorkflowTaskStore,
+  verifyAuditChain
 } from "../../../packages/core/src/index.js";
 
 export const STATE_VERSION = 2;
@@ -204,6 +206,96 @@ export async function ensureBootstrapTenants(dataDir, bootstrapTenants = []) {
   if (changed) {
     await saveState(state, dataDir);
   }
+}
+
+// --- Tenant offboarding: portability export + evidenced deletion ----------
+
+// Deterministic serialization so a content digest is stable regardless of key
+// insertion order across load/save round-trips.
+function canonicalJson(value) {
+  if (Array.isArray(value)) {
+    return `[${value.map(canonicalJson).join(",")}]`;
+  }
+  if (value && typeof value === "object") {
+    const keys = Object.keys(value).sort();
+    return `{${keys.map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value ?? null);
+}
+
+export function tenantContentDigest(tenantData) {
+  return createHash("sha256").update(canonicalJson(tenantData ?? {})).digest("hex");
+}
+
+// A full, self-describing portability pack for one tenant, reproducible from the
+// source-of-truth records: the control-plane record, the complete data plane,
+// and the tenant-scoped audit evidence pack (with its integrity verdict). This
+// is what an exiting regulated entity — or its new provider — receives.
+export function buildTenantExport(state, tenantId, { now = new Date() } = {}) {
+  const record = state.controlPlane?.tenants?.[tenantId];
+  const data = state.tenants?.[tenantId];
+  if (!record || !data) {
+    return null;
+  }
+  const auditPack = buildAuditEvidencePack(data.events, tenantId, { now });
+  return {
+    tenantId,
+    generatedAt: now.toISOString(),
+    formatVersion: STATE_VERSION,
+    tenant: publicTenant(record),
+    dataPlane: data,
+    audit: auditPack,
+    integrity: {
+      chainValid: auditPack.integrity.valid,
+      eventCount: auditPack.eventCount,
+      headHash: auditPack.headHash,
+      contentDigest: tenantContentDigest(data)
+    }
+  };
+}
+
+// Evidenced deletion: purge the tenant's data plane but retain a tamper-evident
+// attestation in the control plane recording what was erased (event count, audit
+// head hash, content digest), who authorized it, and why. The api key is revoked
+// and the status moves to `offboarded`, so the tenant can no longer authenticate.
+export function offboardTenant(state, tenantId, { actor, reason, now = new Date() } = {}) {
+  const record = state.controlPlane?.tenants?.[tenantId];
+  const data = state.tenants?.[tenantId];
+  if (!record || !data) {
+    return null;
+  }
+  const integrity = verifyAuditChain(data.events, tenantId);
+  const attestation = {
+    offboardedAt: now.toISOString(),
+    actor: actor ?? null,
+    reason: reason ?? null,
+    erasedEventCount: (data.events ?? []).length,
+    auditHeadHash: integrity.headHash ?? null,
+    chainValidAtDeletion: integrity.valid,
+    contentDigest: tenantContentDigest(data)
+  };
+  const nextTenants = { ...state.tenants };
+  delete nextTenants[tenantId];
+  return {
+    state: {
+      ...state,
+      controlPlane: {
+        ...state.controlPlane,
+        tenants: {
+          ...state.controlPlane.tenants,
+          [tenantId]: {
+            ...record,
+            status: "offboarded",
+            apiKeyHash: null,
+            updatedAt: now.toISOString(),
+            offboarding: attestation
+          }
+        }
+      },
+      tenants: nextTenants
+    },
+    attestation
+  };
 }
 
 export function appendEvent(tenantData, event, now = new Date()) {

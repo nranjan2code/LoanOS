@@ -2758,6 +2758,95 @@ test("API seals events into an audit chain and exports a verifiable evidence pac
   assert.equal(bEvents.chainValid, true);
 });
 
+test("platform can export a tenant and offboard it with evidenced deletion", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const adminKey = "platform-admin-secret";
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A], platformAdminKey: adminKey });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+  const adminHeaders = { "x-platform-admin-key": adminKey };
+
+  // Drive a full origination under tenant A: seeds data-plane records + audit events.
+  await approveAndDisburseApplication(base);
+
+  // Export requires the platform admin key, not a tenant key.
+  const forbidden = await rawFetch(`${base}/platform/tenants/${TENANT_A.tenantId}/export`);
+  assert.equal(forbidden.status, 403);
+
+  // The portability export reproduces the source-of-truth records + audit spine.
+  const exportResponse = await rawFetch(`${base}/platform/tenants/${TENANT_A.tenantId}/export`, {
+    headers: adminHeaders
+  });
+  assert.equal(exportResponse.status, 200);
+  const exportPack = await exportResponse.json();
+  assert.equal(exportPack.tenantId, TENANT_A.tenantId);
+  assert.ok(Object.keys(exportPack.dataPlane.regulatedEntities).length > 0, "export carries data-plane records");
+  assert.ok(Object.keys(exportPack.dataPlane.loanAccounts).length > 0, "export carries loan accounts");
+  assert.equal(exportPack.integrity.chainValid, true);
+  assert.ok(exportPack.integrity.eventCount > 0);
+  assert.ok(exportPack.integrity.headHash && exportPack.integrity.contentDigest);
+  assert.equal(exportPack.audit.integrity.valid, true);
+  const capturedEventCount = exportPack.integrity.eventCount;
+  const capturedHeadHash = exportPack.integrity.headHash;
+
+  // Offboarding requires an actor and reason.
+  const badOffboard = await rawFetch(`${base}/platform/tenants/${TENANT_A.tenantId}/offboarding`, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...adminHeaders },
+    body: JSON.stringify({ actor: "platform-ops" })
+  });
+  assert.equal(badOffboard.status, 422);
+
+  // Evidenced deletion returns an attestation of what was erased.
+  const offboard = await rawFetch(`${base}/platform/tenants/${TENANT_A.tenantId}/offboarding`, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...adminHeaders },
+    body: JSON.stringify({ actor: "platform-ops", reason: "contract terminated" })
+  });
+  assert.equal(offboard.status, 200);
+  const offboardBody = await offboard.json();
+  assert.equal(offboardBody.tenant.status, "offboarded");
+  assert.equal(offboardBody.offboarding.actor, "platform-ops");
+  assert.equal(offboardBody.offboarding.reason, "contract terminated");
+  assert.equal(offboardBody.offboarding.erasedEventCount, capturedEventCount);
+  assert.equal(offboardBody.offboarding.auditHeadHash, capturedHeadHash);
+  assert.equal(offboardBody.offboarding.chainValidAtDeletion, true);
+
+  // The tenant's api key no longer authenticates: the data plane is gone.
+  const afterAuth = await apiFetch(`${base}/regulated-entities`, {}, TENANT_A.apiKey);
+  assert.equal(afterAuth.status, 401);
+
+  // Export is no longer available now that the data plane is purged.
+  const afterExport = await rawFetch(`${base}/platform/tenants/${TENANT_A.tenantId}/export`, {
+    headers: adminHeaders
+  });
+  assert.equal(afterExport.status, 404);
+
+  // The control-plane record survives with the retained deletion attestation.
+  const record = await (
+    await rawFetch(`${base}/platform/tenants/${TENANT_A.tenantId}`, { headers: adminHeaders })
+  ).json();
+  assert.equal(record.status, "offboarded");
+  assert.equal(record.offboarding.erasedEventCount, capturedEventCount);
+
+  // Re-offboarding an already-offboarded tenant is rejected.
+  const again = await rawFetch(`${base}/platform/tenants/${TENANT_A.tenantId}/offboarding`, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...adminHeaders },
+    body: JSON.stringify({ actor: "platform-ops", reason: "duplicate" })
+  });
+  assert.equal(again.status, 409);
+});
+
 function eligibilityApplication(overrides = {}) {
   const base = {
     borrower: {
