@@ -1689,6 +1689,58 @@ test("API part-prepayment re-amortizes the remaining schedule", async (t) => {
   );
 });
 
+test("API logs collections reminders and blocks out-of-hours recovery calls", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+  const application = await approveAndDisburseApplication(base);
+  const account = await (await apiFetch(`${base}/loan-accounts/${application.loanAccountId}`)).json();
+
+  // A call at 21:00 IST (15:30 UTC) is outside the 08:00-19:00 window.
+  const lateCall = await postJson(`${base}/loan-accounts/${account.loanAccountId}/reminders`, {
+    channel: "call",
+    stage: "overdue",
+    actor: "collections-1",
+    sentAt: "2026-08-01T15:30:00.000Z"
+  });
+  assert.equal(lateCall.status, 422);
+  assert(lateCall.body.findings.some((finding) => finding.controlId === "RBI-FPC-PENAL"));
+
+  // The same call at 11:00 IST (05:30 UTC) is within the permitted window.
+  const okCall = await postJson(`${base}/loan-accounts/${account.loanAccountId}/reminders`, {
+    channel: "call",
+    stage: "overdue",
+    actor: "collections-1",
+    messageRef: "call-log-1",
+    sentAt: "2026-08-01T05:30:00.000Z"
+  });
+  assert.equal(okCall.status, 201);
+  assert.equal(okCall.body.reminder.channel, "call");
+
+  // An SMS is unrestricted by time of day.
+  const sms = await postJson(`${base}/loan-accounts/${account.loanAccountId}/reminders`, {
+    channel: "sms",
+    stage: "pre_due",
+    actor: "collections-1",
+    sentAt: "2026-08-01T20:00:00.000Z"
+  });
+  assert.equal(sms.status, 201);
+  assert.equal(sms.body.loanAccount.collectionsReminders.length, 2);
+
+  const events = await (await apiFetch(`${base}/audit/events`)).json();
+  assert.ok(events.events.some((event) => event.type === "loan_account.reminder_sent"));
+});
+
 test("API restructures a hardship loan under four-eyes approval and flags it", async (t) => {
   const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
   t.after(async () => {

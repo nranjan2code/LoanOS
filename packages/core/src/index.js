@@ -141,6 +141,7 @@ export {
   generateRepaymentSchedule,
   postCashRecoveryToLoanAccount,
   prepayLoanAccount,
+  recordCollectionsReminder,
   restructureLoanAccount,
   settleLoanAccount,
   writeOffLoanAccount,

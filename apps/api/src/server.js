@@ -69,6 +69,7 @@ import {
   postPaymentToLoanAccount,
   prepayLoanAccount,
   proposeDecision,
+  recordCollectionsReminder,
   restructureLoanAccount,
   settleLoanAccount,
   writeOffLoanAccount,
@@ -2368,6 +2369,40 @@ async function route(req, res, dataDir, platformAdminKey) {
       schedule: result.schedule,
       summary: summarizeLoanAccount(stored, new Date())
     });
+    return;
+  }
+
+  const loanAccountReminderMatch = path.match(/^\/loan-accounts\/([^/]+)\/reminders$/);
+  if (method === "POST" && loanAccountReminderMatch) {
+    const body = await readJson(req);
+    const state = await store.load();
+    const loanAccountId = decodeURIComponent(loanAccountReminderMatch[1]);
+    const loanAccount = state.loanAccounts[loanAccountId];
+    if (!loanAccount) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Loan account not found." } });
+      return;
+    }
+    const result = recordCollectionsReminder(loanAccount, body);
+    if (result.summary.status === "blocked") {
+      sendJson(res, 422, {
+        error: { code: "reminder_blocked", message: "Reminder is blocked by fair-practices or LMS findings." },
+        findings: result.findings
+      });
+      return;
+    }
+    const stored = result.loanAccount;
+    const nextState = appendEvent(
+      { ...state, loanAccounts: { ...state.loanAccounts, [stored.loanAccountId]: stored } },
+      {
+        type: "loan_account.reminder_sent",
+        loanAccountId: stored.loanAccountId,
+        reminderId: result.reminder.reminderId,
+        channel: result.reminder.channel,
+        stage: result.reminder.stage
+      }
+    );
+    await store.save(nextState);
+    sendJson(res, 201, { loanAccount: stored, reminder: result.reminder });
     return;
   }
 

@@ -1246,6 +1246,82 @@ export function writeOffLoanAccount(account, input = {}, now = new Date()) {
   return { loanAccount: updated, writeOff, findings: [], summary: summarizeFindings([]) };
 }
 
+// Collections reminders and notices. RBI's Fair Practices Code bars recovery
+// calls to a borrower before 8:00 a.m. or after 7:00 p.m., so voice-channel
+// contact outside that IST window is blocked; asynchronous channels (SMS, email,
+// letter) are unrestricted. Every reminder is logged with the delinquency state
+// at the time, building an auditable contact history.
+const REMINDER_CHANNELS = new Set(["sms", "email", "ivr", "call", "whatsapp", "letter"]);
+const VOICE_REMINDER_CHANNELS = new Set(["call", "ivr"]);
+const REMINDER_STAGES = new Set(["pre_due", "overdue", "reminder", "final_notice", "legal_notice"]);
+
+export function recordCollectionsReminder(account, input = {}, now = new Date()) {
+  const findings = [];
+  const sentAt = input.sentAt ? new Date(input.sentAt) : now;
+
+  if (!account) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Loan account is required.", "loanAccount"));
+  }
+  if (account && account.status !== ACTIVE_STATUS) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Reminders can only be sent on active loan accounts.", "status"));
+  }
+  if (!REMINDER_CHANNELS.has(input.channel)) {
+    findings.push(createFinding("error", "RBI-FPC-PENAL", "Reminder channel is invalid.", "channel"));
+  }
+  if (!REMINDER_STAGES.has(input.stage)) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Reminder stage is invalid.", "stage"));
+  }
+  if (!input.actor) {
+    findings.push(createFinding("error", "RBI-IT-GRC", "Reminder requires an actor.", "actor"));
+  }
+  if (Number.isNaN(sentAt.getTime())) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Reminder sentAt is invalid.", "sentAt"));
+  } else if (VOICE_REMINDER_CHANNELS.has(input.channel)) {
+    const istHour = new Date(sentAt.getTime() + 330 * 60 * 1000).getUTCHours();
+    if (istHour < 8 || istHour >= 19) {
+      findings.push(
+        createFinding("error", "RBI-FPC-PENAL", "Recovery calls are only permitted between 08:00 and 19:00 IST.", "sentAt")
+      );
+    }
+  }
+
+  const summary = summarizeFindings(findings);
+  if (summary.status === "blocked") {
+    return { loanAccount: account, reminder: null, findings, summary };
+  }
+
+  const delinquency = computeDelinquency(account, sentAt);
+  const reminder = {
+    reminderId: input.reminderId ?? createLoanId("reminder"),
+    channel: input.channel,
+    stage: input.stage,
+    messageRef: input.messageRef ?? null,
+    templateRef: input.templateRef ?? null,
+    sentAt: sentAt.toISOString(),
+    daysPastDue: delinquency.daysPastDue,
+    delinquencyBucket: delinquency.bucket,
+    actor: input.actor
+  };
+  const updated = {
+    ...account,
+    collectionsReminders: [...(account.collectionsReminders ?? []), reminder],
+    servicingEvents: [
+      ...(account.servicingEvents ?? []),
+      {
+        type: "loan_account.reminder_sent",
+        reminderId: reminder.reminderId,
+        channel: reminder.channel,
+        stage: reminder.stage,
+        at: reminder.sentAt,
+        actor: reminder.actor
+      }
+    ],
+    updatedAt: now.toISOString()
+  };
+
+  return { loanAccount: updated, reminder, findings: [], summary: summarizeFindings([]) };
+}
+
 function requireMakerChecker(findings, input) {
   if (!input.reason) {
     findings.push(createFinding("error", "RBI-DL-2025", "A reason is required.", "reason"));

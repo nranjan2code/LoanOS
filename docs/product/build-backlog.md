@@ -136,7 +136,7 @@ Goal: manage overdue accounts without violating borrower protection and recovery
 Tasks:
 
 - Delinquency buckets. Done.
-- Reminder and notice workflow.
+- Reminder and notice workflow. First slice done: `recordCollectionsReminder` (`packages/core/src/loan-account.js`) logs each borrower reminder/notice (channel, stage, delinquency state at the time) and enforces the RBI Fair Practices Code contact window — voice-channel (call/IVR) recovery contact outside 08:00–19:00 IST is blocked; asynchronous channels are unrestricted. `POST /loan-accounts/{id}/reminders` drives it and seals a `loan_account.reminder_sent` event into the audit spine.
 - Recovery-agent registry. Partial.
 - Recovery-agent assignment notice before contact. Done.
 - Cash recovery exception workflow. Partial.
