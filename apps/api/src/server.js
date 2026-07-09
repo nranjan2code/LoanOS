@@ -1695,6 +1695,117 @@ async function route(req, res, dataDir, platformAdminKey) {
     }
   }
 
+  const vcipEvidenceMatch = path.match(/^\/borrowers\/([^/]+)\/vcip\/evidence$/);
+  if (vcipEvidenceMatch) {
+    const borrowerId = decodeURIComponent(vcipEvidenceMatch[1]);
+    const state = await store.load();
+    const borrower = state.borrowerProfiles[borrowerId];
+    if (!borrower) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Borrower not found." } });
+      return;
+    }
+
+    if (method === "POST") {
+      const body = await readJson(req);
+      const officialId = body.vCip?.officialActorId;
+      const official = state.staffActors?.[officialId];
+      if (!official) {
+        sendJson(res, 422, {
+          summary: { status: "blocked", errors: 1 },
+          findings: [{
+            level: "error",
+            controlId: "RBI-KYC-2016",
+            message: `Official actor '${officialId}' not found.`,
+            path: "vCip.officialActorId"
+          }]
+        });
+        return;
+      }
+      if (official.status !== "active") {
+        sendJson(res, 422, {
+          summary: { status: "blocked", errors: 1 },
+          findings: [{
+            level: "error",
+            controlId: "RBI-KYC-2016",
+            message: `Official actor '${officialId}' is not active.`,
+            path: "vCip.officialActorId"
+          }]
+        });
+        return;
+      }
+      const hasCorrectRole = official.roles && (official.roles.includes("kyc_officer") || official.roles.includes("credit_officer") || official.roles.includes("compliance_analyst"));
+      if (!hasCorrectRole) {
+        sendJson(res, 422, {
+          summary: { status: "blocked", errors: 1 },
+          findings: [{
+            level: "error",
+            controlId: "RBI-KYC-2016",
+            message: `Official actor '${officialId}' does not have kyc_officer, credit_officer, or compliance_analyst role.`,
+            path: "vCip.officialActorId"
+          }]
+        });
+        return;
+      }
+
+      let existingKyc = Object.values(state.kycRecords).find(k => k.borrowerId === borrowerId);
+      const kycInput = {
+        ...(existingKyc || {}),
+        borrowerId,
+        status: "verified",
+        method: "vcip",
+        verifiedAt: new Date().toISOString(),
+        vCip: {
+          used: true,
+          storageCountry: body.vCip?.storageCountry,
+          videoRecordingHash: body.vCip?.videoRecordingHash,
+          recordingTimestamp: body.vCip?.recordingTimestamp || new Date().toISOString(),
+          gpsCoordinates: body.vCip?.gpsCoordinates,
+          panVerificationRef: body.vCip?.panVerificationRef,
+          livenessConfirmed: body.vCip?.livenessConfirmed,
+          faceMatchScore: body.vCip?.faceMatchScore,
+          officialActorId: body.vCip?.officialActorId,
+          signedByOfficial: body.vCip?.signedByOfficial
+        }
+      };
+
+      const result = upsertKycRecord(state.kycRecords, kycInput, state.borrowerProfiles);
+      if (result.summary.status === "blocked") {
+        sendJson(res, 422, result);
+        return;
+      }
+
+      const nextState = appendEvent(
+        {
+          ...state,
+          kycRecords: {
+            ...state.kycRecords,
+            [result.kycRecord.kycRecordId]: result.kycRecord
+          }
+        },
+        {
+          type: "borrower.vcip_evidence_recorded",
+          borrowerId,
+          kycRecordId: result.kycRecord.kycRecordId,
+          vCip: result.kycRecord.vCip
+        }
+      );
+
+      await store.save(nextState);
+      sendJson(res, 201, { success: true, kycRecord: result.kycRecord });
+      return;
+    }
+
+    if (method === "GET") {
+      const kycRecord = Object.values(state.kycRecords).find(k => k.borrowerId === borrowerId && k.method === "vcip");
+      if (!kycRecord) {
+        sendJson(res, 404, { error: { code: "not_found", message: "V-CIP evidence not found for borrower." } });
+        return;
+      }
+      sendJson(res, 200, { vCip: kycRecord.vCip });
+      return;
+    }
+  }
+
   if (method === "POST" && path === "/loans/applications") {
     const body = await readJson(req);
     const state = await store.load();

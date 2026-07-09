@@ -10,6 +10,7 @@ export const STAFF_ROLES = {
   COMPLIANCE_ANALYST: "compliance_analyst",
   LOAN_OFFICER: "loan_officer",
   CREDIT_OFFICER: "credit_officer",
+  KYC_OFFICER: "kyc_officer",
   HUMAN_REVIEWER: "human_reviewer",
   CREDIT_CHECKER: "credit_checker",
   DISBURSEMENT_MAKER: "disbursement_maker",

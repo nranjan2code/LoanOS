@@ -5638,6 +5638,12 @@ function operationalActors() {
       roles: ["workflow_admin"],
       queues: ["*"],
       canAssignQueues: ["grievance_ops"]
+    },
+    {
+      actorId: "kyc-officer-1",
+      displayName: "KYC Officer",
+      roles: ["kyc_officer"],
+      queues: ["kyc_ops"]
     }
   ];
 }
@@ -6157,4 +6163,96 @@ test("CKYC Search, Download, and Upload flow", async (t) => {
   assert.equal(searchRes2.status, 200);
   assert(searchRes2.body.results.some(r => r.fullName === "Karan Johar"));
 });
+
+test("V-CIP Evidence Vault and validation checks", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-vcip-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+
+  // Seed data
+  await seedOperationalActors(base);
+  assert.equal((await postJson(`${base}/regulated-entities`, validRegulatedEntity())).status, 201);
+  assert.equal((await postJson(`${base}/borrowers`, validBorrowerProfile())).status, 201);
+
+  // 1. Submit valid V-CIP evidence
+  const validVcip = {
+    vCip: {
+      storageCountry: "IN",
+      videoRecordingHash: "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f61234",
+      gpsCoordinates: { latitude: 28.6139, longitude: 77.2090 }, // Delhi
+      panVerificationRef: "PAN_VERIFY_9999",
+      livenessConfirmed: true,
+      faceMatchScore: 0.85,
+      officialActorId: "kyc-officer-1",
+      signedByOfficial: true
+    }
+  };
+
+  const validRes = await postJson(`${base}/borrowers/bor_001/vcip/evidence`, validVcip);
+  assert.equal(validRes.status, 201);
+  assert.equal(validRes.body.success, true);
+  assert.equal(validRes.body.kycRecord.status, "verified");
+  assert.equal(validRes.body.kycRecord.method, "vcip");
+  assert.equal(validRes.body.kycRecord.vCip.videoRecordingHash, validVcip.vCip.videoRecordingHash);
+
+  // 2. Fetch V-CIP evidence
+  const getRes = await apiFetch(`${base}/borrowers/bor_001/vcip/evidence`);
+  assert.equal(getRes.status, 200);
+  const getBody = await getRes.json();
+  assert.equal(getBody.vCip.videoRecordingHash, validVcip.vCip.videoRecordingHash);
+
+  // Helper to test invalid input
+  const expectFailure = async (patch) => {
+    const payload = {
+      vCip: {
+        ...validVcip.vCip,
+        ...patch
+      }
+    };
+    const res = await postJson(`${base}/borrowers/bor_001/vcip/evidence`, payload);
+    assert.equal(res.status, 422);
+    assert.equal(res.body.summary.status, "blocked");
+  };
+
+  // 3. Reject storage outside India
+  await expectFailure({ storageCountry: "US" });
+
+  // 4. Reject invalid video recording hash format
+  await expectFailure({ videoRecordingHash: "short_hash" });
+
+  // 5. Reject GPS outside India (e.g. New York coordinates)
+  await expectFailure({ gpsCoordinates: { latitude: 40.7128, longitude: -74.0060 } });
+
+  // 6. Reject missing GPS
+  await expectFailure({ gpsCoordinates: null });
+
+  // 7. Reject missing PAN verification reference
+  await expectFailure({ panVerificationRef: null });
+
+  // 8. Reject unconfirmed liveness
+  await expectFailure({ livenessConfirmed: false });
+
+  // 9. Reject low face match score
+  await expectFailure({ faceMatchScore: 0.75 });
+
+  // 10. Reject missing or invalid official digital signature
+  await expectFailure({ signedByOfficial: false });
+
+  // 11. Reject non-existent official actor
+  await expectFailure({ officialActorId: "non-existent" });
+
+  // 12. Reject official actor with wrong role (e.g. collections manager)
+  await expectFailure({ officialActorId: "collections-manager-1" });
+});
+
 

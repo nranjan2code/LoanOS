@@ -233,8 +233,39 @@ export function validateKycRecord(record, now = new Date()) {
   if (record?.aadhaar?.biometricStored === true || record?.aadhaar?.otpStored === true || record?.aadhaar?.pidStored === true) {
     findings.push(createFinding("error", "UIDAI-AADHAAR", "Aadhaar biometric, OTP, or PID data must not be stored.", "aadhaar"));
   }
-  if (record?.vCip?.used && record.vCip.storageCountry !== "IN") {
-    findings.push(createFinding("error", "RBI-KYC-2016", "V-CIP recordings and logs must be stored in India.", "vCip.storageCountry"));
+  if (record?.vCip?.used) {
+    if (record.vCip.storageCountry !== "IN") {
+      findings.push(createFinding("error", "RBI-KYC-2016", "V-CIP recordings and logs must be stored in India.", "vCip.storageCountry"));
+    }
+    if (record.method === "vcip") {
+      if (!record.vCip.videoRecordingHash || typeof record.vCip.videoRecordingHash !== "string" || !/^[a-fA-F0-9]{64}$/.test(record.vCip.videoRecordingHash)) {
+        findings.push(createFinding("error", "RBI-KYC-2016", "V-CIP recording hash must be a valid 64-character SHA-256 hex string.", "vCip.videoRecordingHash"));
+      }
+      const lat = record.vCip.gpsCoordinates?.latitude;
+      const lon = record.vCip.gpsCoordinates?.longitude;
+      if (lat === null || lat === undefined || lon === null || lon === undefined) {
+        findings.push(createFinding("error", "RBI-KYC-2016", "V-CIP requires GPS coordinates.", "vCip.gpsCoordinates"));
+      } else {
+        if (lat < 6.0 || lat > 37.6 || lon < 68.1 || lon > 97.4) {
+          findings.push(createFinding("error", "RBI-KYC-2016", "V-CIP customer location must be physically within India.", "vCip.gpsCoordinates"));
+        }
+      }
+      if (!record.vCip.panVerificationRef) {
+        findings.push(createFinding("error", "RBI-KYC-2016", "V-CIP requires PAN verification reference.", "vCip.panVerificationRef"));
+      }
+      if (record.vCip.livenessConfirmed !== true) {
+        findings.push(createFinding("error", "RBI-KYC-2016", "V-CIP requires liveness confirmation.", "vCip.livenessConfirmed"));
+      }
+      if (record.vCip.faceMatchScore === null || record.vCip.faceMatchScore === undefined || record.vCip.faceMatchScore < 0.8) {
+        findings.push(createFinding("error", "RBI-KYC-2016", "V-CIP requires a face match score of at least 0.8 (80%).", "vCip.faceMatchScore"));
+      }
+      if (!record.vCip.officialActorId) {
+        findings.push(createFinding("error", "RBI-KYC-2016", "V-CIP requires official KYC officer actor ID.", "vCip.officialActorId"));
+      }
+      if (record.vCip.signedByOfficial !== true) {
+        findings.push(createFinding("error", "RBI-KYC-2016", "V-CIP recording must be digitally signed by the official.", "vCip.signedByOfficial"));
+      }
+    }
   }
 
   return {
@@ -258,7 +289,18 @@ export function normalizeKycRecord(input, now = new Date()) {
       used: Boolean(input.vCip?.used),
       storageCountry: input.vCip?.storageCountry ?? null,
       recordingRef: input.vCip?.recordingRef ?? null,
-      activityLogRef: input.vCip?.activityLogRef ?? null
+      activityLogRef: input.vCip?.activityLogRef ?? null,
+      videoRecordingHash: input.vCip?.videoRecordingHash ?? null,
+      recordingTimestamp: input.vCip?.recordingTimestamp ?? null,
+      gpsCoordinates: input.vCip?.gpsCoordinates ? {
+        latitude: Number.isFinite(input.vCip.gpsCoordinates.latitude) ? input.vCip.gpsCoordinates.latitude : null,
+        longitude: Number.isFinite(input.vCip.gpsCoordinates.longitude) ? input.vCip.gpsCoordinates.longitude : null
+      } : null,
+      panVerificationRef: input.vCip?.panVerificationRef ?? null,
+      livenessConfirmed: input.vCip?.livenessConfirmed !== undefined ? Boolean(input.vCip.livenessConfirmed) : null,
+      faceMatchScore: Number.isFinite(input.vCip?.faceMatchScore) ? input.vCip.faceMatchScore : null,
+      officialActorId: input.vCip?.officialActorId ?? null,
+      signedByOfficial: input.vCip?.signedByOfficial !== undefined ? Boolean(input.vCip.signedByOfficial) : null
     },
     aadhaar: {
       biometricStored: Boolean(input.aadhaar?.biometricStored),

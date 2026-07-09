@@ -72,7 +72,7 @@ Legend:
 | KYC record expiry | Borrower-backed application resolution blocks expired verified KYC records. | Done |
 | KYC periodic-review refresh | A verified KYC record past its RBI risk-based review cycle (high 2y / medium 8y / low 10y) reads as `refresh_required` and blocks new sanction. | Done |
 | CKYC search/upload | CKYC registry connector with search, download, and upload flows. | Done |
-| V-CIP evidence | India storage check exists; full evidence vault planned. | Partial |
+| V-CIP evidence | V-CIP evidence vault validates video hash, liveness, face match score (>=0.8), India GPS coordinates, official actor role (kyc_officer/credit_officer), and digital signature. | Done |
 | FIU-IND reporting support | AML alerts and reporting pack. | Planned |
 | Beneficial-owner checks for legal entities | A legal-entity (company/partnership/llp/trust) borrower's preflight is blocked without at least one verified beneficial owner meeting the PMLA controlling-interest threshold (25% company, 15% partnership/llp/trust) or declared as control/senior-managing-official. | Done |
 

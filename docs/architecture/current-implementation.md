@@ -113,6 +113,8 @@ npm run dev:api
 | `POST /borrowers/:id/ckyc/search` | Searches the CKYC registry by identifier (PAN). |
 | `POST /borrowers/:id/ckyc/download` | Downloads and syncs a verified record from CKYC to borrower profile. |
 | `POST /borrowers/:id/ckyc/upload` | Uploads a local verified KYC record to CKYC registry. |
+| `POST /borrowers/:id/vcip/evidence` | Records V-CIP evidence (video recording hash, India GPS coordinates, liveness confirmation, face match score >=0.8, official digital signature) and updates borrower KYC record. |
+| `GET /borrowers/:id/vcip/evidence` | Retrieves V-CIP evidence details for the borrower's V-CIP KYC record. |
 | `GET /borrowers/:id/beneficial-owners` | Lists a legal-entity borrower's declared beneficial owners. |
 | `POST /borrowers/:id/beneficial-owners` | Declares or updates a beneficial owner (ownership/control/senior-managing-official) with identification and verification evidence. |
 | `GET /staff/actors` | Lists operational staff actors. |
@@ -214,6 +216,7 @@ npm run dev:api
 | Third-party data disclosure | Consent-basis (`consent`) disclosures are blocked without an active `third_party_sharing` consent; legal-obligation-basis disclosures (CIC/regulator) require a cited `legalReference`; both are logged as DPDP record-of-processing entries. |
 | DPDP right-to-erasure | An erasure request is held while the borrower has an active loan or any closed account is within the 5-year RBI/PMLA retention window; fulfilment redacts the borrower profile in place, retaining a skeleton for audit. |
 | KYC record registry | Requires borrower-linked KYC status, risk category, verified timestamp, V-CIP India storage, and no Aadhaar biometric/OTP/PID persistence. |
+| V-CIP evidence vault | Enforces video recording hash, India GPS coordinates boundary, PAN reference, liveness check, facial match score (>=0.8), official digital signature, and active kyc_officer/credit_officer actor validation. |
 | KYC periodic-review refresh | A verified KYC record past its RBI risk-based review cycle (high 2y / medium 8y / low 10y) reads as `refresh_required`; preflight blocks new sanction on a refresh-due or expired KYC record. |
 | Beneficial-owner registry (PMLA) | A legal-entity (company/partnership/llp/trust) borrower's application preflight is blocked without at least one verified beneficial owner meeting the PMLA controlling-interest threshold (25% company, 15% partnership/llp/trust) or declared as control/senior-managing-official. |
 | Staff actor registry | Requires India-operational actors, active status, and recognized roles. |
@@ -281,7 +284,7 @@ npm run dev:api
 - The platform admin key is a single shared secret from env/option; break-glass access is audited, but there are no individual platform-staff identities/roles yet (break-glass grants are minted by whoever holds the shared admin key).
 - No real KYC, CKYC, bureau, payment, eSign, SMS, email, or CERSAI integrations yet.
 - Registries are file-backed and lack external IAM, maker-checker administration workflow, and periodic access review.
-- Borrower/consent/KYC records are file-backed and do not yet integrate CKYC, V-CIP providers, consent managers, or document stores.
+- Borrower/consent/KYC records are file-backed, but support CKYC registry and V-CIP evidence vault validation boundaries.
 - Workflow is file-backed and does not yet include dashboard UI, notification dispatch, or outbound RBI CMS API integration.
 - LMS restructure/settlement/write-off and collections reminders have first slices; NACH files, refunds, external CIC file/API submission, and full multi-channel recovery contact logging are still planned.
 - Document packet renders HTML/text but does not yet create PDFs or eSign envelopes.
