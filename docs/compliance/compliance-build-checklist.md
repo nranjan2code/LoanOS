@@ -147,7 +147,7 @@ Legend:
 | LWS SLA clocks | Derived tasks include SLA target hours, opened time, due time, and breach status. | Done |
 | LWS task assignment audit | Assignment, start, release, and comment events are persisted against deterministic task IDs and actor policy. | Done |
 | Role-based authorization | Staff actor role/queue checks for credit proposal, checker approval, human review, recovery assignment, and workflow task actions. | Partial |
-| External IAM and access reviews | Login/session auth, access certification, and approval-matrix administration. | Planned |
+| External IAM and access reviews | Local tenant/platform login sessions, tenant user admin, access-review snapshots/completion, and service-key rotation are implemented; external IAM/SSO/MFA and maker-checker approval for admin changes remain planned. | Partial |
 
 ## LMS Ledger and Servicing
 
@@ -186,9 +186,12 @@ LoanOS is delivered as SaaS, so the platform itself has compliance obligations a
 | --- | --- | --- |
 | Tenant = contracting RE, tenant context on every record | State is partitioned per tenant; all domain collections live inside a tenant's data plane, minted through the control-plane tenant registry. | Done |
 | Cross-tenant isolation by construction | The store hands each request only its tenant's partition; no handler has a code path to another tenant's data. | Done |
-| Tenant-scoped API authentication | Every data-plane route resolves a tenant from the `x-api-key`/bearer token and returns 401 without a valid key; open routes are limited to health and static reference. | Done |
+| Tenant-scoped authentication | Every data-plane route resolves a tenant from either a tenant user session or `x-api-key`/bearer service token and returns 401 without valid tenant context; open routes are limited to health and static reference. | Done |
 | Cross-tenant isolation regression tests | Two-tenant suite proves tenant B cannot read or mutate tenant A's records across resource types, plus 401 on missing/invalid key. | Done |
-| Platform control plane mints tenants | `POST /platform/tenants` behind a platform admin key issues a one-time api key stored only as a hash. | Done |
+| Platform control plane onboards tenants | `GET /platform/onboarding-options`, `POST /platform/tenants`, and `GET /platform/tenants/:id/onboarding` support a guided onboarding flow: tenant shell, owner user, regulated entity profile, first product policies, module/flow enablement, readiness checklist, and one-time api key stored only as a hash. | Done |
+| Tenant user administration | `/admin/users` creates, reads, suspends, and resets tenant users; users can be linked to staff actors for regulated workflow actions. | Done |
+| Periodic access review | `/admin/access-reviews` captures user/role snapshots and records completion decisions, including user suspension or admin-role removal. | Done |
+| Tenant service-key rotation | `/admin/api-key/rotation` revokes the previous service key, returns a one-time replacement, and seals a tenant audit event. | Done |
 | Append-only hash-chained audit spine | Every save seals the tenant's events into a per-tenant SHA-256 hash chain (tenant-bound genesis, previous-hash linkage); `verifyAuditChain` detects any edit, drop, reorder, or genesis swap. | Done |
 | Evidence export pack | `GET /audit/export` produces an auditor-ready pack (genesis/head anchors, whole-chain integrity attestation, optionally filtered events); a broken chain returns 409 instead of a silently-tampered pack. `GET /audit/events` lists the chain with a validity verdict. | Done |
 | Platform-staff break-glass access with audit | Time-boxed, tenant-scoped credential; use seals a `platform.break_glass.access` event into the tenant's own audit chain; tenant-visible grants, revocation, and TTL expiry. | Done |

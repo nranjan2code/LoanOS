@@ -24,13 +24,35 @@ npm run dev:api
 
 The API uses a local JSON store under `.loanos-data/` by default. Set `LOANOS_DATA_DIR` to use another location.
 
-The API is multi-tenant. Every route except `GET /health`, `GET /compliance/controls`, `GET /reference/decline-reasons`, and the `/platform/*` control plane requires a tenant api key sent as `x-api-key: <key>` (or `Authorization: Bearer <key>`); calls without a valid key return 401. Tenants are minted through the platform control plane behind `LOANOS_PLATFORM_ADMIN_KEY`. For local dev, set `LOANOS_DEV_TENANT_KEY` to boot a ready-to-use `dev` tenant.
+The API is multi-tenant and supports both human sessions and service credentials. Data-plane routes accept a tenant user session cookie from `POST /auth/login`, or a tenant service key sent as `x-api-key: <key>` / `Authorization: Bearer <key>`; calls without a valid tenant context return 401. Tenants are onboarded through the platform control plane behind `LOANOS_PLATFORM_ADMIN_KEY` or a logged-in platform admin. The platform onboarding flow can create the tenant shell, first owner, regulated entity profile, initial product policy, enabled modules/flows, readiness checklist, and one-time service key in one transaction. For local dev, set `LOANOS_DEV_TENANT_KEY` to boot a ready-to-use `dev` tenant with login `admin@dev.local` / `dev-admin-password` (override with `LOANOS_DEV_ADMIN_PASSWORD`).
 
-Control-plane endpoints (platform admin key via `x-platform-admin-key`):
+Human auth endpoints:
 
-- `POST /platform/tenants` — mint a tenant, returns a one-time api key
+- `POST /auth/login` — tenant or platform login; sets an HTTP-only session cookie
+- `GET /auth/me`
+- `POST /auth/logout`
+
+Tenant administration endpoints (tenant admin session or tenant service key):
+
+- `GET /admin/me`
+- `GET /admin/governance-summary`
+- `GET|POST /admin/users`
+- `GET /admin/users/:id`
+- `POST /admin/users/:id/status`
+- `POST /admin/users/:id/password`
+- `GET|POST /admin/access-reviews`
+- `POST /admin/access-reviews/:id/complete`
+- `POST /admin/api-key/rotation` — rotate the tenant service key and return the one-time replacement
+
+Control-plane endpoints (platform admin key via `x-platform-admin-key` or platform admin session):
+
+- `GET /platform/onboarding-options` — list supported onboarding modules, flows, launch modes, and isolation tiers
+- `POST /platform/tenants` — onboard a tenant, optionally with owner user, regulated entity, initial products, module/flow blueprint, readiness, and one-time api key
 - `GET /platform/tenants`
 - `GET /platform/tenants/:id`
+- `GET /platform/tenants/:id/onboarding` — read onboarding blueprint, readiness checklist, seeded REs, and seeded products
+- `GET|POST /platform/users`
+- `GET /platform/admin-summary`
 - `GET /platform/tenants/:id/export` — reproducible tenant portability export
 - `POST /platform/tenants/:id/offboarding` — evidenced tenant deletion
 - `POST /platform/tenants/:id/break-glass` — mint a time-boxed break-glass credential
@@ -39,7 +61,7 @@ Control-plane endpoints (platform admin key via `x-platform-admin-key`):
 - `POST /platform/sub-processors`
 - `GET /platform/sub-processors`
 
-Useful data-plane endpoints (tenant api key required):
+Useful data-plane endpoints (tenant session or service key required):
 
 - `GET /health`
 - `GET /compliance/controls`

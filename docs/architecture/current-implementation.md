@@ -9,10 +9,10 @@ The current implementation is intentionally small:
 - No external npm dependencies.
 - Node.js built-in HTTP server.
 - File-backed JSON state under `.loanos-data/state.json`, partitioned into a control plane (tenant registry) and one data plane per tenant.
-- Multi-tenant: every data-plane request runs inside exactly one tenant, resolved from an `x-api-key`/bearer token; cross-tenant access is impossible by construction because each request only ever receives its own tenant's partition.
+- Multi-tenant: every data-plane request runs inside exactly one tenant, resolved from a tenant user session or `x-api-key`/bearer service token; cross-tenant access is impossible by construction because each request only ever receives its own tenant's partition.
 - Core domain logic in `packages/core/src`.
 - API wrapper in `apps/api/src`.
-- Automated tests in `tests/` (136 tests as of the latest commit).
+- Automated tests in `tests/` (139 tests as of the latest commit).
 
 Run it:
 
@@ -52,8 +52,9 @@ npm run dev:api
 | `packages/core/src/external-services.js` | Switchable `ExternalServiceManager` for external integrations (SMS, email, WhatsApp, credit bureau, V-CIP, bank-account verification, NACH/UPI payment rails, eSign, CERSAI, FIU-IND) with mock/real providers selected per integration and India data-residency checks enforced across all external services. |
 | `packages/core/src/audit.js` | Tenant-scoped, append-only audit hash chain: tenant-bound genesis, canonical hashing, `sealAuditChain`/`verifyAuditChain`/`buildAuditEvidencePack`, plus uniform `stampAuditEvents`/`classifyAuditDataClass` actor/data-class provenance. |
 | `packages/core/src/index.js` | Public exports for core domain modules. |
+| `apps/api/src/identity.js` | Local IAM helpers for tenant/platform users, PBKDF2 password hashes, HTTP session records, tenant access reviews, and role checks. |
 | `apps/api/src/file-store.js` | Local JSON state load/save helpers; control-plane tenant registry (api-key hashing, tenant resolution), sub-processor register, and break-glass grants; per-tenant data partitions and tenant-scoped accessors; `buildTenantExport`/`offboardTenant` for portability and evidenced deletion. |
-| `apps/api/src/server.js` | HTTP API: platform control plane (tenant minting, export, offboarding, break-glass, sub-processors), tenant-context resolution with break-glass fallback and 401 gate, tenant-scoped store with centralized audit stamping, plus endpoints for compliance controls, AI models, kill switch, workflow tasks, applications, loan accounts, document vault, communications, payment rails, fraud cases, erasure requests, data disclosures, incidents, bank-account verification, CERSAI security interests, DPDP access/correction requests, and FIU-IND reports. |
+| `apps/api/src/server.js` | HTTP API: auth/session routes, tenant admin routes, platform control plane (tenant minting, export, offboarding, break-glass, sub-processors), tenant-context resolution with session/api-key/break-glass fallback and 401 gate, tenant-scoped store with centralized audit stamping, plus endpoints for compliance controls, AI models, kill switch, workflow tasks, applications, loan accounts, document vault, communications, payment rails, fraud cases, erasure requests, data disclosures, incidents, bank-account verification, CERSAI security interests, DPDP access/correction requests, and FIU-IND reports. |
 | `tests/compliance.test.js` | Regression tests for compliance, API, tenancy, audit, LOS/LMS/LWS, and integration-ledger gates. |
 | `tests/external-services.test.js` | Provider-boundary tests for `ExternalServiceManager` mock/real dispatch and residency guards. |
 
@@ -64,16 +65,35 @@ npm run dev:api
 | `GET /health` | Service health. Open route, no tenant context. |
 | `GET /compliance/controls` | Returns regulatory control catalog. Open route. |
 | `GET /reference/decline-reasons` | Returns the coded decline-reason taxonomy. Open route. |
-| `POST /platform/tenants` | Mints a tenant and returns a one-time api key; requires the platform admin key. |
-| `GET /platform/tenants` | Lists tenants (no secrets); requires the platform admin key. |
-| `GET /platform/tenants/:id` | Reads one tenant record; requires the platform admin key. |
-| `GET /platform/tenants/:id/export` | Produces a reproducible tenant portability export (control record, data plane, audit evidence pack); requires the platform admin key. |
-| `POST /platform/tenants/:id/offboarding` | Purges the tenant's data plane, revokes its api key, and retains a deletion attestation; requires the platform admin key. |
-| `POST /platform/tenants/:id/break-glass` | Mints a time-boxed, tenant-scoped break-glass credential (returned once, hashed at rest); requires the platform admin key. |
-| `GET /platform/tenants/:id/break-glass` | Lists break-glass grants minted for a tenant; requires the platform admin key. |
-| `POST /platform/break-glass/:grantId/revoke` | Revokes a break-glass grant immediately; requires the platform admin key. |
-| `POST /platform/sub-processors` | Registers a sub-processor with DPA and data-residency evidence; requires the platform admin key. |
-| `GET /platform/sub-processors` | Lists the sub-processor register; requires the platform admin key. |
+| `POST /auth/login` | Authenticates a tenant user or platform user, returning public principal data and setting an HTTP-only session cookie. |
+| `GET /auth/me` | Reads the current session principal. |
+| `POST /auth/logout` | Revokes the current session and clears the session cookie. |
+| `GET /platform/admin-summary` | Returns platform-level counts for tenants, sandboxes, sub-processors, break-glass grants, and platform users. |
+| `GET /platform/users` | Lists platform users (no password hashes); requires platform admin/security/auditor role or platform admin key. |
+| `POST /platform/users` | Creates or updates a platform user with PBKDF2-hashed password and platform roles. |
+| `GET /platform/onboarding-options` | Lists supported tenant-onboarding modules, flows, launch modes, and isolation tiers. |
+| `POST /platform/tenants` | Onboards a tenant, optionally creating the first owner user, regulated entity profile, initial product policies, enabled module/flow blueprint, readiness checklist, and one-time api key; requires platform tenant-provisioning authority. |
+| `GET /platform/tenants` | Lists tenants (no secrets); requires platform authority. |
+| `GET /platform/tenants/:id` | Reads one tenant record; requires platform authority. |
+| `GET /platform/tenants/:id/onboarding` | Reads the tenant onboarding blueprint, readiness, seeded regulated entities, and seeded product policies. |
+| `GET /platform/tenants/:id/export` | Produces a reproducible tenant portability export (control record, data plane, audit evidence pack); requires platform authority. |
+| `POST /platform/tenants/:id/offboarding` | Purges the tenant's data plane, revokes its api key, and retains a deletion attestation; requires platform authority. |
+| `POST /platform/tenants/:id/break-glass` | Mints a time-boxed, tenant-scoped break-glass credential (returned once, hashed at rest); requires platform authority. |
+| `GET /platform/tenants/:id/break-glass` | Lists break-glass grants minted for a tenant; requires platform authority. |
+| `POST /platform/break-glass/:grantId/revoke` | Revokes a break-glass grant immediately; requires platform authority. |
+| `POST /platform/sub-processors` | Registers a sub-processor with DPA and data-residency evidence; requires platform authority. |
+| `GET /platform/sub-processors` | Lists the sub-processor register; requires platform authority. |
+| `GET /admin/me` | Reads the current tenant admin/service auth context. |
+| `GET /admin/governance-summary` | Summarizes tenant users, access-review status, service-key rotation metadata, and onboarding readiness. |
+| `GET /admin/users` | Lists tenant users (no password hashes). |
+| `POST /admin/users` | Creates or updates tenant users, optionally creating a linked staff actor. |
+| `GET /admin/users/:id` | Reads one tenant user. |
+| `POST /admin/users/:id/status` | Activates/suspends/inactivates a tenant user. |
+| `POST /admin/users/:id/password` | Resets a tenant user's password. |
+| `GET /admin/access-reviews` | Lists access reviews. |
+| `POST /admin/access-reviews` | Captures a point-in-time user access review snapshot. |
+| `POST /admin/access-reviews/:id/complete` | Completes an access review and can suspend users or remove admin roles. |
+| `POST /admin/api-key/rotation` | Rotates the tenant service api key, returns the one-time replacement, and seals an audit event. |
 | `GET /audit/events` | Lists the tenant's sealed audit chain (filterable by `type`/`subjectId`/`from`/`to`) with a chain-validity verdict. |
 | `GET /audit/export` | Produces an integrity-attested evidence pack from the tenant's audit chain; 409 if the chain fails verification. |
 | `GET /sub-processors` | Standing disclosure of the sub-processor register to every authenticated tenant, flagging cross-border processing. |
@@ -233,8 +253,11 @@ npm run dev:api
 | Control | Current behavior |
 | --- | --- |
 | Tenant isolation | State is partitioned per tenant; each data-plane request receives only its own tenant's partition, so a handler has no code path to another tenant's records. |
-| Tenant authentication | Data-plane routes require a valid `x-api-key`/bearer token mapping to an active tenant; missing or invalid keys return 401. Only health and static reference routes are open. |
-| Tenant provisioning | The platform control plane mints tenants behind an admin key and returns a one-time api key stored only as a SHA-256 hash. |
+| Tenant authentication | Data-plane routes require either a tenant user session cookie or a valid `x-api-key`/bearer token mapping to an active tenant; missing or invalid tenant context returns 401. Only health and static reference routes are open. |
+| Tenant users and sessions | `POST /auth/login` authenticates tenant users with PBKDF2-hashed passwords, issues HTTP-only session cookies, and stamps session-backed events as `tenant_user` in the audit chain. |
+| Tenant administration | Tenant admins manage users, linked staff actors, access reviews, and service-key rotation through `/admin/*`; tenant service keys remain valid for integrations and bootstrap administration. |
+| Tenant provisioning and onboarding | The platform control plane onboards tenants behind an admin key or platform admin session, optionally creates the first tenant owner, seeds the regulated entity and first product policies through the same compliance validators as data-plane APIs, captures enabled modules/flows, computes readiness, and returns a one-time api key stored only as a SHA-256 hash. |
+| Platform administration | Platform users can log in with sessions, list/provision tenants, administer platform users, manage sub-processors, and mint/revoke break-glass grants according to platform roles. |
 | Audit spine | Every save seals the tenant's events into an append-only SHA-256 hash chain with a tenant-bound genesis; `verifyAuditChain` detects any edit, drop, reorder, or genesis swap. |
 | Uniform audit provenance | Every event is stamped with an `actor`/`actorType`/`dataClass` envelope before sealing (tenant-attributed normally, platform-staff under break-glass), hashed into the chain. |
 | Evidence export | `GET /audit/export` emits an auditor-ready pack (genesis/head anchors, whole-chain integrity verdict, optionally filtered events) and 409s rather than release a broken chain. |
@@ -324,15 +347,16 @@ npm run dev:api
 ## Known Limitations
 
 - Persistence is local JSON only (now tenant-partitioned), not a production database.
-- Tenant authentication is a static api key per tenant (hashed at rest); there is no human login/session or key rotation yet. Actor-level authorization remains API-level registry validation within a tenant.
-- The platform admin key is a single shared secret from env/option; break-glass access is audited, but there are no individual platform-staff identities/roles yet (break-glass grants are minted by whoever holds the shared admin key).
+- Tenant human login/session auth is implemented locally, but external IAM/SSO, enforced MFA, SCIM, and production-grade password policy are still integration work.
+- Tenant service api keys are hashed at rest and rotatable, but there is still one active service key per tenant/environment rather than multiple named integration keys with independent scopes.
+- The platform admin key remains as a bootstrap/emergency secret; individual platform users and roles are implemented for normal platform administration.
 - No live KYC, CKYC, bureau, bank-account, payment settlement/reconciliation, eSign, SMS, email, WhatsApp, or CERSAI integrations yet.
-- Registries are file-backed and lack external IAM, maker-checker administration workflow, and periodic access review.
+- Registries are file-backed; tenant user administration and access reviews exist, but external IAM sync and maker-checker approval for admin changes are still planned.
 - Borrower/consent/KYC records are file-backed, but support CKYC registry and V-CIP evidence vault validation boundaries.
 - Workflow is file-backed; the local dashboard is not a production workflow UI and outbound RBI CMS API integration is still planned.
 - LMS restructure/settlement/write-off and collections reminders have first slices; full NACH file exchange, payment reconciliation, refunds, external CIC file/API submission, and full multi-channel recovery contact logging are still planned.
 - Document packet renders HTML/text and stores document-vault receipts, but does not yet create PDFs or external eSign envelopes.
-- UI is limited to the local operations dashboard; there is no production borrower/admin application yet.
+- UI is limited to the local operations/admin dashboard; there is no production borrower application yet.
 - AI governance has first slices for lifecycle, validation gates (fairness/explainability/monitoring for high-risk, adversarial/hallucination for generative), drift-triggered kill switch, disclosure, and human handoff; recurring fairness reports and a sectoral incident-intelligence pack are still planned.
 - The audit spine stamps a uniform actor/actorType/dataClass envelope on every event at the seal seam; signed external anchoring is a follow-on.
 - Compliance docs are source-grounded but still require counsel/compliance review before production.
@@ -341,11 +365,14 @@ npm run dev:api
 
 Current tests prove:
 
-- Data-plane routes reject a missing or invalid tenant api key with 401, while health and compliance-controls stay open.
+- Data-plane routes reject missing or invalid tenant context with 401, while health and compliance-controls stay open.
 - Sealing events produces a verifiable hash chain; editing, dropping, or reordering an event breaks verification, a chain does not verify under another tenant's genesis, and re-sealing is idempotent.
 - The API seals origination events into an audit chain, reports chain validity, exports an integrity-attested (and filterable) evidence pack, and keeps the audit spine tenant-scoped.
 - The platform admin can mint a tenant, receives a one-time api key, and that key immediately authenticates data-plane calls; duplicate tenant ids are rejected.
+- The platform onboarding flow can create a tenant owner, seed a regulated entity and product policy, persist enabled modules/flows, compute readiness, and expose onboarding readback.
 - Two provisioned tenants are isolated: tenant B sees none of tenant A's records across resource types, by-id reads return 404, a re-used id writes only into B's own partition, and tenant A's data is unchanged.
+- Tenant users can log in with session cookies, create/suspend users, create and complete access reviews, rotate the tenant service key, and leave `tenant_user` audit evidence.
+- Platform users can log in with session cookies and provision a tenant with an initial owner user who can immediately log in to that tenant.
 - Valid India-only loan application passes preflight.
 - Non-India borrower/currency/storage are blocked.
 - LSP/pass-through fund flow is blocked.

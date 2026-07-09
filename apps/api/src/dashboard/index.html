@@ -18,7 +18,61 @@
   <link rel="stylesheet" href="/dashboard/index.css">
 </head>
 <body>
-  <div class="app-container">
+  <section class="login-screen" id="login-screen" aria-label="Login">
+    <div class="login-card">
+      <div class="login-brand">
+        <span class="logo-icon" aria-hidden="true">▲</span>
+        <div>
+          <h1>LoanOS India</h1>
+          <p>Secure multi-tenant lending operations</p>
+        </div>
+      </div>
+
+      <div class="login-tabs" role="tablist" aria-label="Login scope">
+        <button class="login-tab active" type="button" data-login-scope="tenant">Tenant user</button>
+        <button class="login-tab" type="button" data-login-scope="platform">Platform admin</button>
+      </div>
+
+      <form id="tenant-login-form" class="login-form">
+        <div class="field-group">
+          <label for="login-tenant-id">Tenant ID</label>
+          <input id="login-tenant-id" autocomplete="organization" placeholder="dev" value="dev" required>
+        </div>
+        <div class="field-group">
+          <label for="login-email">Email</label>
+          <input id="login-email" type="email" autocomplete="username" placeholder="admin@dev.local" value="admin@dev.local" required>
+        </div>
+        <div class="field-group">
+          <label for="login-password">Password</label>
+          <input id="login-password" type="password" autocomplete="current-password" placeholder="dev-admin-password" required>
+        </div>
+        <button class="btn btn-primary login-submit" type="submit">Sign In</button>
+      </form>
+
+      <form id="platform-login-form" class="login-form hidden">
+        <div class="field-group">
+          <label for="platform-login-email">Platform Email</label>
+          <input id="platform-login-email" type="email" autocomplete="username" placeholder="platform.admin@example.in">
+        </div>
+        <div class="field-group">
+          <label for="platform-login-password">Password</label>
+          <input id="platform-login-password" type="password" autocomplete="current-password">
+        </div>
+        <button class="btn btn-primary login-submit" type="submit">Open Platform Console</button>
+      </form>
+
+      <details class="service-key-login">
+        <summary>Use a service API key instead</summary>
+        <div class="field-group">
+          <label for="config-api-key">Tenant API Key</label>
+          <input type="password" id="config-api-key" placeholder="Enter x-api-key…" autocomplete="off" aria-label="Tenant API Key">
+        </div>
+        <button id="btn-service-key-login" class="btn btn-secondary" type="button">Connect With Key</button>
+      </details>
+    </div>
+  </section>
+
+  <div class="app-container auth-hidden" id="app-container">
     <!-- ═══ Header ═══════════════════════════════════════════════════════ -->
     <header class="app-header">
       <div class="brand">
@@ -37,14 +91,9 @@
         </div>
 
         <div class="control-group">
-          <label for="config-api-key">Tenant API Key</label>
-          <input type="password" id="config-api-key" placeholder="Enter x-api-key…" autocomplete="off" aria-label="Tenant API Key">
-        </div>
-        
-        <div class="control-group">
           <label for="current-actor-select">Acting User</label>
           <select id="current-actor-select" aria-label="Select acting user">
-            <option value="">— Set API Key First —</option>
+            <option value="">— Sign In First —</option>
           </select>
         </div>
 
@@ -56,6 +105,8 @@
         <button id="btn-refresh" class="btn btn-secondary" aria-label="Refresh tasks">
           <span class="btn-icon">⟳</span> Refresh
         </button>
+        <button id="btn-admin-open" class="btn btn-secondary" aria-label="Open administration console">Admin</button>
+        <button id="btn-logout" class="btn btn-secondary" aria-label="Sign out">Sign Out</button>
       </div>
     </header>
 
@@ -314,6 +365,211 @@
   </div>
 
   <!-- ═══ Dialog Modals (replaces prompt()) ═════════════════════════════ -->
+
+  <dialog id="dialog-admin" class="admin-dialog">
+    <div class="dialog-header">
+      <h3 id="admin-dialog-title">Administration</h3>
+      <p id="admin-dialog-subtitle">Provision users, run access reviews, and govern service access.</p>
+    </div>
+    <div class="admin-layout">
+      <nav class="admin-tabs" aria-label="Admin sections">
+        <button class="admin-tab active" type="button" data-admin-tab="users">Tenant Users</button>
+        <button class="admin-tab" type="button" data-admin-tab="reviews">Access Reviews</button>
+        <button class="admin-tab" type="button" data-admin-tab="service">Service Access</button>
+        <button class="admin-tab" type="button" data-admin-tab="platform">Platform</button>
+      </nav>
+
+      <section class="admin-panel active" id="admin-panel-users">
+        <div class="admin-summary-grid" id="admin-summary"></div>
+        <form id="admin-user-form" class="admin-form">
+          <h4>Create Tenant User</h4>
+          <div class="admin-form-grid">
+            <input id="admin-user-email" type="email" placeholder="user@example.in" required>
+            <input id="admin-user-name" placeholder="Display name" required>
+            <input id="admin-user-password" type="password" placeholder="Temporary password" required>
+            <input id="admin-user-staff-actor" placeholder="Staff actor ID, optional">
+            <select id="admin-user-role">
+              <option value="operator">Operator</option>
+              <option value="tenant_admin">Tenant Admin</option>
+              <option value="user_admin">User Admin</option>
+              <option value="security_admin">Security Admin</option>
+              <option value="auditor">Auditor</option>
+            </select>
+            <button class="btn btn-primary" type="submit">Create User</button>
+          </div>
+        </form>
+        <div class="admin-list" id="admin-users-list"></div>
+      </section>
+
+      <section class="admin-panel" id="admin-panel-reviews">
+        <form id="admin-review-form" class="admin-form">
+          <h4>Start Access Review</h4>
+          <div class="admin-form-grid">
+            <input id="admin-reviewer" placeholder="Reviewer / committee ref" required>
+            <input id="admin-review-due" type="date">
+            <button class="btn btn-primary" type="submit">Create Review</button>
+          </div>
+        </form>
+        <div class="admin-list" id="admin-reviews-list"></div>
+      </section>
+
+      <section class="admin-panel" id="admin-panel-service">
+        <div class="admin-form">
+          <h4>Service API Key Rotation</h4>
+          <p>Rotate the tenant service key when a credential is exposed, scheduled rotation is due, or an integration owner changes.</p>
+          <div class="admin-form-grid">
+            <input id="admin-rotation-reason" placeholder="Rotation reason" value="scheduled access governance rotation">
+            <button id="btn-admin-rotate-key" class="btn btn-warning" type="button">Rotate Key</button>
+          </div>
+          <pre class="admin-secret-output" id="admin-rotated-key-output"></pre>
+        </div>
+      </section>
+
+      <section class="admin-panel" id="admin-panel-platform">
+        <div class="admin-summary-grid" id="platform-summary"></div>
+        <form id="platform-tenant-form" class="admin-form onboarding-wizard">
+          <div class="wizard-title-row">
+            <div>
+              <h4>New Tenant Onboarding</h4>
+              <p>Provision the tenant shell, regulated entity profile, first product, enabled flows, and owner access together.</p>
+            </div>
+            <span class="admin-pill" id="onboarding-step-label">Step 1 of 5</span>
+          </div>
+
+          <div class="wizard-steps" aria-label="Tenant onboarding steps">
+            <span class="wizard-dot active">Tenant</span>
+            <span class="wizard-dot">RE</span>
+            <span class="wizard-dot">Product</span>
+            <span class="wizard-dot">Flows</span>
+            <span class="wizard-dot">Owner</span>
+          </div>
+
+          <fieldset class="wizard-panel active" data-wizard-step="0">
+            <legend>Tenant Basics</legend>
+            <div class="admin-form-grid">
+              <input id="platform-tenant-id" placeholder="tenant_id" required>
+              <input id="platform-tenant-name" placeholder="Tenant display name" required>
+              <select id="platform-tenant-isolation">
+                <option value="pooled">Pooled isolation</option>
+                <option value="dedicated">Dedicated isolation</option>
+              </select>
+              <select id="platform-launch-mode">
+                <option value="pilot">Pilot launch</option>
+                <option value="production">Production launch</option>
+                <option value="sandbox_only">Sandbox only</option>
+              </select>
+            </div>
+          </fieldset>
+
+          <fieldset class="wizard-panel" data-wizard-step="1">
+            <legend>Regulated Entity</legend>
+            <div class="admin-form-grid">
+              <input id="platform-re-id" placeholder="regulated_entity_id">
+              <input id="platform-re-name" placeholder="RE legal name" required>
+              <select id="platform-re-type">
+                <option value="nbfc">NBFC</option>
+                <option value="commercial_bank">Commercial bank</option>
+                <option value="small_finance_bank">Small finance bank</option>
+                <option value="payments_bank">Payments bank</option>
+                <option value="cooperative_bank">Cooperative bank</option>
+                <option value="hfc">HFC</option>
+                <option value="all_india_financial_institution">All-India financial institution</option>
+              </select>
+              <input id="platform-re-registration" placeholder="RBI registration number" required>
+              <input id="platform-re-website" placeholder="https://example.in" required>
+              <input id="platform-re-privacy" placeholder="https://example.in/privacy" required>
+              <input id="platform-re-grievance-name" placeholder="Grievance officer name" required>
+              <input id="platform-re-grievance-email" type="email" placeholder="grievance@example.in" required>
+              <input id="platform-re-license-category" placeholder="License category" value="NBFC-ICC">
+              <input id="platform-re-license-number" placeholder="License number" required>
+              <input id="platform-re-license-date" type="date" value="2026-01-01" required>
+            </div>
+          </fieldset>
+
+          <fieldset class="wizard-panel" data-wizard-step="2">
+            <legend>Initial Product</legend>
+            <div class="admin-form-grid">
+              <input id="platform-product-id" placeholder="product_id">
+              <input id="platform-product-code" placeholder="PRODUCT_CODE" required>
+              <input id="platform-product-name" placeholder="Product name" required>
+              <select id="platform-product-type">
+                <option value="personal_loan">Personal loan</option>
+                <option value="business_loan">Business loan</option>
+                <option value="msme_loan">MSME loan</option>
+                <option value="vehicle_loan">Vehicle loan</option>
+                <option value="housing_loan">Housing loan</option>
+                <option value="education_loan">Education loan</option>
+                <option value="gold_loan">Gold loan</option>
+              </select>
+              <input id="platform-product-min-amount" type="number" min="1" value="10000" placeholder="Min amount">
+              <input id="platform-product-max-amount" type="number" min="1" value="100000" placeholder="Max amount">
+              <input id="platform-product-min-tenor" type="number" min="1" value="3" placeholder="Min tenor months">
+              <input id="platform-product-max-tenor" type="number" min="1" value="12" placeholder="Max tenor months">
+              <input id="platform-product-rate" type="number" min="0" value="1500" placeholder="Interest bps">
+              <input id="platform-product-apr" type="number" min="0" value="1800" placeholder="APR bps">
+              <input id="platform-product-min-income" type="number" min="0" value="15000" placeholder="Min monthly income">
+              <input id="platform-product-pricing-ref" placeholder="Pricing policy ref" value="BOARD-PRICING-V1">
+              <input id="platform-product-board-ref" placeholder="Board approval ref" value="BOARD-DL-V1">
+              <input id="platform-product-penal-ref" placeholder="Penal charges policy ref" value="BOARD-PENAL-V1">
+            </div>
+          </fieldset>
+
+          <fieldset class="wizard-panel" data-wizard-step="3">
+            <legend>Enabled Modules and Flows</legend>
+            <div class="wizard-choice-grid">
+              <label><input type="checkbox" name="onboarding-modules" value="los" checked> Loan Origination</label>
+              <label><input type="checkbox" name="onboarding-modules" value="lms" checked> Loan Management</label>
+              <label><input type="checkbox" name="onboarding-modules" value="lws" checked> Workflow Studio</label>
+              <label><input type="checkbox" name="onboarding-modules" value="compliance" checked> Compliance Evidence</label>
+              <label><input type="checkbox" name="onboarding-modules" value="iam" checked> Identity and Access</label>
+              <label><input type="checkbox" name="onboarding-modules" value="ai_governance"> AI Governance</label>
+              <label><input type="checkbox" name="onboarding-modules" value="collections"> Collections and Recovery</label>
+              <label><input type="checkbox" name="onboarding-modules" value="marketplace"> Marketplace Offers</label>
+              <label><input type="checkbox" name="onboarding-modules" value="integrations"> External Integrations</label>
+            </div>
+            <div class="wizard-choice-grid">
+              <label><input type="checkbox" name="onboarding-flows" value="borrower_onboarding" checked> Borrower onboarding</label>
+              <label><input type="checkbox" name="onboarding-flows" value="kyc" checked> KYC and consent</label>
+              <label><input type="checkbox" name="onboarding-flows" value="eligibility" checked> Eligibility</label>
+              <label><input type="checkbox" name="onboarding-flows" value="kfs" checked> KFS and offer</label>
+              <label><input type="checkbox" name="onboarding-flows" value="maker_checker" checked> Maker-checker</label>
+              <label><input type="checkbox" name="onboarding-flows" value="document_execution" checked> Document execution</label>
+              <label><input type="checkbox" name="onboarding-flows" value="disbursement" checked> Disbursement guard</label>
+              <label><input type="checkbox" name="onboarding-flows" value="servicing" checked> Servicing</label>
+              <label><input type="checkbox" name="onboarding-flows" value="collections"> Collections</label>
+              <label><input type="checkbox" name="onboarding-flows" value="grievance" checked> Grievance</label>
+              <label><input type="checkbox" name="onboarding-flows" value="fraud"> Fraud cases</label>
+              <label><input type="checkbox" name="onboarding-flows" value="ai_handoff"> AI handoff</label>
+            </div>
+            <textarea id="platform-onboarding-notes" rows="3" placeholder="Launch notes, disabled-flow rationale, migration assumptions"></textarea>
+          </fieldset>
+
+          <fieldset class="wizard-panel" data-wizard-step="4">
+            <legend>Owner and Review</legend>
+            <div class="admin-form-grid">
+              <input id="platform-owner-email" type="email" placeholder="owner@example.in" required>
+              <input id="platform-owner-password" type="password" placeholder="Owner temporary password" required>
+            </div>
+            <div class="admin-row">
+              <div class="admin-row-title">Provisioning Output</div>
+              <p>Creates the tenant, first owner, regulated entity, initial product policy, module/flow settings, and readiness record in one transaction.</p>
+              <pre class="admin-secret-output" id="platform-onboarding-output"></pre>
+            </div>
+          </fieldset>
+
+          <div class="wizard-actions">
+            <button class="btn btn-secondary" type="button" id="btn-onboarding-prev">Back</button>
+            <button class="btn btn-secondary" type="button" id="btn-onboarding-next">Next</button>
+            <button class="btn btn-primary hidden" type="submit" id="btn-onboarding-submit">Provision Tenant</button>
+          </div>
+        </form>
+        <div class="admin-list" id="platform-tenants-list"></div>
+      </section>
+    </div>
+    <div class="dialog-footer">
+      <button class="btn btn-secondary" id="btn-admin-close">Close</button>
+    </div>
+  </dialog>
 
   <!-- Release Task Dialog -->
   <dialog id="dialog-release">

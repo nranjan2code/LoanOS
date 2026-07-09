@@ -5,6 +5,9 @@
 // ─── State Management ───────────────────────────────────────────────────────
 let apiState = {
   apiKey: '',
+  authScope: '',
+  currentUser: null,
+  currentTenant: null,
   actors: [],
   currentActorId: '',
   simulationDate: '',
@@ -15,15 +18,24 @@ let apiState = {
   connected: false,
   autoRefreshEnabled: true,
   autoRefreshInterval: null,
-  lastRefreshTime: null
+  lastRefreshTime: null,
+  onboardingStep: 0
 };
 
 // ─── DOM Cache ──────────────────────────────────────────────────────────────
 const dom = {
+  loginScreen: document.getElementById('login-screen'),
+  appContainer: document.getElementById('app-container'),
+  tenantLoginForm: document.getElementById('tenant-login-form'),
+  platformLoginForm: document.getElementById('platform-login-form'),
+  loginTabs: document.querySelectorAll('.login-tab'),
+  btnServiceKeyLogin: document.getElementById('btn-service-key-login'),
   apiKeyInput: document.getElementById('config-api-key'),
   actorSelect: document.getElementById('current-actor-select'),
   timeAsOfInput: document.getElementById('time-as-of'),
   btnRefresh: document.getElementById('btn-refresh'),
+  btnAdminOpen: document.getElementById('btn-admin-open'),
+  btnLogout: document.getElementById('btn-logout'),
   
   // Connection status
   statusDot: document.getElementById('status-dot'),
@@ -80,12 +92,33 @@ const dom = {
   dialogRelease: document.getElementById('dialog-release'),
   dialogDelivery: document.getElementById('dialog-delivery'),
   dialogDecline: document.getElementById('dialog-decline'),
+  dialogAdmin: document.getElementById('dialog-admin'),
+  adminTabs: document.querySelectorAll('.admin-tab'),
+  adminSummary: document.getElementById('admin-summary'),
+  adminUsersList: document.getElementById('admin-users-list'),
+  adminUserForm: document.getElementById('admin-user-form'),
+  adminReviewForm: document.getElementById('admin-review-form'),
+  adminReviewsList: document.getElementById('admin-reviews-list'),
+  btnAdminRotateKey: document.getElementById('btn-admin-rotate-key'),
+  adminRotationReason: document.getElementById('admin-rotation-reason'),
+  adminRotatedKeyOutput: document.getElementById('admin-rotated-key-output'),
+  platformSummary: document.getElementById('platform-summary'),
+  platformTenantForm: document.getElementById('platform-tenant-form'),
+  platformTenantsList: document.getElementById('platform-tenants-list'),
+  onboardingStepLabel: document.getElementById('onboarding-step-label'),
+  onboardingPanels: document.querySelectorAll('[data-wizard-step]'),
+  onboardingDots: document.querySelectorAll('.wizard-dot'),
+  btnOnboardingPrev: document.getElementById('btn-onboarding-prev'),
+  btnOnboardingNext: document.getElementById('btn-onboarding-next'),
+  btnOnboardingSubmit: document.getElementById('btn-onboarding-submit'),
+  onboardingOutput: document.getElementById('platform-onboarding-output'),
+  btnAdminClose: document.getElementById('btn-admin-close'),
   
   toastContainer: document.getElementById('toast-container')
 };
 
 // ─── Init ───────────────────────────────────────────────────────────────────
-function initConfig() {
+async function initConfig() {
   apiState.apiKey = localStorage.getItem('loanos_api_key') || '';
   apiState.currentActorId = localStorage.getItem('loanos_actor_id') || '';
   
@@ -98,13 +131,50 @@ function initConfig() {
   dom.timeAsOfInput.value = apiState.simulationDate;
   
   updateConnectionStatus(false);
-  
-  if (apiState.apiKey) {
-    onApiKeyChange();
+
+  try {
+    const me = await bareFetch('/auth/me');
+    applyAuthenticatedContext(me);
+    showApp();
+    if (me.scope === 'tenant') {
+      await loadTenantWorkspace();
+    } else {
+      showToast('Platform session restored. Open Admin to manage tenants.', 'success');
+      updateConnectionStatus(true, 'Platform admin');
+    }
+  } catch (_) {
+    showLogin();
   }
   
   // Start auto-refresh
   startAutoRefresh();
+}
+
+function showLogin() {
+  dom.loginScreen.classList.remove('hidden');
+  dom.appContainer.classList.add('auth-hidden');
+}
+
+function showApp() {
+  dom.loginScreen.classList.add('hidden');
+  dom.appContainer.classList.remove('auth-hidden');
+}
+
+function applyAuthenticatedContext(context) {
+  apiState.authScope = context.scope;
+  apiState.currentUser = context.user || null;
+  apiState.currentTenant = context.tenant || null;
+  apiState.apiKey = '';
+  dom.apiKeyInput.value = '';
+  if (context.scope === 'tenant') {
+    apiState.currentActorId = context.user?.staffActorId || apiState.currentActorId || '';
+    if (apiState.currentActorId) {
+      localStorage.setItem('loanos_actor_id', apiState.currentActorId);
+    }
+    dom.footerTenantLabel.textContent = `Tenant: ${context.tenant?.tenantId || 'unknown'} · ${context.user?.email || ''}`;
+  } else {
+    dom.footerTenantLabel.textContent = `Platform: ${context.user?.email || ''}`;
+  }
 }
 
 // ─── Connection Status ──────────────────────────────────────────────────────
@@ -186,7 +256,7 @@ function startAutoRefresh() {
   if (!apiState.autoRefreshEnabled) return;
   
   apiState.autoRefreshInterval = setInterval(() => {
-    if (apiState.apiKey && apiState.connected) {
+    if (hasTenantWorkspaceAccess() && apiState.connected) {
       loadTasks(true); // silent refresh
     }
   }, 30000);
@@ -201,6 +271,7 @@ async function apiFetch(path, options = {}) {
   
   const response = await fetch(path, {
     ...options,
+    credentials: 'same-origin',
     headers: {
       ...headers,
       ...options.headers
@@ -225,52 +296,85 @@ async function apiFetch(path, options = {}) {
   return response.json();
 }
 
+async function bareFetch(path, options = {}) {
+  const response = await fetch(path, {
+    ...options,
+    credentials: 'same-origin',
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers
+    }
+  });
+
+  if (!response.ok) {
+    let message = `HTTP Error ${response.status}`;
+    try {
+      const body = await response.json();
+      message = body?.error?.message || message;
+    } catch (_) {}
+    throw new Error(message);
+  }
+
+  if (response.status === 204) return null;
+  return response.json();
+}
+
 // ─── API Key Changed ────────────────────────────────────────────────────────
 async function onApiKeyChange() {
   apiState.apiKey = dom.apiKeyInput.value.trim();
   localStorage.setItem('loanos_api_key', apiState.apiKey);
+  apiState.authScope = apiState.apiKey ? 'tenant_service' : '';
+  apiState.currentUser = null;
   
   if (!apiState.apiKey) {
-    dom.actorSelect.innerHTML = '<option value="">— Set API Key First —</option>';
+    dom.actorSelect.innerHTML = '<option value="">— Sign In First —</option>';
     updateConnectionStatus(false);
     return;
   }
   
   try {
-    const res = await apiFetch('/staff/actors');
-    apiState.actors = res.actors || [];
-    updateConnectionStatus(true, 'Tenant: dev');
-    
-    // Populate actor select
-    dom.actorSelect.innerHTML = '';
-    
-    if (apiState.actors.length === 0) {
-      dom.actorSelect.innerHTML = '<option value="seed">Seeding needed (Click Refresh to Seed)</option>';
-      await seedDefaultActors();
-      return;
-    }
-    
-    apiState.actors.forEach(actor => {
-      const opt = document.createElement('option');
-      opt.value = actor.actorId;
-      opt.textContent = `${actor.displayName} (${actor.roles.join(', ')})`;
-      if (actor.actorId === apiState.currentActorId) {
-        opt.selected = true;
-      }
-      dom.actorSelect.appendChild(opt);
-    });
-    
-    if (!apiState.currentActorId && apiState.actors.length > 0) {
-      apiState.currentActorId = apiState.actors[0].actorId;
-      localStorage.setItem('loanos_actor_id', apiState.currentActorId);
-    }
-    
-    showToast('Connected and loaded staff actors.', 'success');
-    loadTasks();
+    showApp();
+    await loadTenantWorkspace('Tenant service key');
   } catch (err) {
     updateConnectionStatus(false);
     showToast(`Failed to connect: ${err.message}`, 'error');
   }
+}
+
+async function loadTenantWorkspace(label) {
+  const res = await apiFetch('/staff/actors');
+  apiState.actors = res.actors || [];
+  updateConnectionStatus(true, label || `Tenant: ${apiState.currentTenant?.tenantId || 'active'}`);
+
+  dom.actorSelect.innerHTML = '';
+
+  if (apiState.actors.length === 0) {
+    dom.actorSelect.innerHTML = '<option value="seed">Seeding needed…</option>';
+    await seedDefaultActors();
+    return;
+  }
+
+  apiState.actors.forEach(actor => {
+    const opt = document.createElement('option');
+    opt.value = actor.actorId;
+    opt.textContent = `${actor.displayName} (${actor.roles.join(', ')})`;
+    if (actor.actorId === apiState.currentActorId) {
+      opt.selected = true;
+    }
+    dom.actorSelect.appendChild(opt);
+  });
+
+  if (!apiState.currentActorId && apiState.actors.length > 0) {
+    apiState.currentActorId = apiState.currentUser?.staffActorId || apiState.actors[0].actorId;
+    localStorage.setItem('loanos_actor_id', apiState.currentActorId);
+  }
+
+  if (apiState.currentActorId) {
+    dom.actorSelect.value = apiState.currentActorId;
+  }
+
+  showToast('Connected and loaded staff actors.', 'success');
+  loadTasks();
 }
 
 // ─── Seed Default Actors ────────────────────────────────────────────────────
@@ -303,8 +407,8 @@ async function seedDefaultActors() {
 
 // ─── Load Tasks ─────────────────────────────────────────────────────────────
 async function loadTasks(silent = false) {
-  if (!apiState.apiKey) {
-    if (!silent) showToast('Provide a Tenant API Key first.', 'info');
+  if (!hasTenantWorkspaceAccess()) {
+    if (!silent) showToast('Sign in as a tenant user or use a tenant service key first.', 'info');
     return;
   }
   
@@ -342,6 +446,10 @@ async function loadTasks(silent = false) {
   } finally {
     dom.tasksSkeleton.classList.add('hidden');
   }
+}
+
+function hasTenantWorkspaceAccess() {
+  return apiState.authScope === 'tenant' || apiState.authScope === 'tenant_service' || !!apiState.apiKey;
 }
 
 // ─── Metrics ────────────────────────────────────────────────────────────────
@@ -679,7 +787,7 @@ document.getElementById('btn-release-confirm').addEventListener('click', async (
 });
 
 // Close dialog on backdrop click
-[dom.dialogRelease, dom.dialogDelivery, dom.dialogDecline].forEach(dialog => {
+[dom.dialogRelease, dom.dialogDelivery, dom.dialogDecline, dom.dialogAdmin].forEach(dialog => {
   dialog.addEventListener('click', (e) => {
     if (e.target === dialog) dialog.close();
   });
@@ -1310,10 +1418,487 @@ function renderActionForm(task) {
   }
 }
 
+// ─── Authentication & Administration ───────────────────────────────────────
+
+function setLoginScope(scope) {
+  dom.loginTabs.forEach(tab => {
+    const active = tab.dataset.loginScope === scope;
+    tab.classList.toggle('active', active);
+  });
+  dom.tenantLoginForm.classList.toggle('hidden', scope !== 'tenant');
+  dom.platformLoginForm.classList.toggle('hidden', scope !== 'platform');
+}
+
+async function handleTenantLogin(event) {
+  event.preventDefault();
+  try {
+    const context = await bareFetch('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({
+        scope: 'tenant',
+        tenantId: document.getElementById('login-tenant-id').value.trim(),
+        email: document.getElementById('login-email').value.trim(),
+        password: document.getElementById('login-password').value
+      })
+    });
+    applyAuthenticatedContext(context);
+    showApp();
+    await loadTenantWorkspace(`Tenant: ${context.tenant?.tenantId || 'active'}`);
+  } catch (err) {
+    showToast(`Sign in failed: ${err.message}`, 'error');
+  }
+}
+
+async function handlePlatformLogin(event) {
+  event.preventDefault();
+  try {
+    const context = await bareFetch('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({
+        scope: 'platform',
+        email: document.getElementById('platform-login-email').value.trim(),
+        password: document.getElementById('platform-login-password').value
+      })
+    });
+    applyAuthenticatedContext(context);
+    showApp();
+    updateConnectionStatus(true, `Platform: ${context.user?.email || 'admin'}`);
+    showToast('Platform admin session active.', 'success');
+    openAdminConsole();
+  } catch (err) {
+    showToast(`Platform sign in failed: ${err.message}`, 'error');
+  }
+}
+
+async function logout() {
+  try {
+    if (apiState.authScope === 'tenant' || apiState.authScope === 'platform') {
+      await bareFetch('/auth/logout', { method: 'POST', body: JSON.stringify({}) });
+    }
+  } catch (_) {}
+  apiState.apiKey = '';
+  apiState.authScope = '';
+  apiState.currentUser = null;
+  apiState.currentTenant = null;
+  apiState.actors = [];
+  apiState.tasks = [];
+  apiState.connected = false;
+  localStorage.removeItem('loanos_api_key');
+  dom.apiKeyInput.value = '';
+  closeDetails();
+  updateConnectionStatus(false);
+  showLogin();
+}
+
+function setAdminTab(tabName) {
+  dom.adminTabs.forEach(tab => {
+    const active = tab.dataset.adminTab === tabName;
+    tab.classList.toggle('active', active);
+  });
+  document.querySelectorAll('.admin-panel').forEach(panel => {
+    panel.classList.toggle('active', panel.id === `admin-panel-${tabName}`);
+  });
+}
+
+async function openAdminConsole() {
+  dom.dialogAdmin.showModal();
+  if (apiState.authScope === 'platform') {
+    setAdminTab('platform');
+  } else {
+    setAdminTab('users');
+  }
+  await refreshAdminConsole();
+}
+
+async function refreshAdminConsole() {
+  if (apiState.authScope === 'platform') {
+    await renderPlatformAdmin();
+    return;
+  }
+  if (!hasTenantWorkspaceAccess()) {
+    showToast('Tenant administration requires tenant login or service key.', 'warning');
+    return;
+  }
+  await renderTenantAdmin();
+}
+
+async function renderTenantAdmin() {
+  try {
+    const [summary, users, reviews] = await Promise.all([
+      apiFetch('/admin/governance-summary'),
+      apiFetch('/admin/users'),
+      apiFetch('/admin/access-reviews')
+    ]);
+    dom.adminSummary.innerHTML = renderSummaryCards([
+      ['Users', summary.users.total],
+      ['Active', summary.users.active],
+      ['Suspended', summary.users.suspended],
+      ['Open Reviews', summary.accessReviews.open],
+      ['Readiness', summary.onboarding?.status || 'unknown']
+    ]);
+    dom.adminUsersList.innerHTML = (users.users || []).map(renderUserRow).join('') || emptyAdminRow('No tenant users yet.');
+    dom.adminReviewsList.innerHTML = (reviews.accessReviews || []).map(renderReviewRow).join('') || emptyAdminRow('No access reviews yet.');
+    dom.adminRotatedKeyOutput.textContent = '';
+  } catch (err) {
+    showToast(`Admin load failed: ${err.message}`, 'error');
+  }
+}
+
+async function renderPlatformAdmin() {
+  try {
+    const [summary, tenants] = await Promise.all([
+      apiFetch('/platform/admin-summary'),
+      apiFetch('/platform/tenants')
+    ]);
+    dom.platformSummary.innerHTML = renderSummaryCards([
+      ['Tenants', summary.tenants.total],
+      ['Active', summary.tenants.active],
+      ['Sandboxes', summary.tenants.sandboxes],
+      ['Sub-processors', summary.subProcessors]
+    ]);
+    dom.platformTenantsList.innerHTML = (tenants.tenants || []).map(renderTenantRow).join('') || emptyAdminRow('No tenants provisioned.');
+  } catch (err) {
+    showToast(`Platform admin load failed: ${err.message}`, 'error');
+  }
+}
+
+function renderSummaryCards(cards) {
+  return cards.map(([label, value]) => `
+    <div class="admin-summary-card">
+      <strong>${escapeHtml(value)}</strong>
+      <span>${escapeHtml(label)}</span>
+    </div>
+  `).join('');
+}
+
+function renderUserRow(user) {
+  const nextStatus = user.status === 'active' ? 'suspended' : 'active';
+  return `
+    <div class="admin-row">
+      <div class="admin-row-header">
+        <div>
+          <div class="admin-row-title">${escapeHtml(user.displayName || user.email)}</div>
+          <p>${escapeHtml(user.email)} · ${escapeHtml(user.staffActorId || 'no staff actor')}</p>
+        </div>
+        <span class="admin-pill">${escapeHtml(user.status)}</span>
+      </div>
+      <p>Admin roles: ${(user.adminRoles || []).map(escapeHtml).join(', ') || 'none'}</p>
+      <div class="op-buttons">
+        <button class="btn btn-secondary btn-sm" data-user-status="${escapeHtml(user.userId)}" data-status="${nextStatus}">
+          Mark ${nextStatus}
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+function renderReviewRow(review) {
+  return `
+    <div class="admin-row">
+      <div class="admin-row-header">
+        <div>
+          <div class="admin-row-title">${escapeHtml(review.reviewId)}</div>
+          <p>${escapeHtml(review.reviewer || 'No reviewer')} · ${escapeHtml(review.snapshot?.length || 0)} users captured</p>
+        </div>
+        <span class="admin-pill">${escapeHtml(review.status)}</span>
+      </div>
+      ${review.status === 'open' ? `<button class="btn btn-success btn-sm" data-review-complete="${escapeHtml(review.reviewId)}">Complete As Certified</button>` : ''}
+    </div>
+  `;
+}
+
+function renderTenantRow(tenant) {
+  const readiness = tenant.onboarding?.status || 'configured';
+  const productCount = tenant.onboarding?.productIds?.length ?? 0;
+  return `
+    <div class="admin-row">
+      <div class="admin-row-header">
+        <div>
+          <div class="admin-row-title">${escapeHtml(tenant.name || tenant.tenantId)}</div>
+          <p>${escapeHtml(tenant.tenantId)} · ${escapeHtml(tenant.isolationTier || 'pooled')}</p>
+        </div>
+        <span class="admin-pill">${escapeHtml(tenant.status)}</span>
+      </div>
+      <p>${tenant.isSandbox ? `Sandbox of ${escapeHtml(tenant.parentTenantId || '')}` : 'Production tenant'} · onboarding ${escapeHtml(readiness)} · ${escapeHtml(productCount)} product(s)</p>
+    </div>
+  `;
+}
+
+function emptyAdminRow(message) {
+  return `<div class="admin-row"><p>${escapeHtml(message)}</p></div>`;
+}
+
+function setOnboardingStep(nextStep) {
+  const maxStep = Math.max(0, dom.onboardingPanels.length - 1);
+  apiState.onboardingStep = Math.min(Math.max(nextStep, 0), maxStep);
+  dom.onboardingPanels.forEach(panel => {
+    panel.classList.toggle('active', Number(panel.dataset.wizardStep) === apiState.onboardingStep);
+  });
+  dom.onboardingDots.forEach((dot, index) => {
+    dot.classList.toggle('active', index === apiState.onboardingStep);
+  });
+  dom.onboardingStepLabel.textContent = `Step ${apiState.onboardingStep + 1} of ${maxStep + 1}`;
+  dom.btnOnboardingPrev.disabled = apiState.onboardingStep === 0;
+  dom.btnOnboardingNext.classList.toggle('hidden', apiState.onboardingStep === maxStep);
+  dom.btnOnboardingSubmit.classList.toggle('hidden', apiState.onboardingStep !== maxStep);
+}
+
+function selectedCheckboxValues(name) {
+  return Array.from(document.querySelectorAll(`input[name="${name}"]:checked`)).map(input => input.value);
+}
+
+function slugifyId(value, fallback) {
+  const slug = String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  return slug || fallback;
+}
+
+function numberFromInput(id) {
+  const value = Number(document.getElementById(id).value);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function buildTenantOnboardingPayload() {
+  const tenantId = document.getElementById('platform-tenant-id').value.trim();
+  const tenantName = document.getElementById('platform-tenant-name').value.trim();
+  const regulatedEntityId = document.getElementById('platform-re-id').value.trim() || `${tenantId}_re`;
+  const productCode = document.getElementById('platform-product-code').value.trim();
+  const productId = document.getElementById('platform-product-id').value.trim() || slugifyId(productCode, `${tenantId}_product`);
+  return {
+    tenantId,
+    name: tenantName,
+    isolationTier: document.getElementById('platform-tenant-isolation').value,
+    onboarding: {
+      launchMode: document.getElementById('platform-launch-mode').value,
+      primaryRegulatedEntityId: regulatedEntityId,
+      productIds: [productId],
+      enabledModules: selectedCheckboxValues('onboarding-modules'),
+      enabledFlows: selectedCheckboxValues('onboarding-flows'),
+      notes: document.getElementById('platform-onboarding-notes').value.trim() || null
+    },
+    regulatedEntity: {
+      regulatedEntityId,
+      regulatedEntityName: document.getElementById('platform-re-name').value.trim(),
+      regulatedEntityType: document.getElementById('platform-re-type').value,
+      rbiRegistrationNumber: document.getElementById('platform-re-registration').value.trim(),
+      country: 'IN',
+      status: 'active',
+      websiteUrl: document.getElementById('platform-re-website').value.trim(),
+      privacyPolicyUrl: document.getElementById('platform-re-privacy').value.trim(),
+      grievanceOfficer: {
+        name: document.getElementById('platform-re-grievance-name').value.trim(),
+        email: document.getElementById('platform-re-grievance-email').value.trim()
+      },
+      dataResidency: {
+        primaryStorageCountry: 'IN',
+        paymentDataStorageCountry: 'IN',
+        processedOutsideIndia: false
+      },
+      boardPolicyRefs: {
+        digitalLendingPolicyRef: 'BOARD-DL-V1',
+        kycPolicyRef: 'BOARD-KYC-V1',
+        penalChargesPolicyRef: document.getElementById('platform-product-penal-ref').value.trim(),
+        outsourcingPolicyRef: 'BOARD-OUTSOURCING-V1',
+        modelRiskPolicyRef: 'BOARD-MODEL-RISK-V1',
+        grievancePolicyRef: 'BOARD-GRIEVANCE-V1'
+      },
+      licenseMetadata: {
+        category: document.getElementById('platform-re-license-category').value.trim(),
+        licenseNumber: document.getElementById('platform-re-license-number').value.trim(),
+        issuingAuthority: 'Reserve Bank of India',
+        issueDate: document.getElementById('platform-re-license-date').value,
+        status: 'active'
+      }
+    },
+    products: [
+      {
+        productId,
+        regulatedEntityId,
+        productCode,
+        productName: document.getElementById('platform-product-name').value.trim(),
+        productType: document.getElementById('platform-product-type').value,
+        status: 'active',
+        currency: 'INR',
+        minAmount: numberFromInput('platform-product-min-amount'),
+        maxAmount: numberFromInput('platform-product-max-amount'),
+        minTenorMonths: numberFromInput('platform-product-min-tenor'),
+        maxTenorMonths: numberFromInput('platform-product-max-tenor'),
+        annualInterestRateBps: numberFromInput('platform-product-rate'),
+        aprBps: numberFromInput('platform-product-apr'),
+        coolingOffDays: 3,
+        recoveryMechanism: 'authorized_agency_only',
+        interestCalcMethod: 'reducing_balance',
+        eligibility: {
+          minAgeYears: 18,
+          maxAgeYears: 65,
+          minMonthlyIncome: numberFromInput('platform-product-min-income'),
+          allowedResidencyCountry: 'IN'
+        },
+        policyRefs: {
+          boardApprovalRef: document.getElementById('platform-product-board-ref').value.trim(),
+          pricingPolicyRef: document.getElementById('platform-product-pricing-ref').value.trim(),
+          penalChargesPolicyRef: document.getElementById('platform-product-penal-ref').value.trim()
+        }
+      }
+    ]
+  };
+}
+
+function formatReadiness(readiness) {
+  const findings = readiness?.findings ?? [];
+  if (findings.length === 0) {
+    return 'Readiness: ready';
+  }
+  return `Readiness: ${readiness.status}\n${findings.map(finding => `- ${finding.severity}: ${finding.message}`).join('\n')}`;
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
 
 // ─── Event Handlers & Initializers ──────────────────────────────────────────
 
+dom.loginTabs.forEach(tab => {
+  tab.addEventListener('click', () => setLoginScope(tab.dataset.loginScope));
+});
+
+dom.tenantLoginForm.addEventListener('submit', handleTenantLogin);
+dom.platformLoginForm.addEventListener('submit', handlePlatformLogin);
+dom.btnServiceKeyLogin.addEventListener('click', onApiKeyChange);
 dom.apiKeyInput.addEventListener('change', onApiKeyChange);
+dom.btnLogout.addEventListener('click', logout);
+dom.btnAdminOpen.addEventListener('click', openAdminConsole);
+dom.btnAdminClose.addEventListener('click', () => dom.dialogAdmin.close());
+
+dom.adminTabs.forEach(tab => {
+  tab.addEventListener('click', () => setAdminTab(tab.dataset.adminTab));
+});
+
+dom.btnOnboardingPrev.addEventListener('click', () => setOnboardingStep(apiState.onboardingStep - 1));
+dom.btnOnboardingNext.addEventListener('click', () => setOnboardingStep(apiState.onboardingStep + 1));
+
+dom.adminUserForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  try {
+    await apiFetch('/admin/users', {
+      method: 'POST',
+      body: JSON.stringify({
+        email: document.getElementById('admin-user-email').value.trim(),
+        displayName: document.getElementById('admin-user-name').value.trim(),
+        password: document.getElementById('admin-user-password').value,
+        staffActorId: document.getElementById('admin-user-staff-actor').value.trim() || null,
+        adminRoles: [document.getElementById('admin-user-role').value]
+      })
+    });
+    dom.adminUserForm.reset();
+    showToast('Tenant user created.', 'success');
+    await refreshAdminConsole();
+  } catch (err) {
+    showToast(`User creation failed: ${err.message}`, 'error');
+  }
+});
+
+dom.adminUsersList.addEventListener('click', async (event) => {
+  const button = event.target.closest('[data-user-status]');
+  if (!button) return;
+  try {
+    await apiFetch(`/admin/users/${encodeURIComponent(button.dataset.userStatus)}/status`, {
+      method: 'POST',
+      body: JSON.stringify({ status: button.dataset.status })
+    });
+    showToast('User status updated.', 'success');
+    await refreshAdminConsole();
+  } catch (err) {
+    showToast(`Status update failed: ${err.message}`, 'error');
+  }
+});
+
+dom.adminReviewForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  try {
+    const due = document.getElementById('admin-review-due').value;
+    await apiFetch('/admin/access-reviews', {
+      method: 'POST',
+      body: JSON.stringify({
+        reviewer: document.getElementById('admin-reviewer').value.trim(),
+        dueAt: due ? new Date(`${due}T00:00:00`).toISOString() : null
+      })
+    });
+    dom.adminReviewForm.reset();
+    showToast('Access review created.', 'success');
+    await refreshAdminConsole();
+  } catch (err) {
+    showToast(`Access review failed: ${err.message}`, 'error');
+  }
+});
+
+dom.adminReviewsList.addEventListener('click', async (event) => {
+  const button = event.target.closest('[data-review-complete]');
+  if (!button) return;
+  try {
+    await apiFetch(`/admin/access-reviews/${encodeURIComponent(button.dataset.reviewComplete)}/complete`, {
+      method: 'POST',
+      body: JSON.stringify({
+        completedBy: apiState.currentActorId || apiState.currentUser?.email || 'admin-console',
+        decisions: []
+      })
+    });
+    showToast('Access review completed.', 'success');
+    await refreshAdminConsole();
+  } catch (err) {
+    showToast(`Review completion failed: ${err.message}`, 'error');
+  }
+});
+
+dom.btnAdminRotateKey.addEventListener('click', async () => {
+  try {
+    const result = await apiFetch('/admin/api-key/rotation', {
+      method: 'POST',
+      body: JSON.stringify({ reason: dom.adminRotationReason.value.trim() })
+    });
+    dom.adminRotatedKeyOutput.textContent = `One-time new service key:\n${result.apiKey}`;
+    showToast('Tenant service API key rotated.', 'success');
+    await refreshAdminConsole();
+  } catch (err) {
+    showToast(`Key rotation failed: ${err.message}`, 'error');
+  }
+});
+
+dom.platformTenantForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  try {
+    const ownerEmail = document.getElementById('platform-owner-email').value.trim();
+    const ownerPassword = document.getElementById('platform-owner-password').value;
+    const payload = buildTenantOnboardingPayload();
+    if (ownerEmail && ownerPassword) {
+      payload.ownerUser = {
+        email: ownerEmail,
+        displayName: ownerEmail,
+        password: ownerPassword,
+        adminRoles: ['tenant_admin', 'user_admin', 'security_admin', 'auditor']
+      };
+    }
+    const result = await apiFetch('/platform/tenants', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    dom.platformTenantForm.reset();
+    dom.onboardingOutput.textContent = `Tenant ${result.tenant.tenantId} provisioned.\nOne-time service API key:\n${result.apiKey}\n\n${formatReadiness(result.readiness)}`;
+    showToast(`Tenant ${result.tenant.tenantId} provisioned with onboarding blueprint.`, 'success');
+    await refreshAdminConsole();
+  } catch (err) {
+    showToast(`Tenant provisioning failed: ${err.message}`, 'error');
+  }
+});
 
 dom.actorSelect.addEventListener('change', () => {
   apiState.currentActorId = dom.actorSelect.value;
@@ -1377,7 +1962,7 @@ dom.queueList.addEventListener('keydown', (e) => {
 // Keyboard: Escape closes detail panel
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
-    if (dom.dialogRelease.open || dom.dialogDelivery.open || dom.dialogDecline.open) return;
+    if (dom.dialogRelease.open || dom.dialogDelivery.open || dom.dialogDecline.open || dom.dialogAdmin.open) return;
     closeDetails();
   }
 });
@@ -1385,4 +1970,5 @@ document.addEventListener('keydown', (e) => {
 // Boot
 window.addEventListener('DOMContentLoaded', () => {
   initConfig();
+  setOnboardingStep(0);
 });

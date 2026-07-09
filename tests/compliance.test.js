@@ -4264,7 +4264,7 @@ test("platform admin can mint a tenant and its api key", async (t) => {
   const port = server.address().port;
   const base = `http://127.0.0.1:${port}`;
 
-  // Minting requires the platform admin key, not a tenant key.
+  // Minting requires platform authority, not a tenant key.
   const forbidden = await rawFetch(`${base}/platform/tenants`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -4296,6 +4296,87 @@ test("platform admin can mint a tenant and its api key", async (t) => {
     body: JSON.stringify({ tenantId: "tnt_minted" })
   });
   assert.equal(dup.status, 409);
+});
+
+test("platform onboarding provisions tenant owner, regulated entity, product, and launch blueprint", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-onboarding-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const adminKey = "platform-admin-secret";
+  const server = createLoanOsServer({ dataDir, platformAdminKey: adminKey });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const adminHeaders = { "content-type": "application/json", "x-platform-admin-key": adminKey };
+
+  const options = await rawFetch(`${base}/platform/onboarding-options`, { headers: adminHeaders });
+  assert.equal(options.status, 200);
+  const optionsBody = await options.json();
+  assert(optionsBody.modules.some((module) => module.id === "los"));
+  assert(optionsBody.flows.some((flow) => flow.id === "maker_checker"));
+
+  const regulatedEntity = merge(validRegulatedEntity(), {
+    regulatedEntityId: "re_onboarded_nbfc",
+    regulatedEntityName: "Onboarded India NBFC Ltd"
+  });
+  const product = merge(validProductPolicy(), {
+    productId: "prod_onboarded_personal",
+    regulatedEntityId: regulatedEntity.regulatedEntityId,
+    productCode: "ONBOARD_PL",
+    productName: "Onboarded Personal Loan"
+  });
+
+  const created = await rawFetch(`${base}/platform/tenants`, {
+    method: "POST",
+    headers: adminHeaders,
+    body: JSON.stringify({
+      tenantId: "tnt_onboarded",
+      name: "Onboarded NBFC",
+      isolationTier: "pooled",
+      onboarding: {
+        launchMode: "pilot",
+        enabledModules: ["los", "lms", "lws", "compliance", "iam", "ai_governance"],
+        enabledFlows: ["borrower_onboarding", "kyc", "eligibility", "kfs", "maker_checker", "document_execution", "disbursement"],
+        notes: "Pilot launch with AI governance enabled."
+      },
+      regulatedEntity,
+      products: [product],
+      ownerUser: {
+        email: "owner@onboarded.example.in",
+        displayName: "Onboarded Owner",
+        password: "OwnerPass1!",
+        adminRoles: ["tenant_admin", "user_admin", "security_admin", "auditor"]
+      }
+    })
+  });
+  assert.equal(created.status, 201);
+  const createdBody = await created.json();
+  assert.equal(createdBody.tenant.tenantId, "tnt_onboarded");
+  assert.equal(createdBody.tenant.onboarding.primaryRegulatedEntityId, regulatedEntity.regulatedEntityId);
+  assert(createdBody.tenant.onboarding.enabledModules.includes("ai_governance"));
+  assert(createdBody.tenant.onboarding.enabledFlows.includes("maker_checker"));
+  assert.equal(createdBody.readiness.status, "ready");
+  assert.equal(createdBody.readiness.counts.productPolicies, 1);
+  assert.ok(createdBody.apiKey.startsWith("lsk_"));
+
+  const seededProducts = await apiFetch(`${base}/products`, {}, createdBody.apiKey);
+  assert.equal(seededProducts.status, 200);
+  const seededProductsBody = await seededProducts.json();
+  assert.equal(seededProductsBody.products[0].productCode, "ONBOARD_PL");
+
+  const onboardingReadback = await rawFetch(`${base}/platform/tenants/tnt_onboarded/onboarding`, {
+    headers: { "x-platform-admin-key": adminKey }
+  });
+  assert.equal(onboardingReadback.status, 200);
+  const onboardingBody = await onboardingReadback.json();
+  assert.equal(onboardingBody.readiness.status, "ready");
+  assert.equal(onboardingBody.regulatedEntities[0].regulatedEntityId, regulatedEntity.regulatedEntityId);
+  assert.equal(onboardingBody.products[0].productId, product.productId);
 });
 
 test("tenants are isolated: one tenant cannot read or mutate another's data", async (t) => {
@@ -4363,6 +4444,181 @@ test("tenants are isolated: one tenant cannot read or mutate another's data", as
   assert.equal(aEntities.regulatedEntities.length, 1);
   const aBorrower = await apiFetch(`${base}/borrowers/bor_001`, {}, TENANT_A.apiKey);
   assert.equal(aBorrower.status, 200);
+});
+
+test("tenant users log in with sessions and administer users, reviews, and service keys", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-auth-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const base = `http://127.0.0.1:${server.address().port}`;
+
+  const adminUser = await postJson(`${base}/admin/users`, {
+    email: "admin@test-a.example.in",
+    displayName: "Tenant Admin",
+    password: "CorrectHorseBatteryStaple1!",
+    adminRoles: ["tenant_admin", "user_admin", "security_admin"],
+    staffActor: {
+      actorId: "tenant-admin-actor",
+      displayName: "Tenant Admin Actor",
+      roles: ["workflow_admin"],
+      queues: ["*"],
+      canAssignQueues: ["*"]
+    }
+  }, TENANT_A.apiKey);
+  assert.equal(adminUser.status, 201);
+
+  const login = await rawFetch(`${base}/auth/login`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      scope: "tenant",
+      tenantId: TENANT_A.tenantId,
+      email: "admin@test-a.example.in",
+      password: "CorrectHorseBatteryStaple1!"
+    })
+  });
+  assert.equal(login.status, 200);
+  const tenantCookie = sessionCookieHeader(login);
+  const loginBody = await login.json();
+  assert.equal(loginBody.user.email, "admin@test-a.example.in");
+  assert.equal(loginBody.user.staffActorId, "tenant-admin-actor");
+
+  const sessionRead = await rawFetch(`${base}/staff/actors`, { headers: { cookie: tenantCookie } });
+  assert.equal(sessionRead.status, 200);
+
+  const operator = await rawFetch(`${base}/admin/users`, {
+    method: "POST",
+    headers: { "content-type": "application/json", cookie: tenantCookie },
+    body: JSON.stringify({
+      email: "operator@test-a.example.in",
+      displayName: "Operations User",
+      password: "OperatorPass1!",
+      adminRoles: ["operator"]
+    })
+  });
+  assert.equal(operator.status, 201);
+  const operatorBody = await operator.json();
+  assert.equal(operatorBody.user.email, "operator@test-a.example.in");
+
+  const review = await rawFetch(`${base}/admin/access-reviews`, {
+    method: "POST",
+    headers: { "content-type": "application/json", cookie: tenantCookie },
+    body: JSON.stringify({ reviewer: "risk-committee-q3" })
+  });
+  assert.equal(review.status, 201);
+  const reviewBody = await review.json();
+  assert.equal(reviewBody.accessReview.snapshot.length, 2);
+
+  const complete = await rawFetch(`${base}/admin/access-reviews/${reviewBody.accessReview.reviewId}/complete`, {
+    method: "POST",
+    headers: { "content-type": "application/json", cookie: tenantCookie },
+    body: JSON.stringify({
+      completedBy: "risk-committee-q3",
+      decisions: [{ userId: operatorBody.user.userId, action: "suspend", reason: "contract ended" }]
+    })
+  });
+  assert.equal(complete.status, 200);
+
+  const suspended = await rawFetch(`${base}/admin/users/${operatorBody.user.userId}`, { headers: { cookie: tenantCookie } });
+  assert.equal(suspended.status, 200);
+  assert.equal((await suspended.json()).user.status, "suspended");
+
+  const rotated = await rawFetch(`${base}/admin/api-key/rotation`, {
+    method: "POST",
+    headers: { "content-type": "application/json", cookie: tenantCookie },
+    body: JSON.stringify({ reason: "scheduled quarterly rotation" })
+  });
+  assert.equal(rotated.status, 200);
+  const rotatedBody = await rotated.json();
+  assert.ok(rotatedBody.apiKey.startsWith("lsk_"));
+
+  assert.equal((await apiFetch(`${base}/regulated-entities`, {}, TENANT_A.apiKey)).status, 401);
+  assert.equal((await apiFetch(`${base}/regulated-entities`, {}, rotatedBody.apiKey)).status, 200);
+
+  const events = await (await rawFetch(`${base}/audit/events`, { headers: { cookie: tenantCookie } })).json();
+  assert(events.events.some((event) => event.type === "tenant.api_key.rotated" && event.actorType === "tenant_user"));
+});
+
+test("platform users log in with sessions and provision tenant owners", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-platform-auth-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const adminKey = "platform-admin-secret";
+  const server = createLoanOsServer({ dataDir, platformAdminKey: adminKey });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const platformUser = await rawFetch(`${base}/platform/users`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-platform-admin-key": adminKey },
+    body: JSON.stringify({
+      email: "platform.admin@example.in",
+      displayName: "Platform Admin",
+      password: "PlatformPass1!",
+      roles: ["platform_admin", "tenant_provisioner", "security_admin"]
+    })
+  });
+  assert.equal(platformUser.status, 201);
+
+  const login = await rawFetch(`${base}/auth/login`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      scope: "platform",
+      email: "platform.admin@example.in",
+      password: "PlatformPass1!"
+    })
+  });
+  assert.equal(login.status, 200);
+  const platformCookie = sessionCookieHeader(login);
+
+  const created = await rawFetch(`${base}/platform/tenants`, {
+    method: "POST",
+    headers: { "content-type": "application/json", cookie: platformCookie },
+    body: JSON.stringify({
+      tenantId: "tnt_session_minted",
+      name: "Session Minted RE",
+      ownerUser: {
+        email: "owner@session-minted.example.in",
+        displayName: "Tenant Owner",
+        password: "OwnerPass1!"
+      }
+    })
+  });
+  assert.equal(created.status, 201);
+  const createdBody = await created.json();
+  assert.equal(createdBody.tenant.tenantId, "tnt_session_minted");
+  assert.equal(createdBody.ownerUser.email, "owner@session-minted.example.in");
+  assert.ok(createdBody.apiKey.startsWith("lsk_"));
+
+  const ownerLogin = await rawFetch(`${base}/auth/login`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      scope: "tenant",
+      tenantId: "tnt_session_minted",
+      email: "owner@session-minted.example.in",
+      password: "OwnerPass1!"
+    })
+  });
+  assert.equal(ownerLogin.status, 200);
+  const ownerCookie = sessionCookieHeader(ownerLogin);
+  const users = await rawFetch(`${base}/admin/users`, { headers: { cookie: ownerCookie } });
+  assert.equal(users.status, 200);
+  assert.equal((await users.json()).users.length, 1);
 });
 
 test("audit spine hash-chains events with a verifiable, tamper-evident chain", () => {
@@ -5108,7 +5364,7 @@ test("platform can export a tenant and offboard it with evidenced deletion", asy
   // Drive a full origination under tenant A: seeds data-plane records + audit events.
   await approveAndDisburseApplication(base);
 
-  // Export requires the platform admin key, not a tenant key.
+  // Export requires platform authority, not a tenant key.
   const forbidden = await rawFetch(`${base}/platform/tenants/${TENANT_A.tenantId}/export`);
   assert.equal(forbidden.status, 403);
 
@@ -5286,7 +5542,7 @@ test("platform maintains a sub-processor register disclosed to every tenant", as
   const base = `http://127.0.0.1:${port}`;
   const adminHeaders = { "content-type": "application/json", "x-platform-admin-key": adminKey };
 
-  // Writing the register requires the platform admin key, not a tenant key.
+  // Writing the register requires platform authority, not a tenant key.
   const forbidden = await rawFetch(`${base}/platform/sub-processors`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -6335,6 +6591,12 @@ async function postJson(url, payload, apiKey) {
     status: response.status,
     body
   };
+}
+
+function sessionCookieHeader(response) {
+  const setCookie = response.headers.get("set-cookie");
+  assert.ok(setCookie, "login response must set a session cookie");
+  return setCookie.split(";")[0];
 }
 
 async function createRegistryBackedApplication(base, overrides = {}) {

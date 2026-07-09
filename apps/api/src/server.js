@@ -159,6 +159,7 @@ import {
 import {
   appendEvent,
   buildTenantExport,
+  computeTenantOnboardingReadiness,
   createEmptyTenantData,
   ensureBootstrapTenants,
   generateApiKey,
@@ -183,10 +184,29 @@ import {
   revokeBreakGlass,
   saveState as saveWholeState,
   setTenantData,
+  TENANT_ONBOARDING_FLOWS,
+  TENANT_ONBOARDING_MODULES,
   validateSubProcessor
 } from "./file-store.js";
+import {
+  authenticatePlatformUser,
+  authenticateTenantUser,
+  completeAccessReview,
+  createAccessReview,
+  createSessionRecord,
+  hasPlatformRole,
+  hasTenantAdminRole,
+  publicPlatformUser,
+  publicSession,
+  publicTenantUser,
+  resolveSession,
+  revokeSession,
+  upsertPlatformUser,
+  upsertTenantUser
+} from "./identity.js";
 
 const DEFAULT_PORT = Number(process.env.PORT || 3040);
+const SESSION_COOKIE = "loanos_session";
 
 export function createLoanOsServer({ dataDir, bootstrapTenants = [], platformAdminKey } = {}) {
   const adminKey = platformAdminKey ?? process.env.LOANOS_PLATFORM_ADMIN_KEY ?? null;
@@ -237,6 +257,11 @@ async function route(req, res, dataDir, platformAdminKey) {
     return;
   }
 
+  if (path === "/auth" || path.startsWith("/auth/")) {
+    await routeAuth(req, res, { dataDir, method, path });
+    return;
+  }
+
   if (method === "GET" && (path === "/dashboard" || path.startsWith("/dashboard/"))) {
     try {
       if (path === "/dashboard") {
@@ -281,16 +306,53 @@ async function route(req, res, dataDir, platformAdminKey) {
 
   // --- Tenant context: every data-plane route runs inside exactly one tenant. ---
   const wholeState = await loadWholeState(dataDir);
-  const apiKey = tenantApiKeyFromRequest(req);
-  let tenant = resolveTenantByApiKey(wholeState, apiKey);
-  // A tenant's own api key is the primary path. Failing that, platform staff may
-  // present a break-glass credential scoped to exactly one tenant.
+  const sessionResolution = resolveSession(wholeState, sessionTokenFromRequest(req));
+  let tenant = null;
   let breakGlass = null;
+  let authContext = null;
+
+  if (sessionResolution?.session?.principalType === "tenant_user") {
+    tenant = sessionResolution.tenant;
+    authContext = {
+      principalType: "tenant_user",
+      tenantId: tenant.tenantId,
+      userId: sessionResolution.user.userId,
+      email: sessionResolution.user.email,
+      displayName: sessionResolution.user.displayName,
+      roles: sessionResolution.user.adminRoles ?? [],
+      staffActorId: sessionResolution.user.staffActorId ?? null,
+      sessionId: sessionResolution.session.sessionId
+    };
+  }
+
+  // A tenant session is the human path. A tenant api key remains the service
+  // integration path. Failing both, platform staff may present a break-glass
+  // credential scoped to exactly one tenant.
+  if (!tenant) {
+    const apiKey = tenantApiKeyFromRequest(req);
+    tenant = resolveTenantByApiKey(wholeState, apiKey);
+    if (tenant) {
+      authContext = {
+        principalType: "tenant_service",
+        tenantId: tenant.tenantId,
+        roles: ["tenant_service"],
+        actor: tenant.tenantId
+      };
+    }
+  }
+
   if (!tenant) {
     const resolved = resolveBreakGlass(wholeState, breakGlassKeyFromRequest(req));
     if (resolved) {
       tenant = resolved.tenant;
       breakGlass = resolved.grant;
+      authContext = {
+        principalType: "platform_staff",
+        tenantId: tenant.tenantId,
+        staffId: breakGlass.staffId,
+        roles: ["break_glass"],
+        grantId: breakGlass.grantId
+      };
     }
   }
   if (!tenant) {
@@ -323,6 +385,9 @@ async function route(req, res, dataDir, platformAdminKey) {
       }
     }
   }
+  if (authContext) {
+    authContext.effectiveTenantId = tenant.tenantId;
+  }
 
   // The store hands each handler ONLY this tenant's partition. There is no code
   // path from a handler back to another tenant's data. On every save the tenant's
@@ -335,7 +400,9 @@ async function route(req, res, dataDir, platformAdminKey) {
   // ordinary requests attribute to the tenant.
   const auditActor = breakGlass
     ? { actor: `platform:${breakGlass.staffId}`, actorType: AUDIT_ACTOR_TYPES.PLATFORM_STAFF }
-    : { actor: tenant.tenantId, actorType: AUDIT_ACTOR_TYPES.TENANT };
+    : authContext?.principalType === "tenant_user"
+      ? { actor: authContext.staffActorId ?? authContext.userId, actorType: AUDIT_ACTOR_TYPES.TENANT_USER }
+      : { actor: tenant.tenantId, actorType: AUDIT_ACTOR_TYPES.TENANT };
   const store = {
     load: async () => getTenantData(scopedWholeState, tenant.tenantId) ?? createEmptyTenantData(),
     save: async (tenantData) => {
@@ -346,6 +413,12 @@ async function route(req, res, dataDir, platformAdminKey) {
       };
       scopedWholeState = setTenantData(scopedWholeState, tenant.tenantId, sealed);
       await saveWholeState(scopedWholeState, dataDir);
+    }
+  };
+  const stateRef = {
+    get: () => scopedWholeState,
+    set: (nextState) => {
+      scopedWholeState = nextState;
     }
   };
 
@@ -408,6 +481,11 @@ async function route(req, res, dataDir, platformAdminKey) {
     sendJson(res, 200, {
       grants: listBreakGlassGrants(scopedWholeState, tenant.tenantId)
     });
+    return;
+  }
+
+  if (path === "/admin" || path.startsWith("/admin/")) {
+    await routeTenantAdmin(req, res, { dataDir, method, path, tenant, authContext, store, stateRef });
     return;
   }
 
@@ -4544,8 +4622,608 @@ function platformAdminKeyFromRequest(req) {
   return Array.isArray(key) ? key[0] : key ?? null;
 }
 
+function sessionTokenFromRequest(req) {
+  const cookieHeader = req.headers["cookie"];
+  const raw = Array.isArray(cookieHeader) ? cookieHeader.join("; ") : cookieHeader ?? "";
+  for (const part of raw.split(";")) {
+    const [name, ...valueParts] = part.trim().split("=");
+    if (name === SESSION_COOKIE) {
+      return decodeURIComponent(valueParts.join("="));
+    }
+  }
+  return null;
+}
+
+function sessionCookie(token, expiresAt) {
+  return `${SESSION_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Expires=${new Date(expiresAt).toUTCString()}`;
+}
+
+function expiredSessionCookie() {
+  return `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+}
+
+async function platformAuthFromRequest(req, dataDir, platformAdminKey) {
+  const key = platformAdminKeyFromRequest(req);
+  if (platformAdminKey && key === platformAdminKey) {
+    return {
+      authContext: {
+        principalType: "platform_key",
+        userId: "platform_admin_key",
+        displayName: "Platform admin key",
+        roles: ["platform_admin", "tenant_provisioner", "security_admin", "auditor"]
+      }
+    };
+  }
+  const state = await loadWholeState(dataDir);
+  const resolved = resolveSession(state, sessionTokenFromRequest(req));
+  if (resolved?.session?.principalType !== "platform_user") {
+    return { authContext: null };
+  }
+  return {
+    authContext: {
+      principalType: "platform_user",
+      userId: resolved.user.userId,
+      email: resolved.user.email,
+      displayName: resolved.user.displayName,
+      roles: resolved.user.roles ?? [],
+      sessionId: resolved.session.sessionId
+    }
+  };
+}
+
+function authActor(authContext) {
+  return authContext?.staffActorId
+    ?? authContext?.userId
+    ?? authContext?.staffId
+    ?? authContext?.actor
+    ?? "system";
+}
+
+function publicAuthContext(authContext) {
+  if (!authContext) return null;
+  const { sessionId, ...rest } = authContext;
+  return rest;
+}
+
+function mergeOnboardingConfig(input, patch) {
+  return {
+    ...(input ?? {}),
+    productIds: [
+      ...new Set([
+        ...((input?.productIds && Array.isArray(input.productIds)) ? input.productIds : []),
+        ...((patch?.productIds && Array.isArray(patch.productIds)) ? patch.productIds : [])
+      ])
+    ],
+    primaryRegulatedEntityId:
+      input?.primaryRegulatedEntityId ?? patch?.primaryRegulatedEntityId ?? null
+  };
+}
+
+function validationErrorPayload(code, message, findings, context = {}) {
+  return {
+    error: { code, message },
+    findings,
+    ...context
+  };
+}
+
+function provisionTenantSetup(state, tenantId, body, authContext, now = new Date()) {
+  let tenantData = state.tenants[tenantId] ?? createEmptyTenantData();
+  const seeded = {
+    regulatedEntity: null,
+    products: []
+  };
+  const actor = authActor(authContext);
+
+  if (body.regulatedEntity) {
+    const reResult = upsertRegulatedEntity(tenantData.regulatedEntities, body.regulatedEntity, now);
+    if (reResult.summary.status === "blocked") {
+      return {
+        ok: false,
+        statusCode: 422,
+        payload: validationErrorPayload(
+          "onboarding_regulated_entity_invalid",
+          "The regulated entity profile is incomplete or non-compliant.",
+          reResult.findings,
+          { summary: reResult.summary }
+        )
+      };
+    }
+    seeded.regulatedEntity = reResult.entity;
+    tenantData = appendEvent(
+      {
+        ...tenantData,
+        regulatedEntities: reResult.registry
+      },
+      {
+        type: "tenant_onboarding.regulated_entity_seeded",
+        regulatedEntityId: reResult.entity.regulatedEntityId,
+        actor
+      },
+      now
+    );
+  }
+
+  const productInputs = Array.isArray(body.products) ? body.products : [];
+  for (const inputProduct of productInputs) {
+    const productInput = {
+      ...inputProduct,
+      regulatedEntityId:
+        inputProduct.regulatedEntityId ??
+        seeded.regulatedEntity?.regulatedEntityId ??
+        body.onboarding?.primaryRegulatedEntityId
+    };
+    const productResult = upsertProductPolicy(tenantData.productPolicies, productInput, tenantData.regulatedEntities, now);
+    if (productResult.summary.status === "blocked") {
+      return {
+        ok: false,
+        statusCode: 422,
+        payload: validationErrorPayload(
+          "onboarding_product_invalid",
+          `The product policy ${productInput.productCode ?? productInput.productId ?? ""} is incomplete or non-compliant.`.trim(),
+          productResult.findings,
+          { product: productResult.product, summary: productResult.summary }
+        )
+      };
+    }
+    seeded.products.push(productResult.product);
+    tenantData = appendEvent(
+      {
+        ...tenantData,
+        productPolicies: productResult.registry
+      },
+      {
+        type: "tenant_onboarding.product_seeded",
+        productId: productResult.product.productId,
+        productCode: productResult.product.productCode,
+        regulatedEntityId: productResult.product.regulatedEntityId,
+        actor
+      },
+      now
+    );
+  }
+
+  const sealedTenantData = {
+    ...tenantData,
+    events: sealAuditChain(
+      stampAuditEvents(tenantData.events, { actor, actorType: AUDIT_ACTOR_TYPES.PLATFORM_STAFF }),
+      tenantId
+    )
+  };
+  const seededState = setTenantData(state, tenantId, sealedTenantData);
+  const onboarding = mergeOnboardingConfig(body.onboarding, {
+    primaryRegulatedEntityId: seeded.regulatedEntity?.regulatedEntityId,
+    productIds: seeded.products.map((product) => product.productId)
+  });
+  const nextState = registerTenant(
+    seededState,
+    {
+      tenantId,
+      name: state.controlPlane.tenants[tenantId]?.name,
+      isolationTier: state.controlPlane.tenants[tenantId]?.isolationTier,
+      status: state.controlPlane.tenants[tenantId]?.status,
+      isSandbox: state.controlPlane.tenants[tenantId]?.isSandbox,
+      parentTenantId: state.controlPlane.tenants[tenantId]?.parentTenantId,
+      sandboxName: state.controlPlane.tenants[tenantId]?.sandboxName,
+      onboarding
+    },
+    now
+  );
+
+  return {
+    ok: true,
+    state: nextState,
+    seeded
+  };
+}
+
+async function routeAuth(req, res, { dataDir, method, path }) {
+  if (method === "POST" && path === "/auth/login") {
+    const body = await readJson(req);
+    const scope = body.scope === "platform" ? "platform" : "tenant";
+    const state = await loadWholeState(dataDir);
+    const now = new Date();
+
+    if (scope === "platform") {
+      const authenticated = authenticatePlatformUser(state.controlPlane, body, now);
+      if (!authenticated) {
+        sendJson(res, 401, { error: { code: "invalid_credentials", message: "Invalid email or password." } });
+        return;
+      }
+      const { token, session } = createSessionRecord({
+        principalType: "platform_user",
+        userId: authenticated.user.userId,
+        email: authenticated.user.email,
+        displayName: authenticated.user.displayName,
+        roles: authenticated.user.roles
+      }, now);
+      const nextState = {
+        ...state,
+        controlPlane: {
+          ...state.controlPlane,
+          platformUsers: {
+            ...state.controlPlane.platformUsers,
+            [authenticated.user.userId]: authenticated.storedUser
+          },
+          sessions: {
+            ...state.controlPlane.sessions,
+            [session.sessionId]: session
+          }
+        }
+      };
+      await saveWholeState(nextState, dataDir);
+      sendJson(
+        res,
+        200,
+        { scope, user: authenticated.user, session: publicSession(session) },
+        { "set-cookie": sessionCookie(token, session.expiresAt) }
+      );
+      return;
+    }
+
+    const tenantId = body.tenantId;
+    const tenant = state.controlPlane.tenants?.[tenantId];
+    const tenantData = state.tenants?.[tenantId];
+    if (!tenant || tenant.status !== "active" || !tenantData) {
+      sendJson(res, 401, { error: { code: "invalid_credentials", message: "Invalid tenant, email, or password." } });
+      return;
+    }
+    const authenticated = authenticateTenantUser(tenantData, body, now);
+    if (!authenticated) {
+      sendJson(res, 401, { error: { code: "invalid_credentials", message: "Invalid tenant, email, or password." } });
+      return;
+    }
+    const { token, session } = createSessionRecord({
+      principalType: "tenant_user",
+      tenantId,
+      userId: authenticated.user.userId,
+      email: authenticated.user.email,
+      displayName: authenticated.user.displayName,
+      roles: authenticated.user.adminRoles,
+      staffActorId: authenticated.user.staffActorId
+    }, now);
+    const nextTenantData = {
+      ...tenantData,
+      users: {
+        ...tenantData.users,
+        [authenticated.user.userId]: authenticated.storedUser
+      }
+    };
+    const nextState = {
+      ...state,
+      controlPlane: {
+        ...state.controlPlane,
+        sessions: {
+          ...state.controlPlane.sessions,
+          [session.sessionId]: session
+        }
+      },
+      tenants: {
+        ...state.tenants,
+        [tenantId]: nextTenantData
+      }
+    };
+    await saveWholeState(nextState, dataDir);
+    sendJson(
+      res,
+      200,
+      { scope, tenant: publicTenant(tenant), user: authenticated.user, session: publicSession(session) },
+      { "set-cookie": sessionCookie(token, session.expiresAt) }
+    );
+    return;
+  }
+
+  if (method === "GET" && path === "/auth/me") {
+    const state = await loadWholeState(dataDir);
+    const resolved = resolveSession(state, sessionTokenFromRequest(req));
+    if (!resolved) {
+      sendJson(res, 401, { error: { code: "session_required", message: "A valid login session is required." } });
+      return;
+    }
+    if (resolved.session.principalType === "tenant_user") {
+      sendJson(res, 200, {
+        scope: "tenant",
+        tenant: publicTenant(resolved.tenant),
+        user: resolved.user,
+        session: publicSession(resolved.session)
+      });
+      return;
+    }
+    sendJson(res, 200, {
+      scope: "platform",
+      user: resolved.user,
+      session: publicSession(resolved.session)
+    });
+    return;
+  }
+
+  if (method === "POST" && path === "/auth/logout") {
+    const state = await loadWholeState(dataDir);
+    const resolved = resolveSession(state, sessionTokenFromRequest(req));
+    const nextSessions = resolved
+      ? revokeSession(state.controlPlane.sessions, resolved.session.sessionId)
+      : state.controlPlane.sessions;
+    await saveWholeState({
+      ...state,
+      controlPlane: {
+        ...state.controlPlane,
+        sessions: nextSessions
+      }
+    }, dataDir);
+    sendJson(res, 200, { ok: true }, { "set-cookie": expiredSessionCookie() });
+    return;
+  }
+
+  sendJson(res, 404, { error: { code: "not_found", message: "Auth route not found." } });
+}
+
+async function routeTenantAdmin(req, res, { dataDir, method, path, tenant, authContext, store, stateRef }) {
+  if (!hasTenantAdminRole(authContext)) {
+    sendJson(res, 403, {
+      error: {
+        code: "tenant_admin_forbidden",
+        message: "A tenant admin, user admin, security admin, or tenant service key is required."
+      }
+    });
+    return;
+  }
+
+  if (method === "GET" && path === "/admin/me") {
+    sendJson(res, 200, {
+      tenant: publicTenant(tenant),
+      auth: publicAuthContext(authContext)
+    });
+    return;
+  }
+
+  if (method === "GET" && path === "/admin/governance-summary") {
+    const state = await store.load();
+    const users = Object.values(state.users ?? {});
+    const reviews = Object.values(state.accessReviews ?? {});
+    sendJson(res, 200, {
+      tenant: publicTenant(tenant),
+      users: {
+        total: users.length,
+        active: users.filter((user) => user.status === "active").length,
+        suspended: users.filter((user) => user.status === "suspended").length
+      },
+      accessReviews: {
+        total: reviews.length,
+        open: reviews.filter((review) => review.status === "open").length,
+        completed: reviews.filter((review) => review.status === "completed").length
+      },
+      serviceAccess: {
+        apiKeyLastRotatedAt: tenant.apiKeyRotatedAt ?? tenant.updatedAt ?? null,
+        apiKeyLastRotatedBy: tenant.apiKeyRotatedBy ?? null
+      },
+      onboarding: computeTenantOnboardingReadiness(tenant, state)
+    });
+    return;
+  }
+
+  if (method === "GET" && path === "/admin/users") {
+    const state = await store.load();
+    sendJson(res, 200, { users: Object.values(state.users ?? {}).map(publicTenantUser) });
+    return;
+  }
+
+  if (method === "POST" && path === "/admin/users") {
+    const body = await readJson(req);
+    const state = await store.load();
+    let nextStaffActors = state.staffActors;
+    if (body.staffActor) {
+      const staffResult = upsertStaffActor(state.staffActors, body.staffActor);
+      if (staffResult.summary.status === "blocked") {
+        sendJson(res, 422, {
+          error: { code: "staff_actor_invalid", message: "Linked staff actor is invalid." },
+          findings: staffResult.findings
+        });
+        return;
+      }
+      nextStaffActors = staffResult.registry;
+      body.staffActorId = staffResult.actor.actorId;
+    }
+    const result = upsertTenantUser(state.users ?? {}, body);
+    if (result.findings.length > 0) {
+      sendJson(res, 422, {
+        error: { code: "tenant_user_invalid", message: "Tenant user is invalid." },
+        findings: result.findings
+      });
+      return;
+    }
+    const nextState = appendEvent(
+      {
+        ...state,
+        staffActors: nextStaffActors,
+        users: result.users
+      },
+      {
+        type: "tenant_user.upserted",
+        userId: result.user.userId,
+        email: result.user.email,
+        adminRoles: result.user.adminRoles,
+        actor: authActor(authContext)
+      }
+    );
+    await store.save(nextState);
+    sendJson(res, 201, { user: result.user });
+    return;
+  }
+
+  const userMatch = path.match(/^\/admin\/users\/([^/]+)$/);
+  if (method === "GET" && userMatch) {
+    const state = await store.load();
+    const user = state.users?.[decodeURIComponent(userMatch[1])];
+    if (!user) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Tenant user not found." } });
+      return;
+    }
+    sendJson(res, 200, { user: publicTenantUser(user) });
+    return;
+  }
+
+  const userStatusMatch = path.match(/^\/admin\/users\/([^/]+)\/status$/);
+  if (method === "POST" && userStatusMatch) {
+    const body = await readJson(req);
+    const state = await store.load();
+    const userId = decodeURIComponent(userStatusMatch[1]);
+    const existing = state.users?.[userId];
+    if (!existing) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Tenant user not found." } });
+      return;
+    }
+    const result = upsertTenantUser(state.users ?? {}, { ...existing, status: body.status });
+    if (result.findings.length > 0) {
+      sendJson(res, 422, {
+        error: { code: "tenant_user_invalid", message: "Tenant user status is invalid." },
+        findings: result.findings
+      });
+      return;
+    }
+    const nextState = appendEvent(
+      { ...state, users: result.users },
+      { type: "tenant_user.status_changed", userId, status: body.status, actor: authActor(authContext) }
+    );
+    await store.save(nextState);
+    sendJson(res, 200, { user: result.user });
+    return;
+  }
+
+  const userPasswordMatch = path.match(/^\/admin\/users\/([^/]+)\/password$/);
+  if (method === "POST" && userPasswordMatch) {
+    const body = await readJson(req);
+    const state = await store.load();
+    const userId = decodeURIComponent(userPasswordMatch[1]);
+    const existing = state.users?.[userId];
+    if (!existing) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Tenant user not found." } });
+      return;
+    }
+    const result = upsertTenantUser(state.users ?? {}, { ...existing, password: body.password });
+    if (result.findings.length > 0) {
+      sendJson(res, 422, {
+        error: { code: "tenant_user_invalid", message: "Tenant user password update is invalid." },
+        findings: result.findings
+      });
+      return;
+    }
+    const nextState = appendEvent(
+      { ...state, users: result.users },
+      { type: "tenant_user.password_reset", userId, actor: authActor(authContext) }
+    );
+    await store.save(nextState);
+    sendJson(res, 200, { user: result.user });
+    return;
+  }
+
+  if (method === "GET" && path === "/admin/access-reviews") {
+    const state = await store.load();
+    sendJson(res, 200, { accessReviews: Object.values(state.accessReviews ?? {}) });
+    return;
+  }
+
+  if (method === "POST" && path === "/admin/access-reviews") {
+    const body = await readJson(req);
+    const state = await store.load();
+    const { review } = createAccessReview(state.users ?? {}, body);
+    const nextState = appendEvent(
+      {
+        ...state,
+        accessReviews: {
+          ...(state.accessReviews ?? {}),
+          [review.reviewId]: review
+        }
+      },
+      {
+        type: "access_review.created",
+        reviewId: review.reviewId,
+        reviewer: review.reviewer,
+        actor: authActor(authContext)
+      }
+    );
+    await store.save(nextState);
+    sendJson(res, 201, { accessReview: review });
+    return;
+  }
+
+  const accessReviewCompleteMatch = path.match(/^\/admin\/access-reviews\/([^/]+)\/complete$/);
+  if (method === "POST" && accessReviewCompleteMatch) {
+    const body = await readJson(req);
+    const state = await store.load();
+    const reviewId = decodeURIComponent(accessReviewCompleteMatch[1]);
+    const result = completeAccessReview(state.accessReviews ?? {}, state.users ?? {}, reviewId, body);
+    if (result.findings.length > 0) {
+      sendJson(res, 422, {
+        error: { code: "access_review_invalid", message: "Access review cannot be completed." },
+        findings: result.findings
+      });
+      return;
+    }
+    const nextState = appendEvent(
+      {
+        ...state,
+        users: result.users,
+        accessReviews: result.reviews
+      },
+      {
+        type: "access_review.completed",
+        reviewId,
+        completedBy: body.completedBy ?? null,
+        actor: authActor(authContext)
+      }
+    );
+    await store.save(nextState);
+    sendJson(res, 200, { accessReview: result.review });
+    return;
+  }
+
+  if (method === "POST" && path === "/admin/api-key/rotation") {
+    if (!hasTenantAdminRole(authContext, ["tenant_admin", "security_admin"])) {
+      sendJson(res, 403, {
+        error: { code: "api_key_rotation_forbidden", message: "Tenant admin or security admin role is required." }
+      });
+      return;
+    }
+    const body = await readJson(req);
+    const apiKey = generateApiKey(tenant.isSandbox);
+    const now = new Date();
+    const wholeState = stateRef.get();
+    const rotatedState = registerTenant(wholeState, {
+      tenantId: tenant.tenantId,
+      name: tenant.name,
+      apiKey,
+      isolationTier: tenant.isolationTier,
+      status: tenant.status,
+      isSandbox: tenant.isSandbox,
+      parentTenantId: tenant.parentTenantId,
+      sandboxName: tenant.sandboxName
+    }, now);
+    rotatedState.controlPlane.tenants[tenant.tenantId] = {
+      ...rotatedState.controlPlane.tenants[tenant.tenantId],
+      apiKeyRotatedAt: now.toISOString(),
+      apiKeyRotatedBy: authActor(authContext)
+    };
+    stateRef.set(rotatedState);
+    const state = await store.load();
+    const nextTenantData = appendEvent(state, {
+      type: "tenant.api_key.rotated",
+      actor: authActor(authContext),
+      reason: body.reason ?? null
+    });
+    await store.save(nextTenantData);
+    sendJson(res, 200, {
+      tenant: publicTenant(stateRef.get().controlPlane.tenants[tenant.tenantId]),
+      apiKey
+    });
+    return;
+  }
+
+  sendJson(res, 404, { error: { code: "not_found", message: "Admin route not found." } });
+}
+
 async function routePlatform(req, res, { dataDir, platformAdminKey, method, path }) {
-  if (!platformAdminKey) {
+  const platformAuth = await platformAuthFromRequest(req, dataDir, platformAdminKey);
+  if (!platformAuth.authContext && !platformAdminKey) {
     sendJson(res, 403, {
       error: {
         code: "platform_admin_disabled",
@@ -4554,13 +5232,86 @@ async function routePlatform(req, res, { dataDir, platformAdminKey, method, path
     });
     return;
   }
-  if (platformAdminKeyFromRequest(req) !== platformAdminKey) {
+  if (!platformAuth.authContext) {
     sendJson(res, 403, {
       error: {
         code: "platform_admin_forbidden",
         message: "A valid platform admin key is required for tenant administration."
       }
     });
+    return;
+  }
+  const authContext = platformAuth.authContext;
+
+  if (method === "GET" && path === "/platform/admin-summary") {
+    if (!hasPlatformRole(authContext, ["platform_admin", "tenant_provisioner", "security_admin", "auditor"])) {
+      sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } });
+      return;
+    }
+    const state = await loadWholeState(dataDir);
+    const tenants = Object.values(state.controlPlane.tenants ?? {});
+    sendJson(res, 200, {
+      tenants: {
+        total: tenants.length,
+        active: tenants.filter((tenant) => tenant.status === "active").length,
+        offboarded: tenants.filter((tenant) => tenant.status === "offboarded").length,
+        sandboxes: tenants.filter((tenant) => tenant.isSandbox).length
+      },
+      subProcessors: Object.keys(state.controlPlane.subProcessors ?? {}).length,
+      breakGlassGrants: Object.keys(state.controlPlane.breakGlassGrants ?? {}).length,
+      platformUsers: Object.keys(state.controlPlane.platformUsers ?? {}).length
+    });
+    return;
+  }
+
+  if (method === "GET" && path === "/platform/onboarding-options") {
+    if (!hasPlatformRole(authContext, ["platform_admin", "tenant_provisioner", "security_admin", "auditor"])) {
+      sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } });
+      return;
+    }
+    sendJson(res, 200, {
+      modules: TENANT_ONBOARDING_MODULES,
+      flows: TENANT_ONBOARDING_FLOWS,
+      launchModes: ["pilot", "production", "sandbox_only"],
+      isolationTiers: ["pooled", "dedicated"]
+    });
+    return;
+  }
+
+  if (method === "GET" && path === "/platform/users") {
+    if (!hasPlatformRole(authContext, ["platform_admin", "security_admin", "auditor"])) {
+      sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } });
+      return;
+    }
+    const state = await loadWholeState(dataDir);
+    sendJson(res, 200, { users: Object.values(state.controlPlane.platformUsers ?? {}).map(publicPlatformUser) });
+    return;
+  }
+
+  if (method === "POST" && path === "/platform/users") {
+    if (!hasPlatformRole(authContext, ["platform_admin", "security_admin"])) {
+      sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } });
+      return;
+    }
+    const body = await readJson(req);
+    const state = await loadWholeState(dataDir);
+    const result = upsertPlatformUser(state.controlPlane.platformUsers ?? {}, body);
+    if (result.findings.length > 0) {
+      sendJson(res, 422, {
+        error: { code: "platform_user_invalid", message: "Platform user is invalid." },
+        findings: result.findings
+      });
+      return;
+    }
+    const nextState = {
+      ...state,
+      controlPlane: {
+        ...state.controlPlane,
+        platformUsers: result.users
+      }
+    };
+    await saveWholeState(nextState, dataDir);
+    sendJson(res, 201, { user: result.user });
     return;
   }
 
@@ -4595,6 +5346,10 @@ async function routePlatform(req, res, { dataDir, platformAdminKey, method, path
   // one-time, time-boxed credential stored only as a hash.
   const breakGlassMintMatch = path.match(/^\/platform\/tenants\/([^/]+)\/break-glass$/);
   if (method === "POST" && breakGlassMintMatch) {
+    if (!hasPlatformRole(authContext, ["platform_admin", "security_admin"])) {
+      sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } });
+      return;
+    }
     const body = await readJson(req);
     const tenantId = decodeURIComponent(breakGlassMintMatch[1]);
     const state = await loadWholeState(dataDir);
@@ -4620,7 +5375,7 @@ async function routePlatform(req, res, { dataDir, platformAdminKey, method, path
       staffId: body.staffId,
       reason: body.reason,
       ttlMinutes: body.ttlMinutes,
-      createdBy: "platform_admin",
+      createdBy: authActor(authContext),
       credential
     });
     await saveWholeState(nextState, dataDir);
@@ -4640,6 +5395,10 @@ async function routePlatform(req, res, { dataDir, platformAdminKey, method, path
 
   const breakGlassRevokeMatch = path.match(/^\/platform\/break-glass\/([^/]+)\/revoke$/);
   if (method === "POST" && breakGlassRevokeMatch) {
+    if (!hasPlatformRole(authContext, ["platform_admin", "security_admin"])) {
+      sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } });
+      return;
+    }
     const state = await loadWholeState(dataDir);
     const nextState = revokeBreakGlass(state, decodeURIComponent(breakGlassRevokeMatch[1]));
     if (!nextState) {
@@ -4660,6 +5419,10 @@ async function routePlatform(req, res, { dataDir, platformAdminKey, method, path
   }
 
   if (method === "POST" && path === "/platform/tenants") {
+    if (!hasPlatformRole(authContext, ["platform_admin", "tenant_provisioner"])) {
+      sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } });
+      return;
+    }
     const body = await readJson(req);
     if (!body.tenantId) {
       sendJson(res, 422, {
@@ -4674,19 +5437,79 @@ async function routePlatform(req, res, { dataDir, platformAdminKey, method, path
       });
       return;
     }
+    const now = new Date();
+    const productIds = Array.isArray(body.products) ? body.products.map((product) => product.productId).filter(Boolean) : [];
+    const onboarding = mergeOnboardingConfig(body.onboarding, {
+      primaryRegulatedEntityId: body.regulatedEntity?.regulatedEntityId,
+      productIds
+    });
     // The api key is returned once here and only ever stored as a hash.
     const apiKey = body.apiKey ?? generateApiKey();
-    const nextState = registerTenant(state, {
+    let nextState = registerTenant(state, {
       tenantId: body.tenantId,
       name: body.name,
       apiKey,
       isolationTier: body.isolationTier,
-      status: body.status
-    });
+      status: body.status,
+      onboarding
+    }, now);
+    let ownerUser = null;
+    if (body.ownerUser) {
+      const tenantData = nextState.tenants[body.tenantId];
+      const result = upsertTenantUser(tenantData.users ?? {}, {
+        ...body.ownerUser,
+        adminRoles: body.ownerUser.adminRoles ?? ["tenant_admin", "user_admin", "security_admin", "auditor"]
+      });
+      if (result.findings.length > 0) {
+        sendJson(res, 422, {
+          error: { code: "tenant_owner_invalid", message: "Tenant owner user is invalid." },
+          findings: result.findings
+        });
+        return;
+      }
+      ownerUser = result.user;
+      nextState = setTenantData(nextState, body.tenantId, {
+        ...tenantData,
+        users: result.users
+      });
+    }
+    if (body.regulatedEntity || (Array.isArray(body.products) && body.products.length > 0)) {
+      const setup = provisionTenantSetup(nextState, body.tenantId, body, authContext, now);
+      if (!setup.ok) {
+        sendJson(res, setup.statusCode, setup.payload);
+        return;
+      }
+      nextState = setup.state;
+    }
+    const readiness = computeTenantOnboardingReadiness(
+      nextState.controlPlane.tenants[body.tenantId],
+      nextState.tenants[body.tenantId]
+    );
     await saveWholeState(nextState, dataDir);
     sendJson(res, 201, {
       tenant: publicTenant(nextState.controlPlane.tenants[body.tenantId]),
+      ownerUser,
+      readiness,
       apiKey
+    });
+    return;
+  }
+
+  const tenantOnboardingMatch = path.match(/^\/platform\/tenants\/([^/]+)\/onboarding$/);
+  if (method === "GET" && tenantOnboardingMatch) {
+    const state = await loadWholeState(dataDir);
+    const tenantId = decodeURIComponent(tenantOnboardingMatch[1]);
+    const record = state.controlPlane.tenants[tenantId];
+    const tenantData = state.tenants[tenantId];
+    if (!record || !tenantData) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Tenant not found." } });
+      return;
+    }
+    sendJson(res, 200, {
+      tenant: publicTenant(record),
+      readiness: computeTenantOnboardingReadiness(record, tenantData),
+      regulatedEntities: Object.values(tenantData.regulatedEntities ?? {}),
+      products: Object.values(tenantData.productPolicies ?? {})
     });
     return;
   }
@@ -4775,11 +5598,12 @@ async function readJson(req) {
   return JSON.parse(raw);
 }
 
-function sendJson(res, statusCode, payload) {
+function sendJson(res, statusCode, payload, headers = {}) {
   const body = JSON.stringify(payload, null, 2);
   res.writeHead(statusCode, {
     "content-type": "application/json; charset=utf-8",
-    "content-length": Buffer.byteLength(body)
+    "content-length": Buffer.byteLength(body),
+    ...headers
   });
   res.end(body);
 }

@@ -27,7 +27,7 @@ Both tiers are India-hosted. Tier choice is a tenant-contract fact recorded in t
 
 ## Identity and Access
 
-- Platform IAM authenticates humans (OIDC/SSO per tenant) and services (scoped API credentials per tenant and environment).
+- Local IAM now authenticates tenant/platform humans with HTTP-only sessions and services with scoped tenant API credentials; production IAM should federate this through OIDC/SSO per tenant.
 - The existing staff-actor registry becomes the tenant-level authorization layer: IAM proves who you are; the staff-actor registry decides what regulated actions you may perform (maker, checker, credit officer, grievance officer, human reviewer).
 - Maker-checker and four-eyes rules already enforced in the domain remain the source of truth; IAM never bypasses them.
 
@@ -84,10 +84,10 @@ Whether LoanOS also constitutes a lending service provider (LSP) under the Digit
 ## Engineering Direction (Sequenced)
 
 1. **Tenant context groundwork.** *Done.* State is partitioned into a control plane (tenant registry) and per-tenant data planes in `apps/api/src/file-store.js`; a tenant-scoped store in `apps/api/src/server.js` hands each request only its own partition.
-2. **API authentication.** *Done.* Every data-plane route resolves a tenant from `x-api-key`/bearer and returns 401 without a valid key. Tenants are minted through `POST /platform/tenants` behind a platform admin key; api keys are stored only as hashes. Platform-staff identities and human login are still to come.
+2. **API and human authentication.** *Done.* Every data-plane route resolves a tenant from either a tenant user session or `x-api-key`/bearer service credential and returns 401 without a valid tenant context. Tenants are minted through `POST /platform/tenants` behind a platform admin key or platform admin session; api keys are stored only as hashes, tenant service keys are rotatable, and tenant/platform users have PBKDF2-hashed passwords with HTTP-only sessions.
 3. **Cross-tenant isolation tests.** *Done.* A regression suite provisions two tenants and proves tenant B cannot read or mutate tenant A's records across resource types, plus 401 on missing/invalid keys.
 4. **Audit spine.** *Done.* Every save seals tenant events into a tamper-evident SHA-256 chain; `GET /audit/events` reports chain validity, and `GET /audit/export` produces a verifiable evidence pack.
-5. **Tenant lifecycle.** *Done.* `GET /platform/tenants/:id/export` produces a reproducible portability pack; `POST /platform/tenants/:id/offboarding` performs evidenced deletion; sandbox environments can be provisioned, reset, and deleted with synthetic-only borrower checks and automatic mock overrides.
-6. **Vendor posture pack.** *Done.* CERT-In/RBI 6-hour incident clock is tracked in `GET`/`POST /incidents`; sub-processor register is active in `GET`/`POST /platform/sub-processors`; platform staff break-glass is active, time-boxed, and sealed into tenant audit chains.
+5. **Tenant lifecycle.** *Done.* Platform onboarding can create the tenant shell, owner user, regulated entity profile, first product policies, enabled module/flow blueprint, readiness checklist, and one-time service key in one transaction; `GET /platform/tenants/:id/export` produces a reproducible portability pack; `POST /platform/tenants/:id/offboarding` performs evidenced deletion; sandbox environments can be provisioned, reset, and deleted with synthetic-only borrower checks and automatic mock overrides.
+6. **Vendor posture pack.** *Done.* CERT-In/RBI 6-hour incident clock is tracked in `GET`/`POST /incidents`; sub-processor register is active in `GET`/`POST /platform/sub-processors`; platform staff break-glass is active, time-boxed, and sealed into tenant audit chains; platform users can log in and perform control-plane administration by role.
 
-Steps 1–5 are complete, and Step 6 is partially complete (incident notification, sub-processor register, and break-glass are implemented; contract terms and certifications remain).
+Steps 1–6 have executable first slices. Contract terms, BCP/DR evidence, certifications, external IAM/SSO/MFA integration, and production key-management infrastructure remain outside this local implementation.

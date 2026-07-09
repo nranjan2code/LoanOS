@@ -180,11 +180,11 @@ The current codebase contains Phase 0 executable controls:
 
 ## What We Build Next
 
-Recently completed: SaaS tenancy groundwork plus the audit spine — per-tenant state partitioning, tenant-scoped API authentication, a platform control plane for minting tenants, a cross-tenant isolation suite, and a tamper-evident per-tenant audit hash chain with an integrity-attested evidence export pack (Epic 11, stages S1–S4).
+Recently completed: SaaS tenancy groundwork, tenant onboarding, human login/admin, and the audit spine — per-tenant state partitioning, tenant-scoped service credentials, tenant/platform user sessions, tenant user administration, access reviews, service-key rotation, a platform onboarding wizard/control plane for tenant shell + owner + RE + product + module/flow readiness, a cross-tenant isolation suite, and a tamper-evident per-tenant audit hash chain with an integrity-attested evidence export pack (Epic 11, stages S1–S6 first slices).
 
 Immediate next build:
 
-1. Tenant lifecycle: onboarding/offboarding, sandbox environments, and a full tenant export (records plus audit spine plus rendered documents) with evidenced deletion (Epic 11, stage S5).
+1. Production hardening for tenant lifecycle: enterprise IAM/SSO, MFA, admin maker-checker, deeper key management, and expanded onboarding approvals around the existing wizard/offboarding/export foundation (Epic 11, stage S5/S6).
 2. Product policy versioning with effective dates and explicit prepayment/foreclosure policy rules.
 3. CKYC adapter boundary and fuller V-CIP evidence vault.
 4. Data-retention, deletion-request, and third-party sharing consent workflows.

@@ -8,8 +8,52 @@ import {
   normalizeWorkflowTaskStore,
   verifyAuditChain
 } from "../../../packages/core/src/index.js";
+import {
+  normalizeAccessReviews,
+  normalizePlatformUsers,
+  normalizeSessions,
+  normalizeTenantUsers,
+  upsertTenantUser
+} from "./identity.js";
 
-export const STATE_VERSION = 2;
+export const STATE_VERSION = 4;
+
+export const TENANT_ONBOARDING_MODULES = [
+  { id: "los", label: "Loan Origination", defaultEnabled: true },
+  { id: "lms", label: "Loan Management", defaultEnabled: true },
+  { id: "lws", label: "Workflow Studio", defaultEnabled: true },
+  { id: "compliance", label: "Compliance Evidence", defaultEnabled: true },
+  { id: "iam", label: "Identity and Access", defaultEnabled: true },
+  { id: "ai_governance", label: "AI Governance", defaultEnabled: false },
+  { id: "collections", label: "Collections and Recovery", defaultEnabled: false },
+  { id: "marketplace", label: "Marketplace Offers", defaultEnabled: false },
+  { id: "integrations", label: "External Integrations", defaultEnabled: false }
+];
+
+export const TENANT_ONBOARDING_FLOWS = [
+  { id: "borrower_onboarding", label: "Borrower Onboarding", defaultEnabled: true },
+  { id: "kyc", label: "KYC and Consent", defaultEnabled: true },
+  { id: "eligibility", label: "Eligibility and Underwriting", defaultEnabled: true },
+  { id: "kfs", label: "KFS and Offer", defaultEnabled: true },
+  { id: "maker_checker", label: "Maker-Checker Approval", defaultEnabled: true },
+  { id: "document_execution", label: "Document Execution", defaultEnabled: true },
+  { id: "disbursement", label: "Disbursement Guard", defaultEnabled: true },
+  { id: "servicing", label: "Servicing and Statements", defaultEnabled: true },
+  { id: "collections", label: "Collections", defaultEnabled: false },
+  { id: "grievance", label: "Grievance Redressal", defaultEnabled: true },
+  { id: "fraud", label: "Fraud Case Management", defaultEnabled: false },
+  { id: "ai_handoff", label: "AI Human Handoff", defaultEnabled: false }
+];
+
+const DEFAULT_ONBOARDING_MODULES = TENANT_ONBOARDING_MODULES
+  .filter((module) => module.defaultEnabled)
+  .map((module) => module.id);
+const DEFAULT_ONBOARDING_FLOWS = TENANT_ONBOARDING_FLOWS
+  .filter((flow) => flow.defaultEnabled)
+  .map((flow) => flow.id);
+const MODULE_IDS = new Set(TENANT_ONBOARDING_MODULES.map((module) => module.id));
+const FLOW_IDS = new Set(TENANT_ONBOARDING_FLOWS.map((flow) => flow.id));
+const ONBOARDING_STATUSES = new Set(["draft", "configured", "ready", "needs_attention"]);
 
 export function resolveDataDir() {
   return process.env.LOANOS_DATA_DIR || join(process.cwd(), ".loanos-data");
@@ -53,6 +97,8 @@ export function createEmptyTenantData() {
     modelRegistry: createModelRegistryState(),
     aiHandoffRequests: {},
     marketplaceOffers: {},
+    users: {},
+    accessReviews: {},
     events: []
   };
 }
@@ -87,6 +133,8 @@ function normalizeTenantData(data) {
     modelRegistry: normalizeModelRegistryState(data?.modelRegistry),
     aiHandoffRequests: data?.aiHandoffRequests ?? {},
     marketplaceOffers: data?.marketplaceOffers ?? {},
+    users: normalizeTenantUsers(data?.users),
+    accessReviews: normalizeAccessReviews(data?.accessReviews),
     events: Array.isArray(data?.events) ? data.events : []
   };
 }
@@ -123,6 +171,8 @@ function normalizeState(state) {
       tenants: state?.controlPlane?.tenants ?? {},
       subProcessors: state?.controlPlane?.subProcessors ?? {},
       breakGlassGrants: state?.controlPlane?.breakGlassGrants ?? {},
+      platformUsers: normalizePlatformUsers(state?.controlPlane?.platformUsers),
+      sessions: normalizeSessions(state?.controlPlane?.sessions),
       ckycRegistry: state?.controlPlane?.ckycRegistry ?? { ...MOCK_CKYC_PRESEED }
     },
     tenants
@@ -136,6 +186,8 @@ export function createEmptyState() {
       tenants: {},
       subProcessors: {},
       breakGlassGrants: {},
+      platformUsers: {},
+      sessions: {},
       ckycRegistry: { ...MOCK_CKYC_PRESEED }
     },
     tenants: {}
@@ -175,6 +227,110 @@ export function generateApiKey(isSandbox = false) {
   return `${prefix}_${randomBytes(24).toString("hex")}`;
 }
 
+function normalizeSelectionList(value, allowed, defaults) {
+  const raw = Array.isArray(value) ? value : defaults;
+  return [...new Set(raw.filter((item) => allowed.has(item)))];
+}
+
+function normalizeStringList(value) {
+  return [...new Set((Array.isArray(value) ? value : []).filter(Boolean).map(String))];
+}
+
+export function normalizeTenantOnboarding(input = {}, existing = {}, now = new Date()) {
+  const enabledModules = normalizeSelectionList(
+    input.enabledModules ?? input.modules ?? existing.enabledModules,
+    MODULE_IDS,
+    DEFAULT_ONBOARDING_MODULES
+  );
+  const enabledFlows = normalizeSelectionList(
+    input.enabledFlows ?? input.flows ?? existing.enabledFlows,
+    FLOW_IDS,
+    DEFAULT_ONBOARDING_FLOWS
+  );
+  const status = ONBOARDING_STATUSES.has(input.status) ? input.status : existing.status ?? "configured";
+  return {
+    status,
+    launchMode: input.launchMode ?? existing.launchMode ?? "pilot",
+    primaryRegulatedEntityId:
+      input.primaryRegulatedEntityId ?? existing.primaryRegulatedEntityId ?? null,
+    productIds: normalizeStringList(input.productIds ?? existing.productIds),
+    enabledModules,
+    enabledFlows,
+    disabledModules: TENANT_ONBOARDING_MODULES
+      .map((module) => module.id)
+      .filter((moduleId) => !enabledModules.includes(moduleId)),
+    disabledFlows: TENANT_ONBOARDING_FLOWS
+      .map((flow) => flow.id)
+      .filter((flowId) => !enabledFlows.includes(flowId)),
+    checklist: {
+      ...(existing.checklist ?? {}),
+      ...(input.checklist ?? {})
+    },
+    notes: input.notes ?? existing.notes ?? null,
+    createdAt: existing.createdAt ?? input.createdAt ?? now.toISOString(),
+    updatedAt: now.toISOString()
+  };
+}
+
+export function computeTenantOnboardingReadiness(record, tenantData) {
+  const onboarding = normalizeTenantOnboarding(record?.onboarding ?? {});
+  const regulatedEntities = Object.values(tenantData?.regulatedEntities ?? {});
+  const productPolicies = Object.values(tenantData?.productPolicies ?? {});
+  const users = Object.values(tenantData?.users ?? {});
+  const findings = [];
+  const checklist = {
+    tenantActive: record?.status === "active",
+    ownerUser: users.some((user) => (user.adminRoles ?? []).includes("tenant_admin")),
+    regulatedEntity: regulatedEntities.some((entity) => entity.status === "active"),
+    productPolicy: productPolicies.some((product) => product.status === "active"),
+    modulesSelected: onboarding.enabledModules.length > 0,
+    flowsSelected: onboarding.enabledFlows.length > 0,
+    serviceCredential: Boolean(record?.apiKeyHash),
+    accessGovernance:
+      users.some((user) => (user.adminRoles ?? []).includes("security_admin")) ||
+      users.some((user) => (user.adminRoles ?? []).includes("auditor"))
+  };
+
+  if (!checklist.tenantActive) {
+    findings.push({ code: "tenant_not_active", severity: "error", message: "Tenant status must be active before launch." });
+  }
+  if (!checklist.ownerUser) {
+    findings.push({ code: "owner_user_missing", severity: "error", message: "Create at least one tenant administrator." });
+  }
+  if (!checklist.regulatedEntity) {
+    findings.push({ code: "regulated_entity_missing", severity: "error", message: "Seed an active regulated entity profile." });
+  }
+  if (!checklist.productPolicy) {
+    findings.push({ code: "product_policy_missing", severity: "error", message: "Seed at least one active product policy." });
+  }
+  if (!checklist.modulesSelected) {
+    findings.push({ code: "modules_missing", severity: "error", message: "Select at least one enabled module." });
+  }
+  if (!checklist.flowsSelected) {
+    findings.push({ code: "flows_missing", severity: "error", message: "Select at least one enabled operating flow." });
+  }
+  if (!checklist.serviceCredential) {
+    findings.push({ code: "service_key_missing", severity: "warning", message: "No active tenant service credential is present." });
+  }
+  if (!checklist.accessGovernance) {
+    findings.push({ code: "governance_roles_missing", severity: "warning", message: "Assign security or auditor responsibility before production launch." });
+  }
+
+  const hasErrors = findings.some((finding) => finding.severity === "error");
+  const hasWarnings = findings.some((finding) => finding.severity === "warning");
+  return {
+    status: hasErrors ? "blocked" : hasWarnings ? "attention" : "ready",
+    checklist,
+    findings,
+    onboarding,
+    counts: {
+      regulatedEntities: regulatedEntities.length,
+      productPolicies: productPolicies.length,
+      users: users.length
+    }
+  };
+}
+
 export function registerTenant(state, tenant, now = new Date()) {
   const { tenantId } = tenant;
   if (!tenantId) {
@@ -190,6 +346,7 @@ export function registerTenant(state, tenant, now = new Date()) {
     isSandbox: tenant.isSandbox ?? existing?.isSandbox ?? false,
     parentTenantId: tenant.parentTenantId ?? existing?.parentTenantId ?? null,
     sandboxName: tenant.sandboxName ?? existing?.sandboxName ?? null,
+    onboarding: normalizeTenantOnboarding(tenant.onboarding ?? existing?.onboarding ?? {}, existing?.onboarding, now),
     createdAt: existing?.createdAt ?? now.toISOString(),
     updatedAt: now.toISOString()
   };
@@ -234,6 +391,8 @@ export function resetSandbox(state, sandboxId, preserveConfig = false) {
       productPolicies: tenantData.productPolicies ?? {},
       staffActors: tenantData.staffActors ?? {},
       recoveryAgents: tenantData.recoveryAgents ?? {},
+      users: tenantData.users ?? {},
+      accessReviews: tenantData.accessReviews ?? {},
     };
   } else {
     newTenantData = createEmptyTenantData();
@@ -513,6 +672,34 @@ export async function ensureBootstrapTenants(dataDir, bootstrapTenants = []) {
 
     if (tenant.tenantId === "dev" && state.tenants["dev"]) {
       const devData = state.tenants["dev"];
+      if (!devData.staffActors?.["tenant_admin_1"]) {
+        devData.staffActors = {
+          ...(devData.staffActors ?? {}),
+          "tenant_admin_1": {
+            actorId: "tenant_admin_1",
+            displayName: "Dev Tenant Administrator",
+            country: "IN",
+            status: "active",
+            roles: ["workflow_admin"],
+            queues: ["*"],
+            canAssignQueues: ["*"],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          }
+        };
+        changed = true;
+      }
+      if (!devData.users || Object.keys(devData.users).length === 0) {
+        const result = upsertTenantUser(devData.users ?? {}, {
+          email: "admin@dev.local",
+          displayName: "Dev Tenant Admin",
+          password: process.env.LOANOS_DEV_ADMIN_PASSWORD ?? "dev-admin-password",
+          adminRoles: ["tenant_admin", "user_admin", "security_admin", "auditor"],
+          staffActorId: "tenant_admin_1"
+        });
+        devData.users = result.users;
+        changed = true;
+      }
       if (!devData.loanApplications || Object.keys(devData.loanApplications).length === 0) {
         devData.regulatedEntities = {
           "re_1": {
