@@ -66,6 +66,8 @@ import {
   prepayLoanAccount,
   proposeDecision,
   restructureLoanAccount,
+  settleLoanAccount,
+  writeOffLoanAccount,
   quoteForeclosure,
   reverseLoanAccountEvent,
   summarizeLoanAccount,
@@ -2294,6 +2296,76 @@ async function route(req, res, dataDir, platformAdminKey) {
       schedule: result.schedule,
       summary: summarizeLoanAccount(stored, new Date())
     });
+    return;
+  }
+
+  const loanAccountSettlementMatch = path.match(/^\/loan-accounts\/([^/]+)\/settlement$/);
+  if (method === "POST" && loanAccountSettlementMatch) {
+    const body = await readJson(req);
+    const state = await store.load();
+    const loanAccountId = decodeURIComponent(loanAccountSettlementMatch[1]);
+    const loanAccount = state.loanAccounts[loanAccountId];
+    if (!loanAccount) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Loan account not found." } });
+      return;
+    }
+    const result = settleLoanAccount(loanAccount, body);
+    if (result.summary.status === "blocked") {
+      sendJson(res, 422, {
+        error: { code: "settlement_blocked", message: "Settlement is blocked by LMS or approval findings." },
+        findings: result.findings
+      });
+      return;
+    }
+    const stored = result.loanAccount;
+    const nextState = appendEvent(
+      { ...state, loanAccounts: { ...state.loanAccounts, [stored.loanAccountId]: stored } },
+      {
+        type: "loan_account.settled",
+        loanAccountId: stored.loanAccountId,
+        settlementId: result.settlement.settlementId,
+        approvedBy: result.settlement.approvedBy
+      }
+    );
+    await store.save(nextState);
+    sendJson(res, 200, {
+      loanAccount: stored,
+      settlement: result.settlement,
+      summary: summarizeLoanAccount(stored, new Date(result.settlement.settledAt))
+    });
+    return;
+  }
+
+  const loanAccountWriteOffMatch = path.match(/^\/loan-accounts\/([^/]+)\/write-off$/);
+  if (method === "POST" && loanAccountWriteOffMatch) {
+    const body = await readJson(req);
+    const state = await store.load();
+    const loanAccountId = decodeURIComponent(loanAccountWriteOffMatch[1]);
+    const loanAccount = state.loanAccounts[loanAccountId];
+    if (!loanAccount) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Loan account not found." } });
+      return;
+    }
+    const result = writeOffLoanAccount(loanAccount, body);
+    if (result.summary.status === "blocked") {
+      sendJson(res, 422, {
+        error: { code: "write_off_blocked", message: "Write-off is blocked by LMS or approval findings." },
+        findings: result.findings
+      });
+      return;
+    }
+    const stored = result.loanAccount;
+    const nextState = appendEvent(
+      { ...state, loanAccounts: { ...state.loanAccounts, [stored.loanAccountId]: stored } },
+      {
+        type: "loan_account.written_off",
+        loanAccountId: stored.loanAccountId,
+        writeOffId: result.writeOff.writeOffId,
+        approvedBy: result.writeOff.approvedBy
+      }
+    );
+    await store.save(nextState);
+    sendJson(res, 200, { loanAccount: stored, writeOff: result.writeOff });
     return;
   }
 

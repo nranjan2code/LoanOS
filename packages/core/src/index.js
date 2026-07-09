@@ -133,6 +133,8 @@ export {
   postCashRecoveryToLoanAccount,
   prepayLoanAccount,
   restructureLoanAccount,
+  settleLoanAccount,
+  writeOffLoanAccount,
   quoteForeclosure,
   postPaymentToLoanAccount,
   reverseLoanAccountEvent,

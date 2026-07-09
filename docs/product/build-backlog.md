@@ -129,7 +129,7 @@ Done when:
 
 ## Epic 6: Collections, Recovery, and Delinquency
 
-Status: first executable slice complete; hardship restructure first slice complete.
+Status: first executable slice complete; hardship restructure and settlement/write-off first slices complete.
 
 Goal: manage overdue accounts without violating borrower protection and recovery rules.
 
@@ -142,7 +142,7 @@ Tasks:
 - Cash recovery exception workflow. Partial.
 - Same-day cash recovery posting. Done.
 - Hardship and restructure workflow. First slice done: `restructureLoanAccount` (`packages/core/src/loan-account.js`) modifies a stressed but active loan under maker-checker approval (four-eyes) — extending the remaining tenure and/or conceding the rate and re-amortizing the remaining principal over the new term (past installments untouched). The account is flagged `restructured`, which surfaces in `classifyLoanAsset` and the CIC snapshot. `POST /loan-accounts/{id}/restructure` drives it and seals the event into the audit spine.
-- Settlement and write-off approval.
+- Settlement and write-off approval. First slice done: `settleLoanAccount` closes an active loan for less than the full outstanding under maker-checker approval (four-eyes) — the borrower pays the agreed amount and the RE waives (sacrifices) the shortfall via principal/interest waiver ledger credits, closing the account as `settled`; `writeOffLoanAccount` marks an account `written_off` as a book loss while retaining the borrower's legal dues on the ledger. Both are reported to the CIC snapshot (`settled`/`closureType`, `writtenOff`/`writeOffAmount`). `POST /loan-accounts/{id}/settlement` and `POST /loan-accounts/{id}/write-off` drive them and seal events into the audit spine.
 - Tests for recovery notice and same-day cash posting. Done.
 
 Done when:

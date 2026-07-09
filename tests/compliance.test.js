@@ -1636,6 +1636,96 @@ test("API restructures a hardship loan under four-eyes approval and flags it", a
   assert.ok(events.events.some((event) => event.type === "loan_account.restructured"));
 });
 
+test("API settles a loan for less than outstanding and writes off another, both four-eyes", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+  const round2 = (value) => Math.round((value + Number.EPSILON) * 100) / 100;
+
+  const applicationA = await approveAndDisburseApplication(base);
+  const accountA = await (await apiFetch(`${base}/loan-accounts/${applicationA.loanAccountId}`)).json();
+  const outstanding = accountA.principalAmount;
+
+  // A settlement at or above the outstanding is rejected (use full repayment).
+  const tooHigh = await postJson(`${base}/loan-accounts/${accountA.loanAccountId}/settlement`, {
+    settlementAmount: outstanding,
+    paymentRef: "set_full",
+    reason: "hardship",
+    proposedBy: "collections-1",
+    approvedBy: "collections-lead-1",
+    approvalReference: "SET-1"
+  });
+  assert.equal(tooHigh.status, 422);
+
+  // Four-eyes: proposer cannot also approve.
+  const sameActor = await postJson(`${base}/loan-accounts/${accountA.loanAccountId}/settlement`, {
+    settlementAmount: round2(outstanding * 0.6),
+    paymentRef: "set_x",
+    reason: "hardship",
+    proposedBy: "collections-1",
+    approvedBy: "collections-1",
+    approvalReference: "SET-2"
+  });
+  assert.equal(sameActor.status, 422);
+
+  // A valid compromise settlement: borrower pays 60%, the rest is sacrificed and
+  // the account closes as `settled` with a zero balance.
+  const settlementAmount = round2(outstanding * 0.6);
+  const settled = await postJson(`${base}/loan-accounts/${accountA.loanAccountId}/settlement`, {
+    settlementAmount,
+    paymentRef: "set_ok",
+    reason: "hardship - permanent income loss",
+    proposedBy: "collections-1",
+    approvedBy: "collections-lead-1",
+    approvalReference: "SET-3"
+  });
+  assert.equal(settled.status, 200);
+  assert.equal(settled.body.loanAccount.status, "closed");
+  assert.equal(settled.body.loanAccount.closureType, "settled");
+  assert.equal(settled.body.settlement.settlementAmount, settlementAmount);
+  assert.equal(settled.body.settlement.sacrificeAmount, round2(outstanding - settlementAmount));
+  assert.equal(settled.body.summary.totalOutstanding, 0);
+  // The sacrifice is a waiver, not cash: total paid stays at the settlement sum.
+  assert.equal(settled.body.summary.totalPaid, settlementAmount);
+
+  // The settlement is reported to the CIC as such.
+  const snapshotA = await (await apiFetch(`${base}/loan-accounts/${accountA.loanAccountId}/cic-snapshot`)).json();
+  assert.equal(snapshotA.settled, true);
+  assert.equal(snapshotA.closureType, "settled");
+
+  // A separate account is written off: the account is marked but dues are retained.
+  const applicationB = await approveAndDisburseApplication(base);
+  const accountB = await (await apiFetch(`${base}/loan-accounts/${applicationB.loanAccountId}`)).json();
+  const writtenOff = await postJson(`${base}/loan-accounts/${accountB.loanAccountId}/write-off`, {
+    reason: "unrecoverable after recovery efforts",
+    proposedBy: "collections-1",
+    approvedBy: "collections-lead-1",
+    approvalReference: "WO-1"
+  });
+  assert.equal(writtenOff.status, 200);
+  assert.equal(writtenOff.body.loanAccount.status, "written_off");
+  assert.equal(writtenOff.body.writeOff.duesRetained, true);
+  assert.equal(writtenOff.body.writeOff.writeOffAmount, accountB.principalAmount);
+  const snapshotB = await (await apiFetch(`${base}/loan-accounts/${accountB.loanAccountId}/cic-snapshot`)).json();
+  assert.equal(snapshotB.writtenOff, true);
+  // Dues are retained on the ledger despite the book write-off.
+  assert.equal(snapshotB.currentBalance, accountB.principalAmount);
+
+  const events = await (await apiFetch(`${base}/audit/events`)).json();
+  assert.ok(events.events.some((event) => event.type === "loan_account.settled"));
+  assert.ok(events.events.some((event) => event.type === "loan_account.written_off"));
+});
+
 test("API quotes and executes foreclosure, closing the loan account", async (t) => {
   const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
   t.after(async () => {

@@ -146,8 +146,12 @@ export function summarizeLoanAccount(account, asOf = new Date()) {
   const chargesAssessed = roundMoney(ledger.reduce((sum, event) => sum + (event.chargesDebit ?? 0), 0));
   const chargesWaived = roundMoney(ledger.reduce((sum, event) => sum + (event.chargesWaiverCredit ?? 0), 0));
   const chargesPaid = roundMoney(ledger.reduce((sum, event) => sum + (event.chargesCredit ?? 0), 0));
+  // Principal and interest waived (e.g. a settlement sacrifice) reduce what is
+  // owed without counting as cash paid, so payoff figures stay honest.
+  const principalWaived = roundMoney(ledger.reduce((sum, event) => sum + (event.principalWaiverCredit ?? 0), 0));
+  const interestWaived = roundMoney(ledger.reduce((sum, event) => sum + (event.interestWaiverCredit ?? 0), 0));
   const totalPaid = roundMoney(principalPaid + interestPaid + chargesPaid);
-  const principalOutstanding = roundMoney(Math.max(0, principalDisbursed - principalPaid));
+  const principalOutstanding = roundMoney(Math.max(0, principalDisbursed - principalPaid - principalWaived));
   const interestDueAsOf = roundMoney(
     (account.schedule ?? [])
       .filter((installment) => new Date(`${installment.dueDate}T00:00:00.000Z`).getTime() <= asOf.getTime())
@@ -158,9 +162,9 @@ export function summarizeLoanAccount(account, asOf = new Date()) {
       .filter((installment) => new Date(`${installment.dueDate}T00:00:00.000Z`).getTime() <= asOf.getTime())
       .reduce((sum, installment) => sum + installment.principalDue, 0)
   );
-  const interestOutstanding = roundMoney(Math.max(0, interestDueAsOf - interestPaid));
+  const interestOutstanding = roundMoney(Math.max(0, interestDueAsOf - interestPaid - interestWaived));
   const chargesOutstanding = roundMoney(Math.max(0, chargesAssessed - chargesWaived - chargesPaid));
-  const principalOverdue = roundMoney(Math.max(0, principalDueAsOf - principalPaid));
+  const principalOverdue = roundMoney(Math.max(0, principalDueAsOf - principalPaid - principalWaived));
   const nextInstallment = (account.schedule ?? []).find(
     (installment) => new Date(`${installment.dueDate}T00:00:00.000Z`).getTime() > asOf.getTime()
   ) ?? null;
@@ -175,6 +179,8 @@ export function summarizeLoanAccount(account, asOf = new Date()) {
     chargesAssessed,
     chargesWaived,
     chargesPaid,
+    principalWaived,
+    interestWaived,
     totalPaid,
     principalOutstanding,
     interestOutstanding,
@@ -309,6 +315,7 @@ export function classifyLoanAsset(account, asOf = new Date()) {
     delinquencyBucket: delinquency.bucket,
     isNpa: assetClass === "npa",
     restructured: Boolean(account.restructured),
+    writtenOff: Boolean(account.writtenOff),
     basis: "days_past_due",
     npaThresholdDays: 90,
     delinquency
@@ -347,6 +354,11 @@ export function generateCicSnapshot(account, asOf = new Date()) {
     isNpa: classification.isNpa,
     restructured: Boolean(account.restructured),
     restructuredAt: (account.restructures ?? []).at(-1)?.restructuredAt ?? null,
+    closureType: account.closureType ?? (account.foreclosure ? "foreclosure" : null),
+    settled: account.closureType === "settled",
+    settlementSacrifice: account.settlement?.sacrificeAmount ?? null,
+    writtenOff: Boolean(account.writtenOff),
+    writeOffAmount: account.writeOff?.writeOffAmount ?? null,
     lastPaymentDate: lastPayment?.eventDate ?? null,
     lastPaymentAmount: lastPayment?.amount ?? null,
     totalPaid: summary.totalPaid,
@@ -1059,6 +1071,197 @@ export function restructureLoanAccount(account, input = {}, now = new Date()) {
   };
 
   return { loanAccount: updated, restructure, schedule, findings: [], summary: summarizeFindings([]) };
+}
+
+// A compromise settlement (one-time settlement) closes the account for a sum
+// less than the full outstanding under maker-checker approval: the borrower pays
+// the agreed amount and the RE waives (sacrifices) the shortfall. The account
+// closes as `settled` — materially different from full closure and reported as
+// such to the credit bureau.
+export function settleLoanAccount(account, input = {}, now = new Date()) {
+  const findings = [];
+  const settledAt = input.settledAt ? new Date(input.settledAt) : now;
+
+  if (!account) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Loan account is required.", "loanAccount"));
+  }
+  if (account && account.status !== ACTIVE_STATUS) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Only an active loan account can be settled.", "status"));
+  }
+  if (!Number.isFinite(input.settlementAmount) || input.settlementAmount <= 0) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Settlement amount must be positive.", "settlementAmount"));
+  }
+  if (!input.paymentRef) {
+    findings.push(createFinding("error", "RBI-IT-GRC", "Settlement requires paymentRef.", "paymentRef"));
+  }
+  requireMakerChecker(findings, input);
+
+  const balance = account ? summarizeLoanAccount(account, settledAt) : null;
+  if (balance && Number.isFinite(input.settlementAmount) && roundMoney(input.settlementAmount) >= balance.totalOutstanding) {
+    findings.push(
+      createFinding(
+        "error",
+        "RBI-DL-2025",
+        "Settlement amount meets or exceeds the outstanding; use full repayment or foreclosure instead.",
+        "settlementAmount"
+      )
+    );
+  }
+
+  const summary = summarizeFindings(findings);
+  if (summary.status === "blocked") {
+    return { loanAccount: account, settlement: null, events: [], findings, summary };
+  }
+
+  // Post the borrower's payment first (allocated interest -> charges -> principal).
+  const paymentResult = postPaymentToLoanAccount(
+    account,
+    {
+      amount: input.settlementAmount,
+      receivedAt: settledAt.toISOString(),
+      paymentRef: input.paymentRef,
+      channel: input.channel ?? "settlement",
+      actor: input.actor ?? input.proposedBy ?? "system"
+    },
+    now
+  );
+  if (paymentResult.summary.status === "blocked") {
+    return { loanAccount: account, settlement: null, events: [], findings: paymentResult.findings, summary: paymentResult.summary };
+  }
+
+  // Whatever remains after the payment is the sacrifice, waived off the ledger so
+  // the account genuinely zeroes out.
+  const residual = summarizeLoanAccount(paymentResult.loanAccount, settledAt);
+  const sacrificeEvent = {
+    eventId: createLoanId("ledger"),
+    type: "settlement_sacrifice",
+    eventDate: settledAt.toISOString(),
+    amount: roundMoney(residual.principalOutstanding + residual.interestOutstanding + residual.chargesOutstanding),
+    principalDebit: 0,
+    principalCredit: 0,
+    interestCredit: 0,
+    chargesDebit: 0,
+    chargesCredit: 0,
+    principalWaiverCredit: residual.principalOutstanding,
+    interestWaiverCredit: residual.interestOutstanding,
+    chargesWaiverCredit: residual.chargesOutstanding,
+    reason: input.reason ?? "compromise_settlement",
+    actor: input.approvedBy
+  };
+  const settlement = {
+    settlementId: input.settlementId ?? createLoanId("settlement"),
+    settlementAmount: roundMoney(input.settlementAmount),
+    sacrificeAmount: sacrificeEvent.amount,
+    outstandingBeforeSettlement: balance.totalOutstanding,
+    reason: input.reason ?? null,
+    settledAt: settledAt.toISOString(),
+    proposedBy: input.proposedBy,
+    approvedBy: input.approvedBy,
+    approvalReference: input.approvalReference,
+    paymentRef: input.paymentRef
+  };
+  const updated = {
+    ...paymentResult.loanAccount,
+    ledger: [...paymentResult.loanAccount.ledger, sacrificeEvent],
+    status: CLOSED_STATUS,
+    closedAt: settledAt.toISOString(),
+    closureType: "settled",
+    settlement,
+    servicingEvents: [
+      ...(paymentResult.loanAccount.servicingEvents ?? []),
+      {
+        type: "loan_account.settled",
+        settlementId: settlement.settlementId,
+        at: settledAt.toISOString(),
+        actor: settlement.approvedBy
+      }
+    ],
+    updatedAt: now.toISOString()
+  };
+
+  return {
+    loanAccount: updated,
+    settlement,
+    events: [paymentResult.paymentEvent, sacrificeEvent],
+    findings: [],
+    summary: summarizeFindings([])
+  };
+}
+
+// A prudential/technical write-off recognizes the outstanding as a loss in the
+// RE's books under maker-checker approval. It does NOT extinguish the borrower's
+// legal dues, so the ledger balance is retained; the account is marked
+// `written_off` and reported as such. Recovery efforts may continue off-book.
+export function writeOffLoanAccount(account, input = {}, now = new Date()) {
+  const findings = [];
+  const writtenOffAt = input.writtenOffAt ? new Date(input.writtenOffAt) : now;
+
+  if (!account) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Loan account is required.", "loanAccount"));
+  }
+  if (account && account.status !== ACTIVE_STATUS) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Only an active loan account can be written off.", "status"));
+  }
+  if (!input.reason) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Write-off requires a reason.", "reason"));
+  }
+  requireMakerChecker(findings, input);
+
+  const summary = summarizeFindings(findings);
+  if (summary.status === "blocked") {
+    return { loanAccount: account, writeOff: null, findings, summary };
+  }
+
+  const balance = summarizeLoanAccount(account, writtenOffAt);
+  const writeOff = {
+    writeOffId: input.writeOffId ?? createLoanId("writeoff"),
+    writeOffAmount: balance.totalOutstanding,
+    principalWrittenOff: balance.principalOutstanding,
+    interestWrittenOff: balance.interestOutstanding,
+    chargesWrittenOff: balance.chargesOutstanding,
+    reason: input.reason,
+    duesRetained: true,
+    writtenOffAt: writtenOffAt.toISOString(),
+    proposedBy: input.proposedBy,
+    approvedBy: input.approvedBy,
+    approvalReference: input.approvalReference
+  };
+  const updated = {
+    ...account,
+    status: "written_off",
+    writtenOff: true,
+    writeOff,
+    servicingEvents: [
+      ...(account.servicingEvents ?? []),
+      {
+        type: "loan_account.written_off",
+        writeOffId: writeOff.writeOffId,
+        at: writtenOffAt.toISOString(),
+        actor: writeOff.approvedBy
+      }
+    ],
+    updatedAt: now.toISOString()
+  };
+
+  return { loanAccount: updated, writeOff, findings: [], summary: summarizeFindings([]) };
+}
+
+function requireMakerChecker(findings, input) {
+  if (!input.reason) {
+    findings.push(createFinding("error", "RBI-DL-2025", "A reason is required.", "reason"));
+  }
+  if (!input.proposedBy) {
+    findings.push(createFinding("error", "RBI-IT-GRC", "A proposing maker is required.", "proposedBy"));
+  }
+  if (!input.approvedBy) {
+    findings.push(createFinding("error", "RBI-IT-GRC", "An approving checker is required.", "approvedBy"));
+  }
+  if (!input.approvalReference) {
+    findings.push(createFinding("error", "RBI-IT-GRC", "An approvalReference is required.", "approvalReference"));
+  }
+  if (input.proposedBy && input.approvedBy && input.proposedBy === input.approvedBy) {
+    findings.push(createFinding("error", "RBI-IT-GRC", "The approver must differ from the proposer (four-eyes).", "approvedBy"));
+  }
 }
 
 export function assessChargeToLoanAccount(account, input, now = new Date()) {
