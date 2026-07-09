@@ -215,7 +215,7 @@ Tasks:
 - DLA CIMS export.
 - FIU-IND suspicious transaction support. First slice done: `fiu-str.js` runs STR/CTR draft → reviewed → filed → acknowledged with Principal Officer review, ₹10 lakh CTR threshold, tipping-off guard, and filing via `ExternalServiceManager` (mock/real `fiuProvider`).
 - Payment integrations: NACH/UPI/bank account verification. Bank-account verification first slice done: `ExternalServiceManager` provides mock/real provider switching, the tenant API returns sanitized active-account/name-match evidence, and disbursement is blocked without matching verified-account proof. NACH/UPI rails remain planned.
-- eSign/document vault.
+- eSign/document vault. First slice done: signed document packets are indexed into a tenant-scoped document vault with signature evidence, storage country, retention policy, per-document checksums, and manifest checksum. PDF generation and external eSign envelope storage remain planned.
 - SMS/email delivery provider.
 - Vendor data-residency checks.
 

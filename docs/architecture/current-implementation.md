@@ -30,6 +30,7 @@ npm run dev:api
 | `packages/core/src/access-control.js` | Staff actor registry, role checks, queue assignment authority, and regulated-action actor validation. |
 | `packages/core/src/grievance.js` | Complaint registry, grievance lifecycle, 30-day RBI Ombudsman clock, and RBI CMS escalation evidence. |
 | `packages/core/src/document-packet.js` | KFS, sanction letter, loan agreement summary, and privacy notice rendering, rendered borrower loan-statement document, plus delivery evidence controls. |
+| `packages/core/src/document-vault.js` | Document-vault receipt builder for signed execution packets: signature evidence, India storage policy, retention policy, per-document checksums, and manifest checksum. |
 | `packages/core/src/registries.js` | Regulated-entity, LSP, DLA, and product-policy registries, prepayment/foreclosure/reset validations, DLA CIMS export shape, plus application reference resolution. |
 | `packages/core/src/offer-marketplace.js` | Multi-lender offer marketplace: validates offer presentation neutrality, enforces ranking and partner disclosures, blocks dark patterns, and performs objective sorting. |
 | `packages/core/src/borrower-onboarding.js` | Borrower profile, consent ledger, KYC records (with RBI risk-based periodic-review refresh status), a PMLA beneficial-owner registry for legal-entity borrowers, borrower reference resolution, and in-place redaction for DPDP erasure. |
@@ -52,7 +53,7 @@ npm run dev:api
 | `packages/core/src/audit.js` | Tenant-scoped, append-only audit hash chain: tenant-bound genesis, canonical hashing, `sealAuditChain`/`verifyAuditChain`/`buildAuditEvidencePack`, plus uniform `stampAuditEvents`/`classifyAuditDataClass` actor/data-class provenance. |
 | `packages/core/src/index.js` | Public exports for core domain modules. |
 | `apps/api/src/file-store.js` | Local JSON state load/save helpers; control-plane tenant registry (api-key hashing, tenant resolution), sub-processor register, and break-glass grants; per-tenant data partitions and tenant-scoped accessors; `buildTenantExport`/`offboardTenant` for portability and evidenced deletion. |
-| `apps/api/src/server.js` | HTTP API: platform control plane (tenant minting, export, offboarding, break-glass, sub-processors), tenant-context resolution with break-glass fallback and 401 gate, tenant-scoped store with centralized audit stamping, plus endpoints for compliance controls, AI models, kill switch, workflow tasks, applications, loan accounts, fraud cases, erasure requests, data disclosures, incidents, bank-account verification, CERSAI security interests, DPDP access/correction requests, and FIU-IND reports. |
+| `apps/api/src/server.js` | HTTP API: platform control plane (tenant minting, export, offboarding, break-glass, sub-processors), tenant-context resolution with break-glass fallback and 401 gate, tenant-scoped store with centralized audit stamping, plus endpoints for compliance controls, AI models, kill switch, workflow tasks, applications, loan accounts, document vault, fraud cases, erasure requests, data disclosures, incidents, bank-account verification, CERSAI security interests, DPDP access/correction requests, and FIU-IND reports. |
 | `tests/compliance.test.js` | Regression tests for the compliance gates (112 tests as of the latest commit). |
 
 ## Implemented API Endpoints
@@ -76,6 +77,8 @@ npm run dev:api
 | `GET /audit/export` | Produces an integrity-attested evidence pack from the tenant's audit chain; 409 if the chain fails verification. |
 | `GET /sub-processors` | Standing disclosure of the sub-processor register to every authenticated tenant, flagging cross-border processing. |
 | `GET /break-glass-grants` | Lists every break-glass grant scoped to the calling tenant, with effective status. |
+| `GET /document-vault` | Lists signed document-vault receipts, filterable by `applicationId`, `borrowerId`, or `packetId`. |
+| `GET /document-vault/:id` | Reads a document-vault receipt by id. |
 | `POST /integrations/bank-account-verification` | Verifies a borrower/end-beneficiary bank account through `ExternalServiceManager`, returning sanitized evidence (`verificationRef`, IFSC, last four digits, status/name match) and sealing the attempt into the tenant audit chain. |
 | `GET /incidents` | Lists tenant security/data incidents with computed CERT-In/RBI reporting-clock status. |
 | `POST /incidents` | Creates a tenant security/data incident, starting the 6-hour reporting clock. |
@@ -254,7 +257,8 @@ npm run dev:api
 | Regulated-action RBAC | Credit proposal, manual underwriting override, checker approval, human review, recovery assignment, and LWS task actions validate actor role and queue policy. |
 | Complaint workflow | Tracks received, assigned, under-review, resolved, escalation-due, and RBI CMS escalation states with acknowledgement, closure, and CMS references. |
 | 30-day grievance clock | Computes due date, breach status, and escalation-due state from complaint received time. |
-| Execution document packet | Renders borrower-facing HTML/text KFS, sanction letter, agreement summary, and privacy notice with SHA-256 checksums and delivery evidence. |
+| Execution document packet | Renders borrower-facing HTML/text KFS, sanction letter, agreement summary, and privacy notice with SHA-256 checksums, delivery evidence, eSign evidence, and document-vault receipt indexing. |
+| Document vault | Successful eSign stores a tenant-scoped receipt with signed-packet signature evidence, India storage country, retention policy, per-document checksum manifest, and manifest checksum; the receipt is readable without duplicating full HTML bodies. |
 | LWS task queues | Derives active tasks for blocked compliance, KFS acceptance, credit decision, manual underwriting review for eligibility-referred applications, AI human review, checker approval (surfacing any manual underwriting override for the checker to review), document packet delivery, disbursement, recovery assignment, NPA review, complaint assignment, complaint resolution, and RBI CMS escalation. Each task includes SLA target, due time, and breach status. |
 | LWS task audit | Persists assignment, start, release, and comment events while the domain state remains the source of truth for task resolution. |
 | Fraud case module | Runs a tenant-scoped fraud case (`reported → under_investigation → show_cause_issued → classified_fraud/classified_not_fraud`). |
@@ -311,7 +315,7 @@ npm run dev:api
 - Borrower/consent/KYC records are file-backed, but support CKYC registry and V-CIP evidence vault validation boundaries.
 - Workflow is file-backed; the local dashboard is not a production workflow UI and notification dispatch/outbound RBI CMS API integration are still planned.
 - LMS restructure/settlement/write-off and collections reminders have first slices; NACH files, refunds, external CIC file/API submission, and full multi-channel recovery contact logging are still planned.
-- Document packet renders HTML/text but does not yet create PDFs or eSign envelopes.
+- Document packet renders HTML/text and stores document-vault receipts, but does not yet create PDFs or external eSign envelopes.
 - UI is limited to the local operations dashboard; there is no production borrower/admin application yet.
 - AI governance has first slices for lifecycle, validation gates (fairness/explainability/monitoring for high-risk, adversarial/hallucination for generative), drift-triggered kill switch, disclosure, and human handoff; recurring fairness reports and a sectoral incident-intelligence pack are still planned.
 - The audit spine stamps a uniform actor/actorType/dataClass envelope on every event at the seal seam; signed external anchoring is a follow-on.
@@ -369,6 +373,7 @@ Current tests prove:
 - API blocks a declined decision without a valid decline-reason code and carries the coded reason into the final decision.
 - API requires maker-checker approval before disbursement.
 - API blocks disbursement until the execution document packet is generated and delivered.
+- API creates a document-vault receipt when eSign succeeds, exposes it by list/id routes, and seals a `document_vault.packet_vaulted` audit event.
 - API verifies borrower/end-beneficiary bank accounts through the integration boundary, seals sanitized evidence in the audit chain, and blocks disbursement without verified account proof.
 - API routes material AI decisions to human review before decision proposal.
 - API stores staff actors and enforces role/queue checks on regulated workflow actions.

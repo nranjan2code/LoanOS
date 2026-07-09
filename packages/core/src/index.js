@@ -225,6 +225,11 @@ export {
 } from "./document-packet.js";
 
 export {
+  listDocumentVaultRecords,
+  vaultDocumentPacket
+} from "./document-vault.js";
+
+export {
   ELIGIBILITY_DECISIONS,
   estimateEmi,
   evaluateEligibility

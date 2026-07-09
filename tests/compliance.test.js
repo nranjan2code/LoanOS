@@ -2157,6 +2157,28 @@ test("API generates and delivers execution document packet before disbursement",
   assert.equal(esignResponse.status, 200);
   assert.equal(esignResponse.body.status, "signed");
 
+  const vaultListResponse = await apiFetch(`${base}/document-vault?applicationId=${application.applicationId}`);
+  assert.equal(vaultListResponse.status, 200);
+  const vaultList = await vaultListResponse.json();
+  assert.equal(vaultList.count, 1);
+  const vaultRecord = vaultList.records[0];
+  assert.equal(vaultRecord.packetId, esignResponse.body.packetId);
+  assert.equal(vaultRecord.signature.signatureRef, esignResponse.body.signature.signatureRef);
+  assert.equal(vaultRecord.storageCountry, "IN");
+  assert.equal(vaultRecord.documentCount, 4);
+  assert.equal(vaultRecord.manifestChecksumSha256.length, 64);
+  assert(vaultRecord.documents.every((document) => document.checksumSha256.length === 64));
+  assert.equal(Object.hasOwn(vaultRecord.documents[0], "html"), false);
+
+  const vaultReadResponse = await apiFetch(`${base}/document-vault/${vaultRecord.vaultRecordId}`);
+  assert.equal(vaultReadResponse.status, 200);
+  const vaultRead = await vaultReadResponse.json();
+  assert.equal(vaultRead.vaultRecordId, vaultRecord.vaultRecordId);
+
+  const vaultEvents = await (await apiFetch(`${base}/audit/events?type=document_vault.packet_vaulted`)).json();
+  assert.equal(vaultEvents.count, 1);
+  assert.equal(vaultEvents.events[0].dataClass, "financial");
+
   const disbursementResponse = await postJson(`${base}/loans/applications/${application.applicationId}/disbursement`, {
     destinationAccount: validApplication().disbursement.destinationAccount
   });
@@ -5283,6 +5305,7 @@ test("audit events carry a uniform actor/actorType/dataClass provenance envelope
   assert.equal(classifyAuditDataClass("complaint.received"), "personal_data");
   assert.equal(classifyAuditDataClass("loan.disbursement.recorded"), "financial");
   assert.equal(classifyAuditDataClass("integration.bank_account.verification_completed"), "financial");
+  assert.equal(classifyAuditDataClass("document_vault.packet_vaulted"), "financial");
   assert.equal(classifyAuditDataClass("model.transitioned"), "model_governance");
   assert.equal(classifyAuditDataClass("platform.break_glass.access"), "platform");
   assert.equal(classifyAuditDataClass("regulated_entity.upserted"), "operational");

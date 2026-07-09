@@ -49,7 +49,7 @@ Legend:
 | Recovery mechanism | KFS requires recovery mechanism. | Done |
 | Grievance officer | KFS requires name and email. | Done |
 | Undisclosed fees cannot be charged later | Ground KFS charges in Product Policy and block ad-hoc, foreclosure, and prepayment ledger charges exceeding KFS/policy limits. | Done |
-| Digitally signed/rendered KFS | HTML/text document packet renderer with checksum and delivery evidence; eSign/PDF planned. | Partial |
+| Digitally signed/rendered KFS | HTML/text document packet renderer with checksum and delivery evidence; eSign creates a signed packet and document-vault receipt with manifest checksum. PDF generation and external envelope storage remain planned. | Partial |
 | KFS workflow state | KFS route separates issued KFS from decision-ready KFS based on acceptance and delivery evidence. | Done |
 
 ## Fair Lending and Penal Charges

@@ -48,6 +48,8 @@ Useful data-plane endpoints (tenant api key required):
 - `GET /audit/export`
 - `GET /sub-processors`
 - `GET /break-glass-grants`
+- `GET /document-vault`
+- `GET /document-vault/:id`
 - `POST /integrations/bank-account-verification`
 - `GET /incidents`
 - `POST /incidents`
@@ -219,6 +221,7 @@ Phase 0 has a working executable foundation, and Epics 1-8 and 11 (S1-S6) each h
 - Borrower-backed application resolution through `borrowerId`.
 - LOS application workflow state machine for preflight, KFS, decision proposal, human review, maker-checker approval, and disbursement.
 - LOS execution document packet with rendered KFS, sanction letter, loan agreement summary, privacy notice, checksums, and delivery evidence.
+- Document-vault first slice: successful eSign stores a tenant-scoped vault receipt with signed-packet signature evidence, per-document checksums, storage country, retention policy, and manifest checksum.
 - LWS task queues derived from LOS/LMS state, with SLA metadata, role checks, assignment, start, release, and comment audit.
 - Fraud case module with a natural-justice gate (show-cause notice + response window, four-eyes classification) and a checksum-sealed committee pack.
 - LMS loan account creation on disbursement with repayment schedule, ledger, balance summary, interest accrual, payment posting, part-prepayment, foreclosure, and closure NOC.

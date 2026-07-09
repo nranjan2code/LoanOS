@@ -56,6 +56,7 @@ import {
   listBorrowerConsents,
   listBorrowerKycRecords,
   listDataDisclosures,
+  listDocumentVaultRecords,
   recordDataDisclosure,
   listRegulatoryControls,
   registerModel,
@@ -123,6 +124,7 @@ import {
   rankMarketplaceOffers,
   ExternalServiceManager,
   signDocumentPacket,
+  vaultDocumentPacket,
   createSecurityInterest,
   enrichSecurityInterest,
   fileSecurityInterest,
@@ -378,6 +380,33 @@ async function route(req, res, dataDir, platformAdminKey) {
     sendJson(res, 200, {
       grants: listBreakGlassGrants(scopedWholeState, tenant.tenantId)
     });
+    return;
+  }
+
+  if (method === "GET" && path === "/document-vault") {
+    const state = await store.load();
+    const records = listDocumentVaultRecords(state.documentVault, {
+      applicationId: url.searchParams.get("applicationId") ?? undefined,
+      borrowerId: url.searchParams.get("borrowerId") ?? undefined,
+      packetId: url.searchParams.get("packetId") ?? undefined
+    });
+    sendJson(res, 200, {
+      count: records.length,
+      records
+    });
+    return;
+  }
+
+  const documentVaultMatch = path.match(/^\/document-vault\/([^/]+)$/);
+  if (method === "GET" && documentVaultMatch) {
+    const state = await store.load();
+    const vaultRecordId = decodeURIComponent(documentVaultMatch[1]);
+    const record = state.documentVault?.[vaultRecordId];
+    if (!record) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Document vault record not found." } });
+      return;
+    }
+    sendJson(res, 200, record);
     return;
   }
 
@@ -2619,20 +2648,48 @@ async function route(req, res, dataDir, platformAdminKey) {
       ...application,
       documentPacket: signResult.packet
     };
-    const nextState = appendEvent(
-      {
-        ...state,
-        loanApplications: {
-          ...state.loanApplications,
-          [stored.applicationId]: stored
-        }
+    const vaultResult = vaultDocumentPacket(state.documentVault, stored, signResult.packet, {
+      vaultedBy: body.actor ?? "esign",
+      retentionPolicyId: body.retentionPolicyId ?? undefined,
+      storageCountry: body.storageCountry ?? undefined
+    });
+    if (vaultResult.summary.status === "blocked") {
+      sendJson(res, 422, {
+        error: {
+          code: "document_vault_blocked",
+          message: "Signed document packet could not be vaulted."
+        },
+        findings: vaultResult.findings
+      });
+      return;
+    }
+    const stateWithSignedPacket = {
+      ...state,
+      loanApplications: {
+        ...state.loanApplications,
+        [stored.applicationId]: stored
       },
+      documentVault: vaultResult.registry
+    };
+    const nextState = appendEvent(
+      appendEvent(
+        stateWithSignedPacket,
+        {
+          type: "loan.document_packet.signed",
+          applicationId: stored.applicationId,
+          packetId: signResult.packet.packetId,
+          signatureRef: esignResult.signatureRef,
+          signerName,
+          vaultRecordId: vaultResult.record.vaultRecordId
+        }
+      ),
       {
-        type: "loan.document_packet.signed",
+        type: "document_vault.packet_vaulted",
         applicationId: stored.applicationId,
         packetId: signResult.packet.packetId,
-        signatureRef: esignResult.signatureRef,
-        signerName
+        vaultRecordId: vaultResult.record.vaultRecordId,
+        documentCount: vaultResult.record.documentCount,
+        manifestChecksumSha256: vaultResult.record.manifestChecksumSha256
       }
     );
     await store.save(nextState);
