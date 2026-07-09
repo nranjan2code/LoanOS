@@ -3,11 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LoanOS India - Loan Officer Workspace (LWS)</title>
+  <title>LoanOS India — Loan Officer Workspace</title>
   <!-- SEO Meta -->
   <meta name="description" content="Manage compliance, credit underwriting, grievances, and loan actions in a secure, multi-tenant workspace.">
   
-  <!-- Inter Font -->
+  <!-- Favicon -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%236366f1'/><text x='50' y='68' font-size='50' text-anchor='middle' fill='white' font-weight='bold'>L</text></svg>">
+
+  <!-- Inter + JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -16,10 +19,10 @@
 </head>
 <body>
   <div class="app-container">
-    <!-- Header -->
+    <!-- ═══ Header ═══════════════════════════════════════════════════════ -->
     <header class="app-header">
       <div class="brand">
-        <span class="logo-icon">▲</span>
+        <span class="logo-icon" aria-hidden="true">▲</span>
         <div class="brand-text">
           <h1>LoanOS India</h1>
           <span class="sub-brand">Loan Officer Workspace</span>
@@ -28,50 +31,66 @@
 
       <!-- Config & Status -->
       <div class="header-controls">
+        <div class="connection-status" id="connection-status" aria-live="polite">
+          <span class="status-dot" id="status-dot"></span>
+          <span id="status-label">No Key</span>
+        </div>
+
         <div class="control-group">
           <label for="config-api-key">Tenant API Key</label>
-          <input type="password" id="config-api-key" placeholder="Enter x-api-key..." autocomplete="off">
+          <input type="password" id="config-api-key" placeholder="Enter x-api-key…" autocomplete="off" aria-label="Tenant API Key">
         </div>
         
         <div class="control-group">
           <label for="current-actor-select">Acting User</label>
-          <select id="current-actor-select">
-            <option value="">-- Set API Key First --</option>
+          <select id="current-actor-select" aria-label="Select acting user">
+            <option value="">— Set API Key First —</option>
           </select>
         </div>
 
         <div class="control-group">
           <label for="time-as-of">Simulation Date</label>
-          <input type="datetime-local" id="time-as-of">
+          <input type="datetime-local" id="time-as-of" aria-label="Simulation date and time">
         </div>
 
-        <button id="btn-refresh" class="btn btn-secondary">
+        <button id="btn-refresh" class="btn btn-secondary" aria-label="Refresh tasks">
           <span class="btn-icon">⟳</span> Refresh
         </button>
       </div>
     </header>
 
-    <!-- Main Workspace -->
+    <!-- ═══ Main Workspace ═══════════════════════════════════════════════ -->
     <div class="workspace-layout">
-      <!-- Sidebar / Filters -->
-      <aside class="sidebar">
-        <!-- Dashboard Summary Mini-Widget -->
+      <!-- ─── Sidebar ─────────────────────────────────────────────────── -->
+      <aside class="sidebar" role="navigation" aria-label="Work queues and filters">
+        <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Collapse sidebar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="11 17 6 12 11 7"></polyline>
+            <polyline points="18 17 13 12 18 7"></polyline>
+          </svg>
+        </button>
+
+        <!-- Dashboard Summary Metrics -->
         <section class="summary-widget">
           <h3>Overview</h3>
           <div class="metrics-grid">
             <div class="metric-card" id="metric-total">
+              <span class="metric-icon" aria-hidden="true">📋</span>
               <span class="metric-val">0</span>
               <span class="metric-lbl">Total Tasks</span>
             </div>
             <div class="metric-card danger" id="metric-breached">
+              <span class="metric-icon" aria-hidden="true">🔴</span>
               <span class="metric-val">0</span>
               <span class="metric-lbl">Breached</span>
             </div>
             <div class="metric-card warning" id="metric-due-soon">
+              <span class="metric-icon" aria-hidden="true">⏰</span>
               <span class="metric-val">0</span>
               <span class="metric-lbl">Due Soon</span>
             </div>
             <div class="metric-card info" id="metric-assigned">
+              <span class="metric-icon" aria-hidden="true">👤</span>
               <span class="metric-val">0</span>
               <span class="metric-lbl">Assigned</span>
             </div>
@@ -79,46 +98,56 @@
         </section>
 
         <!-- Queue Filters -->
-        <nav class="queue-nav">
+        <nav class="queue-nav" aria-label="Task queue filters">
           <h3>Work Queues</h3>
-          <ul id="queue-list">
-            <li class="queue-item active" data-queue="all">
+          <ul id="queue-list" role="listbox">
+            <li class="queue-item active" data-queue="all" role="option" tabindex="0" aria-selected="true">
+              <svg class="queue-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
               <span class="queue-name">All Queues</span>
               <span class="queue-count badge" id="count-all">0</span>
             </li>
-            <li class="queue-item" data-queue="compliance_ops">
+            <li class="queue-item" data-queue="compliance_ops" role="option" tabindex="0">
+              <svg class="queue-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
               <span class="queue-name">Compliance Ops</span>
               <span class="queue-count badge" id="count-compliance_ops">0</span>
             </li>
-            <li class="queue-item" data-queue="loan_ops">
+            <li class="queue-item" data-queue="loan_ops" role="option" tabindex="0">
+              <svg class="queue-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
               <span class="queue-name">Loan Operations</span>
               <span class="queue-count badge" id="count-loan_ops">0</span>
             </li>
-            <li class="queue-item" data-queue="credit_ops">
+            <li class="queue-item" data-queue="credit_ops" role="option" tabindex="0">
+              <svg class="queue-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
               <span class="queue-name">Credit Decisioning</span>
               <span class="queue-count badge" id="count-credit_ops">0</span>
             </li>
-            <li class="queue-item" data-queue="credit_checker">
+            <li class="queue-item" data-queue="credit_checker" role="option" tabindex="0">
+              <svg class="queue-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
               <span class="queue-name">Checker Approvals</span>
               <span class="queue-count badge" id="count-credit_checker">0</span>
             </li>
-            <li class="queue-item" data-queue="disbursement_ops">
+            <li class="queue-item" data-queue="disbursement_ops" role="option" tabindex="0">
+              <svg class="queue-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
               <span class="queue-name">Disbursements</span>
               <span class="queue-count badge" id="count-disbursement_ops">0</span>
             </li>
-            <li class="queue-item" data-queue="collections_ops">
+            <li class="queue-item" data-queue="collections_ops" role="option" tabindex="0">
+              <svg class="queue-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
               <span class="queue-name">Collections & Recovery</span>
               <span class="queue-count badge" id="count-collections_ops">0</span>
             </li>
-            <li class="queue-item" data-queue="risk_ops">
+            <li class="queue-item" data-queue="risk_ops" role="option" tabindex="0">
+              <svg class="queue-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
               <span class="queue-name">Risk Management</span>
               <span class="queue-count badge" id="count-risk_ops">0</span>
             </li>
-            <li class="queue-item" data-queue="grievance_ops">
+            <li class="queue-item" data-queue="grievance_ops" role="option" tabindex="0">
+              <svg class="queue-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
               <span class="queue-name">Grievance Escalations</span>
               <span class="queue-count badge" id="count-grievance_ops">0</span>
             </li>
-            <li class="queue-item" data-queue="model_risk">
+            <li class="queue-item" data-queue="model_risk" role="option" tabindex="0">
+              <svg class="queue-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
               <span class="queue-name">Model Governance</span>
               <span class="queue-count badge" id="count-model_risk">0</span>
             </li>
@@ -128,7 +157,7 @@
         <!-- Status Filter -->
         <div class="filter-section">
           <h3>Task Status</h3>
-          <select id="filter-status">
+          <select id="filter-status" aria-label="Filter by task status">
             <option value="">All Statuses</option>
             <option value="open">Open</option>
             <option value="assigned">Assigned</option>
@@ -137,13 +166,21 @@
         </div>
       </aside>
 
-      <!-- Task List Area -->
-      <main class="tasks-panel">
+      <!-- ─── Task List Area ──────────────────────────────────────────── -->
+      <main class="tasks-panel" role="main" aria-label="Task list">
         <div class="search-bar-container">
-          <input type="text" id="task-search" placeholder="Search tasks by ID, name, borrower or loan account...">
+          <input type="text" id="task-search" placeholder="Search tasks by ID, name, borrower or loan account…" aria-label="Search tasks">
         </div>
 
         <div class="tasks-list-scroll">
+          <!-- Skeleton loading state -->
+          <div id="tasks-skeleton" class="hidden">
+            <div class="skeleton skeleton-card"></div>
+            <div class="skeleton skeleton-card"></div>
+            <div class="skeleton skeleton-card"></div>
+            <div class="skeleton skeleton-card"></div>
+          </div>
+
           <div class="empty-state" id="tasks-empty-state">
             <div class="empty-icon">📂</div>
             <p>No active tasks found in the selected queue.</p>
@@ -154,8 +191,8 @@
         </div>
       </main>
 
-      <!-- Detail Panel -->
-      <section class="detail-panel" id="task-detail-container">
+      <!-- ─── Detail Panel ────────────────────────────────────────────── -->
+      <section class="detail-panel" id="task-detail-container" aria-label="Task details">
         <div class="empty-state" id="detail-empty-state">
           <div class="empty-icon">🔍</div>
           <p>Select a task from the list to view compliance context and run actions.</p>
@@ -207,8 +244,8 @@
               <div class="op-card" id="op-assign-card">
                 <h5>Assign Task</h5>
                 <div class="form-row">
-                  <select id="op-assign-to-select">
-                    <option value="">-- Select Actor --</option>
+                  <select id="op-assign-to-select" aria-label="Select actor to assign">
+                    <option value="">— Select Actor —</option>
                   </select>
                   <button id="btn-op-assign" class="btn btn-primary btn-sm">Assign</button>
                 </div>
@@ -227,7 +264,7 @@
               <div class="op-card span-all">
                 <h5>Audit Trail Comment</h5>
                 <div class="form-row">
-                  <input type="text" id="op-comment-text" placeholder="Add an official audit comment...">
+                  <input type="text" id="op-comment-text" placeholder="Add an official audit comment…" aria-label="Audit comment text">
                   <button id="btn-op-comment" class="btn btn-secondary btn-sm">Post Comment</button>
                 </div>
               </div>
@@ -260,10 +297,99 @@
       </section>
 
     </div>
+
+    <!-- ═══ Footer Status Bar ════════════════════════════════════════════ -->
+    <footer class="footer-bar" aria-label="Status bar">
+      <div class="footer-left">
+        <span id="footer-refresh-time">Last refreshed: —</span>
+        <span class="footer-sep"></span>
+        <span id="footer-task-count">0 tasks</span>
+      </div>
+      <div class="footer-right">
+        <span id="footer-tenant-label">No tenant</span>
+        <span class="footer-sep"></span>
+        <span>LoanOS India v0.1</span>
+      </div>
+    </footer>
   </div>
 
+  <!-- ═══ Dialog Modals (replaces prompt()) ═════════════════════════════ -->
+
+  <!-- Release Task Dialog -->
+  <dialog id="dialog-release">
+    <div class="dialog-header">
+      <h3>Release Task to Queue</h3>
+      <p>Specify why this task is being released back to the open queue.</p>
+    </div>
+    <div class="dialog-body">
+      <div class="field-group">
+        <label for="release-reason">Release Reason</label>
+        <textarea id="release-reason" rows="3" placeholder="Provide a reason for releasing this task…" required></textarea>
+      </div>
+    </div>
+    <div class="dialog-footer">
+      <button class="btn btn-secondary" id="btn-release-cancel">Cancel</button>
+      <button class="btn btn-warning" id="btn-release-confirm">Release Task</button>
+    </div>
+  </dialog>
+
+  <!-- Document Delivery Dialog -->
+  <dialog id="dialog-delivery">
+    <div class="dialog-header">
+      <h3>Record Document Delivery</h3>
+      <p>Enter the delivery channel and reference for the document packet.</p>
+    </div>
+    <div class="dialog-body">
+      <div class="field-group">
+        <label for="delivery-channel">Delivery Channel</label>
+        <select id="delivery-channel">
+          <option value="email">Email</option>
+          <option value="sms">SMS</option>
+          <option value="physical">Physical Delivery</option>
+        </select>
+      </div>
+      <div class="field-group">
+        <label for="delivery-ref">Delivery Reference / Tracking ID</label>
+        <input type="text" id="delivery-ref" placeholder="e.g. MSG-98176" required>
+      </div>
+    </div>
+    <div class="dialog-footer">
+      <button class="btn btn-secondary" id="btn-delivery-cancel">Cancel</button>
+      <button class="btn btn-success" id="btn-delivery-confirm">Record Delivery</button>
+    </div>
+  </dialog>
+
+  <!-- Decline Reason Dialog -->
+  <dialog id="dialog-decline">
+    <div class="dialog-header">
+      <h3>Decline Application</h3>
+      <p>Provide the decline reason code and a narrative for the borrower.</p>
+    </div>
+    <div class="dialog-body">
+      <div class="field-group">
+        <label for="decline-code">Decline Reason Code</label>
+        <select id="decline-code">
+          <option value="credit_score_insufficient">Credit Score Insufficient</option>
+          <option value="foir_exceeded">FOIR Threshold Exceeded</option>
+          <option value="age_bounds_invalid">Age Bounds Invalid</option>
+          <option value="residency_non_india">Non-India Resident</option>
+          <option value="kyc_verification_failed">KYC Verification Failed</option>
+          <option value="other">Other (requires narrative)</option>
+        </select>
+      </div>
+      <div class="field-group">
+        <label for="decline-narrative">Detailed Narrative</label>
+        <textarea id="decline-narrative" rows="3" placeholder="Describe the reason for decline…" required></textarea>
+      </div>
+    </div>
+    <div class="dialog-footer">
+      <button class="btn btn-secondary" id="btn-decline-cancel">Cancel</button>
+      <button class="btn btn-danger" id="btn-decline-confirm">Confirm Decline</button>
+    </div>
+  </dialog>
+
   <!-- Notification Toast Container -->
-  <div class="toast-container" id="toast-container"></div>
+  <div class="toast-container" id="toast-container" aria-live="polite"></div>
 
   <script src="/dashboard/index.js"></script>
 </body>

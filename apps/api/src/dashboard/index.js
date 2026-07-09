@@ -1,4 +1,8 @@
-// State Management
+// ═══════════════════════════════════════════════════════════════════════════
+// LoanOS India — Loan Officer Workspace  ·  Dashboard v2
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ─── State Management ───────────────────────────────────────────────────────
 let apiState = {
   apiKey: '',
   actors: [],
@@ -7,15 +11,23 @@ let apiState = {
   tasks: [],
   selectedTaskId: null,
   activeQueue: 'all',
-  statusFilter: ''
+  statusFilter: '',
+  connected: false,
+  autoRefreshEnabled: true,
+  autoRefreshInterval: null,
+  lastRefreshTime: null
 };
 
-// DOM Cache
+// ─── DOM Cache ──────────────────────────────────────────────────────────────
 const dom = {
   apiKeyInput: document.getElementById('config-api-key'),
   actorSelect: document.getElementById('current-actor-select'),
   timeAsOfInput: document.getElementById('time-as-of'),
   btnRefresh: document.getElementById('btn-refresh'),
+  
+  // Connection status
+  statusDot: document.getElementById('status-dot'),
+  statusLabel: document.getElementById('status-label'),
   
   // Metrics
   metricTotal: document.getElementById('metric-total').querySelector('.metric-val'),
@@ -29,6 +41,7 @@ const dom = {
   taskSearch: document.getElementById('task-search'),
   tasksGrid: document.getElementById('tasks-grid-list'),
   tasksEmptyState: document.getElementById('tasks-empty-state'),
+  tasksSkeleton: document.getElementById('tasks-skeleton'),
   
   // Details pane
   detailContainer: document.getElementById('task-detail-container'),
@@ -58,10 +71,20 @@ const dom = {
   timelineContainer: document.getElementById('detail-timeline-events'),
   contextJson: document.getElementById('detail-context-json'),
   
+  // Footer
+  footerRefreshTime: document.getElementById('footer-refresh-time'),
+  footerTaskCount: document.getElementById('footer-task-count'),
+  footerTenantLabel: document.getElementById('footer-tenant-label'),
+  
+  // Dialogs
+  dialogRelease: document.getElementById('dialog-release'),
+  dialogDelivery: document.getElementById('dialog-delivery'),
+  dialogDecline: document.getElementById('dialog-decline'),
+  
   toastContainer: document.getElementById('toast-container')
 };
 
-// Load saved config
+// ─── Init ───────────────────────────────────────────────────────────────────
 function initConfig() {
   apiState.apiKey = localStorage.getItem('loanos_api_key') || '';
   apiState.currentActorId = localStorage.getItem('loanos_actor_id') || '';
@@ -74,31 +97,102 @@ function initConfig() {
   dom.apiKeyInput.value = apiState.apiKey;
   dom.timeAsOfInput.value = apiState.simulationDate;
   
+  updateConnectionStatus(false);
+  
   if (apiState.apiKey) {
     onApiKeyChange();
   }
+  
+  // Start auto-refresh
+  startAutoRefresh();
 }
 
-// Toast Logger
+// ─── Connection Status ──────────────────────────────────────────────────────
+function updateConnectionStatus(connected, tenantLabel) {
+  apiState.connected = connected;
+  dom.statusDot.className = `status-dot ${connected ? 'connected' : (apiState.apiKey ? 'disconnected' : '')}`;
+  dom.statusLabel.textContent = connected ? 'Connected' : (apiState.apiKey ? 'Error' : 'No Key');
+  if (tenantLabel) {
+    dom.footerTenantLabel.textContent = tenantLabel;
+  }
+}
+
+// ─── Toast Notifications ────────────────────────────────────────────────────
+const MAX_TOASTS = 4;
+
 function showToast(message, type = 'info') {
+  // Limit visible toasts
+  const toasts = dom.toastContainer.querySelectorAll('.toast:not(.toast-exit)');
+  if (toasts.length >= MAX_TOASTS) {
+    dismissToast(toasts[toasts.length - 1]);
+  }
+  
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
   
   let icon = 'ℹ️';
   if (type === 'success') icon = '✅';
   if (type === 'error') icon = '❌';
+  if (type === 'warning') icon = '⚠️';
   
-  toast.innerHTML = `<span>${icon}</span> <span>${message}</span>`;
+  toast.innerHTML = `
+    <span aria-hidden="true">${icon}</span>
+    <span class="toast-message">${message}</span>
+    <button class="toast-dismiss" aria-label="Dismiss notification">×</button>
+    <div class="toast-progress"></div>
+  `;
+  
+  // Dismiss button
+  toast.querySelector('.toast-dismiss').addEventListener('click', () => dismissToast(toast));
+  
   dom.toastContainer.appendChild(toast);
   
-  setTimeout(() => {
-    toast.style.opacity = '0';
-    toast.style.transform = 'translateY(20px)';
-    setTimeout(() => toast.remove(), 300);
-  }, 4000);
+  // Auto-dismiss after 4s
+  setTimeout(() => dismissToast(toast), 4000);
 }
 
-// Fetch helper
+function dismissToast(toast) {
+  if (!toast || toast.classList.contains('toast-exit')) return;
+  toast.classList.add('toast-exit');
+  setTimeout(() => toast.remove(), 300);
+}
+
+// ─── Animated Counter ───────────────────────────────────────────────────────
+function animateCounter(element, targetValue) {
+  const current = parseInt(element.textContent) || 0;
+  if (current === targetValue) return;
+  
+  const duration = 500;
+  const start = performance.now();
+  
+  function step(timestamp) {
+    const elapsed = timestamp - start;
+    const progress = Math.min(elapsed / duration, 1);
+    // Ease-out cubic
+    const eased = 1 - Math.pow(1 - progress, 3);
+    const value = Math.round(current + (targetValue - current) * eased);
+    element.textContent = value;
+    if (progress < 1) {
+      requestAnimationFrame(step);
+    }
+  }
+  
+  requestAnimationFrame(step);
+}
+
+// ─── Auto-Refresh ───────────────────────────────────────────────────────────
+function startAutoRefresh() {
+  if (apiState.autoRefreshInterval) clearInterval(apiState.autoRefreshInterval);
+  if (!apiState.autoRefreshEnabled) return;
+  
+  apiState.autoRefreshInterval = setInterval(() => {
+    if (apiState.apiKey && apiState.connected) {
+      loadTasks(true); // silent refresh
+    }
+  }, 30000);
+}
+
+// ─── Fetch Helper ───────────────────────────────────────────────────────────
 async function apiFetch(path, options = {}) {
   const headers = {
     'Content-Type': 'application/json',
@@ -131,25 +225,26 @@ async function apiFetch(path, options = {}) {
   return response.json();
 }
 
-// API Key changed
+// ─── API Key Changed ────────────────────────────────────────────────────────
 async function onApiKeyChange() {
   apiState.apiKey = dom.apiKeyInput.value.trim();
   localStorage.setItem('loanos_api_key', apiState.apiKey);
   
   if (!apiState.apiKey) {
-    dom.actorSelect.innerHTML = '<option value="">-- Set API Key First --</option>';
+    dom.actorSelect.innerHTML = '<option value="">— Set API Key First —</option>';
+    updateConnectionStatus(false);
     return;
   }
   
   try {
     const res = await apiFetch('/staff/actors');
     apiState.actors = res.actors || [];
+    updateConnectionStatus(true, 'Tenant: dev');
     
     // Populate actor select
     dom.actorSelect.innerHTML = '';
     
     if (apiState.actors.length === 0) {
-      // Add auto-seed option
       dom.actorSelect.innerHTML = '<option value="seed">Seeding needed (Click Refresh to Seed)</option>';
       await seedDefaultActors();
       return;
@@ -170,14 +265,15 @@ async function onApiKeyChange() {
       localStorage.setItem('loanos_actor_id', apiState.currentActorId);
     }
     
-    showToast('Loaded staff actors successfully.', 'success');
+    showToast('Connected and loaded staff actors.', 'success');
     loadTasks();
   } catch (err) {
-    showToast(`Failed to load actors: ${err.message}`, 'error');
+    updateConnectionStatus(false);
+    showToast(`Failed to connect: ${err.message}`, 'error');
   }
 }
 
-// Seed default actors helper for easy local dev testing
+// ─── Seed Default Actors ────────────────────────────────────────────────────
 async function seedDefaultActors() {
   const defaults = [
     { actorId: 'loan_officer_1', displayName: 'Loan Officer Alpha', roles: ['loan_officer'], queues: ['loan_ops'] },
@@ -190,7 +286,7 @@ async function seedDefaultActors() {
     { actorId: 'human_reviewer_1', displayName: 'Human Reviewer Theta', roles: ['human_reviewer'], queues: ['model_risk'] }
   ];
   
-  showToast('Seeding test staff actors into tenant registry...', 'info');
+  showToast('Seeding test staff actors…', 'info');
   try {
     for (const actor of defaults) {
       await apiFetch('/staff/actors', {
@@ -205,11 +301,18 @@ async function seedDefaultActors() {
   }
 }
 
-// Load tasks from backend
-async function loadTasks() {
+// ─── Load Tasks ─────────────────────────────────────────────────────────────
+async function loadTasks(silent = false) {
   if (!apiState.apiKey) {
-    showToast('Provide a Tenant API Key first.', 'info');
+    if (!silent) showToast('Provide a Tenant API Key first.', 'info');
     return;
+  }
+  
+  // Show skeleton
+  if (!silent) {
+    dom.tasksSkeleton.classList.remove('hidden');
+    dom.tasksEmptyState.classList.add('hidden');
+    dom.tasksGrid.innerHTML = '';
   }
   
   try {
@@ -217,12 +320,15 @@ async function loadTasks() {
     const res = await apiFetch(`/workflow/tasks${asOfStr}`);
     apiState.tasks = res.tasks || [];
     
+    apiState.lastRefreshTime = new Date();
+    updateConnectionStatus(true);
+    
     updateMetrics();
     renderSidebarCounts();
     renderTasksList();
+    updateFooter();
     
     if (apiState.selectedTaskId) {
-      // Re-load selected task
       const updated = apiState.tasks.find(t => t.taskId === apiState.selectedTaskId);
       if (updated) {
         selectTask(updated);
@@ -231,38 +337,54 @@ async function loadTasks() {
       }
     }
   } catch (err) {
-    showToast(`Load tasks failed: ${err.message}`, 'error');
+    if (!silent) showToast(`Load tasks failed: ${err.message}`, 'error');
+    updateConnectionStatus(false);
+  } finally {
+    dom.tasksSkeleton.classList.add('hidden');
   }
 }
 
-// Compute metrics based on currently fetched tasks
+// ─── Metrics ────────────────────────────────────────────────────────────────
 function updateMetrics() {
   const total = apiState.tasks.length;
   const breached = apiState.tasks.filter(t => t.slaStatus === 'breached').length;
   const dueSoon = apiState.tasks.filter(t => t.slaStatus === 'due_soon').length;
   const assigned = apiState.tasks.filter(t => t.status === 'assigned' || t.status === 'in_progress').length;
   
-  dom.metricTotal.textContent = total;
-  dom.metricBreached.textContent = breached;
-  dom.metricDueSoon.textContent = dueSoon;
-  dom.metricAssigned.textContent = assigned;
+  animateCounter(dom.metricTotal, total);
+  animateCounter(dom.metricBreached, breached);
+  animateCounter(dom.metricDueSoon, dueSoon);
+  animateCounter(dom.metricAssigned, assigned);
 }
 
-// Update count bubbles next to sidebar queues
+// ─── Sidebar Counts ─────────────────────────────────────────────────────────
 function renderSidebarCounts() {
   const queues = ['compliance_ops', 'loan_ops', 'credit_ops', 'credit_checker', 'disbursement_ops', 'collections_ops', 'risk_ops', 'grievance_ops', 'model_risk'];
   
-  // Total All
-  document.getElementById('count-all').textContent = apiState.tasks.length;
+  const allCount = apiState.tasks.length;
+  const allBadge = document.getElementById('count-all');
+  allBadge.textContent = allCount;
+  allBadge.classList.toggle('zero', allCount === 0);
   
   queues.forEach(q => {
     const count = apiState.tasks.filter(t => t.queue === q).length;
     const elem = document.getElementById(`count-${q}`);
-    if (elem) elem.textContent = count;
+    if (elem) {
+      elem.textContent = count;
+      elem.classList.toggle('zero', count === 0);
+    }
   });
 }
 
-// Get task styling properties based on priorities and SLA status
+// ─── Footer ─────────────────────────────────────────────────────────────────
+function updateFooter() {
+  if (apiState.lastRefreshTime) {
+    dom.footerRefreshTime.textContent = `Last refreshed: ${apiState.lastRefreshTime.toLocaleTimeString()}`;
+  }
+  dom.footerTaskCount.textContent = `${apiState.tasks.length} task${apiState.tasks.length !== 1 ? 's' : ''}`;
+}
+
+// ─── Task Helpers ───────────────────────────────────────────────────────────
 function getPriorityLabel(priority) {
   return priority || 'medium';
 }
@@ -273,23 +395,15 @@ function getSlaLabel(slaStatus) {
   return 'Within SLA';
 }
 
-// Render the list grid
+// ─── Render Task List ───────────────────────────────────────────────────────
 function renderTasksList() {
   dom.tasksGrid.innerHTML = '';
   
   // Apply filtering
   const filtered = apiState.tasks.filter(task => {
-    // Queue filter
-    if (apiState.activeQueue !== 'all' && task.queue !== apiState.activeQueue) {
-      return false;
-    }
+    if (apiState.activeQueue !== 'all' && task.queue !== apiState.activeQueue) return false;
+    if (apiState.statusFilter && task.status !== apiState.statusFilter) return false;
     
-    // Status filter
-    if (apiState.statusFilter && task.status !== apiState.statusFilter) {
-      return false;
-    }
-    
-    // Search query filter
     const query = dom.taskSearch.value.trim().toLowerCase();
     if (query) {
       const matchId = task.taskId.toLowerCase().includes(query);
@@ -309,10 +423,12 @@ function renderTasksList() {
   
   dom.tasksEmptyState.classList.add('hidden');
   
-  filtered.forEach(task => {
+  filtered.forEach((task, index) => {
     const card = document.createElement('div');
-    card.className = `task-card ${apiState.selectedTaskId === task.taskId ? 'active' : ''}`;
+    card.className = `task-card animate-in ${apiState.selectedTaskId === task.taskId ? 'active' : ''}`;
     card.dataset.id = task.taskId;
+    card.dataset.type = task.type || '';
+    card.style.animationDelay = `${index * 40}ms`;
     
     const formattedDate = new Date(task.openedAt).toLocaleDateString(undefined, {
       month: 'short',
@@ -321,7 +437,7 @@ function renderTasksList() {
       minute: '2-digit'
     });
     
-    const assignedLabel = task.assignedTo ? `Assigned to: ${task.assignedTo}` : 'Open Queue';
+    const assignedLabel = task.assignedTo ? `Assigned: ${task.assignedTo}` : 'Open Queue';
     
     card.innerHTML = `
       <div class="task-card-header">
@@ -332,7 +448,7 @@ function renderTasksList() {
       <div class="task-card-footer">
         <div class="task-meta-left">
           <span class="priority-marker ${task.priority}">${getPriorityLabel(task.priority)}</span>
-          <span>•</span>
+          <span>·</span>
           <span>${assignedLabel}</span>
         </div>
         <div class="task-meta-right">${formattedDate}</div>
@@ -340,17 +456,18 @@ function renderTasksList() {
     `;
     
     card.addEventListener('click', () => {
-      // Toggle select
       document.querySelectorAll('.task-card').forEach(c => c.classList.remove('active'));
       card.classList.add('active');
       selectTask(task);
+      // Mobile: open detail panel
+      dom.detailContainer.classList.add('panel-open');
     });
     
     dom.tasksGrid.appendChild(card);
   });
 }
 
-// Select task and fill Details Pane
+// ─── Select Task & Fill Details ─────────────────────────────────────────────
 function selectTask(task) {
   apiState.selectedTaskId = task.taskId;
   
@@ -378,19 +495,10 @@ function selectTask(task) {
     dom.detailRegulatoryBox.classList.add('hidden');
   }
   
-  // Populate assignment actors matching required roles or queues
   populateAssigneeActors(task.queue, task.role);
-  
-  // Status-based display of control buttons
   updateWorkflowStateControls(task);
-  
-  // Render timeline history
   renderTimeline(task.events || []);
-  
-  // Raw Context JSON
   dom.contextJson.textContent = JSON.stringify(task.context || {}, null, 2);
-  
-  // Render dynamic action resolution form
   renderActionForm(task);
 }
 
@@ -398,13 +506,13 @@ function closeDetails() {
   apiState.selectedTaskId = null;
   dom.detailEmptyState.classList.remove('hidden');
   dom.detailContent.classList.add('hidden');
+  dom.detailContainer.classList.remove('panel-open');
 }
 
-// Populate assign dropdown in details panel
+// ─── Populate Assignee Actors ───────────────────────────────────────────────
 function populateAssigneeActors(queue, role) {
-  dom.opAssignToSelect.innerHTML = '<option value="">-- Choose Staff --</option>';
+  dom.opAssignToSelect.innerHTML = '<option value="">— Choose Staff —</option>';
   
-  // Filter actors that have the required role or queue access
   const matchingActors = apiState.actors.filter(actor => {
     return actor.status === 'active' && 
       (actor.roles.includes(role) || actor.queues.includes(queue));
@@ -418,12 +526,8 @@ function populateAssigneeActors(queue, role) {
   });
 }
 
-// Enable/Disable buttons based on task state (open, assigned, in_progress)
+// ─── Workflow State Controls ────────────────────────────────────────────────
 function updateWorkflowStateControls(task) {
-  // If open, enable Start (starts under current actor) or Assign
-  // If assigned, enable Start or Release
-  // If in_progress, enable Release, disable Start
-  
   if (task.status === 'open') {
     dom.btnOpStart.classList.remove('hidden');
     dom.btnOpStart.textContent = 'Claim & Start';
@@ -438,16 +542,15 @@ function updateWorkflowStateControls(task) {
   }
 }
 
-// Timeline event rendering
+// ─── Timeline Rendering ────────────────────────────────────────────────────
 function renderTimeline(events) {
   dom.timelineContainer.innerHTML = '';
   
   if (events.length === 0) {
-    dom.timelineContainer.innerHTML = '<p style="font-size:0.75rem; color:var(--color-muted); italic">No workflow logs registered yet.</p>';
+    dom.timelineContainer.innerHTML = '<p style="font-size:var(--text-xs); color:var(--text-muted); font-style:italic">No workflow logs registered yet.</p>';
     return;
   }
   
-  // Sort reverse chronological
   const sorted = [...events].sort((a, b) => new Date(b.occurredAt) - new Date(a.occurredAt));
   
   sorted.forEach(ev => {
@@ -462,13 +565,18 @@ function renderTimeline(events) {
     let actorLabel = ev.actor || ev.assignedTo || 'System';
     
     let extraText = '';
-    if (ev.notes) extraText = `<div class="event-notes">Notes: ${ev.notes}</div>`;
-    if (ev.comment) extraText = `<div class="event-notes">Comment: "${ev.comment}"</div>`;
+    if (ev.notes) extraText = `<div class="event-notes">${ev.notes}</div>`;
+    if (ev.comment) extraText = `<div class="event-notes">"${ev.comment}"</div>`;
     if (ev.reason) extraText = `<div class="event-notes">Reason: ${ev.reason}</div>`;
+    
+    // Icon glyphs
+    let dotIcon = '●';
+    if (typeClass === 'assigned') dotIcon = '→';
+    if (typeClass === 'started') dotIcon = '▶';
     
     item.className = `timeline-event ${typeClass}`;
     item.innerHTML = `
-      <div class="event-dot"></div>
+      <div class="event-dot">${dotIcon}</div>
       <div class="event-content">
         <div class="event-meta">
           <span>${text}</span>
@@ -483,8 +591,9 @@ function renderTimeline(events) {
   });
 }
 
-// --- Task Control API Submissions ---
+// ─── Task Control API Submissions ───────────────────────────────────────────
 
+// Assign
 dom.btnOpAssign.addEventListener('click', async () => {
   const targetActor = dom.opAssignToSelect.value;
   if (!targetActor) {
@@ -508,6 +617,7 @@ dom.btnOpAssign.addEventListener('click', async () => {
   }
 });
 
+// Start
 dom.btnOpStart.addEventListener('click', async () => {
   if (!apiState.currentActorId) {
     showToast('Configure an Acting User in the header first.', 'warning');
@@ -529,25 +639,35 @@ dom.btnOpStart.addEventListener('click', async () => {
   }
 });
 
-dom.btnOpRelease.addEventListener('click', async () => {
+// Release — uses dialog instead of prompt()
+dom.btnOpRelease.addEventListener('click', () => {
   if (!apiState.currentActorId) {
     showToast('Configure an Acting User in the header first.', 'warning');
     return;
   }
-  
-  const reason = prompt('Specify a reason for releasing this task back to the open queue:');
-  if (reason === null) return; // Cancelled
-  if (!reason.trim()) {
+  document.getElementById('release-reason').value = '';
+  dom.dialogRelease.showModal();
+});
+
+document.getElementById('btn-release-cancel').addEventListener('click', () => {
+  dom.dialogRelease.close();
+});
+
+document.getElementById('btn-release-confirm').addEventListener('click', async () => {
+  const reason = document.getElementById('release-reason').value.trim();
+  if (!reason) {
     showToast('Release reason is required.', 'warning');
     return;
   }
+  
+  dom.dialogRelease.close();
   
   try {
     await apiFetch(`/workflow/tasks/${encodeURIComponent(apiState.selectedTaskId)}/release`, {
       method: 'POST',
       body: JSON.stringify({
         actor: apiState.currentActorId,
-        reason: reason.trim(),
+        reason: reason,
         asOf: apiState.simulationDate ? new Date(apiState.simulationDate).toISOString() : new Date().toISOString()
       })
     });
@@ -558,6 +678,14 @@ dom.btnOpRelease.addEventListener('click', async () => {
   }
 });
 
+// Close dialog on backdrop click
+[dom.dialogRelease, dom.dialogDelivery, dom.dialogDecline].forEach(dialog => {
+  dialog.addEventListener('click', (e) => {
+    if (e.target === dialog) dialog.close();
+  });
+});
+
+// Comment
 dom.btnOpComment.addEventListener('click', async () => {
   const commentText = dom.opCommentText.value.trim();
   if (!commentText) {
@@ -588,7 +716,7 @@ dom.btnOpComment.addEventListener('click', async () => {
 });
 
 
-// --- Render Dynamic Resolution Forms based on Task Type ---
+// ─── Dynamic Resolution Forms Based on Task Type ────────────────────────────
 function renderActionForm(task) {
   dom.resolutionContainer.innerHTML = '';
   
@@ -659,7 +787,7 @@ function renderActionForm(task) {
         <h5>Manual Underwriting Override</h5>
         <div class="field-group">
           <label>Override Rationale / Reason</label>
-          <textarea id="mu-reason" placeholder="Explain credit worthiness override details..." required></textarea>
+          <textarea id="mu-reason" placeholder="Explain credit worthiness override details…" required></textarea>
         </div>
         <div class="field-group">
           <label>Board-Approved Policy Reference</label>
@@ -679,7 +807,6 @@ function renderActionForm(task) {
         const reason = document.getElementById('mu-reason').value.trim();
         const policy = document.getElementById('mu-policy').value.trim();
         
-        // Step 1: Submit override review
         await apiFetch(`/loans/applications/${encodeURIComponent(appId)}/human-reviews`, {
           method: 'POST',
           body: JSON.stringify({
@@ -689,7 +816,6 @@ function renderActionForm(task) {
           })
         });
 
-        // Step 2: Propose decision with manual underwriting details
         await apiFetch(`/loans/applications/${encodeURIComponent(appId)}/decision`, {
           method: 'POST',
           body: JSON.stringify({
@@ -710,30 +836,35 @@ function renderActionForm(task) {
       }
     });
 
-    // Decline
-    document.getElementById('btn-mu-decline').addEventListener('click', async () => {
-      const code = prompt('Enter Decline Reason Code (e.g. credit_score_insufficient, foir_exceeded, age_bounds_invalid):', 'credit_score_insufficient');
-      if (code === null) return;
-      const narrative = prompt('Enter detailed narrative for decline:', 'Credit score is below minimum policy threshold.');
-      if (narrative === null) return;
+    // Decline — uses dialog instead of prompt()
+    document.getElementById('btn-mu-decline').addEventListener('click', () => {
+      document.getElementById('decline-narrative').value = 'Credit score is below minimum policy threshold.';
+      dom.dialogDecline.showModal();
       
-      try {
-        await apiFetch(`/loans/applications/${encodeURIComponent(appId)}/decision`, {
-          method: 'POST',
-          body: JSON.stringify({
-            decision: 'declined',
-            proposedBy: apiState.currentActorId,
-            declineReason: {
-              code: code,
-              narrative: narrative
-            }
-          })
-        });
-        showToast('Application declined.', 'success');
-        loadTasks();
-      } catch (err) {
-        showToast(`Decline failed: ${err.message}`, 'error');
-      }
+      // One-time handler for decline confirm
+      const handler = async () => {
+        const code = document.getElementById('decline-code').value;
+        const narrative = document.getElementById('decline-narrative').value.trim();
+        dom.dialogDecline.close();
+        document.getElementById('btn-decline-confirm').removeEventListener('click', handler);
+        
+        try {
+          await apiFetch(`/loans/applications/${encodeURIComponent(appId)}/decision`, {
+            method: 'POST',
+            body: JSON.stringify({
+              decision: 'declined',
+              proposedBy: apiState.currentActorId,
+              declineReason: { code, narrative }
+            })
+          });
+          showToast('Application declined.', 'success');
+          loadTasks();
+        } catch (err) {
+          showToast(`Decline failed: ${err.message}`, 'error');
+        }
+      };
+      
+      document.getElementById('btn-decline-confirm').addEventListener('click', handler);
     });
     
   } else if (type === 'application.credit_decision') {
@@ -758,7 +889,7 @@ function renderActionForm(task) {
             <option value="kyc_verification_failed">KYC Verification Failed</option>
             <option value="other">Other (requires narrative)</option>
           </select>
-          <input type="text" id="cd-decline-narrative" placeholder="Describe the reason for decline..." style="margin-top:0.4rem">
+          <input type="text" id="cd-decline-narrative" placeholder="Describe the reason for decline…" style="margin-top:0.4rem">
         </div>
         
         <button type="submit" class="btn btn-primary">Propose Decision</button>
@@ -768,11 +899,7 @@ function renderActionForm(task) {
     const decisionSel = document.getElementById('cd-decision');
     const declineBox = document.getElementById('cd-decline-reasons-box');
     decisionSel.addEventListener('change', () => {
-      if (decisionSel.value === 'declined') {
-        declineBox.classList.remove('hidden');
-      } else {
-        declineBox.classList.add('hidden');
-      }
+      declineBox.classList.toggle('hidden', decisionSel.value !== 'declined');
     });
     
     document.getElementById('form-credit-decision').addEventListener('submit', async (e) => {
@@ -808,7 +935,7 @@ function renderActionForm(task) {
         <h5>Human Oversight on AI-Assisted Credit Eligibility</h5>
         <div class="field-group">
           <label>Audit Notes</label>
-          <textarea id="hr-notes" placeholder="Add human compliance review details..." required></textarea>
+          <textarea id="hr-notes" placeholder="Add human compliance review details…" required></textarea>
         </div>
         <div class="op-buttons">
           <button type="submit" id="btn-hr-approve" class="btn btn-success">Verify AI Decision</button>
@@ -839,7 +966,7 @@ function renderActionForm(task) {
     dom.resolutionContainer.innerHTML = `
       <form class="resolution-form" id="form-checker-approval">
         <h5>Checker Approval Gate</h5>
-        <p style="font-size:0.8rem; color:var(--color-secondary); margin-bottom: 0.5rem">
+        <p style="font-size:var(--text-sm); color:var(--text-secondary); margin-bottom: var(--space-2)">
           Verify application details, disclosures, and manual overrides before authorizing fund disbursement.
         </p>
         <div class="field-group">
@@ -851,7 +978,7 @@ function renderActionForm(task) {
         </div>
         <div class="field-group">
           <label>Audit Comment</label>
-          <textarea id="chk-notes" placeholder="Approval or rejection notes..."></textarea>
+          <textarea id="chk-notes" placeholder="Approval or rejection notes…"></textarea>
         </div>
         <button type="submit" class="btn btn-success">Submit Maker-Checker Decision</button>
       </form>
@@ -882,12 +1009,12 @@ function renderActionForm(task) {
     dom.resolutionContainer.innerHTML = `
       <div class="resolution-form">
         <h5>Generate & Deliver Document Packet</h5>
-        <p style="font-size:0.8rem; color:var(--color-secondary); margin-bottom: 0.5rem">
+        <p style="font-size:var(--text-sm); color:var(--text-secondary); margin-bottom: var(--space-2)">
           Generate KFS, Sanction Letter, Loan Agreement Summary, and Privacy Notice, then record delivery.
         </p>
         <div class="op-buttons">
           <button id="btn-doc-generate" class="btn btn-primary">1. Generate Documents</button>
-          <button id="btn-doc-deliver" class="btn btn-success">2. Record Delivery Reference</button>
+          <button id="btn-doc-deliver" class="btn btn-success">2. Record Delivery</button>
         </div>
       </div>
     `;
@@ -905,11 +1032,25 @@ function renderActionForm(task) {
       }
     });
 
-    document.getElementById('btn-doc-deliver').addEventListener('click', async () => {
-      const channel = prompt('Enter Delivery Channel (email, sms, physical):', 'email');
-      if (!channel) return;
-      const ref = prompt('Enter Delivery Reference Number / ID:', 'MSG-' + Math.floor(Math.random() * 80000 + 10000));
-      if (!ref) return;
+    // Delivery — uses dialog instead of prompt()
+    document.getElementById('btn-doc-deliver').addEventListener('click', () => {
+      document.getElementById('delivery-ref').value = 'MSG-' + Math.floor(Math.random() * 80000 + 10000);
+      dom.dialogDelivery.showModal();
+    });
+    
+    document.getElementById('btn-delivery-cancel').addEventListener('click', () => {
+      dom.dialogDelivery.close();
+    });
+    
+    document.getElementById('btn-delivery-confirm').addEventListener('click', async () => {
+      const channel = document.getElementById('delivery-channel').value;
+      const ref = document.getElementById('delivery-ref').value.trim();
+      if (!ref) {
+        showToast('Delivery reference is required.', 'warning');
+        return;
+      }
+      
+      dom.dialogDelivery.close();
       
       try {
         await apiFetch(`/loans/applications/${encodeURIComponent(appId)}/document-packet/delivery`, {
@@ -931,7 +1072,7 @@ function renderActionForm(task) {
     dom.resolutionContainer.innerHTML = `
       <form class="resolution-form" id="form-disburse">
         <h5>Disbursement Fund Flow Verification</h5>
-        <p style="font-size:0.8rem; color:var(--color-secondary); margin-bottom: 0.5rem">
+        <p style="font-size:var(--text-sm); color:var(--text-secondary); margin-bottom: var(--space-2)">
           Disbursement can only route directly to a verified borrower or designated beneficiary account. LSP pass-through pools are strictly blocked.
         </p>
         <div class="field-group">
@@ -954,7 +1095,7 @@ function renderActionForm(task) {
           </select>
         </div>
         <div class="field-group">
-          <label>Fund Transfer Transaction Hash / Reference</label>
+          <label>Fund Transfer Reference</label>
           <input type="text" id="disb-ref" required value="IMPS-REF-${Math.floor(Math.random()*800000+100000)}">
         </div>
         <button type="submit" class="btn btn-success">Execute Direct Disbursement</button>
@@ -1051,7 +1192,7 @@ function renderActionForm(task) {
         </div>
         <div class="field-group">
           <label>Resolution Summary Detail</label>
-          <textarea id="comp-res-summary" placeholder="Provide description of investigation findings and outcome..." required></textarea>
+          <textarea id="comp-res-summary" placeholder="Provide description of investigation findings and outcome…" required></textarea>
         </div>
         <button type="submit" class="btn btn-success">Close Complaint</button>
       </form>
@@ -1083,7 +1224,7 @@ function renderActionForm(task) {
     dom.resolutionContainer.innerHTML = `
       <form class="resolution-form" id="form-cms-escalation">
         <h5>Escalate to RBI CMS</h5>
-        <p style="font-size:0.8rem; color:var(--status-danger)">
+        <p style="font-size:var(--text-sm); color:var(--status-danger)">
           SLA warning: 30 days elapsed without resolution. Must record RBI CMS reference.
         </p>
         <div class="field-group">
@@ -1092,7 +1233,7 @@ function renderActionForm(task) {
         </div>
         <div class="field-group">
           <label>Reason for Delay</label>
-          <textarea id="cms-reason" required placeholder="Explain why the complaint could not be resolved within the 30-day SLA..."></textarea>
+          <textarea id="cms-reason" required placeholder="Explain why the complaint could not be resolved within the 30-day SLA…"></textarea>
         </div>
         <button type="submit" class="btn btn-danger">Record RBI CMS Escalation</button>
       </form>
@@ -1123,7 +1264,7 @@ function renderActionForm(task) {
     dom.resolutionContainer.innerHTML = `
       <form class="resolution-form" id="form-recovery-assign">
         <h5>Assign Recovery Agent</h5>
-        <p style="font-size:0.8rem; color:var(--color-secondary); margin-bottom: 0.5rem">
+        <p style="font-size:var(--text-sm); color:var(--text-secondary); margin-bottom: var(--space-2)">
           Assign only registered and verified recovery agents. System requires borrower notice delivery proof before active assignment.
         </p>
         <div class="field-group">
@@ -1132,7 +1273,7 @@ function renderActionForm(task) {
         </div>
         <div class="field-group">
           <label>Borrower Notice Delivery Reference</label>
-          <input type="text" id="rec-notice-ref" placeholder="Notice tracking ref..." required value="NOTICE-DELIVERY-${Math.floor(Math.random()*80000+10000)}">
+          <input type="text" id="rec-notice-ref" placeholder="Notice tracking ref…" required value="NOTICE-DELIVERY-${Math.floor(Math.random()*80000+10000)}">
         </div>
         <button type="submit" class="btn btn-primary">Empanel & Assign Agent</button>
       </form>
@@ -1162,7 +1303,7 @@ function renderActionForm(task) {
     
   } else {
     dom.resolutionContainer.innerHTML = `
-      <div style="font-size:0.8rem; color:var(--color-muted); italic; text-align:center">
+      <div style="font-size:var(--text-sm); color:var(--text-muted); font-style:italic; text-align:center; padding: var(--space-4)">
         No active resolution triggers needed. Mark status above or add comments.
       </div>
     `;
@@ -1170,19 +1311,19 @@ function renderActionForm(task) {
 }
 
 
-// --- Event Handlers & Initializers ---
+// ─── Event Handlers & Initializers ──────────────────────────────────────────
 
 dom.apiKeyInput.addEventListener('change', onApiKeyChange);
 
 dom.actorSelect.addEventListener('change', () => {
   apiState.currentActorId = dom.actorSelect.value;
   localStorage.setItem('loanos_actor_id', apiState.currentActorId);
-  showToast(`Switched active user context to ${apiState.currentActorId}`, 'info');
+  showToast(`Switched to ${apiState.currentActorId}`, 'info');
 });
 
 dom.timeAsOfInput.addEventListener('change', () => {
   apiState.simulationDate = dom.timeAsOfInput.value;
-  showToast('Updated simulation date/time. Re-fetching tasks...', 'info');
+  showToast('Simulation date updated. Refreshing…', 'info');
   loadTasks();
 });
 
@@ -1199,17 +1340,46 @@ dom.filterStatus.addEventListener('change', () => {
   renderTasksList();
 });
 
-// Setup sidebar queue selection
+// Sidebar queue selection
 dom.queueList.addEventListener('click', (e) => {
   const item = e.target.closest('.queue-item');
   if (!item) return;
   
-  document.querySelectorAll('.queue-item').forEach(li => li.classList.remove('active'));
+  document.querySelectorAll('.queue-item').forEach(li => {
+    li.classList.remove('active');
+    li.setAttribute('aria-selected', 'false');
+  });
   item.classList.add('active');
+  item.setAttribute('aria-selected', 'true');
   
   apiState.activeQueue = item.dataset.queue;
   renderTasksList();
   closeDetails();
+});
+
+// Keyboard navigation for queue items
+dom.queueList.addEventListener('keydown', (e) => {
+  const items = Array.from(dom.queueList.querySelectorAll('.queue-item'));
+  const currentIndex = items.indexOf(document.activeElement);
+  
+  if (e.key === 'ArrowDown' && currentIndex < items.length - 1) {
+    e.preventDefault();
+    items[currentIndex + 1].focus();
+  } else if (e.key === 'ArrowUp' && currentIndex > 0) {
+    e.preventDefault();
+    items[currentIndex - 1].focus();
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    document.activeElement.click();
+  }
+});
+
+// Keyboard: Escape closes detail panel
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    if (dom.dialogRelease.open || dom.dialogDelivery.open || dom.dialogDecline.open) return;
+    closeDetails();
+  }
 });
 
 // Boot
