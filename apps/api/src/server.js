@@ -46,6 +46,7 @@ import {
   generateCicSnapshot,
   generateLoanStatement,
   initializeApplicationWorkflow,
+  listBorrowerBeneficialOwners,
   listBorrowerConsents,
   listBorrowerKycRecords,
   listDataDisclosures,
@@ -84,6 +85,7 @@ import {
   startWorkflowTask,
   transitionModel,
   triggerKillSwitch,
+  upsertBeneficialOwner,
   upsertDigitalLendingApp,
   upsertLendingServiceProvider,
   upsertBorrowerProfile,
@@ -1502,6 +1504,56 @@ async function route(req, res, dataDir, platformAdminKey) {
     }
   }
 
+  // PMLA beneficial-owner declarations for a legal-entity (company/
+  // partnership/llp/trust) borrower; resolveBorrowerApplicationReferences
+  // blocks sanction for such a borrower without a verified, qualifying one.
+  const borrowerBeneficialOwnersMatch = path.match(/^\/borrowers\/([^/]+)\/beneficial-owners$/);
+  if (borrowerBeneficialOwnersMatch) {
+    const borrowerId = decodeURIComponent(borrowerBeneficialOwnersMatch[1]);
+    const state = await store.load();
+    if (!state.borrowerProfiles[borrowerId]) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Borrower not found." } });
+      return;
+    }
+
+    if (method === "GET") {
+      sendJson(res, 200, {
+        beneficialOwners: listBorrowerBeneficialOwners(state.beneficialOwners, borrowerId)
+      });
+      return;
+    }
+
+    if (method === "POST") {
+      const body = await readJson(req);
+      const result = upsertBeneficialOwner(
+        state.beneficialOwners,
+        {
+          ...body,
+          borrowerId
+        },
+        state.borrowerProfiles
+      );
+      const nextState =
+        result.summary.status === "blocked"
+          ? state
+          : appendEvent(
+              {
+                ...state,
+                beneficialOwners: result.registry
+              },
+              {
+                type: "borrower_beneficial_owner.upserted",
+                borrowerId,
+                beneficialOwnerId: result.beneficialOwner.beneficialOwnerId,
+                type: result.beneficialOwner.type
+              }
+            );
+      await store.save(nextState);
+      sendJson(res, result.summary.status === "blocked" ? 422 : 201, result);
+      return;
+    }
+  }
+
   if (method === "POST" && path === "/loans/applications") {
     const body = await readJson(req);
     const state = await store.load();
@@ -1514,7 +1566,8 @@ async function route(req, res, dataDir, platformAdminKey) {
     const borrowerResolution = resolveBorrowerApplicationReferences(application, {
       borrowerProfiles: state.borrowerProfiles,
       consentRecords: state.consentRecords,
-      kycRecords: state.kycRecords
+      kycRecords: state.kycRecords,
+      beneficialOwners: state.beneficialOwners
     });
     const resolution = resolveLoanApplicationReferences(borrowerResolution.application, {
       regulatedEntities: state.regulatedEntities,

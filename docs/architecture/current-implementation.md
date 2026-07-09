@@ -31,7 +31,7 @@ npm run dev:api
 | `packages/core/src/grievance.js` | Complaint registry, grievance lifecycle, 30-day RBI Ombudsman clock, and RBI CMS escalation evidence. |
 | `packages/core/src/document-packet.js` | KFS, sanction letter, loan agreement summary, and privacy notice rendering, rendered borrower loan-statement document, plus delivery evidence controls. |
 | `packages/core/src/registries.js` | Regulated-entity, LSP, DLA, and product-policy registries, DLA CIMS export shape, plus application reference resolution. |
-| `packages/core/src/borrower-onboarding.js` | Borrower profile, consent ledger, KYC records (with RBI risk-based periodic-review refresh status), borrower reference resolution, and in-place redaction for DPDP erasure. |
+| `packages/core/src/borrower-onboarding.js` | Borrower profile, consent ledger, KYC records (with RBI risk-based periodic-review refresh status), a PMLA beneficial-owner registry for legal-entity borrowers, borrower reference resolution, and in-place redaction for DPDP erasure. |
 | `packages/core/src/eligibility.js` | Policy-driven creditworthiness/affordability engine: EMI/FOIR computation, age-at-maturity, amount/tenor bounds, and eligible/refer/ineligible decision. |
 | `packages/core/src/data-sharing.js` | Third-party data-disclosure ledger: consent-gated `consent`-basis sharing, `legal_obligation`-basis sharing requiring a legal reference, both logged as DPDP record-of-processing entries. |
 | `packages/core/src/data-retention.js` | DPDP right-to-erasure workflow: `assessErasureEligibility` holds erasure while a statutory retention window (active loan, or a closed account inside the 5-year RBI/PMLA window) applies; fulfilment redacts the borrower profile in place. |
@@ -48,7 +48,7 @@ npm run dev:api
 | `packages/core/src/index.js` | Public exports for core domain modules. |
 | `apps/api/src/file-store.js` | Local JSON state load/save helpers; control-plane tenant registry (api-key hashing, tenant resolution), sub-processor register, and break-glass grants; per-tenant data partitions and tenant-scoped accessors; `buildTenantExport`/`offboardTenant` for portability and evidenced deletion. |
 | `apps/api/src/server.js` | HTTP API: platform control plane (tenant minting, export, offboarding, break-glass, sub-processors), tenant-context resolution with break-glass fallback and 401 gate, tenant-scoped store with centralized audit stamping, plus endpoints for compliance controls, AI models, kill switch, workflow tasks, applications, loan accounts, fraud cases, erasure requests, data disclosures, and incidents. |
-| `tests/compliance.test.js` | Regression tests for the compliance gates (77 tests as of the latest commit). |
+| `tests/compliance.test.js` | Regression tests for the compliance gates (79 tests as of the latest commit). |
 
 ## Implemented API Endpoints
 
@@ -109,6 +109,8 @@ npm run dev:api
 | `POST /borrowers/:id/consents` | Creates or updates a borrower consent record. |
 | `GET /borrowers/:id/kyc-records` | Lists borrower KYC records. |
 | `POST /borrowers/:id/kyc-records` | Creates or updates a borrower KYC record. |
+| `GET /borrowers/:id/beneficial-owners` | Lists a legal-entity borrower's declared beneficial owners. |
+| `POST /borrowers/:id/beneficial-owners` | Declares or updates a beneficial owner (ownership/control/senior-managing-official) with identification and verification evidence. |
 | `GET /staff/actors` | Lists operational staff actors. |
 | `POST /staff/actors` | Creates or updates an operational actor with roles, queues, and assignment authority. |
 | `GET /staff/actors/:id` | Reads one operational staff actor. |
@@ -206,6 +208,7 @@ npm run dev:api
 | DPDP right-to-erasure | An erasure request is held while the borrower has an active loan or any closed account is within the 5-year RBI/PMLA retention window; fulfilment redacts the borrower profile in place, retaining a skeleton for audit. |
 | KYC record registry | Requires borrower-linked KYC status, risk category, verified timestamp, V-CIP India storage, and no Aadhaar biometric/OTP/PID persistence. |
 | KYC periodic-review refresh | A verified KYC record past its RBI risk-based review cycle (high 2y / medium 8y / low 10y) reads as `refresh_required`; preflight blocks new sanction on a refresh-due or expired KYC record. |
+| Beneficial-owner registry (PMLA) | A legal-entity (company/partnership/llp/trust) borrower's application preflight is blocked without at least one verified beneficial owner meeting the PMLA controlling-interest threshold (25% company, 15% partnership/llp/trust) or declared as control/senior-managing-official. |
 | Staff actor registry | Requires India-operational actors, active status, and recognized roles. |
 | Borrower-backed applications | Application can reference `borrowerId`; borrower, consent, KYC, and economic profile are resolved before preflight. |
 | LOS state machine | Tracks preflight, KFS issued/accepted, ready for decision, human review required, pending decision approval, approved/declined, and disbursed states. |
@@ -310,6 +313,7 @@ Current tests prove:
 - Every sealed audit event carries a uniform actor/actorType/dataClass provenance envelope, attributed to the tenant or to platform staff under break-glass.
 - Recovery-agent empanelment requires training, authorization, and code-of-conduct evidence for an active agent (and blocks an unknown regulated entity); a recovery assignment is blocked unless it names a registered, active recovery agent.
 - Cash recovery is blocked without a coded exception reason and an approver holding the active `collections_manager` role; an unregistered approver is rejected before the domain gate runs.
+- A legal-entity borrower's application preflight is blocked without a verified beneficial owner above the PMLA threshold (a below-threshold ownership stake still blocks), and unblocks once a qualifying owner is on file; a beneficial-owner declaration is rejected for an individual borrower.
 - API stores blocked compliance applications and supports lookup.
 - Regulated entity and product policy registries resolve an application.
 - Unsafe product penal-charge design is rejected.

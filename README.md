@@ -86,6 +86,8 @@ Useful data-plane endpoints (tenant api key required):
 - `POST /borrowers/:id/consents`
 - `GET /borrowers/:id/kyc-records`
 - `POST /borrowers/:id/kyc-records`
+- `GET /borrowers/:id/beneficial-owners`
+- `POST /borrowers/:id/beneficial-owners`
 - `GET /staff/actors`
 - `POST /staff/actors`
 - `GET /staff/actors/:id`
@@ -194,6 +196,7 @@ Phase 0 has a working executable foundation, and Epics 1-8 and 11 (S1-S6) each h
 - Borrower profile registry with India-only and economic-profile checks.
 - Consent ledger for DPDP-style purpose/notice/evidence records, plus a third-party data-disclosure ledger gating consent-based sharing and logging statutory (CIC/regulator) sharing.
 - KYC record registry with V-CIP India-storage, Aadhaar prohibited-storage, and RBI risk-based periodic-review refresh gating on new sanction.
+- Legal-entity borrower types (company/partnership/llp/trust) with a PMLA beneficial-owner registry: sanction is blocked without a verified owner meeting the controlling-interest threshold (25% company, 15% partnership/llp/trust) or declared as control/senior-managing-official.
 - DPDP right-to-erasure workflow gated on statutory retention (active loan or the 5-year RBI/PMLA window), fulfilling by redacting the borrower profile in place.
 - Staff actor registry with India-only operational actors, roles, queue access, and assignment authority.
 - Complaint registry and grievance workflow with 30-day RBI Ombudsman clock and RBI CMS escalation evidence.

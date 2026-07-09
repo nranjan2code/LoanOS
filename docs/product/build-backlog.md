@@ -64,7 +64,7 @@ Tasks:
 - CKYC search/download/upload adapter boundary.
 - V-CIP evidence object. Partial.
 - Aadhaar connector guardrails with no biometric/OTP/PID persistence. Done.
-- Legal entity onboarding and beneficial owner model.
+- Legal entity onboarding and beneficial owner model. First slice done: `borrowerType` already supported `company`/`partnership`/`llp`/`trust` (legalName-keyed) alongside `individual`. `packages/core/src/borrower-onboarding.js` adds a beneficial-owner registry (`normalizeBeneficialOwner`/`validateBeneficialOwner`/`upsertBeneficialOwner`) recording each declared owner's identification, PMLA-basis type (`ownership`/`control`/`senior_managing_official`), and verification evidence. `resolveBorrowerApplicationReferences` blocks sanction for a legal-entity borrower unless at least one *verified* beneficial owner meets the PMLA controlling-interest threshold (25% company, 15% partnership/llp/trust) or is declared as control/senior-managing-official. `POST/GET /borrowers/{id}/beneficial-owners` drive it. Also fixed `checkEconomicProfile` (`loan-policy.js`), which previously required age/occupation unconditionally, blocking every legal-entity application at preflight regardless of beneficial-owner status.
 - Tests for consent revocation, KYC expiry, Aadhaar prohibited storage. Done.
 
 Done when:

@@ -299,6 +299,126 @@ export function upsertKycRecord(registry, input, borrowerProfiles = {}, now = ne
   };
 }
 
+// PMLA Rules (Rule 9(1A)/9(3)) require a regulated entity to identify the
+// natural person(s) who ultimately own or control a legal-entity customer
+// before an account-based relationship is established: a controlling
+// ownership interest (25% for a company, 15% for a partnership/LLP/trust or
+// unincorporated association), or — where no natural person meets that
+// threshold — the senior managing official exercising control. Individuals
+// and sole proprietors are the customer themselves, so no separate
+// beneficial-owner declaration applies to them.
+export const BENEFICIAL_OWNER_TYPES = new Set(["ownership", "control", "senior_managing_official"]);
+export const BENEFICIAL_OWNER_ENTITY_TYPES = new Set(["company", "partnership", "llp", "trust"]);
+export const BENEFICIAL_OWNERSHIP_THRESHOLD_PERCENT = {
+  company: 25,
+  partnership: 15,
+  llp: 15,
+  trust: 15
+};
+
+export function validateBeneficialOwner(record, borrowerProfiles = {}) {
+  const findings = [];
+  const borrower = record?.borrowerId ? borrowerProfiles[record.borrowerId] : null;
+
+  if (!record?.beneficialOwnerId) {
+    findings.push(createFinding("error", "RBI-KYC-2016", "beneficialOwnerId is required.", "beneficialOwnerId"));
+  }
+  if (!record?.borrowerId) {
+    findings.push(createFinding("error", "RBI-KYC-2016", "borrowerId is required for a beneficial owner.", "borrowerId"));
+  } else if (!borrower) {
+    findings.push(createFinding("error", "RBI-KYC-2016", "Beneficial owner must reference an existing borrower.", "borrowerId"));
+  } else if (!BENEFICIAL_OWNER_ENTITY_TYPES.has(borrower.borrowerType)) {
+    findings.push(
+      createFinding("error", "RBI-KYC-2016", "Beneficial owners apply only to legal-entity (company/partnership/llp/trust) borrowers.", "borrowerId")
+    );
+  }
+  if (!record?.name) {
+    findings.push(createFinding("error", "RBI-KYC-2016", "Beneficial owner name is required.", "name"));
+  }
+  if (!record?.identificationRef) {
+    findings.push(createFinding("error", "RBI-KYC-2016", "Beneficial owner identificationRef (e.g. PAN) is required.", "identificationRef"));
+  }
+  if (!record?.type || !BENEFICIAL_OWNER_TYPES.has(record.type)) {
+    findings.push(createFinding("error", "RBI-KYC-2016", "Beneficial owner type must be ownership, control, or senior_managing_official.", "type"));
+  } else if (record.type === "ownership") {
+    if (!Number.isFinite(record?.ownershipPercentage) || record.ownershipPercentage <= 0 || record.ownershipPercentage > 100) {
+      findings.push(createFinding("error", "RBI-KYC-2016", "Ownership-type beneficial owner requires ownershipPercentage in (0, 100].", "ownershipPercentage"));
+    }
+  } else if (record.type === "control" && !record?.controlBasis) {
+    findings.push(createFinding("error", "RBI-KYC-2016", "Control-type beneficial owner requires controlBasis.", "controlBasis"));
+  } else if (record.type === "senior_managing_official" && !record?.designation) {
+    findings.push(createFinding("error", "RBI-KYC-2016", "Senior-managing-official beneficial owner requires designation.", "designation"));
+  }
+  if (record?.verification?.status === VERIFIED_KYC_STATUS && !record?.verification?.verifiedAt) {
+    findings.push(createFinding("error", "RBI-KYC-2016", "Verified beneficial owner requires verification.verifiedAt.", "verification.verifiedAt"));
+  }
+
+  return {
+    findings,
+    summary: summarizeFindings(findings)
+  };
+}
+
+export function normalizeBeneficialOwner(input, existing = {}, now = new Date()) {
+  return {
+    beneficialOwnerId: input.beneficialOwnerId ?? existing.beneficialOwnerId ?? createLoanId("bo"),
+    borrowerId: input.borrowerId ?? existing.borrowerId,
+    name: input.name ?? existing.name ?? null,
+    identificationType: input.identificationType ?? existing.identificationType ?? "pan",
+    identificationRef: input.identificationRef ?? existing.identificationRef ?? null,
+    type: input.type ?? existing.type ?? "ownership",
+    ownershipPercentage: input.ownershipPercentage ?? existing.ownershipPercentage ?? null,
+    controlBasis: input.controlBasis ?? existing.controlBasis ?? null,
+    designation: input.designation ?? existing.designation ?? null,
+    verification: {
+      status: input.verification?.status ?? existing.verification?.status ?? "pending",
+      verifiedAt: input.verification?.verifiedAt ?? existing.verification?.verifiedAt ?? null,
+      verifiedBy: input.verification?.verifiedBy ?? existing.verification?.verifiedBy ?? null,
+      evidenceRef: input.verification?.evidenceRef ?? existing.verification?.evidenceRef ?? null
+    },
+    createdAt: existing.createdAt ?? input.createdAt ?? now.toISOString(),
+    updatedAt: now.toISOString()
+  };
+}
+
+export function upsertBeneficialOwner(registry, input, borrowerProfiles = {}, now = new Date()) {
+  const record = normalizeBeneficialOwner(input, (registry ?? {})[input?.beneficialOwnerId] ?? {}, now);
+  const validation = validateBeneficialOwner(record, borrowerProfiles);
+  const nextRegistry =
+    validation.summary.status === "blocked"
+      ? registry ?? {}
+      : {
+          ...(registry ?? {}),
+          [record.beneficialOwnerId]: record
+        };
+
+  return {
+    registry: nextRegistry,
+    beneficialOwner: record,
+    findings: validation.findings,
+    summary: validation.summary
+  };
+}
+
+export function listBorrowerBeneficialOwners(beneficialOwners, borrowerId) {
+  return Object.values(beneficialOwners ?? {}).filter((record) => record.borrowerId === borrowerId);
+}
+
+// A beneficial-owner record actually discharges the PMLA identification duty
+// only once it is verified and meets its type's bar: an ownership stake at or
+// above the entity's controlling-interest threshold, or a declared control /
+// senior-managing-official basis.
+function qualifiesAsBeneficialOwner(record, borrowerType) {
+  if (record?.verification?.status !== VERIFIED_KYC_STATUS) {
+    return false;
+  }
+  if (record.type === "ownership") {
+    const threshold = BENEFICIAL_OWNERSHIP_THRESHOLD_PERCENT[borrowerType] ?? 25;
+    return Number.isFinite(record.ownershipPercentage) && record.ownershipPercentage >= threshold;
+  }
+  return record.type === "control" || record.type === "senior_managing_official";
+}
+
 export function resolveBorrowerApplicationReferences(application, registries = {}, now = new Date()) {
   const findings = [];
   let resolved = { ...application };
@@ -322,6 +442,20 @@ export function resolveBorrowerApplicationReferences(application, registries = {
   }
   if (borrower.status !== ACTIVE_STATUS) {
     findings.push(createFinding("error", "RBI-KYC-2016", "Referenced borrower is not active.", "borrowerId"));
+  }
+
+  if (BENEFICIAL_OWNER_ENTITY_TYPES.has(borrower.borrowerType)) {
+    const beneficialOwners = listBorrowerBeneficialOwners(registries.beneficialOwners ?? {}, borrower.borrowerId);
+    if (!beneficialOwners.some((record) => qualifiesAsBeneficialOwner(record, borrower.borrowerType))) {
+      findings.push(
+        createFinding(
+          "error",
+          "RBI-KYC-2016",
+          "A legal-entity borrower requires at least one verified beneficial owner meeting the PMLA controlling-interest threshold.",
+          "borrowerId"
+        )
+      );
+    }
   }
 
   const dataConsent = findLatestConsent(registries.consentRecords ?? {}, borrower.borrowerId, "data_processing");

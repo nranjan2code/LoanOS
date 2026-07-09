@@ -264,13 +264,19 @@ function checkKyc(application, findings) {
 function checkEconomicProfile(application, findings, now) {
   const borrower = application.borrower;
   const profile = application.economicProfile;
-  const age = borrower?.dateOfBirth ? calculateAgeYears(borrower.dateOfBirth, now) : borrower?.ageYears;
+  // Age and occupation are meaningful only for a natural-person borrower; a
+  // legal-entity borrower (company/partnership/llp/trust) is identified by
+  // its legalName and beneficial owners instead (see borrower-onboarding.js).
+  const isIndividual = (borrower?.borrowerType ?? "individual") === "individual";
 
-  if (!Number.isFinite(age) || age < 18) {
-    findings.push(createFinding("error", "RBI-DL-2025", "Borrower age must be captured and at least 18.", "borrower.dateOfBirth"));
-  }
-  if (!profile?.occupation) {
-    findings.push(createFinding("error", "RBI-DL-2025", "Borrower occupation must be captured.", "economicProfile.occupation"));
+  if (isIndividual) {
+    const age = borrower?.dateOfBirth ? calculateAgeYears(borrower.dateOfBirth, now) : borrower?.ageYears;
+    if (!Number.isFinite(age) || age < 18) {
+      findings.push(createFinding("error", "RBI-DL-2025", "Borrower age must be captured and at least 18.", "borrower.dateOfBirth"));
+    }
+    if (!profile?.occupation) {
+      findings.push(createFinding("error", "RBI-DL-2025", "Borrower occupation must be captured.", "economicProfile.occupation"));
+    }
   }
   if (!Number.isFinite(profile?.monthlyIncome) || profile.monthlyIncome <= 0) {
     findings.push(createFinding("error", "RBI-DL-2025", "Borrower monthlyIncome must be captured.", "economicProfile.monthlyIncome"));

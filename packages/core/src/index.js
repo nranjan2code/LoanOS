@@ -88,19 +88,26 @@ export {
 } from "./registries.js";
 
 export {
+  BENEFICIAL_OWNER_ENTITY_TYPES,
+  BENEFICIAL_OWNER_TYPES,
+  BENEFICIAL_OWNERSHIP_THRESHOLD_PERCENT,
   KYC_STATUSES,
   computeKycReviewDueAt,
   evaluateKycStatus,
+  listBorrowerBeneficialOwners,
   listBorrowerConsents,
   listBorrowerKycRecords,
+  normalizeBeneficialOwner,
   normalizeBorrowerProfile,
   normalizeConsentRecord,
   normalizeKycRecord,
   redactBorrowerProfile,
   resolveBorrowerApplicationReferences,
+  upsertBeneficialOwner,
   upsertBorrowerProfile,
   upsertConsentRecord,
   upsertKycRecord,
+  validateBeneficialOwner,
   validateBorrowerProfile,
   validateConsentRecord,
   validateKycRecord

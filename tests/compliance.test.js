@@ -42,6 +42,7 @@ import {
   resolveBorrowerApplicationReferences,
   resolveLoanApplicationReferences,
   triggerKillSwitch,
+  upsertBeneficialOwner,
   upsertDigitalLendingApp,
   upsertLendingServiceProvider,
   upsertBorrowerProfile,
@@ -993,6 +994,87 @@ test("borrower resolution blocks revoked consent and expired KYC", () => {
   assert(resolution.findings.some((finding) => finding.message.includes("expired")));
 });
 
+test("legal-entity borrower resolution requires a verified beneficial owner above the PMLA threshold", () => {
+  const borrowerResult = upsertBorrowerProfile(
+    {},
+    merge(validBorrowerProfile(), {
+      borrowerId: "bor_company_001",
+      borrowerType: "company",
+      legalName: "Example Textiles Pvt Ltd"
+    })
+  );
+  assert.equal(borrowerResult.summary.status, "ready");
+
+  const missingIdentification = upsertBeneficialOwner(
+    {},
+    { beneficialOwnerId: "bo_bad", borrowerId: "bor_company_001", name: "Someone", type: "ownership", ownershipPercentage: 40 },
+    borrowerResult.registry
+  );
+  assert.equal(missingIdentification.summary.status, "blocked");
+  assert(missingIdentification.findings.some((finding) => finding.path === "identificationRef"));
+
+  const individualBorrowerResult = upsertBorrowerProfile({}, validBorrowerProfile());
+  const boForIndividual = upsertBeneficialOwner(
+    {},
+    { beneficialOwnerId: "bo_invalid", borrowerId: "bor_001", name: "Someone", identificationRef: "PAN000", type: "ownership", ownershipPercentage: 40 },
+    individualBorrowerResult.registry
+  );
+  assert.equal(boForIndividual.summary.status, "blocked");
+  assert(boForIndividual.findings.some((finding) => finding.path === "borrowerId"));
+
+  const consentResult = upsertConsentRecord({}, merge(validConsentRecord(), { borrowerId: "bor_company_001" }), borrowerResult.registry);
+  const kycResult = upsertKycRecord({}, merge(validKycRecord(), { borrowerId: "bor_company_001" }), borrowerResult.registry);
+  const registries = { borrowerProfiles: borrowerResult.registry, consentRecords: consentResult.registry, kycRecords: kycResult.registry };
+
+  const blockedNoOwner = resolveBorrowerApplicationReferences({ borrowerId: "bor_company_001" }, registries, new Date("2026-07-08T00:00:00.000Z"));
+  assert.equal(blockedNoOwner.summary.status, "blocked");
+  assert(blockedNoOwner.findings.some((finding) => finding.message.includes("beneficial owner")));
+
+  const belowThreshold = upsertBeneficialOwner(
+    {},
+    {
+      beneficialOwnerId: "bo_minor",
+      borrowerId: "bor_company_001",
+      name: "Minor Stakeholder",
+      identificationRef: "PAN_MINOR",
+      type: "ownership",
+      ownershipPercentage: 10,
+      verification: { status: "verified", verifiedAt: "2026-06-01T00:00:00.000Z", verifiedBy: "compliance-analyst-1" }
+    },
+    borrowerResult.registry
+  );
+  assert.equal(belowThreshold.summary.status, "ready");
+
+  const blockedBelowThreshold = resolveBorrowerApplicationReferences(
+    { borrowerId: "bor_company_001" },
+    { ...registries, beneficialOwners: belowThreshold.registry },
+    new Date("2026-07-08T00:00:00.000Z")
+  );
+  assert.equal(blockedBelowThreshold.summary.status, "blocked");
+
+  const controllingOwner = upsertBeneficialOwner(
+    belowThreshold.registry,
+    {
+      beneficialOwnerId: "bo_controlling",
+      borrowerId: "bor_company_001",
+      name: "Controlling Shareholder",
+      identificationRef: "PAN_MAJOR",
+      type: "ownership",
+      ownershipPercentage: 40,
+      verification: { status: "verified", verifiedAt: "2026-06-01T00:00:00.000Z", verifiedBy: "compliance-analyst-1" }
+    },
+    borrowerResult.registry
+  );
+  assert.equal(controllingOwner.summary.status, "ready");
+
+  const resolved = resolveBorrowerApplicationReferences(
+    { borrowerId: "bor_company_001" },
+    { ...registries, beneficialOwners: controllingOwner.registry },
+    new Date("2026-07-08T00:00:00.000Z")
+  );
+  assert.equal(resolved.summary.status, "ready");
+});
+
 test("KYC periodic-review lapse turns a verified record refresh_required and blocks sanction", () => {
   // A high-risk KYC is on a 2-year review cycle. Just under 2 years in, it is
   // still good; past the review-due date it becomes refresh_required.
@@ -1345,6 +1427,101 @@ test("API supports borrower-backed applications without embedded borrower KYC co
   assert.equal(application.consent.consentRecordId, "consent_data_processing");
   assert.equal(application.kyc.kycRecordId, "kyc_verified_001");
   assert.equal(application.economicProfile.occupation, "salaried");
+});
+
+test("API blocks a legal-entity borrower's application until a qualifying beneficial owner is on file", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+
+  assert.equal((await postJson(`${base}/regulated-entities`, validRegulatedEntity())).status, 201);
+  assert.equal((await postJson(`${base}/products`, validProductPolicy())).status, 201);
+  assert.equal(
+    (
+      await postJson(`${base}/borrowers`, {
+        borrowerId: "bor_company_001",
+        borrowerType: "company",
+        status: "active",
+        legalName: "Example Textiles Pvt Ltd",
+        residencyCountry: "IN",
+        primaryAddressCountry: "IN",
+        contact: { email: "finance@exampletextiles.in" },
+        economicProfile: { monthlyIncome: 900000 }
+      })
+    ).status,
+    201
+  );
+  assert.equal(
+    (await postJson(`${base}/borrowers/bor_company_001/consents`, merge(validConsentRecord(), { borrowerId: "bor_company_001" }))).status,
+    201
+  );
+  assert.equal(
+    (await postJson(`${base}/borrowers/bor_company_001/kyc-records`, merge(validKycRecord(), { borrowerId: "bor_company_001" }))).status,
+    201
+  );
+
+  const companyApplication = {
+    regulatedEntityId: "re_example_nbfc",
+    productId: "prod_personal_loan",
+    borrowerId: "bor_company_001",
+    requestedAmount: 125000,
+    requestedTenorMonths: 12,
+    disbursement: validApplication().disbursement,
+    repayment: validApplication().repayment
+  };
+
+  const blocked = await postJson(`${base}/loans/applications`, companyApplication);
+  assert.equal(blocked.status, 422);
+  assert(blocked.body.compliance.findings.some((finding) => finding.message.includes("beneficial owner")));
+
+  assert.equal(
+    (
+      await postJson(`${base}/borrowers/bor_company_001/beneficial-owners`, {
+        beneficialOwnerId: "bo_minor",
+        name: "Minor Stakeholder",
+        identificationRef: "PAN_MINOR",
+        type: "ownership",
+        ownershipPercentage: 10,
+        verification: { status: "verified", verifiedAt: "2026-06-01T00:00:00.000Z", verifiedBy: "compliance-analyst-1" }
+      })
+    ).status,
+    201
+  );
+  const stillBlocked = await postJson(`${base}/loans/applications`, companyApplication);
+  assert.equal(stillBlocked.status, 422);
+
+  assert.equal(
+    (
+      await postJson(`${base}/borrowers/bor_company_001/beneficial-owners`, {
+        beneficialOwnerId: "bo_controlling",
+        name: "Controlling Shareholder",
+        identificationRef: "PAN_MAJOR",
+        type: "ownership",
+        ownershipPercentage: 40,
+        verification: { status: "verified", verifiedAt: "2026-06-01T00:00:00.000Z", verifiedBy: "compliance-analyst-1" }
+      })
+    ).status,
+    201
+  );
+
+  const allowed = await postJson(`${base}/loans/applications`, companyApplication);
+  assert.equal(allowed.status, 201);
+  assert.equal(allowed.body.status, "ready_for_kfs");
+
+  const listResponse = await apiFetch(`${base}/borrowers/bor_company_001/beneficial-owners`);
+  assert.equal(listResponse.status, 200);
+  const list = await listResponse.json();
+  assert.equal(list.beneficialOwners.length, 2);
 });
 
 test("API requires maker-checker approval before disbursement", async (t) => {

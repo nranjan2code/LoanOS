@@ -49,7 +49,7 @@ Deliverables:
 
 - Tenant and RE setup. First slice done.
 - Product registry and policy versioning. First slice done.
-- Borrower onboarding and consent ledger. First slice done.
+- Borrower onboarding and consent ledger. First slice done, including legal-entity borrower types (company/partnership/llp/trust) with a PMLA beneficial-owner registry gating sanction.
 - KYC state machine with CKYC/V-CIP placeholders. First slice done.
 - Underwriting workflow with human review. Eligibility/affordability engine first slice done; refer-band applications route to a manual underwriting queue, and approving a referred application requires a recorded manual underwriting override (underwriter, reason, policy reference) recorded by a registered credit officer, and declines must cite a coded decline reason.
 - Decision proposal and maker-checker approval. First slice done.
