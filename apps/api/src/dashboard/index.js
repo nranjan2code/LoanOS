@@ -49,6 +49,7 @@ const dom = {
   
   // Queue items
   queueList: document.getElementById('queue-list'),
+  filterMyQueues: document.getElementById('filter-my-queues'),
   filterStatus: document.getElementById('filter-status'),
   taskSearch: document.getElementById('task-search'),
   tasksGrid: document.getElementById('tasks-grid-list'),
@@ -93,7 +94,7 @@ const dom = {
   dialogDelivery: document.getElementById('dialog-delivery'),
   dialogDecline: document.getElementById('dialog-decline'),
   dialogAdmin: document.getElementById('dialog-admin'),
-  adminTabs: document.querySelectorAll('.admin-tab'),
+  adminTabs: document.querySelectorAll('.admin-tab[data-admin-tab]'),
   adminSummary: document.getElementById('admin-summary'),
   adminUsersList: document.getElementById('admin-users-list'),
   adminUserForm: document.getElementById('admin-user-form'),
@@ -113,7 +114,76 @@ const dom = {
   btnOnboardingSubmit: document.getElementById('btn-onboarding-submit'),
   onboardingOutput: document.getElementById('platform-onboarding-output'),
   btnAdminClose: document.getElementById('btn-admin-close'),
-  
+
+  // Login error/MFA
+  tenantLoginError: document.getElementById('tenant-login-error'),
+  platformLoginError: document.getElementById('platform-login-error'),
+  tenantLoginMfaGroup: document.getElementById('tenant-login-mfa-group'),
+  platformLoginMfaGroup: document.getElementById('platform-login-mfa-group'),
+  loginMfaCode: document.getElementById('login-mfa-code'),
+  platformLoginMfaCode: document.getElementById('platform-login-mfa-code'),
+
+  // Accept invite
+  btnShowAcceptInvite: document.getElementById('btn-show-accept-invite'),
+  btnBackToLogin: document.getElementById('btn-back-to-login'),
+  acceptInviteCard: document.getElementById('accept-invite-card'),
+  acceptInviteForm: document.getElementById('accept-invite-form'),
+  acceptInviteError: document.getElementById('accept-invite-error'),
+
+  // Required-action dialog (MFA setup / forced password change)
+  dialogRequiredAction: document.getElementById('dialog-required-action'),
+  requiredActionTitle: document.getElementById('required-action-title'),
+  requiredActionSubtitle: document.getElementById('required-action-subtitle'),
+  requiredActionMfaSetup: document.getElementById('required-action-mfa-setup'),
+  mfaSetupSecret: document.getElementById('mfa-setup-secret'),
+  mfaSetupOtpauthLink: document.getElementById('mfa-setup-otpauth-link'),
+  mfaSetupCode: document.getElementById('mfa-setup-code'),
+  mfaSetupError: document.getElementById('mfa-setup-error'),
+  btnMfaSetupConfirm: document.getElementById('btn-mfa-setup-confirm'),
+  requiredActionPasswordForm: document.getElementById('required-action-password-form'),
+  forcedPasswordCurrent: document.getElementById('forced-password-current'),
+  forcedPasswordNew: document.getElementById('forced-password-new'),
+  forcedPasswordError: document.getElementById('forced-password-error'),
+  btnRequiredActionSignout: document.getElementById('btn-required-action-signout'),
+
+  // Account settings
+  btnAccountOpen: document.getElementById('btn-account-open'),
+  dialogAccount: document.getElementById('dialog-account'),
+  btnAccountClose: document.getElementById('btn-account-close'),
+  accountTabs: document.querySelectorAll('.account-tab'),
+  accountPasswordForm: document.getElementById('account-password-form'),
+  accountCurrentPassword: document.getElementById('account-current-password'),
+  accountNewPassword: document.getElementById('account-new-password'),
+  accountMfaStatusPill: document.getElementById('account-mfa-status-pill'),
+  accountMfaEnrollForm: document.getElementById('account-mfa-enroll-form'),
+  accountMfaPassword: document.getElementById('account-mfa-password'),
+  btnAccountMfaStart: document.getElementById('btn-account-mfa-start'),
+  accountMfaEnrollDetails: document.getElementById('account-mfa-enroll-details'),
+  accountMfaSecret: document.getElementById('account-mfa-secret'),
+  accountMfaConfirmCode: document.getElementById('account-mfa-confirm-code'),
+  btnAccountMfaConfirm: document.getElementById('btn-account-mfa-confirm'),
+  accountMfaDisableForm: document.getElementById('account-mfa-disable-form'),
+  accountMfaDisablePassword: document.getElementById('account-mfa-disable-password'),
+  accountMfaDisableCode: document.getElementById('account-mfa-disable-code'),
+
+  // User provisioning subtabs
+  userSubtabs: document.querySelectorAll('.admin-subtab'),
+  adminInviteForm: document.getElementById('admin-invite-form'),
+  adminInviteOutputRow: document.getElementById('admin-invite-output-row'),
+  adminInviteOutput: document.getElementById('admin-invite-output'),
+
+  // Audit tab
+  btnAuditRefresh: document.getElementById('btn-audit-refresh'),
+  btnAuditExport: document.getElementById('btn-audit-export'),
+  adminAuditList: document.getElementById('admin-audit-list'),
+
+  // Platform access tab
+  platformUserForm: document.querySelector('#admin-panel-platform-access .admin-form'),
+  platformUsersList: document.getElementById('platform-users-list'),
+  btnBreakGlassMint: document.getElementById('btn-break-glass-mint'),
+  breakGlassOutput: document.getElementById('break-glass-output'),
+  breakGlassList: document.getElementById('break-glass-list'),
+
   toastContainer: document.getElementById('toast-container')
 };
 
@@ -175,9 +245,18 @@ function applyAuthenticatedContext(context) {
       localStorage.setItem('loanos_actor_id', apiState.currentActorId);
     }
     dom.footerTenantLabel.textContent = `Tenant: ${context.tenant?.tenantId || 'unknown'} · ${context.user?.email || ''}`;
+    document.title = `${context.tenant?.name || context.tenant?.tenantId || 'LoanOS India'} — Loan Officer Workspace`;
   } else {
     dom.footerTenantLabel.textContent = `Platform: ${context.user?.email || ''}`;
+    document.title = 'LoanOS India — Platform Console';
   }
+  document.body.classList.toggle('platform-mode', context.scope === 'platform');
+  // The simulation-date control is a dev/QA time-travel tool; showing it to
+  // every operator invites confusion about why "today" looks wrong. Restrict
+  // it to identities that can actually reason about it: tenant admins and
+  // service/platform principals.
+  const canSeeSimDate = context.scope !== 'tenant' || (context.user?.adminRoles || []).some(role => TENANT_ADMIN_FAMILY_ROLES.includes(role));
+  dom.timeAsOfInput.closest('.control-group').classList.toggle('hidden', !canSeeSimDate);
   updateAdminButtonVisibility();
 }
 
@@ -336,11 +415,19 @@ async function bareFetch(path, options = {}) {
 
   if (!response.ok) {
     let message = `HTTP Error ${response.status}`;
+    let code = null;
+    let details = null;
     try {
       const body = await response.json();
       message = body?.error?.message || message;
+      code = body?.error?.code || null;
+      details = body?.error || null;
     } catch (_) {}
-    throw new Error(message);
+    const error = new Error(message);
+    error.code = code;
+    error.status = response.status;
+    error.details = details;
+    throw error;
   }
 
   if (response.status === 204) return null;
@@ -378,6 +465,9 @@ async function loadTenantWorkspace(label) {
   const res = await apiFetch('/staff/actors');
   apiState.actors = res.actors || [];
   updateConnectionStatus(true, label || `Tenant: ${apiState.currentTenant?.tenantId || 'active'}`);
+
+  const unrestricted = currentUserQueues() === null;
+  dom.filterMyQueues.closest('.filter-section').classList.toggle('hidden', unrestricted);
 
   dom.actorSelect.innerHTML = '';
 
@@ -493,6 +583,30 @@ function hasTenantWorkspaceAccess() {
   return apiState.authScope === 'tenant' || apiState.authScope === 'tenant_service' || !!apiState.apiKey;
 }
 
+// ─── Role/Queue Scoping ─────────────────────────────────────────────────────
+// Mirrors the server's own canWorkTask/canAssignTask checks (packages/core
+// access-control.js) purely for what the UI shows by default — the server
+// re-checks every action regardless, so this is a UX filter, not a security
+// boundary. workflow_admin and queues:['*'] both mean "sees everything".
+function currentUserQueues() {
+  if (apiState.authScope !== 'tenant') return null;
+  const user = apiState.currentUser;
+  if (!user) return [];
+  if ((user.roles || []).includes('workflow_admin') || (user.queues || []).includes('*')) return null;
+  return user.queues || [];
+}
+
+function canActOnTask(task) {
+  if (apiState.authScope !== 'tenant') return true;
+  const user = apiState.currentUser;
+  if (!user) return true;
+  if ((user.roles || []).includes('workflow_admin')) return true;
+  const hasQueue = (user.queues || []).includes('*') || (user.queues || []).includes(task.queue);
+  const hasRole = (user.roles || []).includes(task.role);
+  const canAssign = (user.canAssignQueues || []).includes('*') || (user.canAssignQueues || []).includes(task.queue);
+  return (hasQueue && hasRole) || canAssign;
+}
+
 // ─── Metrics ────────────────────────────────────────────────────────────────
 function updateMetrics() {
   const total = apiState.tasks.length;
@@ -515,12 +629,19 @@ function renderSidebarCounts() {
   allBadge.textContent = allCount;
   allBadge.classList.toggle('zero', allCount === 0);
   
+  const myQueues = currentUserQueues();
+  const restrictToMine = myQueues !== null && dom.filterMyQueues.checked;
+
   queues.forEach(q => {
     const count = apiState.tasks.filter(t => t.queue === q).length;
     const elem = document.getElementById(`count-${q}`);
     if (elem) {
       elem.textContent = count;
       elem.classList.toggle('zero', count === 0);
+    }
+    const navItem = document.querySelector(`.queue-item[data-queue="${q}"]`);
+    if (navItem) {
+      navItem.classList.toggle('hidden', restrictToMine && !myQueues.includes(q));
     }
   });
 }
@@ -549,10 +670,13 @@ function renderTasksList() {
   dom.tasksGrid.innerHTML = '';
   
   // Apply filtering
+  const myQueues = currentUserQueues();
+  const restrictToMine = myQueues !== null && dom.filterMyQueues.checked;
   const filtered = apiState.tasks.filter(task => {
     if (apiState.activeQueue !== 'all' && task.queue !== apiState.activeQueue) return false;
     if (apiState.statusFilter && task.status !== apiState.statusFilter) return false;
-    
+    if (restrictToMine && !myQueues.includes(task.queue)) return false;
+
     const query = dom.taskSearch.value.trim().toLowerCase();
     if (query) {
       const matchId = task.taskId.toLowerCase().includes(query);
@@ -561,7 +685,7 @@ function renderTasksList() {
       const matchEntity = task.entity?.id?.toLowerCase().includes(query) || '';
       return matchId || matchTitle || matchDesc || matchEntity;
     }
-    
+
     return true;
   });
   
@@ -574,23 +698,25 @@ function renderTasksList() {
   
   filtered.forEach((task, index) => {
     const card = document.createElement('div');
-    card.className = `task-card animate-in ${apiState.selectedTaskId === task.taskId ? 'active' : ''}`;
+    const actionable = canActOnTask(task);
+    card.className = `task-card animate-in ${apiState.selectedTaskId === task.taskId ? 'active' : ''} ${actionable ? '' : 'out-of-role'}`;
     card.dataset.id = task.taskId;
     card.dataset.type = task.type || '';
     card.style.animationDelay = `${index * 40}ms`;
-    
+
     const formattedDate = new Date(task.openedAt).toLocaleDateString(undefined, {
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit'
     });
-    
+
     const assignedLabel = task.assignedTo ? `Assigned: ${task.assignedTo}` : 'Open Queue';
-    
+
     card.innerHTML = `
       <div class="task-card-header">
         <span class="task-card-title">${task.title}</span>
+        ${actionable ? '' : '<span class="task-card-view-only-badge">View Only</span>'}
         <span class="sla-badge ${task.slaStatus || 'within_sla'}">${getSlaLabel(task.slaStatus)}</span>
       </div>
       <div class="task-card-body">${task.description}</div>
@@ -1468,10 +1594,23 @@ function setLoginScope(scope) {
   });
   dom.tenantLoginForm.classList.toggle('hidden', scope !== 'tenant');
   dom.platformLoginForm.classList.toggle('hidden', scope !== 'platform');
+  hideLoginError(dom.tenantLoginError);
+  hideLoginError(dom.platformLoginError);
+}
+
+function showLoginError(el, message) {
+  el.textContent = message;
+  el.classList.remove('hidden');
+}
+
+function hideLoginError(el) {
+  el.classList.add('hidden');
+  el.textContent = '';
 }
 
 async function handleTenantLogin(event) {
   event.preventDefault();
+  hideLoginError(dom.tenantLoginError);
   try {
     const context = await bareFetch('/auth/login', {
       method: 'POST',
@@ -1479,35 +1618,70 @@ async function handleTenantLogin(event) {
         scope: 'tenant',
         tenantId: document.getElementById('login-tenant-id').value.trim(),
         email: document.getElementById('login-email').value.trim(),
-        password: document.getElementById('login-password').value
+        password: document.getElementById('login-password').value,
+        mfaCode: dom.loginMfaCode.value.trim()
       })
     });
-    applyAuthenticatedContext(context);
-    showApp();
-    await loadTenantWorkspace(`Tenant: ${context.tenant?.tenantId || 'active'}`);
+    await onLoginSuccess(context, `Tenant: ${context.tenant?.tenantId || 'active'}`);
   } catch (err) {
-    showToast(`Sign in failed: ${err.message}`, 'error');
+    handleLoginError(err, dom.tenantLoginError, dom.tenantLoginMfaGroup, dom.loginMfaCode);
   }
 }
 
 async function handlePlatformLogin(event) {
   event.preventDefault();
+  hideLoginError(dom.platformLoginError);
   try {
     const context = await bareFetch('/auth/login', {
       method: 'POST',
       body: JSON.stringify({
         scope: 'platform',
         email: document.getElementById('platform-login-email').value.trim(),
-        password: document.getElementById('platform-login-password').value
+        password: document.getElementById('platform-login-password').value,
+        mfaCode: dom.platformLoginMfaCode.value.trim()
       })
     });
-    applyAuthenticatedContext(context);
-    showApp();
-    updateConnectionStatus(true, `Platform: ${context.user?.email || 'admin'}`);
+    await onLoginSuccess(context, `Platform: ${context.user?.email || 'admin'}`);
+  } catch (err) {
+    handleLoginError(err, dom.platformLoginError, dom.platformLoginMfaGroup, dom.platformLoginMfaCode);
+  }
+}
+
+// Shared by both login forms: reveals the authenticator-code field on
+// mfa_code_required so the user can resubmit with a code, shows a countdown
+// message for lockouts instead of a generic failure, and surfaces every
+// other server-side error inline rather than only as a transient toast.
+function handleLoginError(err, errorEl, mfaGroupEl, mfaCodeInput) {
+  if (err.code === 'mfa_code_required') {
+    mfaGroupEl.classList.remove('hidden');
+    mfaCodeInput.focus();
+    showLoginError(errorEl, 'Enter the 6-digit code from your authenticator app.');
+    return;
+  }
+  if (err.code === 'login_locked') {
+    showLoginError(errorEl, 'Too many failed attempts. This account is temporarily locked — try again in a few minutes.');
+    return;
+  }
+  showLoginError(errorEl, err.message);
+}
+
+// After a successful /auth/login, the session may still be "restricted" —
+// the account has MFA enrollment or a forced password change outstanding.
+// The server 403s every other route for a restricted session, so the client
+// must resolve it here before touching the workspace.
+async function onLoginSuccess(context, connectionLabel) {
+  applyAuthenticatedContext(context);
+  if (context.session?.restricted) {
+    openRequiredActionDialog(context.session.restricted, context.scope);
+    return;
+  }
+  showApp();
+  if (context.scope === 'tenant') {
+    await loadTenantWorkspace(connectionLabel);
+  } else {
+    updateConnectionStatus(true, connectionLabel);
     showToast('Platform admin session active.', 'success');
     openAdminConsole();
-  } catch (err) {
-    showToast(`Platform sign in failed: ${err.message}`, 'error');
   }
 }
 
@@ -1532,8 +1706,206 @@ async function logout() {
   closeDetails();
   updateConnectionStatus(false);
   updateAdminButtonVisibility();
+  document.title = 'LoanOS India — Loan Officer Workspace';
+  setLoginScope('tenant');
   showLogin();
 }
+
+// ─── Required-Action Dialog (MFA setup / forced password change) ──────────
+// Shown right after login when the session came back "restricted" — the
+// account has an outstanding required action and every other route 403s
+// until it's resolved. This dialog is the only thing the user can interact
+// with until they clear it (or sign out).
+let requiredActionReason = null;
+let requiredActionScope = null;
+
+function openRequiredActionDialog(reason, scope) {
+  requiredActionReason = reason;
+  requiredActionScope = scope;
+  dom.requiredActionMfaSetup.classList.toggle('hidden', reason !== 'mfa_setup');
+  dom.requiredActionPasswordForm.classList.toggle('hidden', reason !== 'password_change');
+  if (reason === 'mfa_setup') {
+    dom.requiredActionTitle.textContent = 'Set Up Multi-Factor Authentication';
+    dom.requiredActionSubtitle.textContent = 'Your account requires MFA before you can continue.';
+    dom.mfaSetupSecret.textContent = '';
+    dom.mfaSetupCode.value = '';
+    hideLoginError(dom.mfaSetupError);
+    dom.dialogRequiredAction.showModal();
+    beginRequiredMfaSetup();
+    return;
+  }
+  dom.requiredActionTitle.textContent = 'Password Change Required';
+  dom.requiredActionSubtitle.textContent = 'An administrator reset your password.';
+  dom.requiredActionPasswordForm.reset();
+  hideLoginError(dom.forcedPasswordError);
+  dom.dialogRequiredAction.showModal();
+}
+
+dom.btnMfaSetupConfirm.addEventListener('click', async () => {
+  hideLoginError(dom.mfaSetupError);
+  try {
+    if (!dom.mfaSetupSecret.textContent) {
+      showLoginError(dom.mfaSetupError, 'Password is required to start enrollment. Sign out and back in if you were not prompted.');
+      return;
+    }
+    await bareFetch('/auth/mfa/enable', {
+      method: 'POST',
+      body: JSON.stringify({ code: dom.mfaSetupCode.value.trim() })
+    });
+    dom.dialogRequiredAction.close();
+    showToast('MFA enabled.', 'success');
+    await resumeAfterRequiredAction();
+  } catch (err) {
+    showLoginError(dom.mfaSetupError, err.message);
+  }
+});
+
+// The setup key has to come from a password the user just typed at login
+// (never persisted), so we ask for it once via the dialog subtitle field —
+// re-using the login password field's value would be a layering violation,
+// so instead we prompt for it inline the first time the dialog opens.
+async function beginRequiredMfaSetup() {
+  const password = prompt('Re-enter your password to begin MFA enrollment:');
+  if (!password) return;
+  try {
+    const result = await bareFetch('/auth/mfa/setup', {
+      method: 'POST',
+      body: JSON.stringify({ password })
+    });
+    dom.mfaSetupSecret.textContent = result.secret;
+    dom.mfaSetupOtpauthLink.href = result.otpauthUrl;
+  } catch (err) {
+    showLoginError(dom.mfaSetupError, err.message);
+  }
+}
+
+dom.requiredActionPasswordForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  hideLoginError(dom.forcedPasswordError);
+  try {
+    await bareFetch('/auth/password', {
+      method: 'POST',
+      body: JSON.stringify({
+        currentPassword: dom.forcedPasswordCurrent.value,
+        newPassword: dom.forcedPasswordNew.value
+      })
+    });
+    dom.dialogRequiredAction.close();
+    showToast('Password updated.', 'success');
+    await resumeAfterRequiredAction();
+  } catch (err) {
+    showLoginError(dom.forcedPasswordError, err.message);
+  }
+});
+
+dom.btnRequiredActionSignout.addEventListener('click', async () => {
+  dom.dialogRequiredAction.close();
+  await logout();
+});
+
+async function resumeAfterRequiredAction() {
+  const context = await bareFetch('/auth/me');
+  applyAuthenticatedContext(context);
+  showApp();
+  if (context.scope === 'tenant') {
+    await loadTenantWorkspace(`Tenant: ${context.tenant?.tenantId || 'active'}`);
+  } else {
+    updateConnectionStatus(true, `Platform: ${context.user?.email || 'admin'}`);
+  }
+}
+
+// ─── Account Security Settings (self-service) ──────────────────────────────
+function setAccountTab(tabName) {
+  dom.accountTabs.forEach(tab => {
+    tab.classList.toggle('active', tab.dataset.accountTab === tabName);
+  });
+  document.querySelectorAll('#dialog-account .admin-panel').forEach(panel => {
+    panel.classList.toggle('active', panel.id === `account-panel-${tabName}`);
+  });
+}
+
+function openAccountConsole() {
+  dom.accountPasswordForm.reset();
+  setAccountTab('password');
+  const mfaEnabled = apiState.currentUser?.mfaEnabled;
+  dom.accountMfaStatusPill.textContent = mfaEnabled ? 'enabled' : 'disabled';
+  dom.accountMfaStatusPill.classList.toggle('admin-pill-success', !!mfaEnabled);
+  dom.accountMfaEnrollForm.classList.toggle('hidden', !!mfaEnabled);
+  dom.accountMfaDisableForm.classList.toggle('hidden', !mfaEnabled);
+  dom.accountMfaEnrollDetails.classList.add('hidden');
+  dom.accountMfaPassword.value = '';
+  dom.accountMfaSecret.textContent = '';
+  dom.accountMfaConfirmCode.value = '';
+  dom.dialogAccount.showModal();
+}
+
+dom.accountTabs.forEach(tab => {
+  tab.addEventListener('click', () => setAccountTab(tab.dataset.accountTab));
+});
+
+dom.accountPasswordForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  try {
+    await bareFetch('/auth/password', {
+      method: 'POST',
+      body: JSON.stringify({
+        currentPassword: dom.accountCurrentPassword.value,
+        newPassword: dom.accountNewPassword.value
+      })
+    });
+    dom.accountPasswordForm.reset();
+    showToast('Password changed. Other sessions for this account were signed out.', 'success');
+  } catch (err) {
+    showToast(`Password change failed: ${err.message}`, 'error');
+  }
+});
+
+dom.btnAccountMfaStart.addEventListener('click', async () => {
+  try {
+    const result = await bareFetch('/auth/mfa/setup', {
+      method: 'POST',
+      body: JSON.stringify({ password: dom.accountMfaPassword.value })
+    });
+    dom.accountMfaSecret.textContent = result.secret;
+    dom.accountMfaEnrollDetails.classList.remove('hidden');
+  } catch (err) {
+    showToast(`Could not start MFA enrollment: ${err.message}`, 'error');
+  }
+});
+
+dom.btnAccountMfaConfirm.addEventListener('click', async () => {
+  try {
+    await bareFetch('/auth/mfa/enable', {
+      method: 'POST',
+      body: JSON.stringify({ code: dom.accountMfaConfirmCode.value.trim() })
+    });
+    showToast('MFA enabled.', 'success');
+    const context = await bareFetch('/auth/me');
+    applyAuthenticatedContext(context);
+    openAccountConsole();
+  } catch (err) {
+    showToast(`Could not confirm MFA: ${err.message}`, 'error');
+  }
+});
+
+dom.accountMfaDisableForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  try {
+    await bareFetch('/auth/mfa/disable', {
+      method: 'POST',
+      body: JSON.stringify({
+        password: dom.accountMfaDisablePassword.value,
+        code: dom.accountMfaDisableCode.value.trim()
+      })
+    });
+    showToast('MFA disabled.', 'success');
+    const context = await bareFetch('/auth/me');
+    applyAuthenticatedContext(context);
+    openAccountConsole();
+  } catch (err) {
+    showToast(`Could not disable MFA: ${err.message}`, 'error');
+  }
+});
 
 function setAdminTab(tabName) {
   dom.adminTabs.forEach(tab => {
@@ -1543,19 +1915,31 @@ function setAdminTab(tabName) {
   document.querySelectorAll('.admin-panel').forEach(panel => {
     panel.classList.toggle('active', panel.id === `admin-panel-${tabName}`);
   });
+  if (tabName === 'audit') {
+    loadAuditEvents();
+  }
+  if (tabName === 'platform-access') {
+    loadPlatformUsers();
+    loadBreakGlassGrants(document.getElementById('break-glass-tenant-id').value.trim());
+  }
 }
+
+const PLATFORM_ONLY_ADMIN_TABS = new Set(['platform', 'platform-access']);
+const TENANT_ONLY_ADMIN_TABS = new Set(['users', 'reviews', 'service']);
 
 async function openAdminConsole() {
   if (!canOpenTenantAdmin()) {
     showToast('Your account does not have an administration role.', 'warning');
     return;
   }
+  const isPlatform = apiState.authScope === 'platform';
+  dom.adminTabs.forEach(tab => {
+    const name = tab.dataset.adminTab;
+    const irrelevant = isPlatform ? TENANT_ONLY_ADMIN_TABS.has(name) : PLATFORM_ONLY_ADMIN_TABS.has(name);
+    tab.classList.toggle('hidden', irrelevant);
+  });
   dom.dialogAdmin.showModal();
-  if (apiState.authScope === 'platform') {
-    setAdminTab('platform');
-  } else {
-    setAdminTab('users');
-  }
+  setAdminTab(isPlatform ? 'platform' : 'users');
   await refreshAdminConsole();
 }
 
@@ -1622,19 +2006,22 @@ function renderSummaryCards(cards) {
 
 function renderUserRow(user) {
   const nextStatus = user.status === 'active' ? 'suspended' : 'active';
+  const isSelf = apiState.authScope === 'tenant' && apiState.currentUser?.userId === user.userId;
   return `
     <div class="admin-row">
       <div class="admin-row-header">
         <div>
-          <div class="admin-row-title">${escapeHtml(user.displayName || user.email)}</div>
+          <div class="admin-row-title">${escapeHtml(user.displayName || user.email)}${isSelf ? ' (you)' : ''}</div>
           <p>${escapeHtml(user.email)} · ${escapeHtml(user.userId)}</p>
         </div>
         <span class="admin-pill">${escapeHtml(user.status)}</span>
       </div>
       <p>Admin roles: ${(user.adminRoles || []).map(escapeHtml).join(', ') || 'none'}</p>
       <p>Staff roles: ${(user.roles || []).map(escapeHtml).join(', ') || 'none'}${(user.queues || []).length ? ` · queues: ${(user.queues || []).map(escapeHtml).join(', ')}` : ''}</p>
+      ${user.mfaSetupPending ? '<p class="admin-pill admin-pill-warning">MFA setup pending</p>' : ''}
+      ${user.mustChangePassword ? '<p class="admin-pill admin-pill-warning">Password change pending</p>' : ''}
       <div class="op-buttons">
-        <button class="btn btn-secondary btn-sm" data-user-status="${escapeHtml(user.userId)}" data-status="${nextStatus}">
+        <button class="btn btn-secondary btn-sm" data-user-status="${escapeHtml(user.userId)}" data-status="${nextStatus}" ${isSelf && nextStatus === 'suspended' ? 'disabled title="You cannot suspend your own account"' : ''}>
           Mark ${nextStatus}
         </button>
       </div>
@@ -1643,8 +2030,24 @@ function renderUserRow(user) {
 }
 
 function renderReviewRow(review) {
+  const decisionRows = review.status === 'open'
+    ? (review.snapshot || []).map(user => `
+        <div class="review-decision-row">
+          <span>${escapeHtml(user.displayName || user.email)} <span style="color:var(--text-muted)">(${escapeHtml(user.status)})</span></span>
+          <div class="review-decision-actions">
+            <select data-decision-user="${escapeHtml(user.userId)}">
+              <option value="">No action</option>
+              <option value="suspend">Suspend</option>
+              <option value="remove_admin_roles">Remove admin roles</option>
+            </select>
+          </div>
+        </div>
+      `).join('')
+    : (review.skippedDecisions || []).length
+      ? `<p class="admin-form-hint">Skipped (last active admin): ${review.skippedDecisions.map(d => escapeHtml(`${d.userId} (${d.action})`)).join(', ')}</p>`
+      : '';
   return `
-    <div class="admin-row">
+    <div class="admin-row" data-review-row="${escapeHtml(review.reviewId)}">
       <div class="admin-row-header">
         <div>
           <div class="admin-row-title">${escapeHtml(review.reviewId)}</div>
@@ -1652,7 +2055,8 @@ function renderReviewRow(review) {
         </div>
         <span class="admin-pill">${escapeHtml(review.status)}</span>
       </div>
-      ${review.status === 'open' ? `<button class="btn btn-success btn-sm" data-review-complete="${escapeHtml(review.reviewId)}">Complete As Certified</button>` : ''}
+      ${decisionRows}
+      ${review.status === 'open' ? `<button class="btn btn-success btn-sm" data-review-complete="${escapeHtml(review.reviewId)}">Complete Review</button>` : ''}
     </div>
   `;
 }
@@ -1660,6 +2064,8 @@ function renderReviewRow(review) {
 function renderTenantRow(tenant) {
   const readiness = tenant.onboarding?.status || 'configured';
   const productCount = tenant.onboarding?.productIds?.length ?? 0;
+  const nextStatus = tenant.status === 'active' ? 'suspended' : 'active';
+  const canChangeStatus = tenant.status !== 'offboarded';
   return `
     <div class="admin-row">
       <div class="admin-row-header">
@@ -1670,6 +2076,14 @@ function renderTenantRow(tenant) {
         <span class="admin-pill">${escapeHtml(tenant.status)}</span>
       </div>
       <p>${tenant.isSandbox ? `Sandbox of ${escapeHtml(tenant.parentTenantId || '')}` : 'Production tenant'} · onboarding ${escapeHtml(readiness)} · ${escapeHtml(productCount)} product(s)</p>
+      ${canChangeStatus ? `
+        <div class="admin-row-actions">
+          <button class="btn btn-secondary btn-sm" data-tenant-status="${escapeHtml(tenant.tenantId)}" data-status="${nextStatus}">Mark ${nextStatus}</button>
+          <button class="btn btn-secondary btn-sm" data-tenant-export="${escapeHtml(tenant.tenantId)}">Export Data</button>
+          <button class="btn btn-warning btn-sm" data-tenant-offboard="${escapeHtml(tenant.tenantId)}">Offboard</button>
+          <button class="btn btn-secondary btn-sm" data-tenant-break-glass="${escapeHtml(tenant.tenantId)}">View Break-Glass Grants</button>
+        </div>
+      ` : ''}
     </div>
   `;
 }
@@ -1835,6 +2249,68 @@ dom.apiKeyInput.addEventListener('change', onApiKeyChange);
 dom.btnLogout.addEventListener('click', logout);
 dom.btnAdminOpen.addEventListener('click', openAdminConsole);
 dom.btnAdminClose.addEventListener('click', () => dom.dialogAdmin.close());
+dom.btnAccountOpen.addEventListener('click', openAccountConsole);
+dom.btnAccountClose.addEventListener('click', () => dom.dialogAccount.close());
+
+dom.btnShowAcceptInvite.addEventListener('click', () => {
+  document.querySelector('.login-card:not(#accept-invite-card)').classList.add('hidden');
+  dom.acceptInviteCard.classList.remove('hidden');
+});
+dom.btnBackToLogin.addEventListener('click', () => {
+  dom.acceptInviteCard.classList.add('hidden');
+  document.querySelector('.login-card:not(#accept-invite-card)').classList.remove('hidden');
+});
+dom.acceptInviteForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  hideLoginError(dom.acceptInviteError);
+  try {
+    await bareFetch('/auth/accept-invite', {
+      method: 'POST',
+      body: JSON.stringify({
+        tenantId: document.getElementById('invite-tenant-id').value.trim(),
+        token: document.getElementById('invite-token').value.trim(),
+        password: document.getElementById('invite-password').value
+      })
+    });
+    showToast('Account activated. Sign in with your new password.', 'success');
+    dom.acceptInviteForm.reset();
+    dom.btnBackToLogin.click();
+  } catch (err) {
+    showLoginError(dom.acceptInviteError, err.message);
+  }
+});
+
+dom.userSubtabs.forEach(tab => {
+  tab.addEventListener('click', () => {
+    dom.userSubtabs.forEach(t => t.classList.toggle('active', t === tab));
+    document.querySelectorAll('.user-subpanel').forEach(panel => {
+      panel.classList.toggle('active', panel.dataset.userSubpanel === tab.dataset.userSubtab);
+      panel.classList.toggle('hidden', panel.dataset.userSubpanel !== tab.dataset.userSubtab);
+    });
+  });
+});
+
+dom.adminInviteForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  try {
+    const result = await apiFetch('/admin/users/invite', {
+      method: 'POST',
+      body: JSON.stringify({
+        email: document.getElementById('admin-invite-email').value.trim(),
+        displayName: document.getElementById('admin-invite-name').value.trim(),
+        adminRoles: [document.getElementById('admin-invite-role').value],
+        roles: parseCommaList(document.getElementById('admin-invite-staff-roles').value),
+        queues: parseCommaList(document.getElementById('admin-invite-staff-queues').value)
+      })
+    });
+    dom.adminInviteOutputRow.classList.remove('hidden');
+    dom.adminInviteOutput.textContent = `Tenant ID: ${result.tenantId}\nInvite token: ${result.inviteToken}`;
+    showToast('Invite created.', 'success');
+    await refreshAdminConsole();
+  } catch (err) {
+    showToast(`Invite failed: ${err.message}`, 'error');
+  }
+});
 
 dom.adminTabs.forEach(tab => {
   tab.addEventListener('click', () => setAdminTab(tab.dataset.adminTab));
@@ -1868,6 +2344,9 @@ dom.adminUserForm.addEventListener('submit', async (event) => {
 dom.adminUsersList.addEventListener('click', async (event) => {
   const button = event.target.closest('[data-user-status]');
   if (!button) return;
+  if (button.dataset.status !== 'active' && !confirm('Suspend this user? They will be signed out everywhere immediately.')) {
+    return;
+  }
   try {
     await apiFetch(`/admin/users/${encodeURIComponent(button.dataset.userStatus)}/status`, {
       method: 'POST',
@@ -1902,18 +2381,229 @@ dom.adminReviewForm.addEventListener('submit', async (event) => {
 dom.adminReviewsList.addEventListener('click', async (event) => {
   const button = event.target.closest('[data-review-complete]');
   if (!button) return;
+  const row = button.closest('[data-review-row]');
+  const decisions = Array.from(row?.querySelectorAll('[data-decision-user]') ?? [])
+    .map(select => ({ userId: select.dataset.decisionUser, action: select.value }))
+    .filter(decision => decision.action);
   try {
-    await apiFetch(`/admin/access-reviews/${encodeURIComponent(button.dataset.reviewComplete)}/complete`, {
+    const result = await apiFetch(`/admin/access-reviews/${encodeURIComponent(button.dataset.reviewComplete)}/complete`, {
       method: 'POST',
       body: JSON.stringify({
         completedBy: apiState.currentActorId || apiState.currentUser?.email || 'admin-console',
-        decisions: []
+        decisions
       })
     });
-    showToast('Access review completed.', 'success');
+    const skipped = result.accessReview?.skippedDecisions ?? [];
+    showToast(
+      skipped.length
+        ? `Review completed; ${skipped.length} decision(s) skipped to protect the last active tenant admin.`
+        : 'Access review completed.',
+      skipped.length ? 'warning' : 'success'
+    );
     await refreshAdminConsole();
   } catch (err) {
     showToast(`Review completion failed: ${err.message}`, 'error');
+  }
+});
+
+// ─── Tenant Lifecycle (Platform tab) ───────────────────────────────────────
+dom.platformTenantsList.addEventListener('click', async (event) => {
+  const statusBtn = event.target.closest('[data-tenant-status]');
+  const exportBtn = event.target.closest('[data-tenant-export]');
+  const offboardBtn = event.target.closest('[data-tenant-offboard]');
+  const breakGlassBtn = event.target.closest('[data-tenant-break-glass]');
+
+  if (statusBtn) {
+    const status = statusBtn.dataset.status;
+    if (status !== 'active' && !confirm('Suspend this tenant? Every data-plane request for it will be blocked immediately.')) return;
+    try {
+      await apiFetch(`/platform/tenants/${encodeURIComponent(statusBtn.dataset.tenantStatus)}/status`, {
+        method: 'POST',
+        body: JSON.stringify({ status, reason: 'admin console lifecycle action' })
+      });
+      showToast('Tenant status updated.', 'success');
+      await refreshAdminConsole();
+    } catch (err) {
+      showToast(`Tenant status change failed: ${err.message}`, 'error');
+    }
+    return;
+  }
+
+  if (exportBtn) {
+    try {
+      const data = await apiFetch(`/platform/tenants/${encodeURIComponent(exportBtn.dataset.tenantExport)}/export`);
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${exportBtn.dataset.tenantExport}-export.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('Tenant export downloaded.', 'success');
+    } catch (err) {
+      showToast(`Export failed: ${err.message}`, 'error');
+    }
+    return;
+  }
+
+  if (offboardBtn) {
+    const reason = prompt('Reason for offboarding this tenant (required, permanent action):');
+    if (!reason) return;
+    try {
+      await apiFetch(`/platform/tenants/${encodeURIComponent(offboardBtn.dataset.tenantOffboard)}/offboarding`, {
+        method: 'POST',
+        body: JSON.stringify({ actor: apiState.currentUser?.email || 'platform-admin-console', reason })
+      });
+      showToast('Tenant offboarded.', 'success');
+      await refreshAdminConsole();
+    } catch (err) {
+      showToast(`Offboarding failed: ${err.message}`, 'error');
+    }
+    return;
+  }
+
+  if (breakGlassBtn) {
+    document.getElementById('break-glass-tenant-id').value = breakGlassBtn.dataset.tenantBreakGlass;
+    setAdminTab('platform-access');
+    await loadBreakGlassGrants(breakGlassBtn.dataset.tenantBreakGlass);
+  }
+});
+
+// ─── Platform Users & Break-Glass ──────────────────────────────────────────
+if (dom.platformUserForm) {
+  dom.platformUserForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    try {
+      await apiFetch('/platform/users', {
+        method: 'POST',
+        body: JSON.stringify({
+          email: document.getElementById('platform-user-email').value.trim(),
+          displayName: document.getElementById('platform-user-name').value.trim(),
+          password: document.getElementById('platform-user-password').value,
+          roles: [document.getElementById('platform-user-role').value]
+        })
+      });
+      dom.platformUserForm.reset();
+      showToast('Platform user created.', 'success');
+      await loadPlatformUsers();
+    } catch (err) {
+      showToast(`Platform user creation failed: ${err.message}`, 'error');
+    }
+  });
+}
+
+async function loadPlatformUsers() {
+  try {
+    const result = await apiFetch('/platform/users');
+    dom.platformUsersList.innerHTML = (result.users || []).map(user => `
+      <div class="admin-row">
+        <div class="admin-row-header">
+          <div>
+            <div class="admin-row-title">${escapeHtml(user.displayName || user.email)}</div>
+            <p>${escapeHtml(user.email)} · ${(user.roles || []).map(escapeHtml).join(', ')}</p>
+          </div>
+          <span class="admin-pill">${escapeHtml(user.status)}</span>
+        </div>
+        ${user.mfaSetupPending ? '<p class="admin-pill admin-pill-warning">MFA setup pending</p>' : ''}
+      </div>
+    `).join('') || emptyAdminRow('No platform users yet.');
+  } catch (err) {
+    showToast(`Platform users load failed: ${err.message}`, 'error');
+  }
+}
+
+dom.btnBreakGlassMint.addEventListener('click', async () => {
+  const tenantId = document.getElementById('break-glass-tenant-id').value.trim();
+  const staffId = document.getElementById('break-glass-staff-id').value.trim();
+  const reason = document.getElementById('break-glass-reason').value.trim();
+  const ttlMinutes = Number(document.getElementById('break-glass-ttl').value) || 60;
+  if (!tenantId || !staffId || !reason) {
+    showToast('Tenant ID, staff ID, and reason are all required to mint break-glass access.', 'warning');
+    return;
+  }
+  if (!confirm(`Mint a break-glass credential granting platform staff "${staffId}" access to tenant "${tenantId}"? This is an emergency-access escalation and is fully audited.`)) return;
+  try {
+    const result = await apiFetch(`/platform/tenants/${encodeURIComponent(tenantId)}/break-glass`, {
+      method: 'POST',
+      body: JSON.stringify({ staffId, reason, ttlMinutes })
+    });
+    dom.breakGlassOutput.textContent = `One-time credential (shown once):\n${result.credential}`;
+    showToast('Break-glass credential minted.', 'success');
+    await loadBreakGlassGrants(tenantId);
+  } catch (err) {
+    showToast(`Break-glass mint failed: ${err.message}`, 'error');
+  }
+});
+
+async function loadBreakGlassGrants(tenantId) {
+  if (!tenantId) {
+    dom.breakGlassList.innerHTML = emptyAdminRow('Enter a tenant ID above to view its break-glass grants.');
+    return;
+  }
+  try {
+    const result = await apiFetch(`/platform/tenants/${encodeURIComponent(tenantId)}/break-glass`);
+    dom.breakGlassList.innerHTML = (result.grants || []).map(grant => `
+      <div class="admin-row">
+        <div class="admin-row-header">
+          <div>
+            <div class="admin-row-title">${escapeHtml(grant.staffId)}</div>
+            <p>${escapeHtml(grant.reason)} · expires ${escapeHtml(grant.expiresAt || 'n/a')}</p>
+          </div>
+          <span class="admin-pill">${escapeHtml(grant.effectiveStatus)}</span>
+        </div>
+        ${grant.effectiveStatus === 'active' ? `<button class="btn btn-warning btn-sm" data-break-glass-revoke="${escapeHtml(grant.grantId)}">Revoke</button>` : ''}
+      </div>
+    `).join('') || emptyAdminRow('No break-glass grants for this tenant.');
+  } catch (err) {
+    showToast(`Break-glass grants load failed: ${err.message}`, 'error');
+  }
+}
+
+dom.breakGlassList.addEventListener('click', async (event) => {
+  const button = event.target.closest('[data-break-glass-revoke]');
+  if (!button) return;
+  try {
+    await apiFetch(`/platform/break-glass/${encodeURIComponent(button.dataset.breakGlassRevoke)}/revoke`, { method: 'POST' });
+    showToast('Break-glass grant revoked.', 'success');
+    await loadBreakGlassGrants(document.getElementById('break-glass-tenant-id').value.trim());
+  } catch (err) {
+    showToast(`Revoke failed: ${err.message}`, 'error');
+  }
+});
+
+// ─── Audit Tab ──────────────────────────────────────────────────────────────
+async function loadAuditEvents() {
+  const isPlatform = apiState.authScope === 'platform';
+  try {
+    const result = isPlatform ? await apiFetch('/platform/audit-events') : await apiFetch('/audit/events');
+    const events = (result.events || []).slice(-100).reverse();
+    dom.adminAuditList.innerHTML = events.map(ev => `
+      <div class="audit-event-row">
+        <div class="audit-event-type">${escapeHtml(ev.type)}</div>
+        <div class="audit-event-meta">${escapeHtml(ev.actor || 'system')} · ${escapeHtml(ev.actorType || '')} · ${escapeHtml(ev.occurredAt || '')}</div>
+      </div>
+    `).join('') || emptyAdminRow(isPlatform ? 'No platform audit events yet.' : 'No audit events yet.');
+  } catch (err) {
+    showToast(`Audit load failed: ${err.message}`, 'error');
+  }
+}
+
+dom.btnAuditRefresh.addEventListener('click', loadAuditEvents);
+
+dom.btnAuditExport.addEventListener('click', async () => {
+  const isPlatform = apiState.authScope === 'platform';
+  try {
+    const data = isPlatform ? await apiFetch('/platform/audit-events') : await apiFetch('/audit/export');
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = isPlatform ? 'platform-audit-evidence.json' : `${apiState.currentTenant?.tenantId || 'tenant'}-audit-evidence.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Evidence pack downloaded.', 'success');
+  } catch (err) {
+    showToast(`Evidence export failed: ${err.message}`, 'error');
   }
 });
 
@@ -1980,6 +2670,11 @@ dom.taskSearch.addEventListener('input', () => {
 
 dom.filterStatus.addEventListener('change', () => {
   apiState.statusFilter = dom.filterStatus.value;
+  renderTasksList();
+});
+
+dom.filterMyQueues.addEventListener('change', () => {
+  renderSidebarCounts();
   renderTasksList();
 });
 

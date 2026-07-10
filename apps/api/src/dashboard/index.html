@@ -46,6 +46,11 @@
           <label for="login-password">Password</label>
           <input id="login-password" type="password" autocomplete="current-password" placeholder="dev-admin-password" required>
         </div>
+        <div class="field-group hidden" id="tenant-login-mfa-group">
+          <label for="login-mfa-code">Authenticator Code</label>
+          <input id="login-mfa-code" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" placeholder="6-digit code">
+        </div>
+        <p class="login-form-error hidden" id="tenant-login-error" role="alert"></p>
         <button class="btn btn-primary login-submit" type="submit">Sign In</button>
       </form>
 
@@ -58,6 +63,11 @@
           <label for="platform-login-password">Password</label>
           <input id="platform-login-password" type="password" autocomplete="current-password">
         </div>
+        <div class="field-group hidden" id="platform-login-mfa-group">
+          <label for="platform-login-mfa-code">Authenticator Code</label>
+          <input id="platform-login-mfa-code" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" placeholder="6-digit code">
+        </div>
+        <p class="login-form-error hidden" id="platform-login-error" role="alert"></p>
         <button class="btn btn-primary login-submit" type="submit">Open Platform Console</button>
       </form>
 
@@ -69,8 +79,84 @@
         </div>
         <button id="btn-service-key-login" class="btn btn-secondary" type="button">Connect With Key</button>
       </details>
+
+      <p class="login-invite-link">
+        Have an invite? <button type="button" class="link-button" id="btn-show-accept-invite">Accept it here</button>
+      </p>
+    </div>
+
+    <div class="login-card hidden" id="accept-invite-card">
+      <div class="login-brand">
+        <span class="logo-icon" aria-hidden="true">▲</span>
+        <div>
+          <h1>Accept Invitation</h1>
+          <p>Set your password to activate your account</p>
+        </div>
+      </div>
+      <form id="accept-invite-form" class="login-form">
+        <div class="field-group">
+          <label for="invite-tenant-id">Tenant ID</label>
+          <input id="invite-tenant-id" autocomplete="organization" required>
+        </div>
+        <div class="field-group">
+          <label for="invite-token">Invite Token</label>
+          <input id="invite-token" autocomplete="off" required>
+        </div>
+        <div class="field-group">
+          <label for="invite-password">New Password</label>
+          <input id="invite-password" type="password" autocomplete="new-password" minlength="8" required>
+        </div>
+        <p class="login-form-error hidden" id="accept-invite-error" role="alert"></p>
+        <button class="btn btn-primary login-submit" type="submit">Activate Account</button>
+      </form>
+      <p class="login-invite-link">
+        <button type="button" class="link-button" id="btn-back-to-login">Back to sign in</button>
+      </p>
     </div>
   </section>
+
+  <!-- ═══ Required Action Dialog: MFA enrollment / forced password change ═══ -->
+  <dialog id="dialog-required-action" class="dialog dialog-required-action">
+    <div class="dialog-header">
+      <h3 id="required-action-title">Action Required</h3>
+      <p id="required-action-subtitle"></p>
+    </div>
+
+    <div class="dialog-body">
+      <div id="required-action-mfa-setup" class="hidden">
+        <p>Scan this in an authenticator app (Google Authenticator, Authy, etc.), or enter the secret manually.</p>
+        <div class="mfa-secret-box">
+          <label>Setup Key</label>
+          <code id="mfa-setup-secret"></code>
+        </div>
+        <p><a id="mfa-setup-otpauth-link" href="#" class="mfa-otpauth-link">Open in authenticator app</a></p>
+        <div class="field-group">
+          <label for="mfa-setup-code">Enter the 6-digit code to confirm</label>
+          <input id="mfa-setup-code" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" placeholder="6-digit code">
+        </div>
+        <p class="login-form-error hidden" id="mfa-setup-error" role="alert"></p>
+        <button class="btn btn-primary" type="button" id="btn-mfa-setup-confirm">Confirm & Enable MFA</button>
+      </div>
+
+      <form id="required-action-password-form" class="hidden">
+        <p>An administrator reset your password. Choose a new one to continue.</p>
+        <div class="field-group">
+          <label for="forced-password-current">Current (Temporary) Password</label>
+          <input id="forced-password-current" type="password" autocomplete="current-password" required>
+        </div>
+        <div class="field-group">
+          <label for="forced-password-new">New Password</label>
+          <input id="forced-password-new" type="password" autocomplete="new-password" minlength="8" required>
+        </div>
+        <p class="login-form-error hidden" id="forced-password-error" role="alert"></p>
+        <button class="btn btn-primary" type="submit">Set New Password</button>
+      </form>
+    </div>
+
+    <div class="dialog-footer">
+      <button type="button" class="btn btn-secondary" id="btn-required-action-signout">Sign Out Instead</button>
+    </div>
+  </dialog>
 
   <div class="app-container auth-hidden" id="app-container">
     <!-- ═══ Header ═══════════════════════════════════════════════════════ -->
@@ -106,6 +192,7 @@
           <span class="btn-icon">⟳</span> Refresh
         </button>
         <button id="btn-admin-open" class="btn btn-secondary" aria-label="Open administration console">Admin</button>
+        <button id="btn-account-open" class="btn btn-secondary" aria-label="Open account security settings">Account</button>
         <button id="btn-logout" class="btn btn-secondary" aria-label="Sign out">Sign Out</button>
       </div>
     </header>
@@ -204,6 +291,14 @@
             </li>
           </ul>
         </nav>
+
+        <!-- Scope Filter -->
+        <div class="filter-section">
+          <label class="scope-toggle">
+            <input type="checkbox" id="filter-my-queues" checked>
+            <span>My queues only</span>
+          </label>
+        </div>
 
         <!-- Status Filter -->
         <div class="filter-section">
@@ -376,13 +471,20 @@
         <button class="admin-tab active" type="button" data-admin-tab="users">Tenant Users</button>
         <button class="admin-tab" type="button" data-admin-tab="reviews">Access Reviews</button>
         <button class="admin-tab" type="button" data-admin-tab="service">Service Access</button>
+        <button class="admin-tab" type="button" data-admin-tab="audit">Audit</button>
         <button class="admin-tab" type="button" data-admin-tab="platform">Platform</button>
+        <button class="admin-tab" type="button" data-admin-tab="platform-access">Platform Access</button>
       </nav>
 
       <section class="admin-panel active" id="admin-panel-users">
         <div class="admin-summary-grid" id="admin-summary"></div>
-        <form id="admin-user-form" class="admin-form">
+        <div class="admin-subtabs" role="tablist" aria-label="User provisioning method">
+          <button class="admin-subtab active" type="button" data-user-subtab="password">Set Temporary Password</button>
+          <button class="admin-subtab" type="button" data-user-subtab="invite">Invite By Email</button>
+        </div>
+        <form id="admin-user-form" class="admin-form user-subpanel active" data-user-subpanel="password">
           <h4>Create Tenant User</h4>
+          <p class="admin-form-hint">The user must change this password before they can do anything else.</p>
           <div class="admin-form-grid">
             <input id="admin-user-email" type="email" placeholder="user@example.in" required>
             <input id="admin-user-name" placeholder="Display name" required>
@@ -399,6 +501,29 @@
             <button class="btn btn-primary" type="submit">Create User</button>
           </div>
         </form>
+        <form id="admin-invite-form" class="admin-form user-subpanel hidden" data-user-subpanel="invite">
+          <h4>Invite Tenant User</h4>
+          <p class="admin-form-hint">The invitee sets their own password when accepting — nobody else ever knows it.</p>
+          <div class="admin-form-grid">
+            <input id="admin-invite-email" type="email" placeholder="user@example.in" required>
+            <input id="admin-invite-name" placeholder="Display name" required>
+            <select id="admin-invite-role">
+              <option value="operator">Operator</option>
+              <option value="tenant_admin">Tenant Admin</option>
+              <option value="user_admin">User Admin</option>
+              <option value="security_admin">Security Admin</option>
+              <option value="auditor">Auditor</option>
+            </select>
+            <input id="admin-invite-staff-roles" placeholder="Staff roles, optional">
+            <input id="admin-invite-staff-queues" placeholder="Queues, optional">
+            <button class="btn btn-primary" type="submit">Send Invite</button>
+          </div>
+          <div class="admin-row hidden" id="admin-invite-output-row">
+            <div class="admin-row-title">Invite Created</div>
+            <p>Share this token and the tenant ID with the invitee — it is shown only once.</p>
+            <pre class="admin-secret-output" id="admin-invite-output"></pre>
+          </div>
+        </form>
         <div class="admin-list" id="admin-users-list"></div>
       </section>
 
@@ -412,6 +537,18 @@
           </div>
         </form>
         <div class="admin-list" id="admin-reviews-list"></div>
+      </section>
+
+      <section class="admin-panel" id="admin-panel-audit">
+        <div class="admin-form">
+          <h4>Tenant Audit Trail</h4>
+          <p>Every state-changing action, sealed into a tamper-evident hash chain.</p>
+          <div class="admin-form-grid">
+            <button id="btn-audit-refresh" class="btn btn-secondary" type="button">Refresh Events</button>
+            <button id="btn-audit-export" class="btn btn-secondary" type="button">Download Evidence Pack</button>
+          </div>
+        </div>
+        <div class="admin-list" id="admin-audit-list"></div>
       </section>
 
       <section class="admin-panel" id="admin-panel-service">
@@ -564,11 +701,115 @@
             <button class="btn btn-primary hidden" type="submit" id="btn-onboarding-submit">Provision Tenant</button>
           </div>
         </form>
+        <div class="admin-row">
+          <div class="admin-row-title">Manage Existing Tenants</div>
+          <p>Suspend a tenant to immediately block its data-plane access, or offboard it permanently with an evidenced export.</p>
+        </div>
         <div class="admin-list" id="platform-tenants-list"></div>
+      </section>
+
+      <section class="admin-panel" id="admin-panel-platform-access">
+        <div class="admin-form">
+          <h4>Create Platform User</h4>
+          <div class="admin-form-grid">
+            <input id="platform-user-email" type="email" placeholder="platform.user@example.in" required>
+            <input id="platform-user-name" placeholder="Display name" required>
+            <input id="platform-user-password" type="password" placeholder="Temporary password" required>
+            <select id="platform-user-role">
+              <option value="platform_admin">Platform Admin</option>
+              <option value="tenant_provisioner">Tenant Provisioner</option>
+              <option value="security_admin">Security Admin</option>
+              <option value="auditor">Auditor</option>
+            </select>
+            <button class="btn btn-primary" type="submit" id="btn-platform-user-create">Create Platform User</button>
+          </div>
+        </div>
+        <div class="admin-list" id="platform-users-list"></div>
+
+        <div class="admin-form">
+          <h4>Break-Glass Access</h4>
+          <p>Mint a time-boxed, tenant-scoped credential for platform staff to authenticate as one tenant in an emergency. Every use is sealed into that tenant's own audit chain.</p>
+          <div class="admin-form-grid">
+            <input id="break-glass-tenant-id" placeholder="tenant_id">
+            <input id="break-glass-staff-id" placeholder="Staff id">
+            <input id="break-glass-reason" placeholder="Reason (required)">
+            <input id="break-glass-ttl" type="number" min="5" value="60" placeholder="TTL minutes">
+            <button class="btn btn-warning" type="button" id="btn-break-glass-mint">Mint Credential</button>
+          </div>
+          <pre class="admin-secret-output" id="break-glass-output"></pre>
+        </div>
+        <div class="admin-list" id="break-glass-list"></div>
       </section>
     </div>
     <div class="dialog-footer">
       <button class="btn btn-secondary" id="btn-admin-close">Close</button>
+    </div>
+  </dialog>
+
+  <!-- ═══ Account Security Settings ═══ -->
+  <dialog id="dialog-account" class="admin-dialog">
+    <div class="dialog-header">
+      <h3>Account Security</h3>
+      <p id="account-dialog-subtitle">Manage your own password and multi-factor authentication.</p>
+    </div>
+    <div class="admin-layout">
+      <nav class="admin-tabs" aria-label="Account sections">
+        <button class="admin-tab account-tab active" type="button" data-account-tab="password">Password</button>
+        <button class="admin-tab account-tab" type="button" data-account-tab="mfa">Multi-Factor Auth</button>
+      </nav>
+
+      <section class="admin-panel active" id="account-panel-password">
+        <form id="account-password-form" class="admin-form">
+          <h4>Change Password</h4>
+          <div class="admin-form-grid">
+            <input id="account-current-password" type="password" placeholder="Current password" autocomplete="current-password" required>
+            <input id="account-new-password" type="password" placeholder="New password (min 8 chars)" autocomplete="new-password" minlength="8" required>
+            <button class="btn btn-primary" type="submit">Update Password</button>
+          </div>
+          <p class="admin-form-hint">Changing your password signs out every other active session for this account.</p>
+        </form>
+      </section>
+
+      <section class="admin-panel" id="account-panel-mfa">
+        <div class="admin-row" id="account-mfa-status-row">
+          <div class="admin-row-header">
+            <div class="admin-row-title">Multi-Factor Authentication</div>
+            <span class="admin-pill" id="account-mfa-status-pill">unknown</span>
+          </div>
+        </div>
+
+        <div class="admin-form" id="account-mfa-enroll-form">
+          <h4>Enable MFA</h4>
+          <div class="admin-form-grid">
+            <input id="account-mfa-password" type="password" placeholder="Current password" autocomplete="current-password">
+            <button class="btn btn-primary" type="button" id="btn-account-mfa-start">Start Enrollment</button>
+          </div>
+          <div id="account-mfa-enroll-details" class="hidden">
+            <p>Scan or enter this key in your authenticator app:</p>
+            <div class="mfa-secret-box">
+              <label>Setup Key</label>
+              <code id="account-mfa-secret"></code>
+            </div>
+            <div class="admin-form-grid">
+              <input id="account-mfa-confirm-code" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="6-digit code">
+              <button class="btn btn-primary" type="button" id="btn-account-mfa-confirm">Confirm & Enable</button>
+            </div>
+          </div>
+        </div>
+
+        <form id="account-mfa-disable-form" class="admin-form hidden">
+          <h4>Disable MFA</h4>
+          <p class="admin-form-hint">Requires your password and a current authenticator code.</p>
+          <div class="admin-form-grid">
+            <input id="account-mfa-disable-password" type="password" placeholder="Current password" autocomplete="current-password" required>
+            <input id="account-mfa-disable-code" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="6-digit code" required>
+            <button class="btn btn-warning" type="submit">Disable MFA</button>
+          </div>
+        </form>
+      </section>
+    </div>
+    <div class="dialog-footer">
+      <button class="btn btn-secondary" id="btn-account-close">Close</button>
     </div>
   </dialog>
 

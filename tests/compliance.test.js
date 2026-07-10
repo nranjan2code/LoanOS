@@ -4569,6 +4569,7 @@ test("tenant users log in with sessions and administer users, reviews, and servi
     email: "admin@test-a.example.in",
     displayName: "Tenant Admin",
     password: "CorrectHorseBatteryStaple1!",
+    mustChangePassword: false,
     adminRoles: ["tenant_admin", "user_admin", "security_admin"],
     roles: ["workflow_admin"],
     queues: ["*"],
@@ -4670,6 +4671,8 @@ test("platform users log in with sessions and provision tenant owners", async (t
       email: "platform.admin@example.in",
       displayName: "Platform Admin",
       password: "PlatformPass1!",
+      mfaRequired: false,
+      mustChangePassword: false,
       roles: ["platform_admin", "tenant_provisioner", "security_admin"]
     })
   });
@@ -6744,7 +6747,11 @@ const TEST_STAFF_PASSWORD = "StaffPass123!";
 
 async function seedOperationalActors(base) {
   for (const actor of operationalActors()) {
-    const response = await postJson(`${base}/admin/users`, actor);
+    // Test fixtures represent already-operational staff, not a fresh
+    // admin-driven provisioning flow, so they shouldn't be forced through a
+    // password-rotation gate before the session they log in with can do
+    // anything.
+    const response = await postJson(`${base}/admin/users`, { ...actor, mustChangePassword: false });
     assert.equal(response.status, 201);
   }
 }

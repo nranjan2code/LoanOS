@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -205,8 +205,10 @@ import {
   disableMfa,
   hasPlatformRole,
   hasTenantAdminRole,
+  isLastActiveTenantAdmin,
   isLoginLocked,
   loginAttemptKey,
+  TENANT_ADMIN_ROLES,
   publicPlatformUser,
   publicSession,
   publicTenantUser,
@@ -328,6 +330,9 @@ async function route(req, res, dataDir, platformAdminKey) {
   let authContext = null;
 
   if (sessionResolution?.session?.principalType === "tenant_user") {
+    if (rejectIfRestricted(res, sessionResolution.session, path)) {
+      return;
+    }
     tenant = sessionResolution.tenant;
     authContext = {
       principalType: "tenant_user",
@@ -4686,9 +4691,20 @@ function expiredSessionCookie() {
   return `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax${cookieSecureAttribute()}; Expires=Thu, 01 Jan 1970 00:00:00 GMT`;
 }
 
+// Compares via fixed-length SHA-256 digests rather than the raw strings so a
+// length mismatch can't short-circuit the byte-by-byte compare — the
+// platform admin key is the one secret in this codebase that was still using
+// plain `===`, which leaks comparison timing an attacker could use to guess
+// the key byte-by-byte.
+function timingSafeStringEqual(a, b) {
+  const digestA = createHash("sha256").update(String(a ?? "")).digest();
+  const digestB = createHash("sha256").update(String(b ?? "")).digest();
+  return timingSafeEqual(digestA, digestB);
+}
+
 async function platformAuthFromRequest(req, dataDir, platformAdminKey) {
   const key = platformAdminKeyFromRequest(req);
-  if (platformAdminKey && key === platformAdminKey) {
+  if (platformAdminKey && key && timingSafeStringEqual(key, platformAdminKey)) {
     return {
       authContext: {
         principalType: "platform_key",
@@ -4711,7 +4727,8 @@ async function platformAuthFromRequest(req, dataDir, platformAdminKey) {
       displayName: resolved.user.displayName,
       roles: resolved.user.roles ?? [],
       sessionId: resolved.session.sessionId
-    }
+    },
+    session: resolved.session
   };
 }
 
@@ -4736,6 +4753,73 @@ function requiredModuleForPath(path) {
   if (path === "/recovery-agents" || path.startsWith("/recovery-agents/")) return "collections";
   if (path === "/loans/marketplace-offers" || path.startsWith("/loans/marketplace-offers/")) return "marketplace";
   return null;
+}
+
+// Decides whether a freshly-authenticated user gets a full session or one
+// restricted to finishing an outstanding required action. MFA setup takes
+// priority over a forced password change so a user isn't asked to rotate a
+// password they're about to be told to re-enter anyway during enrollment.
+function sessionRestriction(user) {
+  if (user.mfaRequired && !user.mfaEnabled) return "mfa_setup";
+  if (user.mustChangePassword) return "password_change";
+  return null;
+}
+
+// Paths a restricted session may still reach — just enough to resolve the
+// outstanding action (and to log out). Everything else 403s with the reason,
+// so the client can route the user to the right screen instead of guessing.
+const RESTRICTED_SESSION_ALLOWED_PATHS = new Set([
+  "/auth/me",
+  "/auth/logout",
+  "/auth/password",
+  "/auth/mfa/setup",
+  "/auth/mfa/enable"
+]);
+
+// Clears a session's restriction once its matching required action resolves,
+// so the same session becomes fully usable without forcing a re-login.
+function clearSessionRestriction(sessions, sessionId, expectedReason) {
+  const session = sessions[sessionId];
+  if (!session || session.restricted !== expectedReason) return sessions;
+  return { ...sessions, [sessionId]: { ...session, restricted: null } };
+}
+
+// A password change is a credential rotation: every *other* session for this
+// user is revoked (the whole point of rotating is to invalidate whatever a
+// leaked old password could still reach), while the session that performed
+// the change is kept alive with its restriction cleared.
+function clearSessionRestrictionAndRevokeOthers(sessions, userId, currentSessionId, expectedReason) {
+  const now = new Date();
+  const next = {};
+  for (const [id, session] of Object.entries(sessions)) {
+    if (session.userId !== userId) {
+      next[id] = session;
+      continue;
+    }
+    if (id === currentSessionId) {
+      next[id] = session.restricted === expectedReason ? { ...session, restricted: null } : session;
+      continue;
+    }
+    next[id] = session.status === "active" ? { ...session, status: "revoked", revokedAt: now.toISOString() } : session;
+  }
+  return next;
+}
+
+function rejectIfRestricted(res, session, path) {
+  if (!session?.restricted || RESTRICTED_SESSION_ALLOWED_PATHS.has(path)) {
+    return false;
+  }
+  sendJson(res, 403, {
+    error: {
+      code: "session_restricted",
+      message:
+        session.restricted === "mfa_setup"
+          ? "MFA enrollment is required before this session can be used."
+          : "A password change is required before this session can be used.",
+      reason: session.restricted
+    }
+  });
+  return true;
 }
 
 function authActor(authContext) {
@@ -4944,7 +5028,8 @@ async function routeAuth(req, res, { dataDir, method, path }) {
         userId: authenticated.user.userId,
         email: authenticated.user.email,
         displayName: authenticated.user.displayName,
-        roles: authenticated.user.roles
+        roles: authenticated.user.roles,
+        restricted: sessionRestriction(authenticated.user)
       }, now);
       const nextState = {
         ...state,
@@ -4996,7 +5081,8 @@ async function routeAuth(req, res, { dataDir, method, path }) {
       userId: authenticated.user.userId,
       email: authenticated.user.email,
       displayName: authenticated.user.displayName,
-      roles: authenticated.user.adminRoles
+      roles: authenticated.user.adminRoles,
+      restricted: sessionRestriction(authenticated.user)
     }, now);
     const nextTenantData = {
       ...tenantData,
@@ -5047,8 +5133,15 @@ async function routeAuth(req, res, { dataDir, method, path }) {
         sendJson(res, 422, { error: { code: "password_change_invalid", message: "Password change is invalid." }, findings: result.findings });
         return;
       }
+      const nextSessions = clearSessionRestrictionAndRevokeOthers(
+        state.controlPlane.sessions,
+        resolved.user.userId,
+        resolved.session.sessionId,
+        "password_change"
+      );
       await saveWholeState({
         ...state,
+        controlPlane: { ...state.controlPlane, sessions: nextSessions },
         tenants: {
           ...state.tenants,
           [resolved.tenant.tenantId]: {
@@ -5066,10 +5159,17 @@ async function routeAuth(req, res, { dataDir, method, path }) {
       sendJson(res, 422, { error: { code: "password_change_invalid", message: "Password change is invalid." }, findings: result.findings });
       return;
     }
+    const nextSessions = clearSessionRestrictionAndRevokeOthers(
+      state.controlPlane.sessions,
+      resolved.user.userId,
+      resolved.session.sessionId,
+      "password_change"
+    );
     await saveWholeState({
       ...state,
       controlPlane: {
         ...state.controlPlane,
+        sessions: nextSessions,
         platformUsers: { ...state.controlPlane.platformUsers, [result.user.userId]: result.user }
       }
     }, dataDir);
@@ -5084,28 +5184,37 @@ async function routeAuth(req, res, { dataDir, method, path }) {
       sendJson(res, 401, { error: { code: "session_required", message: "A valid login session is required." } });
       return;
     }
+    const body = await readJson(req);
     const now = new Date();
     if (resolved.session.principalType === "tenant_user") {
       const tenantData = state.tenants[resolved.tenant.tenantId];
       const storedUser = tenantData.users[resolved.user.userId];
-      const { user, secret, otpauthUrl } = beginMfaEnrollment(storedUser, now);
+      const result = beginMfaEnrollment(storedUser, body, now);
+      if (result.findings.length > 0) {
+        sendJson(res, 422, { error: { code: "mfa_setup_invalid", message: "MFA enrollment could not be started." }, findings: result.findings });
+        return;
+      }
       await saveWholeState({
         ...state,
         tenants: {
           ...state.tenants,
-          [resolved.tenant.tenantId]: { ...tenantData, users: { ...tenantData.users, [user.userId]: user } }
+          [resolved.tenant.tenantId]: { ...tenantData, users: { ...tenantData.users, [result.user.userId]: result.user } }
         }
       }, dataDir);
-      sendJson(res, 200, { secret, otpauthUrl });
+      sendJson(res, 200, { secret: result.secret, otpauthUrl: result.otpauthUrl });
       return;
     }
     const storedUser = state.controlPlane.platformUsers[resolved.user.userId];
-    const { user, secret, otpauthUrl } = beginMfaEnrollment(storedUser, now);
+    const result = beginMfaEnrollment(storedUser, body, now);
+    if (result.findings.length > 0) {
+      sendJson(res, 422, { error: { code: "mfa_setup_invalid", message: "MFA enrollment could not be started." }, findings: result.findings });
+      return;
+    }
     await saveWholeState({
       ...state,
-      controlPlane: { ...state.controlPlane, platformUsers: { ...state.controlPlane.platformUsers, [user.userId]: user } }
+      controlPlane: { ...state.controlPlane, platformUsers: { ...state.controlPlane.platformUsers, [result.user.userId]: result.user } }
     }, dataDir);
-    sendJson(res, 200, { secret, otpauthUrl });
+    sendJson(res, 200, { secret: result.secret, otpauthUrl: result.otpauthUrl });
     return;
   }
 
@@ -5126,8 +5235,10 @@ async function routeAuth(req, res, { dataDir, method, path }) {
         sendJson(res, 422, { error: { code: "mfa_enable_invalid", message: "MFA enrollment could not be confirmed." }, findings: result.findings });
         return;
       }
+      const nextSessions = clearSessionRestriction(state.controlPlane.sessions, resolved.session.sessionId, "mfa_setup");
       await saveWholeState({
         ...state,
+        controlPlane: { ...state.controlPlane, sessions: nextSessions },
         tenants: {
           ...state.tenants,
           [resolved.tenant.tenantId]: { ...tenantData, users: { ...tenantData.users, [result.user.userId]: result.user } }
@@ -5142,9 +5253,10 @@ async function routeAuth(req, res, { dataDir, method, path }) {
       sendJson(res, 422, { error: { code: "mfa_enable_invalid", message: "MFA enrollment could not be confirmed." }, findings: result.findings });
       return;
     }
+    const nextSessions = clearSessionRestriction(state.controlPlane.sessions, resolved.session.sessionId, "mfa_setup");
     await saveWholeState({
       ...state,
-      controlPlane: { ...state.controlPlane, platformUsers: { ...state.controlPlane.platformUsers, [result.user.userId]: result.user } }
+      controlPlane: { ...state.controlPlane, sessions: nextSessions, platformUsers: { ...state.controlPlane.platformUsers, [result.user.userId]: result.user } }
     }, dataDir);
     sendJson(res, 200, { user: publicPlatformUser(result.user) });
     return;
@@ -5317,7 +5429,28 @@ async function routeTenantAdmin(req, res, { dataDir, method, path, tenant, authC
     // roles/queues/canAssignQueues/country (the former staff-actor fields) are
     // now plain fields on the user creation body — one identity, no separate
     // registry to keep in sync.
-    const result = upsertTenantUser(state.users ?? {}, body);
+    // An admin choosing a user's password directly (as opposed to the invite
+    // flow, where only the invitee ever knows it) means the admin now knows
+    // that credential — force a rotation at next login unless the caller
+    // explicitly opts out.
+    if (
+      body.userId &&
+      isLastActiveTenantAdmin(state.users ?? {}, body.userId) &&
+      (body.status && body.status !== "active" ||
+        (Array.isArray(body.adminRoles) && !body.adminRoles.some((role) => TENANT_ADMIN_ROLES.has(role))))
+    ) {
+      sendJson(res, 409, {
+        error: {
+          code: "last_tenant_admin",
+          message: "This is the only active tenant admin; this change would lock the tenant out of its own admin console."
+        }
+      });
+      return;
+    }
+    const result = upsertTenantUser(state.users ?? {}, {
+      ...body,
+      mustChangePassword: body.password ? body.mustChangePassword ?? true : body.mustChangePassword
+    });
     if (result.findings.length > 0) {
       sendJson(res, 422, {
         error: { code: "tenant_user_invalid", message: "Tenant user is invalid." },
@@ -5391,6 +5524,15 @@ async function routeTenantAdmin(req, res, { dataDir, method, path, tenant, authC
       sendJson(res, 404, { error: { code: "not_found", message: "Tenant user not found." } });
       return;
     }
+    if (body.status !== "active" && isLastActiveTenantAdmin(state.users ?? {}, userId)) {
+      sendJson(res, 409, {
+        error: {
+          code: "last_tenant_admin",
+          message: "This is the only active tenant admin; suspending them would lock the tenant out of its own admin console."
+        }
+      });
+      return;
+    }
     const result = upsertTenantUser(state.users ?? {}, { ...existing, status: body.status });
     if (result.findings.length > 0) {
       sendJson(res, 422, {
@@ -5418,7 +5560,7 @@ async function routeTenantAdmin(req, res, { dataDir, method, path, tenant, authC
       sendJson(res, 404, { error: { code: "not_found", message: "Tenant user not found." } });
       return;
     }
-    const result = upsertTenantUser(state.users ?? {}, { ...existing, password: body.password });
+    const result = upsertTenantUser(state.users ?? {}, { ...existing, password: body.password, mustChangePassword: true });
     if (result.findings.length > 0) {
       sendJson(res, 422, {
         error: { code: "tenant_user_invalid", message: "Tenant user password update is invalid." },
@@ -5426,6 +5568,15 @@ async function routeTenantAdmin(req, res, { dataDir, method, path, tenant, authC
       });
       return;
     }
+    // An admin-driven reset invalidates whatever the user could reach with
+    // the old credential — same reasoning as a self-service password change.
+    const nextSessions = clearSessionRestrictionAndRevokeOthers(
+      stateRef.get().controlPlane.sessions,
+      userId,
+      null,
+      null
+    );
+    stateRef.set({ ...stateRef.get(), controlPlane: { ...stateRef.get().controlPlane, sessions: nextSessions } });
     const nextState = appendEvent(
       { ...state, users: result.users },
       { type: "tenant_user.password_reset", userId, actor: authActor(authContext) }
@@ -5560,6 +5711,9 @@ async function routePlatform(req, res, { dataDir, platformAdminKey, method, path
     });
     return;
   }
+  if (platformAuth.session && rejectIfRestricted(res, platformAuth.session, path)) {
+    return;
+  }
   const authContext = platformAuth.authContext;
 
   if (method === "GET" && path === "/platform/admin-summary") {
@@ -5614,7 +5768,10 @@ async function routePlatform(req, res, { dataDir, platformAdminKey, method, path
     }
     const body = await readJson(req);
     const state = await loadWholeState(dataDir);
-    const result = upsertPlatformUser(state.controlPlane.platformUsers ?? {}, body);
+    const result = upsertPlatformUser(state.controlPlane.platformUsers ?? {}, {
+      ...body,
+      mustChangePassword: body.password ? body.mustChangePassword ?? true : body.mustChangePassword
+    });
     if (result.findings.length > 0) {
       sendJson(res, 422, {
         error: { code: "platform_user_invalid", message: "Platform user is invalid." },
@@ -5731,6 +5888,10 @@ async function routePlatform(req, res, { dataDir, platformAdminKey, method, path
   }
 
   if (method === "GET" && breakGlassMintMatch) {
+    if (!hasPlatformRole(authContext, ["platform_admin", "security_admin", "auditor"])) {
+      sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } });
+      return;
+    }
     const state = await loadWholeState(dataDir);
     const tenantId = decodeURIComponent(breakGlassMintMatch[1]);
     sendJson(res, 200, { grants: listBreakGlassGrants(state, tenantId) });
@@ -5763,6 +5924,10 @@ async function routePlatform(req, res, { dataDir, platformAdminKey, method, path
   }
 
   if (method === "GET" && path === "/platform/tenants") {
+    if (!hasPlatformRole(authContext, ["platform_admin", "tenant_provisioner", "security_admin", "auditor"])) {
+      sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } });
+      return;
+    }
     const state = await loadWholeState(dataDir);
     sendJson(res, 200, { tenants: listTenants(state) });
     return;

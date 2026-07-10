@@ -207,7 +207,8 @@ export function normalizeAccessReviews(reviews = {}) {
       completedAt: review.completedAt ?? null,
       completedBy: review.completedBy ?? null,
       snapshot: Array.isArray(review.snapshot) ? review.snapshot : [],
-      decisions: Array.isArray(review.decisions) ? review.decisions : []
+      decisions: Array.isArray(review.decisions) ? review.decisions : [],
+      skippedDecisions: Array.isArray(review.skippedDecisions) ? review.skippedDecisions : []
     };
   }
   return normalized;
@@ -228,6 +229,7 @@ export function normalizeSessions(sessions = {}) {
       displayName: session.displayName ?? session.email ?? session.userId ?? null,
       roles: normalizeStringList(session.roles),
       status: session.status ?? "active",
+      restricted: session.restricted ?? null,
       createdAt: session.createdAt ?? null,
       expiresAt: session.expiresAt ?? null,
       lastSeenAt: session.lastSeenAt ?? null,
@@ -329,6 +331,11 @@ export function createSessionRecord(input, now = new Date()) {
     displayName: input.displayName ?? input.email ?? input.userId,
     roles: normalizeStringList(input.roles),
     status: "active",
+    // Non-null while the account has an outstanding required action (MFA
+    // enrollment, forced password rotation). The route layer only lets a
+    // restricted session reach the specific /auth/* endpoints that resolve
+    // that action — every other route is 403'd until it's cleared.
+    restricted: input.restricted ?? null,
     createdAt: now.toISOString(),
     expiresAt,
     lastSeenAt: now.toISOString(),
@@ -430,9 +437,15 @@ export function completeAccessReview(reviews = {}, users = {}, reviewId, input =
   }
   const decisions = Array.isArray(input.decisions) ? input.decisions : [];
   let nextUsers = { ...users };
+  const skipped = [];
   for (const decision of decisions) {
     const user = nextUsers[decision.userId];
     if (!user) continue;
+    const isDowngrade = decision.action === "suspend" || decision.action === "remove_admin_roles";
+    if (isDowngrade && isLastActiveTenantAdmin(nextUsers, user.userId)) {
+      skipped.push({ userId: user.userId, action: decision.action });
+      continue;
+    }
     if (decision.action === "suspend") {
       nextUsers[user.userId] = { ...user, status: "suspended", updatedAt: now.toISOString() };
     }
@@ -445,7 +458,8 @@ export function completeAccessReview(reviews = {}, users = {}, reviewId, input =
     status: "completed",
     completedAt: now.toISOString(),
     completedBy: input.completedBy ?? null,
-    decisions
+    decisions,
+    skippedDecisions: skipped
   };
   return {
     reviews: {
@@ -478,6 +492,24 @@ export function hasPlatformRole(authContext, roles = ["platform_admin"]) {
   return roles.some((role) => authContext.roles?.includes(role));
 }
 
+// Guards against a tenant locking itself out of its own admin plane: true
+// when `userId` is the *only* active user carrying a tenant-admin-family
+// role, so removing that role or suspending them would leave nobody able to
+// administer the tenant through the human login path (service key /
+// break-glass would still work, but that's an escalation, not routine ops).
+export function isLastActiveTenantAdmin(users = {}, userId) {
+  const target = users[userId];
+  if (!target || target.status !== "active") return false;
+  if (!(target.adminRoles ?? []).some((role) => TENANT_ADMIN_ROLES.has(role))) return false;
+  const otherActiveAdmins = Object.values(users).filter(
+    (user) =>
+      user.userId !== userId &&
+      user.status === "active" &&
+      (user.adminRoles ?? []).some((role) => TENANT_ADMIN_ROLES.has(role))
+  );
+  return otherActiveAdmins.length === 0;
+}
+
 // --- Self-service password change ------------------------------------------
 
 export function changeOwnPassword(user, { currentPassword, newPassword }, now = new Date()) {
@@ -494,7 +526,7 @@ export function changeOwnPassword(user, { currentPassword, newPassword }, now = 
   }
   return {
     findings: [],
-    user: { ...user, passwordHash: hashPassword(newPassword), updatedAt: now.toISOString() }
+    user: { ...user, passwordHash: hashPassword(newPassword), mustChangePassword: false, updatedAt: now.toISOString() }
   };
 }
 
@@ -562,9 +594,22 @@ export function acceptTenantUserInvite(users = {}, { token, password }, now = ne
 
 // --- MFA enrollment ---------------------------------------------------------
 
-export function beginMfaEnrollment(user, now = new Date()) {
+// Re-verifying the password before minting a new pending secret means a
+// hijacked session (cookie theft, XSS) cannot silently swap a user's
+// authenticator out from under them — the attacker would also need the
+// password. Re-enrollment (mfaEnabled already true) additionally requires
+// the *current* TOTP code, since the whole point of the existing factor is
+// to gate replacing itself.
+export function beginMfaEnrollment(user, { password, code } = {}, now = new Date()) {
+  if (!verifyPassword(password, user.passwordHash)) {
+    return { findings: [{ code: "current_password_invalid", message: "Current password is incorrect." }] };
+  }
+  if (user.mfaEnabled && !verifyTotpCode(user.mfaSecret, code, { now })) {
+    return { findings: [{ code: "mfa_code_invalid", message: "A valid current MFA code is required to re-enroll MFA." }] };
+  }
   const secret = generateTotpSecret();
   return {
+    findings: [],
     user: { ...user, mfaPendingSecret: secret, updatedAt: now.toISOString() },
     secret,
     otpauthUrl: totpAuthUrl(secret, { accountName: user.email })
@@ -591,13 +636,20 @@ export function confirmMfaEnrollment(user, code, now = new Date()) {
   };
 }
 
-export function disableMfa(user, { password }, now = new Date()) {
+// Disabling MFA is a security-downgrade action, so it requires proof of both
+// factors the user currently holds (password + a live TOTP code) — a
+// password alone (e.g. phished, or read from a hijacked session) must not be
+// enough to strip the second factor.
+export function disableMfa(user, { password, code }, now = new Date()) {
   if (!verifyPassword(password, user.passwordHash)) {
     return { findings: [{ code: "current_password_invalid", message: "Current password is incorrect." }] };
   }
+  if (user.mfaEnabled && !verifyTotpCode(user.mfaSecret, code, { now })) {
+    return { findings: [{ code: "mfa_code_invalid", message: "A valid current MFA code is required to disable MFA." }] };
+  }
   return {
     findings: [],
-    user: { ...user, mfaSecret: null, mfaPendingSecret: null, mfaEnabled: false, updatedAt: now.toISOString() }
+    user: { ...user, mfaSecret: null, mfaPendingSecret: null, mfaEnabled: false, mfaRequired: false, updatedAt: now.toISOString() }
   };
 }
 
@@ -621,6 +673,13 @@ function normalizeTenantUser(input = {}, existing = {}, now = new Date()) {
     canAssignQueues: normalizeStringList(input.canAssignQueues ?? existing.canAssignQueues),
     country: input.country ?? existing.country ?? "IN",
     passwordHash: input.password ? hashPassword(input.password) : input.passwordHash ?? existing.passwordHash ?? null,
+    // An admin who directly sets/resets a password knows that credential, so
+    // the account must rotate it at next login; self-service password
+    // changes and invite acceptance (where only the user ever knows the
+    // value) clear the flag. mustChangePassword defaults to false so the
+    // very first admin-provisioned user isn't forced through an extra step.
+    mustChangePassword:
+      input.mustChangePassword !== undefined ? input.mustChangePassword : existing.mustChangePassword ?? false,
     mfaRequired: input.mfaRequired ?? existing.mfaRequired ?? false,
     mfaEnabled: input.mfaEnabled ?? existing.mfaEnabled ?? false,
     mfaSecret: input.mfaSecret !== undefined ? input.mfaSecret : existing.mfaSecret ?? null,
@@ -644,6 +703,8 @@ function normalizePlatformUser(input = {}, existing = {}, now = new Date()) {
     status: input.status ?? existing.status ?? "active",
     roles: normalizeRoles(input.roles ?? existing.roles, PLATFORM_ROLES, ["platform_admin"]),
     passwordHash: input.password ? hashPassword(input.password) : input.passwordHash ?? existing.passwordHash ?? null,
+    mustChangePassword:
+      input.mustChangePassword !== undefined ? input.mustChangePassword : existing.mustChangePassword ?? false,
     mfaRequired: input.mfaRequired ?? existing.mfaRequired ?? true,
     mfaEnabled: input.mfaEnabled ?? existing.mfaEnabled ?? false,
     mfaSecret: input.mfaSecret !== undefined ? input.mfaSecret : existing.mfaSecret ?? null,

@@ -298,6 +298,8 @@ body {
 .header-controls {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  row-gap: var(--space-2);
   gap: var(--space-3);
 }
 
@@ -1599,6 +1601,16 @@ dialog::backdrop {
   letter-spacing: 0.05em;
 }
 
+.admin-pill-warning {
+  background: var(--status-warning-subtle);
+  color: var(--status-warning);
+}
+
+.admin-pill-success {
+  background: var(--status-success-subtle);
+  color: var(--status-success);
+}
+
 .wizard-title-row {
   display: flex;
   justify-content: space-between;
@@ -1960,6 +1972,193 @@ dialog::backdrop {
   .op-card.span-all {
     grid-column: span 1;
   }
+}
+
+/* Platform admin has no tenant workspace to show — hide the task-queue chrome
+   and point them at the Admin console instead of an empty task list. */
+body.platform-mode .sidebar,
+body.platform-mode .tasks-panel,
+body.platform-mode .detail-panel {
+  display: none;
+}
+
+body.platform-mode .workspace-layout::before {
+  content: 'Signed in as platform staff. Open Admin to manage tenants, platform users, break-glass access, and platform audit history.';
+  display: block;
+  padding: var(--space-7);
+  color: var(--text-secondary);
+  font-size: var(--text-md);
+  max-width: 480px;
+  margin: var(--space-7) auto;
+  text-align: center;
+}
+
+.scope-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.task-card.out-of-role {
+  opacity: 0.6;
+}
+
+.task-card-view-only-badge {
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  background: var(--bg-surface-3);
+  border-radius: var(--radius-full);
+  padding: 2px 8px;
+}
+
+/* ─── Auth screens: MFA, invites, forced actions ─────────────────────────── */
+.login-form-error {
+  background: var(--status-danger-subtle);
+  color: var(--status-danger);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  font-size: var(--text-sm);
+  line-height: 1.4;
+}
+
+.login-invite-link {
+  margin-top: var(--space-5);
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.link-button {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent-cyan);
+  font-size: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.link-button:hover {
+  color: var(--accent-primary);
+}
+
+.dialog-required-action {
+  max-width: 440px;
+}
+
+.mfa-secret-box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  background: var(--bg-surface-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  margin: var(--space-3) 0;
+}
+
+.mfa-secret-box label {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.mfa-secret-box code {
+  font-family: var(--font-mono);
+  font-size: var(--text-md);
+  word-break: break-all;
+}
+
+.mfa-otpauth-link {
+  color: var(--accent-cyan);
+  font-size: var(--text-sm);
+}
+
+.admin-subtabs {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.admin-subtab {
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-full);
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  color: var(--text-secondary);
+}
+
+.admin-subtab.active {
+  background: var(--accent-primary);
+  color: var(--bg-surface-1);
+  border-color: var(--accent-primary);
+}
+
+.user-subpanel.hidden {
+  display: none;
+}
+
+.admin-form-hint {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin-top: calc(-1 * var(--space-2));
+  margin-bottom: var(--space-3);
+}
+
+.admin-row-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-top: var(--space-2);
+}
+
+.audit-event-row {
+  border-bottom: 1px solid var(--border-subtle);
+  padding: var(--space-2) 0;
+  font-size: var(--text-sm);
+}
+
+.audit-event-row .audit-event-type {
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+.audit-event-row .audit-event-meta {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.review-decision-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: var(--text-sm);
+}
+
+.review-decision-row:last-child {
+  border-bottom: none;
+}
+
+.review-decision-actions {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.review-decision-actions select {
+  font-size: var(--text-xs);
+  padding: var(--space-1) var(--space-2);
 }
 
 /* ─── Reduced Motion ─────────────────────────────────────────────────────── */
