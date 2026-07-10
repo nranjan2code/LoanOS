@@ -35,16 +35,22 @@
 //     microservice split off from this monolith) gets real, database-
 //     enforced tenant isolation by default, without having to re-implement
 //     this module's care around which rows to touch.
-//   - Deliberately NOT yet implemented (a v3 follow-up): per-tenant-scoped
-//     *fetching* — `loadState`/`saveState` still read and write every
-//     tenant's data-plane document on every whole-state call, matching the
-//     file driver's "load everything, mutate in memory, save everything"
-//     pattern exactly (v2 only changed which *lock* guards that work, not
-//     what it reads/writes). Fetching only the one tenant a request actually
-//     touches requires restructuring server.js's `route()` dispatcher's
-//     store.load()/store.save() closure, which is exercised by the entire
-//     test suite end-to-end — its own focused pass, tracked in
-//     docs/architecture/postgres-migration.md.
+//   - Per-tenant-scoped *fetching* (v3): `loadControlPlaneOnly`/
+//     `loadTenantDataOnly`/`saveTenantDataOnly`/`saveControlPlaneOnly` are
+//     what server.js's route() dispatcher actually calls now, instead of
+//     the whole-state `loadState`/`saveState` above — a request fetches and
+//     writes exactly the tenant it's scoped to, not every tenant's data on
+//     every call. `loadState`/`saveState` remain in active use for
+//     routePlatform/routeAuth's control-plane operations (tenant
+//     provisioning, break-glass, sub-processor registration, sandbox
+//     management), which legitimately span tenants by design. The
+//     per-tenant functions genuinely enforce RLS — they run under
+//     `SET LOCAL ROLE loanos_app` (see withTenantRole below), switched from
+//     the connection's base role, `loanos_control_plane`, which the
+//     whole-state functions run as directly (BYPASSRLS — see the role
+//     comment in db/schema.sql for why that's a deliberate, scoped
+//     privilege mirroring what a platform admin already has at the
+//     application layer, not an RLS bypass for convenience).
 //
 // This module is loaded only when LOANOS_STORAGE_DRIVER=postgres. It has
 // been exercised against a live PostgreSQL 18 instance (see
@@ -320,10 +326,18 @@ export async function peekControlPlaneState() {
 export async function saveState(state, _dataDirIgnored) {
   const client = currentClient();
   const normalized = fileStoreNormalizeState(state);
+  await persistControlPlane(client, normalized.controlPlane);
+  await persistAllTenantData(client, normalized.tenants);
+}
 
+// The full control-plane persistence — tenant registry, sessions, platform
+// users, etc. — factored out so saveControlPlaneOnly (v3) can reuse it
+// without also touching tenant_data, and so saveState (the whole-state path
+// still used by routePlatform/routeAuth) doesn't duplicate the logic.
+async function persistControlPlane(client, controlPlane) {
   // Tenant registry (control-plane metadata only — not the data-plane
-  // document, which is upserted separately below).
-  for (const record of Object.values(normalized.controlPlane.tenants)) {
+  // document, which lives in tenant_data and is persisted separately).
+  for (const record of Object.values(controlPlane.tenants)) {
     const row = recordToTenantRow(record);
     await client.query(
       `INSERT INTO tenants (tenant_id, name, api_key_hash, isolation_tier, status, is_sandbox, parent_tenant_id, sandbox_name, onboarding, offboarding, created_at, updated_at)
@@ -360,7 +374,7 @@ export async function saveState(state, _dataDirIgnored) {
   // present (offboardTenant() in file-store.js deletes the key from
   // state.controlPlane.tenants entirely rather than marking it) must be
   // removed too, or a deleted tenant would silently reappear on next load.
-  const currentTenantIds = Object.keys(normalized.controlPlane.tenants);
+  const currentTenantIds = Object.keys(controlPlane.tenants);
   await client.query(
     currentTenantIds.length > 0
       ? "DELETE FROM tenants WHERE tenant_id <> ALL($1::text[])"
@@ -368,37 +382,20 @@ export async function saveState(state, _dataDirIgnored) {
     currentTenantIds.length > 0 ? [currentTenantIds] : []
   );
 
-  // Tenant data-plane documents.
-  for (const [tenantId, data] of Object.entries(normalized.tenants)) {
-    await client.query(
-      `INSERT INTO tenant_data (tenant_id, data, updated_at)
-       VALUES ($1, $2::jsonb, now())
-       ON CONFLICT (tenant_id) DO UPDATE SET data = EXCLUDED.data, updated_at = now()`,
-      [tenantId, JSON.stringify(data ?? createEmptyTenantData())]
-    );
-  }
-  const currentDataTenantIds = Object.keys(normalized.tenants);
-  await client.query(
-    currentDataTenantIds.length > 0
-      ? "DELETE FROM tenant_data WHERE tenant_id <> ALL($1::text[])"
-      : "DELETE FROM tenant_data",
-    currentDataTenantIds.length > 0 ? [currentDataTenantIds] : []
-  );
-
-  await upsertKeyedTable(client, "platform_users", "user_id", normalized.controlPlane.platformUsers);
-  await upsertKeyedTable(client, "sessions", "session_id", normalized.controlPlane.sessions, (session) => ({
+  await upsertKeyedTable(client, "platform_users", "user_id", controlPlane.platformUsers);
+  await upsertKeyedTable(client, "sessions", "session_id", controlPlane.sessions, (session) => ({
     token_hash: session.tokenHash,
     principal_type: session.principalType,
     tenant_id: session.tenantId,
     expires_at: session.expiresAt
   }));
-  await upsertKeyedTable(client, "login_attempts", "attempt_key", normalized.controlPlane.loginAttempts);
-  await upsertKeyedTable(client, "sub_processors", "sub_processor_id", normalized.controlPlane.subProcessors);
-  await upsertKeyedTable(client, "break_glass_grants", "grant_id", normalized.controlPlane.breakGlassGrants, (grant) => ({
+  await upsertKeyedTable(client, "login_attempts", "attempt_key", controlPlane.loginAttempts);
+  await upsertKeyedTable(client, "sub_processors", "sub_processor_id", controlPlane.subProcessors);
+  await upsertKeyedTable(client, "break_glass_grants", "grant_id", controlPlane.breakGlassGrants, (grant) => ({
     tenant_id: grant.tenantId,
     credential_hash: grant.credentialHash
   }));
-  await upsertKeyedTable(client, "ckyc_registry", "identifier", normalized.controlPlane.ckycRegistry);
+  await upsertKeyedTable(client, "ckyc_registry", "identifier", controlPlane.ckycRegistry);
 
   // Platform audit events are append-only (the table itself enforces this
   // with a trigger — see db/schema.sql): only insert events not already
@@ -406,7 +403,7 @@ export async function saveState(state, _dataDirIgnored) {
   const existingEventIds = new Set(
     (await client.query("SELECT event_id FROM platform_audit_events")).rows.map((row) => row.event_id)
   );
-  for (const event of normalized.controlPlane.platformEvents) {
+  for (const event of controlPlane.platformEvents) {
     if (existingEventIds.has(event.eventId)) continue;
     const { sequence, eventId, occurredAt, previousHash, hash, ...payload } = event;
     await client.query(
@@ -416,6 +413,89 @@ export async function saveState(state, _dataDirIgnored) {
       [sequence, eventId, occurredAt, previousHash, hash, JSON.stringify(payload)]
     );
   }
+}
+
+// Writes every tenant's data-plane document in one go — the whole-state
+// path (saveState) still used by routePlatform/routeAuth. The v3 hot path
+// (saveTenantDataOnly, below) writes exactly one tenant's row instead.
+async function persistAllTenantData(client, tenants) {
+  for (const [tenantId, data] of Object.entries(tenants)) {
+    await client.query(
+      `INSERT INTO tenant_data (tenant_id, data, updated_at)
+       VALUES ($1, $2::jsonb, now())
+       ON CONFLICT (tenant_id) DO UPDATE SET data = EXCLUDED.data, updated_at = now()`,
+      [tenantId, JSON.stringify(data ?? createEmptyTenantData())]
+    );
+  }
+  const currentDataTenantIds = Object.keys(tenants);
+  await client.query(
+    currentDataTenantIds.length > 0
+      ? "DELETE FROM tenant_data WHERE tenant_id <> ALL($1::text[])"
+      : "DELETE FROM tenant_data",
+    currentDataTenantIds.length > 0 ? [currentDataTenantIds] : []
+  );
+}
+
+// ─── v3: per-tenant accessors (the actual fetch-scoping optimization) ─────
+//
+// The application connects as `loanos_control_plane` (BYPASSRLS, granted
+// membership in `loanos_app` — see db/schema.sql), which is what every query
+// in this module runs as by default — necessary for the whole-state
+// operations above, which legitimately span tenants. The two tenant-scoped
+// functions below are the ONE place a query actually needs RLS to mean
+// something: they switch to `loanos_app` (NOBYPASSRLS) for the duration of
+// one statement via `SET LOCAL ROLE`, with `app.current_tenant_id` set to
+// the tenant being read/written, so a bug that somehow passed the wrong
+// tenantId here would be caught by the database itself, not just by review.
+// `SET LOCAL` and `SET LOCAL ROLE` both auto-revert at the end of the
+// surrounding transaction regardless, but each function also explicitly
+// RESET ROLEs afterward so later statements in the same transaction (e.g. a
+// routeTenantAdmin control-plane write via stateRef, on the very same
+// connection) aren't left running under the restricted role by accident.
+async function withTenantRole(client, tenantId, fn) {
+  await client.query("SET LOCAL ROLE loanos_app");
+  await client.query("SELECT set_config('app.current_tenant_id', $1, true)", [tenantId]);
+  try {
+    return await fn();
+  } finally {
+    await client.query("RESET ROLE");
+  }
+}
+
+// A lock-free... no: this one DOES run inside the request's transaction
+// (via currentClient()), unlike peekControlPlaneState — it's the control-
+// plane read route()'s v3 tenant-resolution flow uses for real, once a lock
+// is already held. Control-plane tables carry no RLS, so no role switch is
+// needed here.
+export async function loadControlPlaneOnly(_dataDirIgnored) {
+  const client = currentClient();
+  const controlPlane = await loadControlPlane(client);
+  return assembleState(controlPlane, {});
+}
+
+export async function loadTenantDataOnly(_dataDirIgnored, tenantId) {
+  const client = currentClient();
+  return withTenantRole(client, tenantId, async () => {
+    const result = await client.query("SELECT data FROM tenant_data WHERE tenant_id = $1", [tenantId]);
+    return result.rows[0]?.data ?? createEmptyTenantData();
+  });
+}
+
+export async function saveTenantDataOnly(_dataDirIgnored, tenantId, tenantData) {
+  const client = currentClient();
+  await withTenantRole(client, tenantId, () =>
+    client.query(
+      `INSERT INTO tenant_data (tenant_id, data, updated_at)
+       VALUES ($1, $2::jsonb, now())
+       ON CONFLICT (tenant_id) DO UPDATE SET data = EXCLUDED.data, updated_at = now()`,
+      [tenantId, JSON.stringify(tenantData ?? createEmptyTenantData())]
+    )
+  );
+}
+
+export async function saveControlPlaneOnly(_dataDirIgnored, controlPlaneState) {
+  const client = currentClient();
+  await persistControlPlane(client, fileStoreNormalizeState(controlPlaneState).controlPlane);
 }
 
 async function upsertKeyedTable(client, table, keyColumn, recordMap, extraColumns) {

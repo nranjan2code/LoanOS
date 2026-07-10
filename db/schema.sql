@@ -42,13 +42,40 @@ BEGIN;
 -- BYPASSRLS attribute (including superusers). The application MUST connect
 -- as a plain, non-owner, non-bypassing role for RLS to mean anything — this
 -- is the single most common way teams accidentally defeat RLS.
+--
+-- Two roles exist because the application genuinely needs two different
+-- levels of access to tenant_data in different code paths:
+--   - `loanos_app`: RLS-enforced. Used for the per-tenant hot path (a single
+--     request's own tenant_data row) — apps/api/src/postgres-store.js wraps
+--     those specific queries in `SET LOCAL ROLE loanos_app` so RLS is
+--     genuinely enforced for exactly the query that's supposed to see only
+--     one tenant's row.
+--   - `loanos_control_plane`: BYPASSRLS. Used for operations that
+--     legitimately span tenants by design — platform tenant provisioning
+--     (seeding a new tenant's initial data), tenant export/offboarding
+--     (reading/deleting one specific tenant chosen by a platform admin, not
+--     the requester's own tenant context), and v1/v2's remaining
+--     whole-state control-plane reads (routePlatform, routeAuth). This
+--     mirrors the cross-tenant authority a platform admin key/session
+--     already carries at the application layer — it is not a new privilege,
+--     just the same one also expressed at the database layer.
+-- The application's DATABASE_URL connects as `loanos_control_plane`, which
+-- can `SET ROLE loanos_app` for the duration of one statement (granted
+-- below) — it never authenticates directly as `loanos_app` itself, so a
+-- connection-string leak alone can't be used to selectively bypass RLS by
+-- simply not switching roles (the bypass-capable role is the one that
+-- authenticates; `loanos_app` itself never lets you go the other way).
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'loanos_app') THEN
-    CREATE ROLE loanos_app LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
+    CREATE ROLE loanos_app NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'loanos_control_plane') THEN
+    CREATE ROLE loanos_control_plane LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE BYPASSRLS;
   END IF;
 END
 $$;
+GRANT loanos_app TO loanos_control_plane;
 
 -- ─── Control plane: tenant registry ────────────────────────────────────
 CREATE TABLE IF NOT EXISTS tenants (

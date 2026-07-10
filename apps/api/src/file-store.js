@@ -719,6 +719,35 @@ export function setTenantData(state, tenantId, tenantData) {
   };
 }
 
+// --- Targeted (v3) accessors ------------------------------------------------
+//
+// The postgres driver fetches/persists exactly one tenant's data-plane
+// document per request instead of every tenant's (see postgres-store.js).
+// The file driver has no way to do a partial read/write of a single JSON
+// file — every call here still round-trips the whole file — but exposing
+// the same four functions means server.js's route() dispatcher doesn't need
+// to know or care which driver is active.
+
+export async function loadControlPlaneOnly(dataDir) {
+  const state = await loadState(dataDir);
+  return { ...state, tenants: {} };
+}
+
+export async function loadTenantDataOnly(dataDir, tenantId) {
+  const state = await loadState(dataDir);
+  return getTenantData(state, tenantId) ?? createEmptyTenantData();
+}
+
+export async function saveTenantDataOnly(dataDir, tenantId, tenantData) {
+  const state = await loadState(dataDir);
+  await saveState(setTenantData(state, tenantId, tenantData), dataDir);
+}
+
+export async function saveControlPlaneOnly(dataDir, controlPlaneState) {
+  const state = await loadState(dataDir);
+  await saveState({ ...state, controlPlane: controlPlaneState.controlPlane }, dataDir);
+}
+
 // loadStateFn/saveStateFn default to this module's own file-backed
 // loadState/saveState, so every existing caller (and every test) is
 // completely unaffected. A different storage driver (postgres-store.js)

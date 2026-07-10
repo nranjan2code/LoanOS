@@ -35,7 +35,18 @@ if (driver === "postgres") {
     saveState: postgresStore.saveState,
     withStateLock: postgresStore.withStateLock,
     ensureBootstrapTenants: postgresStore.ensureBootstrapTenants,
-    peekControlPlaneState: postgresStore.peekControlPlaneState
+    peekControlPlaneState: postgresStore.peekControlPlaneState,
+    // v3: per-tenant accessors — route()'s hot path uses these instead of
+    // loadState/saveState so it fetches/writes exactly one tenant's data,
+    // not every tenant's, on every request. The file driver's versions
+    // (from file-store.js, picked up via the `...fileStore` spread above)
+    // still round-trip the whole file — no partial I/O is possible there —
+    // but expose the same four function names so route() doesn't need to
+    // know which driver is active.
+    loadControlPlaneOnly: postgresStore.loadControlPlaneOnly,
+    loadTenantDataOnly: postgresStore.loadTenantDataOnly,
+    saveTenantDataOnly: postgresStore.saveTenantDataOnly,
+    saveControlPlaneOnly: postgresStore.saveControlPlaneOnly
   };
 } else if (driver !== "file") {
   throw new Error(`Unknown LOANOS_STORAGE_DRIVER "${driver}". Expected "file" or "postgres".`);
@@ -46,3 +57,7 @@ export const saveState = ioFunctions.saveState;
 export const withStateLock = ioFunctions.withStateLock;
 export const ensureBootstrapTenants = ioFunctions.ensureBootstrapTenants;
 export const peekControlPlaneState = ioFunctions.peekControlPlaneState;
+export const loadControlPlaneOnly = ioFunctions.loadControlPlaneOnly;
+export const loadTenantDataOnly = ioFunctions.loadTenantDataOnly;
+export const saveTenantDataOnly = ioFunctions.saveTenantDataOnly;
+export const saveControlPlaneOnly = ioFunctions.saveControlPlaneOnly;

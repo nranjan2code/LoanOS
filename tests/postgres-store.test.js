@@ -74,10 +74,11 @@ test("postgres schema applies cleanly and RLS blocks cross-tenant visibility", {
     ["tnt_pg_a", JSON.stringify({ secret: "A's data" }), "tnt_pg_b", JSON.stringify({ secret: "B's data" })]
   );
 
-  // Connect as the RLS-scoped application role (not the admin/owner role
-  // used above to seed fixtures) — this is the role a compromised or buggy
-  // application-tier process would actually hold.
-  const appPool = new Pool({ connectionString: rewriteRole(DATABASE_URL_TEST, "loanos_app") });
+  // Connect as loanos_control_plane (what the application actually
+  // authenticates as — loanos_app is NOLOGIN, only reachable via SET ROLE;
+  // see db/schema.sql) and switch to loanos_app for the RLS-scoped portion,
+  // exactly mirroring withTenantRole() in postgres-store.js.
+  const appPool = new Pool({ connectionString: rewriteRole(DATABASE_URL_TEST, "loanos_control_plane") });
   const client = await appPool.connect();
   // Deliberately NOT using t.after() for the client/pool pair: pool.end()
   // blocks until every checked-out client is released, and node:test does
@@ -86,13 +87,15 @@ test("postgres schema applies cleanly and RLS blocks cross-tenant visibility", {
   // forever. Releasing explicitly, in order, in `finally` sidesteps that
   // entirely.
   try {
+    await client.query("BEGIN");
+    await client.query("SET LOCAL ROLE loanos_app");
+
     // No tenant context set at all: RLS's `current_setting(..., true)`
     // returns NULL, and `tenant_id = NULL` is never true in SQL — this
     // session must see zero rows, proving there is no default-open state.
     const noContext = await client.query("SELECT tenant_id FROM tenant_data");
     assert.equal(noContext.rows.length, 0);
 
-    await client.query("BEGIN");
     // SET LOCAL does not accept bind parameters ($1) — Postgres's SET
     // command needs a literal or identifier, not a query parameter, so a
     // dynamic value must go through set_config()'s third (is_local) arg
@@ -116,6 +119,33 @@ test("postgres schema applies cleanly and RLS blocks cross-tenant visibility", {
     client.release();
     await appPool.end();
   }
+});
+
+test("loanos_control_plane bypasses RLS directly (whole-state control-plane operations need this)", { skip: describeSkip && skipReason }, async (t) => {
+  const pg = await import("pg");
+  const { Pool } = pg.default;
+  const adminPool = new Pool({ connectionString: DATABASE_URL_TEST });
+  t.after(() => adminPool.end());
+  await applySchema(adminPool);
+  await resetDatabase(adminPool);
+
+  await adminPool.query(
+    `INSERT INTO tenants (tenant_id, name, api_key_hash, onboarding) VALUES ($1, $2, $3, '{}'::jsonb), ($4, $5, $6, '{}'::jsonb)`,
+    ["tnt_pg_a", "Tenant A", "hash_a", "tnt_pg_b", "Tenant B", "hash_b"]
+  );
+  await adminPool.query(
+    `INSERT INTO tenant_data (tenant_id, data) VALUES ($1, $2::jsonb), ($3, $4::jsonb)`,
+    ["tnt_pg_a", JSON.stringify({ secret: "A's data" }), "tnt_pg_b", JSON.stringify({ secret: "B's data" })]
+  );
+
+  // Without ever switching role or setting app.current_tenant_id,
+  // loanos_control_plane (BYPASSRLS) must see every tenant's row — this is
+  // what routePlatform/routeAuth's whole-state loadState/saveState rely on
+  // to legitimately span tenants (tenant provisioning, export, offboarding).
+  const controlPlanePool = new Pool({ connectionString: rewriteRole(DATABASE_URL_TEST, "loanos_control_plane") });
+  t.after(() => controlPlanePool.end());
+  const result = await controlPlanePool.query("SELECT tenant_id FROM tenant_data ORDER BY tenant_id");
+  assert.deepEqual(result.rows.map((row) => row.tenant_id), ["tnt_pg_a", "tnt_pg_b"]);
 });
 
 test("withStateLock serializes concurrent state mutations via a Postgres advisory lock", { skip: describeSkip && skipReason }, async (t) => {
@@ -184,7 +214,13 @@ test("storage.js with LOANOS_STORAGE_DRIVER=postgres serves a full multi-tenant 
   const previousDriver = process.env.LOANOS_STORAGE_DRIVER;
   const previousUrl = process.env.DATABASE_URL;
   process.env.LOANOS_STORAGE_DRIVER = "postgres";
-  process.env.DATABASE_URL = DATABASE_URL_TEST;
+  // The running server must connect as `loanos_control_plane` — the role it
+  // actually runs as in production — NOT the admin/superuser connection
+  // used above for schema setup and fixtures. Connecting as the superuser
+  // here would silently mask a broken/missing GRANT loanos_app TO
+  // loanos_control_plane (superusers can SET ROLE to anything regardless of
+  // membership), which is exactly the kind of gap this test exists to catch.
+  process.env.DATABASE_URL = rewriteRole(DATABASE_URL_TEST, "loanos_control_plane");
   t.after(() => {
     process.env.LOANOS_STORAGE_DRIVER = previousDriver;
     process.env.DATABASE_URL = previousUrl;

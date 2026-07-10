@@ -171,6 +171,8 @@ import {
   listSubProcessors,
   listTenants,
   listSandboxes,
+  loadControlPlaneOnly,
+  loadTenantDataOnly,
   resetSandbox,
   deleteSandbox,
   loadState as loadWholeState,
@@ -184,7 +186,9 @@ import {
   resolveBreakGlass,
   resolveTenantByApiKey,
   revokeBreakGlass,
+  saveControlPlaneOnly,
   saveState as saveWholeState,
+  saveTenantDataOnly,
   setTenantData,
   TENANT_ONBOARDING_FLOWS,
   TENANT_ONBOARDING_MODULES,
@@ -216,6 +220,8 @@ import {
   publicTenantUser,
   recordLoginFailure,
   resolveSession,
+  resolveSessionRecord,
+  resolveSessionUser,
   revokeSession,
   sessionEffectiveStatus,
   upsertPlatformUser,
@@ -578,26 +584,41 @@ async function route(req, res, dataDir, platformAdminKey) {
   }
 
   // --- Tenant context: every data-plane route runs inside exactly one tenant. ---
-  const wholeState = await loadWholeState(dataDir);
-  const sessionResolution = resolveSession(wholeState, sessionTokenFromRequest(req));
+  // v3: fetch only the control plane (small — the tenant registry, sessions,
+  // etc., never business data) to resolve which tenant this request belongs
+  // to, then fetch that ONE tenant's data-plane document — not every
+  // tenant's, the way v1/v2 did (see docs/architecture/postgres-migration.md).
+  const controlPlaneState = await loadControlPlaneOnly(dataDir);
+  const sessionRecord = resolveSessionRecord(controlPlaneState, sessionTokenFromRequest(req));
   let tenant = null;
   let breakGlass = null;
   let authContext = null;
+  // Populated as soon as we know which tenant's data-plane document to use —
+  // for a tenant_user session that's immediately below (validating the
+  // session's own login record needs it anyway); for api-key/break-glass
+  // auth, or a sandbox-header swap, it's fetched once tenant is final.
+  let tenantData = null;
 
-  if (sessionResolution?.session?.principalType === "tenant_user") {
-    if (rejectIfRestricted(res, sessionResolution.session, path)) {
+  if (sessionRecord?.session?.principalType === "tenant_user") {
+    if (rejectIfRestricted(res, sessionRecord.session, path)) {
       return;
     }
-    tenant = sessionResolution.tenant;
-    authContext = {
-      principalType: "tenant_user",
-      tenantId: tenant.tenantId,
-      userId: sessionResolution.user.userId,
-      email: sessionResolution.user.email,
-      displayName: sessionResolution.user.displayName,
-      roles: sessionResolution.user.adminRoles ?? [],
-      sessionId: sessionResolution.session.sessionId
-    };
+    tenantData = await loadTenantDataOnly(dataDir, sessionRecord.session.tenantId);
+    const user = resolveSessionUser(tenantData, sessionRecord.session);
+    if (user) {
+      tenant = sessionRecord.tenant;
+      authContext = {
+        principalType: "tenant_user",
+        tenantId: tenant.tenantId,
+        userId: user.userId,
+        email: user.email,
+        displayName: user.displayName,
+        roles: user.adminRoles ?? [],
+        sessionId: sessionRecord.session.sessionId
+      };
+    } else {
+      tenantData = null; // session doesn't actually validate; fall through to api-key/break-glass
+    }
   }
 
   // A tenant session is the human path. A tenant api key remains the service
@@ -605,7 +626,7 @@ async function route(req, res, dataDir, platformAdminKey) {
   // credential scoped to exactly one tenant.
   if (!tenant) {
     const apiKey = tenantApiKeyFromRequest(req);
-    tenant = resolveTenantByApiKey(wholeState, apiKey);
+    tenant = resolveTenantByApiKey(controlPlaneState, apiKey);
     if (tenant) {
       authContext = {
         principalType: "tenant_service",
@@ -617,7 +638,7 @@ async function route(req, res, dataDir, platformAdminKey) {
   }
 
   if (!tenant) {
-    const resolved = resolveBreakGlass(wholeState, breakGlassKeyFromRequest(req));
+    const resolved = resolveBreakGlass(controlPlaneState, breakGlassKeyFromRequest(req));
     if (resolved) {
       tenant = resolved.tenant;
       breakGlass = resolved.grant;
@@ -646,9 +667,10 @@ async function route(req, res, dataDir, platformAdminKey) {
     const sandboxName = Array.isArray(sandboxNameHeader) ? sandboxNameHeader[0] : sandboxNameHeader;
     if (sandboxName) {
       const sandboxId = `${tenant.tenantId}_sandbox_${sandboxName}`;
-      const sandboxRecord = wholeState.controlPlane.tenants[sandboxId];
+      const sandboxRecord = controlPlaneState.controlPlane.tenants[sandboxId];
       if (sandboxRecord && sandboxRecord.status === "active") {
         tenant = sandboxRecord;
+        tenantData = null; // swapped tenants — any earlier fetch (session path) was for the wrong one now
       } else {
         sendJson(res, 404, {
           error: {
@@ -679,11 +701,18 @@ async function route(req, res, dataDir, platformAdminKey) {
     return;
   }
 
+  // Fetch this tenant's data now if resolution didn't already load it
+  // (api-key/break-glass paths, or a sandbox swap that invalidated an
+  // earlier session-path fetch).
+  if (!tenantData) {
+    tenantData = await loadTenantDataOnly(dataDir, tenant.tenantId);
+  }
+
   // The store hands each handler ONLY this tenant's partition. There is no code
   // path from a handler back to another tenant's data. On every save the tenant's
   // audit events are sealed into an append-only hash chain, so the persisted
   // record is tamper-evident by construction.
-  let scopedWholeState = wholeState;
+  let currentTenantData = tenantData;
   // Every event gets a uniform provenance envelope (actor / actorType /
   // dataClass) stamped centrally before sealing, so no handler can persist an
   // unclassified event. Break-glass requests stamp platform-staff provenance;
@@ -694,21 +723,36 @@ async function route(req, res, dataDir, platformAdminKey) {
       ? { actor: authContext.userId, actorType: AUDIT_ACTOR_TYPES.TENANT_USER }
       : { actor: tenant.tenantId, actorType: AUDIT_ACTOR_TYPES.TENANT };
   const store = {
-    load: async () => getTenantData(scopedWholeState, tenant.tenantId) ?? createEmptyTenantData(),
-    save: async (tenantData) => {
-      const stamped = stampAuditEvents(tenantData.events, auditActor);
+    load: async () => currentTenantData,
+    save: async (nextTenantData) => {
+      const stamped = stampAuditEvents(nextTenantData.events, auditActor);
       const sealed = {
-        ...tenantData,
+        ...nextTenantData,
         events: sealAuditChain(stamped, tenant.tenantId)
       };
-      scopedWholeState = setTenantData(scopedWholeState, tenant.tenantId, sealed);
-      await saveWholeState(scopedWholeState, dataDir);
+      currentTenantData = sealed;
+      await saveTenantDataOnly(dataDir, tenant.tenantId, sealed);
     }
   };
+  // Control-plane state exposed to routeTenantAdmin (/admin/*) for the two
+  // operations that legitimately need it (session revocation on password
+  // reset, api-key rotation) and to the CKYC mock-registry handlers further
+  // below (the registry lives in the control plane, not tenant_data).
+  // stateRef.set() now persists immediately rather than staging a change for
+  // store.save() to carry along later — the two writes are no longer bundled
+  // into one saveWholeState() call, but both still run inside the same
+  // request's transaction (opened by withStateLock), so a later error in the
+  // same request still rolls both back together on postgres. The file
+  // driver has no such transaction; every current call site's gap between
+  // stateRef.set() and store.save() is pure, synchronous JS (object
+  // construction) that cannot itself throw, so this is a theoretical, not
+  // practical, atomicity gap there.
+  let currentControlPlaneState = controlPlaneState;
   const stateRef = {
-    get: () => scopedWholeState,
-    set: (nextState) => {
-      scopedWholeState = nextState;
+    get: () => currentControlPlaneState,
+    set: async (nextState) => {
+      currentControlPlaneState = nextState;
+      await saveControlPlaneOnly(dataDir, nextState);
     }
   };
 
@@ -760,7 +804,7 @@ async function route(req, res, dataDir, platformAdminKey) {
   // the platform-wide register of LoanOS sub-processors that apply to it.
   if (method === "GET" && path === "/sub-processors") {
     sendJson(res, 200, {
-      subProcessors: listSubProcessors(wholeState)
+      subProcessors: listSubProcessors(controlPlaneState)
     });
     return;
   }
@@ -769,7 +813,7 @@ async function route(req, res, dataDir, platformAdminKey) {
   // grant scoped to it, past and present, with its effective status.
   if (method === "GET" && path === "/break-glass-grants") {
     sendJson(res, 200, {
-      grants: listBreakGlassGrants(scopedWholeState, tenant.tenantId)
+      grants: listBreakGlassGrants(currentControlPlaneState, tenant.tenantId)
     });
     return;
   }
@@ -1129,6 +1173,16 @@ async function route(req, res, dataDir, platformAdminKey) {
     return;
   }
 
+  // Sandbox management (create/list/reset/delete) intentionally keeps using
+  // whole-state loadWholeState/saveWholeState — NOT controlPlaneState — for
+  // two reasons: resetSandbox/deleteSandbox operate on the SANDBOX's own
+  // tenant_data (a different tenant from the one this request authenticated
+  // as), and saveWholeState's "delete tenant_data rows not present" cleanup
+  // (see persistAllTenantData in postgres-store.js) would silently destroy
+  // every OTHER tenant's data if called with controlPlaneState's empty
+  // `tenants: {}` — these routes are admin-ish/dev-tooling, not the hot
+  // path, so paying the whole-state-load cost here (matching v1/v2's
+  // still-current routePlatform/routeAuth behavior) is the safe choice.
   if (method === "GET" && path === "/sandbox-environments") {
     if (tenant.isSandbox) {
       sendJson(res, 403, {
@@ -1136,7 +1190,7 @@ async function route(req, res, dataDir, platformAdminKey) {
       });
       return;
     }
-    const list = listSandboxes(wholeState, tenant.tenantId);
+    const list = listSandboxes(await loadWholeState(dataDir), tenant.tenantId);
     sendJson(res, 200, { sandboxes: list });
     return;
   }
@@ -1160,7 +1214,8 @@ async function route(req, res, dataDir, platformAdminKey) {
       return;
     }
     const sandboxId = `${tenant.tenantId}_sandbox_${sandboxName}`;
-    if (wholeState.controlPlane.tenants[sandboxId]) {
+    const sandboxWholeState = await loadWholeState(dataDir);
+    if (sandboxWholeState.controlPlane.tenants[sandboxId]) {
       sendJson(res, 409, {
         error: { code: "sandbox_exists", message: "A sandbox environment with this name already exists." }
       });
@@ -1168,7 +1223,7 @@ async function route(req, res, dataDir, platformAdminKey) {
     }
 
     const apiKey = generateApiKey(true);
-    const nextState = registerTenant(wholeState, {
+    const nextState = registerTenant(sandboxWholeState, {
       tenantId: sandboxId,
       name: `${tenant.name} (${sandboxName} Sandbox)`,
       apiKey,
@@ -1196,14 +1251,15 @@ async function route(req, res, dataDir, platformAdminKey) {
     }
     const sandboxName = decodeURIComponent(sandboxResetMatch[1]);
     const sandboxId = `${tenant.tenantId}_sandbox_${sandboxName}`;
-    const sandboxRecord = wholeState.controlPlane.tenants[sandboxId];
+    const sandboxWholeState = await loadWholeState(dataDir);
+    const sandboxRecord = sandboxWholeState.controlPlane.tenants[sandboxId];
     if (!sandboxRecord || sandboxRecord.status === "offboarded") {
       sendJson(res, 404, { error: { code: "not_found", message: "Sandbox environment not found." } });
       return;
     }
     const body = await readJson(req);
     const preserveConfig = !!body.preserveConfig;
-    const nextState = resetSandbox(wholeState, sandboxId, preserveConfig);
+    const nextState = resetSandbox(sandboxWholeState, sandboxId, preserveConfig);
     await saveWholeState(nextState, dataDir);
     sendJson(res, 200, {
       message: `Sandbox environment "${sandboxName}" has been reset.`,
@@ -1222,12 +1278,13 @@ async function route(req, res, dataDir, platformAdminKey) {
     }
     const sandboxName = decodeURIComponent(sandboxDeleteMatch[1]);
     const sandboxId = `${tenant.tenantId}_sandbox_${sandboxName}`;
-    const sandboxRecord = wholeState.controlPlane.tenants[sandboxId];
+    const sandboxWholeState = await loadWholeState(dataDir);
+    const sandboxRecord = sandboxWholeState.controlPlane.tenants[sandboxId];
     if (!sandboxRecord || sandboxRecord.status === "offboarded") {
       sendJson(res, 404, { error: { code: "not_found", message: "Sandbox environment not found." } });
       return;
     }
-    const nextState = deleteSandbox(wholeState, sandboxId);
+    const nextState = deleteSandbox(sandboxWholeState, sandboxId);
     await saveWholeState(nextState, dataDir);
     sendJson(res, 200, {
       message: `Sandbox environment "${sandboxName}" has been deleted.`
@@ -2649,7 +2706,7 @@ async function route(req, res, dataDir, platformAdminKey) {
 
     if (method === "POST") {
       const body = await readJson(req);
-      const result = searchCkyc(scopedWholeState.controlPlane.ckycRegistry, body);
+      const result = searchCkyc(currentControlPlaneState.controlPlane.ckycRegistry, body);
       sendJson(res, result.summary.status === "blocked" ? 422 : 200, result);
       return;
     }
@@ -2667,7 +2724,7 @@ async function route(req, res, dataDir, platformAdminKey) {
 
     if (method === "POST") {
       const body = await readJson(req);
-      const result = downloadCkycRecord(scopedWholeState.controlPlane.ckycRegistry, body.ckycNumber);
+      const result = downloadCkycRecord(currentControlPlaneState.controlPlane.ckycRegistry, body.ckycNumber);
       if (result.summary.status === "blocked") {
         sendJson(res, 422, result);
         return;
@@ -2738,13 +2795,18 @@ async function route(req, res, dataDir, platformAdminKey) {
         return;
       }
 
-      scopedWholeState.controlPlane.ckycRegistry = scopedWholeState.controlPlane.ckycRegistry ?? {};
+      currentControlPlaneState.controlPlane.ckycRegistry = currentControlPlaneState.controlPlane.ckycRegistry ?? {};
 
-      const result = uploadCkycRecord(scopedWholeState.controlPlane.ckycRegistry, borrower, kycRecord);
+      const result = uploadCkycRecord(currentControlPlaneState.controlPlane.ckycRegistry, borrower, kycRecord);
       if (result.summary.status === "blocked") {
         sendJson(res, 422, result);
         return;
       }
+
+      // uploadCkycRecord mutates the ckycRegistry object in place; persist
+      // that control-plane change explicitly (it's no longer carried along
+      // for free by the store.save() below — see stateRef's comment above).
+      await stateRef.set(currentControlPlaneState);
 
       const updatedKyc = {
         ...kycRecord,
@@ -5865,7 +5927,7 @@ async function routeTenantAdmin(req, res, { dataDir, method, path, tenant, authC
       null,
       null
     );
-    stateRef.set({ ...stateRef.get(), controlPlane: { ...stateRef.get().controlPlane, sessions: nextSessions } });
+    await stateRef.set({ ...stateRef.get(), controlPlane: { ...stateRef.get().controlPlane, sessions: nextSessions } });
     const nextState = appendEvent(
       { ...state, users: result.users },
       { type: "tenant_user.password_reset", userId, actor: authActor(authContext) }
@@ -5962,7 +6024,7 @@ async function routeTenantAdmin(req, res, { dataDir, method, path, tenant, authC
       apiKeyRotatedAt: now.toISOString(),
       apiKeyRotatedBy: authActor(authContext)
     };
-    stateRef.set(rotatedState);
+    await stateRef.set(rotatedState);
     const state = await store.load();
     const nextTenantData = appendEvent(state, {
       type: "tenant.api_key.rotated",

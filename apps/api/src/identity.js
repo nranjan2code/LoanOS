@@ -344,7 +344,16 @@ export function createSessionRecord(input, now = new Date()) {
   return { token, session };
 }
 
-export function resolveSession(state, token, now = new Date()) {
+// Resolves everything about a session that's determinable from control-plane
+// data alone: the session record itself, and — for a tenant_user session —
+// the tenant it belongs to (validated active). Deliberately does NOT
+// validate the tenant_user's own login record, since that lives in
+// tenant_data, not the control plane; see resolveSessionUser below, split
+// out specifically so a caller holding only a control-plane snapshot (no
+// tenant_data at all) can still get this far. resolveSession() below
+// composes the two for callers that do have a full state — its behavior is
+// unchanged.
+export function resolveSessionRecord(state, token, now = new Date()) {
   if (!token) return null;
   const tokenHash = hashSecret(token);
   const session = Object.values(state?.controlPlane?.sessions ?? {}).find(
@@ -353,11 +362,10 @@ export function resolveSession(state, token, now = new Date()) {
   if (!session) return null;
   if (session.principalType === "tenant_user") {
     const tenant = state.controlPlane.tenants?.[session.tenantId];
-    const user = state.tenants?.[session.tenantId]?.users?.[session.userId];
-    if (!tenant || tenant.status !== "active" || !user || user.status !== "active") {
+    if (!tenant || tenant.status !== "active") {
       return null;
     }
-    return { session, tenant, user: publicTenantUser(user) };
+    return { session, tenant };
   }
   if (session.principalType === "platform_user") {
     const user = state.controlPlane.platformUsers?.[session.userId];
@@ -367,6 +375,29 @@ export function resolveSession(state, token, now = new Date()) {
     return { session, user: publicPlatformUser(user) };
   }
   return null;
+}
+
+// Completes a tenant_user session resolution given that tenant's OWN
+// data-plane document (fetched separately, however the caller obtained it —
+// this function needs nothing else). Returns the public login record, or
+// null if the user is missing/inactive.
+export function resolveSessionUser(tenantData, session) {
+  const user = tenantData?.users?.[session?.userId];
+  if (!user || user.status !== "active") {
+    return null;
+  }
+  return publicTenantUser(user);
+}
+
+export function resolveSession(state, token, now = new Date()) {
+  const record = resolveSessionRecord(state, token, now);
+  if (!record) return null;
+  if (record.session.principalType === "platform_user") {
+    return record;
+  }
+  const user = resolveSessionUser(state?.tenants?.[record.session.tenantId], record.session);
+  if (!user) return null;
+  return { session: record.session, tenant: record.tenant, user };
 }
 
 export function sessionEffectiveStatus(session, now = new Date()) {
