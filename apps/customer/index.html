@@ -1,0 +1,1194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title id="page-title">Customer Portal</title>
+  <meta name="description" content="Secure customer portal to manage loan applications, review KFS disclosures, download statements, and exercise DPDP privacy rights.">
+  
+  <!-- Favicon -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230a1018'/><text x='50' y='68' font-size='50' text-anchor='middle' fill='%231447e6' font-weight='bold'>C</text></svg>">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <!-- Shared Design Tokens -->
+  <link rel="stylesheet" href="/shared/design-tokens.css">
+
+  <style>
+    .customer-body {
+      background-color: var(--bg-base);
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .customer-header {
+      background: var(--bg-surface-1);
+      border-bottom: 1px solid var(--border-default);
+      padding: var(--space-4) 0;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 var(--space-6);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .portal-logo {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      text-decoration: none;
+      color: var(--text-primary);
+    }
+
+    .portal-logo .logo-mark {
+      background: var(--accent-cyan);
+      color: #fff;
+      font-size: 1.1rem;
+      font-weight: bold;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: var(--radius-sm);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .portal-logo .logo-text {
+      font-weight: 700;
+      font-size: var(--text-lg);
+      letter-spacing: -0.03em;
+    }
+
+    .portal-status {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+    }
+
+    .auth-card {
+      max-width: 460px;
+      margin: var(--space-8) auto;
+      padding: var(--space-6);
+      background: var(--bg-surface-1);
+      border: 2px solid var(--border-active);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .auth-title {
+      font-size: var(--text-xl);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin-bottom: var(--space-3);
+    }
+
+    .auth-desc {
+      font-size: var(--text-sm);
+      color: var(--text-secondary);
+      margin-bottom: var(--space-5);
+    }
+
+    /* Main Console Layout */
+    .portal-layout {
+      max-width: 1200px;
+      width: 100%;
+      margin: var(--space-6) auto;
+      padding: 0 var(--space-6);
+      display: grid;
+      grid-template-columns: 240px 1fr;
+      gap: var(--space-6);
+      align-items: start;
+    }
+
+    @media (max-width: 768px) {
+      .portal-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .portal-sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+    }
+
+    .sidebar-btn {
+      width: 100%;
+      text-align: left;
+      padding: var(--space-3) var(--space-4);
+      background: var(--bg-surface-2);
+      color: var(--text-secondary);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-sm);
+      font-weight: 600;
+      font-size: var(--text-sm);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      transition: all var(--duration-fast);
+    }
+
+    .sidebar-btn:hover {
+      background: var(--bg-surface-3);
+      color: var(--text-primary);
+    }
+
+    .sidebar-btn.active {
+      background: var(--bg-elevated);
+      color: var(--text-primary);
+      border-color: var(--border-active);
+      box-shadow: var(--shadow-sm);
+    }
+
+    /* Card Details */
+    .console-panel {
+      background: var(--bg-surface-1);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-md);
+      padding: var(--space-6);
+      box-shadow: var(--shadow-sm);
+      display: none;
+    }
+
+    .console-panel.active {
+      display: block;
+    }
+
+    .panel-header {
+      border-bottom: 1px solid var(--border-default);
+      padding-bottom: var(--space-3);
+      margin-bottom: var(--space-5);
+    }
+
+    .panel-title {
+      font-size: var(--text-lg);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+
+    .panel-subtitle {
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    /* Items Lists */
+    .item-list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-4);
+    }
+
+    .item-row {
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-sm);
+      padding: var(--space-4);
+      background: var(--bg-surface-2);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: border-color var(--duration-fast);
+    }
+
+    .item-row:hover {
+      border-color: var(--border-active);
+    }
+
+    .item-details {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .item-title {
+      font-size: var(--text-base);
+      font-weight: 700;
+    }
+
+    .item-meta {
+      font-size: var(--text-xs);
+      color: var(--text-secondary);
+    }
+
+    /* KFS Overlay Modal */
+    .kfs-modal {
+      border: 2px solid var(--border-active);
+      border-radius: var(--radius-lg);
+      padding: var(--space-6);
+      max-width: 640px;
+      width: 100%;
+      background: var(--bg-surface-1);
+      box-shadow: var(--shadow-lg);
+      margin: auto;
+    }
+
+    .kfs-modal::backdrop {
+      background: rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(4px);
+    }
+
+    .kfs-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: var(--space-4) 0;
+      font-size: var(--text-sm);
+    }
+
+    .kfs-table th, .kfs-table td {
+      border: 1px solid var(--border-default);
+      padding: var(--space-2) var(--space-3);
+      text-align: left;
+    }
+
+    .kfs-table th {
+      background: var(--bg-surface-2);
+      font-weight: 700;
+    }
+
+    /* Audit comments and timeline elements */
+    .ledger-list {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-sm);
+      background: var(--bg-surface-2);
+      padding: var(--space-3);
+      max-height: 250px;
+      overflow-y: auto;
+    }
+
+    .ledger-row {
+      padding: 4px 0;
+      border-bottom: 1px dashed var(--border-default);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .ledger-row:last-child {
+      border-bottom: none;
+    }
+
+    /* Form rows */
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-1);
+      margin-bottom: var(--space-4);
+    }
+
+    .form-group label {
+      font-size: var(--text-xs);
+      font-weight: 700;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .form-group input, .form-group select, .form-group textarea {
+      padding: var(--space-3);
+      font-size: var(--text-sm);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-sm);
+      background: var(--bg-input);
+      color: var(--text-primary);
+      font-family: inherit;
+    }
+
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+      outline: none;
+      border-color: var(--border-active);
+      box-shadow: var(--shadow-sm);
+    }
+
+    /* Alerts */
+    .alert-banner {
+      padding: var(--space-3) var(--space-4);
+      border-radius: var(--radius-sm);
+      font-size: var(--text-xs);
+      margin-bottom: var(--space-5);
+      border: 1px solid;
+    }
+
+    .alert-banner.info {
+      background: var(--status-info-subtle);
+      border-color: var(--status-info);
+      color: var(--status-info);
+    }
+
+    .alert-banner.success {
+      background: var(--status-success-subtle);
+      border-color: var(--status-success);
+      color: var(--status-success);
+    }
+
+    .alert-banner.danger {
+      background: var(--status-danger-subtle);
+      border-color: var(--status-danger);
+      color: var(--status-danger);
+    }
+
+    .status-tag {
+      font-size: var(--text-xs);
+      font-weight: 700;
+      padding: 2px var(--space-2);
+      border-radius: var(--radius-sm);
+      text-transform: uppercase;
+      border: 1px solid;
+    }
+
+    .status-tag.active, .status-tag.approved, .status-tag.disbursed {
+      background: var(--status-success-subtle);
+      color: var(--status-success);
+      border-color: var(--status-success);
+    }
+
+    .status-tag.kfs_issued, .status-tag.pending {
+      background: var(--status-warning-subtle);
+      color: var(--status-warning);
+      border-color: var(--status-warning);
+    }
+
+    .status-tag.blocked_compliance, .status-tag.rejected {
+      background: var(--status-danger-subtle);
+      color: var(--status-danger);
+      border-color: var(--status-danger);
+    }
+  </style>
+</head>
+<body class="customer-body">
+
+  <header class="customer-header">
+    <div class="header-container">
+      <a id="brand-home-link" href="/" class="portal-logo">
+        <span class="logo-mark" id="brand-mark">▲</span>
+        <span class="logo-text" id="brand-name">Customer Portal</span>
+      </a>
+      <div class="portal-status" id="header-status-area">
+        <span style="font-size: var(--text-sm); color: var(--text-secondary)">Not Connected</span>
+        <a id="brand-back-link" href="/" class="btn btn-secondary btn-sm">Home</a>
+      </div>
+    </div>
+  </header>
+
+  <main style="flex: 1; display: flex; flex-direction: column;">
+    
+    <!-- AUTH/LOOKUP SCREEN -->
+    <div class="auth-card" id="auth-panel">
+      <h2 class="auth-title" id="auth-title">Customer Login</h2>
+      <p class="auth-desc" id="auth-desc">Log in using your borrower credentials to view applications, sign agreement documents, and manage your DPDP rights.</p>
+      
+      <!-- Hidden tenant-id, auto-filled from URL -->
+      <input type="hidden" id="tenant-id" value="dev">
+
+      <form id="auth-form">
+        <div class="form-group">
+          <label for="borrower-id">Borrower ID</label>
+          <input type="text" id="borrower-id" value="borrower_1" required>
+        </div>
+
+        <div class="form-group">
+          <label for="borrower-email">Email Address</label>
+          <input type="email" id="borrower-email" value="rajesh@example.com" required>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%;">Sign In</button>
+      </form>
+    </div>
+
+    <!-- MAIN PORTAL DASHBOARD (HIDDEN UNTIL AUTH) -->
+    <div class="portal-layout" id="main-portal" style="display: none;">
+      
+      <aside class="portal-sidebar">
+        <button class="sidebar-btn active" data-panel="applications" type="button">
+          📋 Loan Applications
+        </button>
+        <button class="sidebar-btn" data-panel="loans" type="button">
+          💳 Active Loans & Schedule
+        </button>
+        <button class="sidebar-btn" data-panel="dpdp" type="button">
+          🛡️ Privacy & DPDP Rights
+        </button>
+        <button class="sidebar-btn" data-panel="grievance" type="button">
+          💬 Grievance Desk
+        </button>
+        <button class="sidebar-btn" style="margin-top: var(--space-4);" id="btn-disconnect" type="button">
+          ➔ Disconnect
+        </button>
+      </aside>
+
+      <div class="portal-content">
+        
+        <!-- PANEL: APPLICATIONS -->
+        <section class="console-panel active" id="panel-applications">
+          <div class="panel-header">
+            <h3 class="panel-title">Loan Applications</h3>
+            <p class="panel-subtitle">Review origination progress, accept KFS disclosures, and execute loan agreements.</p>
+          </div>
+          
+          <div class="item-list" id="app-list-container">
+            <!-- Dynamic application rows -->
+          </div>
+        </section>
+
+        <!-- PANEL: LOANS & SCHEDULE -->
+        <section class="console-panel" id="panel-loans">
+          <div class="panel-header">
+            <h3 class="panel-title">Active Loans & Statements</h3>
+            <p class="panel-subtitle">Track repayments, view installment schedule, and download attested statements.</p>
+          </div>
+          
+          <div class="item-list" id="loan-list-container">
+            <!-- Dynamic active loans -->
+          </div>
+        </section>
+
+        <!-- PANEL: DPDP PRIVACY RIGHTS -->
+        <section class="console-panel" id="panel-dpdp">
+          <div class="panel-header">
+            <h3 class="panel-title">DPDP Privacy & Rights Ledger</h3>
+            <p class="panel-subtitle">Exercise your rights under the Digital Personal Data Protection Act (DPDPA).</p>
+          </div>
+
+          <div class="alert-banner info">
+            <strong>India DPDPA Posture:</strong> You have the right to access your processed data, request corrections, or request complete erasure once active financial relationships conclude.
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-5); margin-bottom: var(--space-5);">
+            <!-- Access Request -->
+            <div class="landing-card" style="box-shadow: none;">
+              <h4 style="font-weight: 700; margin-bottom: var(--space-2);">Right to Access</h4>
+              <p style="font-size: var(--text-xs); color: var(--text-secondary); margin-bottom: var(--space-4);">Request a secure copy of all personal, KYC, and financial data processed by this entity.</p>
+              <button class="btn btn-secondary btn-sm" id="btn-dpdp-access">Request Data Pack</button>
+            </div>
+
+            <!-- Erasure Request -->
+            <div class="landing-card" style="box-shadow: none;">
+              <h4 style="font-weight: 700; margin-bottom: var(--space-2);">Right to Erasure</h4>
+              <p style="font-size: var(--text-xs); color: var(--text-secondary); margin-bottom: var(--space-4);">Request deletion of your profile. Blocked if active loans exist or during the 5-year statutory retention cycle.</p>
+              <button class="btn btn-danger btn-sm" id="btn-dpdp-erasure">Request Data Deletion</button>
+            </div>
+          </div>
+
+          <!-- Profile Correction Request Form -->
+          <div class="landing-card" style="box-shadow: none;">
+            <h4 style="font-weight: 700; margin-bottom: var(--space-3);">Right to Correction</h4>
+            <p style="font-size: var(--text-xs); color: var(--text-secondary); margin-bottom: var(--space-4);">Submit a correction request to update fields on your official credit profile.</p>
+            <form id="correction-form">
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
+                <div class="form-group">
+                  <label for="corr-field">Field to Correct</label>
+                  <select id="corr-field">
+                    <option value="name">Full Name</option>
+                    <option value="email">Email Address</option>
+                    <option value="phone">Phone Number</option>
+                    <option value="address">Postal Address</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="corr-val">New Value</label>
+                  <input type="text" id="corr-val" placeholder="Enter corrected value..." required>
+                </div>
+              </div>
+              <button type="submit" class="btn btn-secondary btn-sm">Submit Correction</button>
+            </form>
+          </div>
+        </section>
+
+        <!-- PANEL: GRIEVANCE DESK -->
+        <section class="console-panel" id="panel-grievance">
+          <div class="panel-header">
+            <h3 class="panel-title">Grievance Desk</h3>
+            <p class="panel-subtitle">File complaints about LSP/DLA conduct, disbursement issues, or recovery practices.</p>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-5); align-items: start;">
+            <!-- Submit form -->
+            <div class="landing-card" style="box-shadow: none;">
+              <h4 style="font-weight: 700; margin-bottom: var(--space-3);">File a New Grievance</h4>
+              <form id="complaint-form">
+                <div class="form-group">
+                  <label for="complaint-category">Category</label>
+                  <select id="complaint-category">
+                    <option value="delay_in_disbursement">Delay in Disbursement</option>
+                    <option value="excessive_interest_charges">Excessive Interest / Fees</option>
+                    <option value="recovery_harassment">Unfair Recovery Agent Behavior</option>
+                    <option value="privacy_breach">Data / Privacy Violation</option>
+                    <option value="other">Other Issue</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="complaint-summary">Description</label>
+                  <textarea id="complaint-summary" rows="3" placeholder="Provide details of your grievance..." required></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm">Submit Grievance</button>
+              </form>
+            </div>
+
+            <!-- List complaints -->
+            <div class="landing-card" style="box-shadow: none; min-height: 250px;">
+              <h4 style="font-weight: 700; margin-bottom: var(--space-3);">Grievance History</h4>
+              <div class="item-list" id="complaint-list-container" style="gap: var(--space-2);">
+                <!-- Dynamic grievances -->
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </div>
+
+  </main>
+
+  <footer class="landing-footer">
+    <div class="container">
+      &copy; 2026 LoanOS India. Customer Self-Service Panel.
+    </div>
+  </footer>
+
+  <!-- ═══ MODAL DIALOGS ═══ -->
+
+  <!-- KFS Display Dialog -->
+  <dialog class="kfs-modal" id="dialog-kfs">
+    <div class="panel-header">
+      <h3 class="panel-title">Key Fact Statement (KFS)</h3>
+      <p class="panel-subtitle">Mandatory disclosure under RBI Digital Lending Guidelines.</p>
+    </div>
+    <div style="max-height: 350px; overflow-y: auto;">
+      <table class="kfs-table">
+        <tbody>
+          <tr>
+            <th>Loan Principal</th>
+            <td id="kfs-principal">₹0</td>
+          </tr>
+          <tr>
+            <th>Annual Percentage Rate (APR)</th>
+            <td id="kfs-apr">0%</td>
+          </tr>
+          <tr>
+            <th>Tenor</th>
+            <td id="kfs-tenor">0 months</td>
+          </tr>
+          <tr>
+            <th>Total Repayment Amount</th>
+            <td id="kfs-total-repay">₹0</td>
+          </tr>
+          <tr>
+            <th>Disclosed Upfront Fees</th>
+            <td id="kfs-fees">₹0</td>
+          </tr>
+          <tr>
+            <th>Cooling-Off Period</th>
+            <td id="kfs-cooling">0 days</td>
+          </tr>
+          <tr>
+            <th>Recovery Mode</th>
+            <td id="kfs-recovery">-</td>
+          </tr>
+        </tbody>
+      </table>
+      
+      <div style="font-size: var(--text-xs); color: var(--text-secondary); margin-top: var(--space-3);">
+        * Implements board-approved credit policies. Compounding penal interest is prohibited.
+      </div>
+    </div>
+    <div class="dialog-footer" style="margin-top: var(--space-4); display: flex; justify-content: flex-end; gap: var(--space-2);">
+      <button class="btn btn-secondary btn-sm" id="btn-kfs-close">Close</button>
+      <button class="btn btn-success btn-sm" id="btn-kfs-accept">Accept & Sign KFS</button>
+    </div>
+  </dialog>
+
+  <!-- Document Execution Dialog -->
+  <dialog class="kfs-modal" id="dialog-signing">
+    <div class="panel-header">
+      <h3 class="panel-title">Execute Loan Agreement</h3>
+      <p class="panel-subtitle">Please sign the contract documents to complete origination.</p>
+    </div>
+    
+    <div class="alert-banner info" style="font-size: var(--text-sm)">
+      <strong>Documents Ready for eSign:</strong>
+      <ul style="margin-left: var(--space-4); margin-top: var(--space-2);">
+        <li>Sanction Letter</li>
+        <li>Loan Agreement Summary</li>
+        <li>Notice of Privacy & DPDP disclosures</li>
+      </ul>
+    </div>
+
+    <div class="dialog-footer" style="display: flex; justify-content: flex-end; gap: var(--space-2);">
+      <button class="btn btn-secondary btn-sm" id="btn-signing-close">Cancel</button>
+      <button class="btn btn-primary btn-sm" id="btn-signing-execute">eSign & Submit Packet</button>
+    </div>
+  </dialog>
+
+  <!-- DPDP Access Request Dialog -->
+  <dialog class="kfs-modal" id="dialog-data-pack">
+    <div class="panel-header">
+      <h3 class="panel-title">Your Portable Data Pack</h3>
+      <p class="panel-subtitle">Integrity attested copy of all stored records under DPDPA Section 11.</p>
+    </div>
+    
+    <pre class="console-box" id="data-pack-json" style="max-height: 250px; overflow-y: auto; font-size: var(--text-xs);"></pre>
+
+    <div class="dialog-footer" style="display: flex; justify-content: flex-end; margin-top: var(--space-3);">
+      <button class="btn btn-secondary btn-sm" id="btn-data-pack-close">Close</button>
+    </div>
+  </dialog>
+
+  <!-- General Toast Container -->
+  <div class="toast-container" id="toast-container" aria-live="polite"></div>
+
+  <!-- CLIENT JS SCRIPT -->
+  <script>
+    // --- Tenant Context from URL ---
+    // URL shape: /t/{tenantId}/portal/
+    const pathSegments = window.location.pathname.split('/');
+    const urlTenantId = (pathSegments[1] === 't' && pathSegments[2]) ? pathSegments[2] : 'dev';
+
+    // Pre-fill the hidden tenant-id field
+    document.getElementById('tenant-id').value = urlTenantId;
+
+    // Fetch branding and white-label the page
+    (async function loadBranding() {
+      try {
+        const res = await fetch(`/t/${urlTenantId}/branding`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const reName = data.regulatedEntity?.name || data.name || urlTenantId;
+        const initial = reName.charAt(0).toUpperCase();
+
+        document.getElementById('page-title').textContent = `${reName} — Customer Portal`;
+        document.getElementById('brand-mark').textContent = initial;
+        document.getElementById('brand-name').textContent = reName;
+        document.getElementById('brand-home-link').href = `/t/${urlTenantId}/`;
+        document.getElementById('brand-back-link').href = `/t/${urlTenantId}/`;
+        document.getElementById('auth-title').textContent = `${reName} — Customer Login`;
+        document.getElementById('auth-desc').textContent =
+          `Log in with your borrower credentials to manage loan applications, statements, and privacy rights with ${reName}.`;
+      } catch (_) { /* branding fetch is best-effort */ }
+    })();
+
+    // --- State and Cache ---
+    let authContext = {
+      tenantId: '',
+      borrowerId: '',
+      email: ''
+    };
+
+    const dom = {
+      authPanel: document.getElementById('auth-panel'),
+      authForm: document.getElementById('auth-form'),
+      mainPortal: document.getElementById('main-portal'),
+      headerStatus: document.getElementById('header-status-area'),
+      sidebarBtns: document.querySelectorAll('.sidebar-btn[data-panel]'),
+      panels: document.querySelectorAll('.console-panel'),
+      btnDisconnect: document.getElementById('btn-disconnect'),
+
+      // App Lists
+      appList: document.getElementById('app-list-container'),
+      loanList: document.getElementById('loan-list-container'),
+      complaintList: document.getElementById('complaint-list-container'),
+
+      // Forms
+      complaintForm: document.getElementById('complaint-form'),
+      correctionForm: document.getElementById('correction-form'),
+
+      // Dialogs
+      dialogKfs: document.getElementById('dialog-kfs'),
+      btnKfsClose: document.getElementById('btn-kfs-close'),
+      btnKfsAccept: document.getElementById('btn-kfs-accept'),
+
+      dialogSigning: document.getElementById('dialog-signing'),
+      btnSigningClose: document.getElementById('btn-signing-close'),
+      btnSigningExecute: document.getElementById('btn-signing-execute'),
+
+      dialogDataPack: document.getElementById('dialog-data-pack'),
+      btnDataPackClose: document.getElementById('btn-data-pack-close'),
+      dataPackJson: document.getElementById('data-pack-json'),
+
+      // Buttons
+      btnDpdpAccess: document.getElementById('btn-dpdp-access'),
+      btnDpdpErasure: document.getElementById('btn-dpdp-erasure'),
+      toastContainer: document.getElementById('toast-container')
+    };
+
+    let activeApplicationId = null;
+    let activeLoanAccountId = null;
+
+    // --- Helper UI Alerts (Toast) ---
+    function showToast(message, type = 'info') {
+      const toast = document.createElement('div');
+      toast.className = `alert-banner ${type}`;
+      toast.style.margin = '0 0 var(--space-2) 0';
+      toast.style.boxShadow = 'var(--shadow-sm)';
+      toast.innerHTML = `<strong>${type.toUpperCase()}:</strong> ${message}`;
+      dom.toastContainer.appendChild(toast);
+      setTimeout(() => {
+        toast.remove();
+      }, 4000);
+    }
+
+    // --- Auth Connection Action ---
+    dom.authForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const tenantId = document.getElementById('tenant-id').value.trim().toLowerCase();
+      const borrowerId = document.getElementById('borrower-id').value.trim();
+      const email = document.getElementById('borrower-email').value.trim();
+
+      try {
+        // Authenticate context setup (simulated auth check by loading the borrower profile from endpoint)
+        const meRes = await fetch(`/borrowers/${borrowerId}`);
+        if (!meRes.ok) {
+          throw new Error('Borrower ID or Tenant Context not found.');
+        }
+        const me = await meRes.json();
+        
+        authContext = { tenantId, borrowerId, email, name: me.name };
+        
+        // Show Workspace
+        dom.authPanel.style.display = 'none';
+        dom.mainPortal.style.display = 'grid';
+        dom.headerStatus.innerHTML = `
+          <span style="font-size: var(--text-sm); font-weight: 700;">👤 ${authContext.name}</span>
+          <span style="font-size: var(--text-xs); color: var(--text-muted);">ID: ${authContext.borrowerId}</span>
+          <button class="btn btn-secondary btn-sm" id="btn-header-logout">Disconnect</button>
+        `;
+        
+        document.getElementById('btn-header-logout').addEventListener('click', disconnect);
+
+        // Load items
+        await loadData();
+        showToast('Connected to LoanOS Borrower Portal', 'success');
+      } catch (err) {
+        showToast(err.message, 'danger');
+      }
+    });
+
+    function disconnect() {
+      authContext = { tenantId: '', borrowerId: '', email: '' };
+      dom.authPanel.style.display = 'block';
+      dom.mainPortal.style.display = 'none';
+      dom.headerStatus.innerHTML = `
+        <span style="font-size: var(--text-sm); color: var(--text-secondary)">Not Connected</span>
+        <a href="/" class="btn btn-secondary btn-sm">Home</a>
+      `;
+    }
+    dom.btnDisconnect.addEventListener('click', disconnect);
+
+    // --- Tab Switching ---
+    dom.sidebarBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        dom.sidebarBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        
+        const targetPanel = btn.getAttribute('data-panel');
+        dom.panels.forEach(panel => {
+          if (panel.id === `panel-${targetPanel}`) {
+            panel.classList.add('active');
+          } else {
+            panel.classList.remove('active');
+          }
+        });
+      });
+    });
+
+    // --- Fetch Operations ---
+    async function loadData() {
+      await Promise.all([
+        loadApplications(),
+        loadLoans(),
+        loadComplaints()
+      ]);
+    }
+
+    // A. Applications
+    async function loadApplications() {
+      try {
+        const res = await fetch('/loans/applications');
+        const data = await res.json();
+        
+        // Filter by borrowerId
+        const list = (data.applications || []).filter(app => app.borrowerId === authContext.borrowerId);
+        
+        if (list.length === 0) {
+          dom.appList.innerHTML = '<div class="item-meta">No active loan applications found.</div>';
+          return;
+        }
+
+        dom.appList.innerHTML = list.map(app => {
+          let actionsHtml = '';
+          if (app.status === 'kfs_issued') {
+            actionsHtml = `<button class="btn btn-warning btn-sm" onclick="showKfsModal('${app.applicationId}')">Review KFS</button>`;
+          } else if (app.status === 'approved') {
+            actionsHtml = `<button class="btn btn-primary btn-sm" onclick="showSigningModal('${app.applicationId}')">Sign Agreement</button>`;
+          }
+
+          return `
+            <div class="item-row">
+              <div class="item-details">
+                <span class="item-title">Application: ${app.applicationId}</span>
+                <span class="item-meta">Amount: ₹${app.amount.toLocaleString()} · Product ID: ${app.productId}</span>
+                <span class="item-meta">Applied: ${new Date(app.createdAt).toLocaleDateString()}</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: var(--space-3)">
+                <span class="status-tag ${app.status}">${app.status.replace('_', ' ')}</span>
+                ${actionsHtml}
+              </div>
+            </div>
+          `;
+        }).join('');
+      } catch (err) {
+        showToast('Failed to load applications.', 'danger');
+      }
+    }
+
+    // B. Loans & Schedule
+    async function loadLoans() {
+      try {
+        const res = await fetch('/loan-accounts');
+        const data = await res.json();
+        
+        // Filter by borrowerId
+        const list = (data.accounts || []).filter(loan => loan.borrowerId === authContext.borrowerId);
+        
+        if (list.length === 0) {
+          dom.loanList.innerHTML = '<div class="item-meta">No active loan accounts found.</div>';
+          return;
+        }
+
+        dom.loanList.innerHTML = list.map(loan => {
+          return `
+            <div class="item-row" style="flex-direction: column; align-items: stretch; gap: var(--space-3)">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div class="item-details">
+                  <span class="item-title">Account ID: ${loan.accountId}</span>
+                  <span class="item-meta">Regulated Entity: ${loan.regulatedEntityId}</span>
+                  <span class="item-meta">Outstanding Principal: ₹${loan.summary.outstandingPrincipal.toLocaleString()}</span>
+                </div>
+                <div style="display: flex; gap: var(--space-2);">
+                  <button class="btn btn-secondary btn-sm" onclick="viewRepaymentSchedule('${loan.accountId}')">Schedule</button>
+                  <a href="/loan-accounts/${loan.accountId}/statement/document" target="_blank" class="btn btn-secondary btn-sm">Sealed Statement</a>
+                </div>
+              </div>
+              
+              <!-- Repayment schedule table dynamically hidden/shown -->
+              <div id="schedule-${loan.accountId}" style="display: none; border-top: 1px solid var(--border-default); padding-top: var(--space-2);">
+                <h5 style="margin-bottom: var(--space-2);">Upcoming Installments</h5>
+                <table class="kfs-table" style="margin: 0; font-size: var(--text-xs);">
+                  <thead>
+                    <tr>
+                      <th>Due Date</th>
+                      <th>EMI Amount</th>
+                      <th>Principal</th>
+                      <th>Interest</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="schedule-body-${loan.accountId}"></tbody>
+                </table>
+              </div>
+            </div>
+          `;
+        }).join('');
+      } catch (err) {
+        showToast('Failed to load loan accounts.', 'danger');
+      }
+    }
+
+    async function viewRepaymentSchedule(accountId) {
+      const container = document.getElementById(`schedule-${accountId}`);
+      const body = document.getElementById(`schedule-body-${accountId}`);
+      
+      if (container.style.display === 'block') {
+        container.style.display = 'none';
+        return;
+      }
+
+      try {
+        const res = await fetch(`/loan-accounts/${accountId}/schedule`);
+        const data = await res.json();
+        
+        body.innerHTML = (data.installments || []).map(inst => `
+          <tr>
+            <td>${new Date(inst.dueDate).toLocaleDateString()}</td>
+            <td>₹${inst.emi.toLocaleString()}</td>
+            <td>₹${inst.principal.toLocaleString()}</td>
+            <td>₹${inst.interest.toLocaleString()}</td>
+            <td><span class="status-tag ${inst.status}">${inst.status}</span></td>
+          </tr>
+        `).join('');
+        
+        container.style.display = 'block';
+      } catch (err) {
+        showToast('Failed to fetch repayment schedule.', 'danger');
+      }
+    }
+
+    // C. Complaints
+    async function loadComplaints() {
+      try {
+        const res = await fetch('/complaints');
+        const data = await res.json();
+        
+        // Filter by borrowerId
+        const list = (data.complaints || []).filter(c => c.borrowerId === authContext.borrowerId);
+        
+        if (list.length === 0) {
+          dom.complaintList.innerHTML = '<div class="item-meta">No grievances recorded.</div>';
+          return;
+        }
+
+        dom.complaintList.innerHTML = list.map(c => `
+          <div style="background: var(--bg-surface-1); border: 1px solid var(--border-default); border-radius: var(--radius-sm); padding: var(--space-3);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-1);">
+              <span style="font-weight: 700; font-size: var(--text-xs);">${c.category.replace(/_/g, ' ')}</span>
+              <span class="status-tag ${c.status}" style="font-size: var(--text-2xs);">${c.status}</span>
+            </div>
+            <p style="font-size: var(--text-xs); color: var(--text-secondary);">${c.summary}</p>
+            <span style="font-size: var(--text-2xs); color: var(--text-muted);">Filed: ${new Date(c.receivedAt).toLocaleString()}</span>
+          </div>
+        `).join('');
+      } catch (err) {
+        showToast('Failed to load grievances.', 'danger');
+      }
+    }
+
+    // --- Dynamic Modal Controls ---
+    
+    // 1. KFS
+    async function showKfsModal(applicationId) {
+      activeApplicationId = applicationId;
+      try {
+        const res = await fetch(`/loans/applications/${applicationId}`);
+        const data = await res.json();
+        
+        document.getElementById('kfs-principal').textContent = `₹${data.amount.toLocaleString()}`;
+        document.getElementById('kfs-apr').textContent = `${(data.kfs.aprBps / 100).toFixed(2)}%`;
+        document.getElementById('kfs-tenor').textContent = `${data.tenorMonths} months`;
+        document.getElementById('kfs-total-repay').textContent = `₹${data.kfs.principal.toLocaleString()}`;
+        document.getElementById('kfs-fees').textContent = `₹${((data.kfs.processingFee || 0) + (data.kfs.verificationCharge || 0)).toLocaleString()}`;
+        document.getElementById('kfs-cooling').textContent = `${data.coolingOffDays || 3} days`;
+        document.getElementById('kfs-recovery').textContent = data.recoveryMechanism || 'Authorized Agent Only';
+
+        dom.dialogKfs.showModal();
+      } catch (err) {
+        showToast('Failed to fetch KFS details.', 'danger');
+      }
+    }
+
+    dom.btnKfsClose.addEventListener('click', () => dom.dialogKfs.close());
+
+    dom.btnKfsAccept.addEventListener('click', async () => {
+      try {
+        const res = await fetch(`/loans/applications/${activeApplicationId}/kfs`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            actor: authContext.borrowerId,
+            channel: 'web_portal',
+            reference: 'accept_direct_web'
+          })
+        });
+
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error?.message || 'Failed to accept KFS.');
+        }
+
+        showToast('KFS Accepted Successfully.', 'success');
+        dom.dialogKfs.close();
+        await loadApplications();
+      } catch (err) {
+        showToast(err.message, 'danger');
+      }
+    });
+
+    // 2. Signing / Execution
+    function showSigningModal(applicationId) {
+      activeApplicationId = applicationId;
+      dom.dialogSigning.showModal();
+    }
+
+    dom.btnSigningClose.addEventListener('click', () => dom.dialogSigning.close());
+
+    dom.btnSigningExecute.addEventListener('click', async () => {
+      try {
+        // eSign Packet execution
+        const buildRes = await fetch(`/loans/applications/${activeApplicationId}/document-packet`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            actor: authContext.borrowerId
+          })
+        });
+
+        if (!buildRes.ok) throw new Error('Failed to generate document packet.');
+
+        // Record delivery
+        const deliveryRes = await fetch(`/loans/applications/${activeApplicationId}/document-packet/delivery`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            channel: 'email',
+            reference: `esign-packet-${activeApplicationId}`
+          })
+        });
+
+        if (!deliveryRes.ok) throw new Error('Failed to deliver/execute document packet.');
+
+        showToast('Loan agreement signed successfully.', 'success');
+        dom.dialogSigning.close();
+        await loadApplications();
+      } catch (err) {
+        showToast(err.message, 'danger');
+      }
+    });
+
+    // --- Grievance Submission ---
+    dom.complaintForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const category = document.getElementById('complaint-category').value;
+      const summary = document.getElementById('complaint-summary').value.trim();
+
+      try {
+        const res = await fetch('/complaints', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            borrowerId: authContext.borrowerId,
+            category,
+            summary
+          })
+        });
+
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error?.message || 'Failed to submit complaint.');
+        }
+
+        showToast('Grievance filed successfully. Checked by Ombudsman.', 'success');
+        document.getElementById('complaint-summary').value = '';
+        await loadComplaints();
+      } catch (err) {
+        showToast(err.message, 'danger');
+      }
+    });
+
+    // --- DPDP Access Request ---
+    dom.btnDpdpAccess.addEventListener('click', async () => {
+      try {
+        // Submit access request
+        const reqRes = await fetch(`/borrowers/${authContext.borrowerId}/access-requests`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ actor: authContext.borrowerId })
+        });
+
+        const reqData = await reqRes.json();
+        if (!reqRes.ok) throw new Error(reqData.error?.message || 'Access request failed.');
+
+        // Fulfill access request to fetch portable pack
+        const fulfillRes = await fetch(`/borrowers/${authContext.borrowerId}/access-requests/${reqData.accessRequest.requestId}/fulfillment`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ actor: authContext.borrowerId })
+        });
+
+        const pack = await fulfillRes.json();
+        if (!fulfillRes.ok) throw new Error('Failed to assemble data pack.');
+
+        dom.dataPackJson.textContent = JSON.stringify(pack.dataPack, null, 2);
+        dom.dialogDataPack.showModal();
+        showToast('DPDP Data Pack assembled.', 'success');
+      } catch (err) {
+        showToast(err.message, 'danger');
+      }
+    });
+
+    dom.btnDataPackClose.addEventListener('click', () => dom.dialogDataPack.close());
+
+    // --- DPDP Correction Request ---
+    dom.correctionForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const field = document.getElementById('corr-field').value;
+      const proposedValue = document.getElementById('corr-val').value.trim();
+
+      try {
+        const res = await fetch(`/borrowers/${authContext.borrowerId}/correction-requests`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            field,
+            proposedValue,
+            actor: authContext.borrowerId
+          })
+        });
+
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error?.message || 'Correction submission failed.');
+        }
+
+        showToast('DPDP Correction Request submitted for Review.', 'success');
+        document.getElementById('corr-val').value = '';
+      } catch (err) {
+        showToast(err.message, 'danger');
+      }
+    });
+
+    // --- DPDP Erasure Request ---
+    dom.btnDpdpErasure.addEventListener('click', async () => {
+      if (!confirm('Are you sure you want to request account erasure? This will permanently wipe your profiles if no active loans remain.')) {
+        return;
+      }
+
+      try {
+        const res = await fetch('/erasure-requests', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            borrowerId: authContext.borrowerId,
+            actor: authContext.borrowerId
+          })
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error?.message || 'Erasure request failed.');
+
+        if (data.erasureRequest.status === 'rejected') {
+          showToast(`Erasure Held: ${data.erasureRequest.rejectionReason}`, 'warning');
+        } else {
+          // Attempt fulfillment if eligible
+          const fulfillRes = await fetch(`/erasure-requests/${data.erasureRequest.erasureRequestId}/fulfillment`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ actor: authContext.borrowerId })
+          });
+
+          const fulfillData = await fulfillRes.json();
+          if (!fulfillRes.ok) {
+            showToast(`Erasure Requested: Awaiting retention clearance.`, 'info');
+          } else {
+            showToast('Account successfully erased under DPDPA.', 'success');
+            disconnect();
+          }
+        }
+      } catch (err) {
+        showToast(err.message, 'danger');
+      }
+    });
+  </script>
+</body>
+</html>

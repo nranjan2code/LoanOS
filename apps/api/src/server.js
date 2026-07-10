@@ -280,38 +280,105 @@ async function route(req, res, dataDir, platformAdminKey) {
     return;
   }
 
-  if (method === "GET" && (path === "/dashboard" || path.startsWith("/dashboard/"))) {
+  // ─── Static App Mounts ─────────────────────────────────────────────────
+  // Three-layer SaaS model:
+  //   /                          → LoanOS platform website (apps/web/)
+  //   /t/{tenantId}/             → Tenant-branded landing (apps/tenant/)
+  //   /t/{tenantId}/staff/       → Tenant staff workspace (apps/dashboard/)
+  //   /t/{tenantId}/portal/      → White-labeled borrower portal (apps/customer/)
+  //   /shared/                   → Shared design tokens (apps/shared/)
+  // ──────────────────────────────────────────────────────────────────────
+
+  const appsRoot = join(__dirname, "..", "..");  // apps/
+
+  // --- Shared design system assets at /shared/ ---
+  if (method === "GET" && path.startsWith("/shared/")) {
+    return serveStaticFile(res, appsRoot, "shared", path, "/shared/");
+  }
+
+  // --- Platform SaaS website at / ---
+  if (method === "GET" && (path === "/" || path === "/index.html")) {
     try {
-      if (path === "/dashboard") {
-        res.writeHead(301, { Location: "/dashboard/" });
-        res.end();
-        return;
-      }
-      let fileSubpath = path.slice("/dashboard/".length);
-      if (fileSubpath === "" || fileSubpath === "index.html") {
-        fileSubpath = "index.html";
-      }
-
-      if (fileSubpath.includes("..")) {
-        res.writeHead(403);
-        res.end("Forbidden");
-        return;
-      }
-
-      const filePath = join(__dirname, "dashboard", fileSubpath);
+      const filePath = join(appsRoot, "web", "index.html");
       const content = await readFile(filePath);
-
-      let contentType = "text/plain";
-      if (fileSubpath.endsWith(".html")) contentType = "text/html; charset=utf-8";
-      else if (fileSubpath.endsWith(".css")) contentType = "text/css; charset=utf-8";
-      else if (fileSubpath.endsWith(".js")) contentType = "application/javascript; charset=utf-8";
-
-      res.writeHead(200, { "Content-Type": contentType });
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
       res.end(content);
     } catch (err) {
-      res.writeHead(404);
-      res.end("Not Found");
+      res.writeHead(302, { Location: "/t/dev/staff/" });
+      res.end();
     }
+    return;
+  }
+
+  // --- Backward compatibility: /dashboard/ → /t/dev/staff/ ---
+  if (method === "GET" && (path === "/dashboard" || path === "/dashboard/")) {
+    res.writeHead(302, { Location: "/t/dev/staff/" });
+    res.end();
+    return;
+  }
+  // Serve dashboard CSS/JS assets at /dashboard/ so existing <link> tags work
+  if (method === "GET" && path.startsWith("/dashboard/")) {
+    return serveStaticFile(res, appsRoot, "dashboard", path, "/dashboard/");
+  }
+
+  // --- Tenant-scoped routes at /t/{tenantId}/ ---
+  const tenantRouteMatch = path.match(/^\/t\/([^/]+)(\/.*)?$/);
+  if (method === "GET" && tenantRouteMatch) {
+    const tenantSlug = decodeURIComponent(tenantRouteMatch[1]);
+    const subPath = tenantRouteMatch[2] || "/";
+
+    // GET /t/{tenantId}/branding → Tenant identity for white-labeling
+    if (subPath === "/branding") {
+      const state = await loadWholeState(dataDir);
+      const tenantRecord = state.controlPlane.tenants[tenantSlug];
+      if (!tenantRecord) {
+        sendJson(res, 404, { error: { code: "tenant_not_found", message: "Tenant not found." } });
+        return;
+      }
+      const tenantData = state.tenants[tenantSlug] || {};
+      const reList = Object.values(tenantData.regulatedEntities || {});
+      const primaryRe = reList[0] || {};
+      sendJson(res, 200, {
+        tenantId: tenantSlug,
+        name: tenantRecord.name || tenantSlug,
+        status: tenantRecord.status || "active",
+        regulatedEntity: {
+          name: primaryRe.name || tenantRecord.name || tenantSlug,
+          entityType: primaryRe.entityType || null,
+          websiteUrl: primaryRe.websiteUrl || null,
+          privacyPolicyUrl: primaryRe.privacyPolicyUrl || null,
+          grievanceOfficer: primaryRe.grievanceOfficer || null
+        }
+      });
+      return;
+    }
+
+    // GET /t/{tenantId}/ → Tenant-branded landing page
+    if (subPath === "/" || subPath === "/index.html") {
+      return serveStaticFile(res, appsRoot, "tenant", "/index.html", "/");
+    }
+
+    // GET /t/{tenantId}/staff/ → Staff workspace (dashboard)
+    if (subPath === "/staff" || subPath === "/staff/") {
+      return serveStaticFile(res, appsRoot, "dashboard", "/index.html", "/");
+    }
+    if (subPath.startsWith("/staff/")) {
+      const assetPath = subPath.slice("/staff".length);
+      return serveStaticFile(res, appsRoot, "dashboard", assetPath, "/");
+    }
+
+    // GET /t/{tenantId}/portal/ → Customer/borrower portal
+    if (subPath === "/portal" || subPath === "/portal/") {
+      return serveStaticFile(res, appsRoot, "customer", "/index.html", "/");
+    }
+    if (subPath.startsWith("/portal/")) {
+      const assetPath = subPath.slice("/portal".length);
+      return serveStaticFile(res, appsRoot, "customer", assetPath, "/");
+    }
+
+    // Fallback: unknown sub-route under /t/{tenantId}/
+    res.writeHead(404);
+    res.end("Not Found");
     return;
   }
 
@@ -6169,6 +6236,35 @@ async function readJson(req) {
     return {};
   }
   return JSON.parse(raw);
+}
+
+// ─── Static File Serving Helper ──────────────────────────────────────────
+async function serveStaticFile(res, appsRoot, appDir, urlPath, urlPrefix) {
+  try {
+    let fileSubpath = urlPath.slice(urlPrefix.length);
+    if (fileSubpath === "" || fileSubpath === "index.html") {
+      fileSubpath = "index.html";
+    }
+    if (fileSubpath.includes("..")) {
+      res.writeHead(403);
+      res.end("Forbidden");
+      return;
+    }
+    const filePath = join(appsRoot, appDir, fileSubpath);
+    const content = await readFile(filePath);
+    let contentType = "text/plain";
+    if (fileSubpath.endsWith(".html")) contentType = "text/html; charset=utf-8";
+    else if (fileSubpath.endsWith(".css")) contentType = "text/css; charset=utf-8";
+    else if (fileSubpath.endsWith(".js")) contentType = "application/javascript; charset=utf-8";
+    else if (fileSubpath.endsWith(".svg")) contentType = "image/svg+xml";
+    else if (fileSubpath.endsWith(".png")) contentType = "image/png";
+    else if (fileSubpath.endsWith(".ico")) contentType = "image/x-icon";
+    res.writeHead(200, { "Content-Type": contentType });
+    res.end(content);
+  } catch (err) {
+    res.writeHead(404);
+    res.end("Not Found");
+  }
 }
 
 function sendJson(res, statusCode, payload, headers = {}) {

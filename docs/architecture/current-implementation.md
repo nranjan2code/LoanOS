@@ -11,8 +11,13 @@ The current implementation is intentionally small:
 - File-backed JSON state under `.loanos-data/state.json`, partitioned into a control plane (tenant registry) and one data plane per tenant.
 - Multi-tenant: every data-plane request runs inside exactly one tenant, resolved from a tenant user session or `x-api-key`/bearer service token; cross-tenant access is impossible by construction because each request only ever receives its own tenant's partition.
 - Core domain logic in `packages/core/src`.
-- API wrapper in `apps/api/src`.
-- Automated tests in `tests/` (139 tests as of the latest commit).
+- Pure backend API in `apps/api/src`.
+- Public platform website in `apps/web/`.
+- Tenant-branded landing template in `apps/tenant/`.
+- Internal staff workspace in `apps/dashboard/`.
+- Borrower customer portal in `apps/customer/`.
+- Shared design system tokens in `apps/shared/`.
+- Automated tests in `tests/` (140 tests as of the latest commit).
 
 Run it:
 
@@ -52,6 +57,11 @@ npm run dev:api
 | `packages/core/src/external-services.js` | Switchable `ExternalServiceManager` for external integrations (SMS, email, WhatsApp, credit bureau, V-CIP, bank-account verification, NACH/UPI payment rails, eSign, CERSAI, FIU-IND) with mock/real providers selected per integration and India data-residency checks enforced across all external services. |
 | `packages/core/src/audit.js` | Tenant-scoped, append-only audit hash chain: tenant-bound genesis, canonical hashing, `sealAuditChain`/`verifyAuditChain`/`buildAuditEvidencePack`, plus uniform `stampAuditEvents`/`classifyAuditDataClass` actor/data-class provenance. |
 | `packages/core/src/index.js` | Public exports for core domain modules. |
+| `apps/shared/design-tokens.css` | Shared CSS variables and styling presets (typography, neobrutalist buttons, forms, status tags, alerts, toasts). |
+| `apps/web/index.html` | Public SaaS landing page for LoanOS. |
+| `apps/tenant/index.html` | Dynamic template for a tenant's own landing page (white-labeled via `/t/{tenantId}/branding`). |
+| `apps/customer/index.html` | Dynamic template for a borrower/customer self-service portal (white-labeled). |
+| `apps/dashboard/index.html` | Tenant staff workspace dashboard. |
 | `apps/api/src/identity.js` | Local IAM helpers for tenant/platform users, PBKDF2 password hashes, HTTP session records, tenant access reviews, and role checks. |
 | `apps/api/src/file-store.js` | Local JSON state load/save helpers; control-plane tenant registry (api-key hashing, tenant resolution), sub-processor register, and break-glass grants; per-tenant data partitions and tenant-scoped accessors; `buildTenantExport`/`offboardTenant` for portability and evidenced deletion. |
 | `apps/api/src/server.js` | HTTP API: auth/session routes, tenant admin routes, platform control plane (tenant minting, export, offboarding, break-glass, sub-processors), tenant-context resolution with session/api-key/break-glass fallback and 401 gate, tenant-scoped store with centralized audit stamping, plus endpoints for compliance controls, AI models, kill switch, workflow tasks, applications, loan accounts, document vault, communications, payment rails, fraud cases, erasure requests, data disclosures, incidents, bank-account verification, CERSAI security interests, DPDP access/correction requests, and FIU-IND reports. |

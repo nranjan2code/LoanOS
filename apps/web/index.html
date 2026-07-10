@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LoanOS India — Compliance-First Lending OS</title>
+  <meta name="description" content="A greenfield loan origination, servicing, and workflow operating system built specifically for India digital lending regulations.">
+  
+  <!-- Favicon -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230a1018'/><text x='50' y='68' font-size='50' text-anchor='middle' fill='%23faf9f1' font-weight='bold'>L</text></svg>">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <!-- Shared Design Tokens -->
+  <link rel="stylesheet" href="/shared/design-tokens.css">
+
+  <style>
+    /* Custom Landing Layout on top of Core Tokens */
+    .landing-body {
+      background-color: var(--bg-base);
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .landing-header {
+      background: var(--bg-surface-1);
+      border-bottom: 1px solid var(--border-default);
+      padding: var(--space-4) 0;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(8px);
+    }
+
+    .header-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 var(--space-6);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .landing-logo {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      text-decoration: none;
+      color: var(--text-primary);
+    }
+
+    .landing-logo .logo-mark {
+      background: var(--accent-primary);
+      color: #fff;
+      font-size: 1.1rem;
+      font-weight: bold;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: var(--radius-sm);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .landing-logo .logo-text {
+      font-weight: 700;
+      font-size: var(--text-lg);
+      letter-spacing: -0.03em;
+    }
+
+    .landing-nav {
+      display: flex;
+      gap: var(--space-5);
+      align-items: center;
+    }
+
+    .landing-nav-link {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: var(--text-sm);
+      font-weight: 500;
+      transition: color var(--duration-fast);
+    }
+
+    .landing-nav-link:hover {
+      color: var(--text-primary);
+    }
+
+    /* Hero Section */
+    .hero-section {
+      padding: var(--space-8) 0;
+      text-align: center;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .badge-rbi {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-1) var(--space-3);
+      background: var(--status-success-subtle);
+      border: 1px solid var(--status-success);
+      color: var(--status-success);
+      font-size: var(--text-xs);
+      font-weight: 700;
+      border-radius: var(--radius-full);
+      margin-bottom: var(--space-5);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .hero-title {
+      font-size: 2.75rem;
+      font-weight: 800;
+      line-height: 1.15;
+      letter-spacing: -0.04em;
+      color: var(--text-primary);
+      margin-bottom: var(--space-4);
+    }
+
+    .hero-desc {
+      font-size: var(--text-md);
+      color: var(--text-secondary);
+      line-height: 1.6;
+      margin-bottom: var(--space-6);
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: var(--space-4);
+      justify-content: center;
+    }
+
+    /* Product Grid */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-7);
+      margin: var(--space-7) auto;
+      max-width: 1200px;
+      padding: 0 var(--space-6);
+      align-items: start;
+    }
+
+    @media (max-width: 968px) {
+      .main-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Core Panel / Card */
+    .landing-card {
+      background: var(--bg-surface-1);
+      border: 2px solid var(--border-active);
+      border-radius: var(--radius-lg);
+      padding: var(--space-6);
+      box-shadow: var(--shadow-md);
+    }
+
+    .card-title-bar {
+      border-bottom: 1px solid var(--border-default);
+      padding-bottom: var(--space-3);
+      margin-bottom: var(--space-5);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .card-title {
+      font-size: var(--text-lg);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    /* Simulator Styling */
+    .sim-panel {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-4);
+    }
+
+    .sim-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--bg-surface-2);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-md);
+      padding: var(--space-3);
+      transition: all var(--duration-fast);
+    }
+
+    .sim-row:hover {
+      background: var(--bg-surface-3);
+      border-color: var(--border-hover);
+    }
+
+    .sim-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .sim-name {
+      font-size: var(--text-base);
+      font-weight: 600;
+    }
+
+    .sim-desc {
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+    }
+
+    .sim-status-badge {
+      font-size: var(--text-xs);
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: var(--space-1) var(--space-2);
+      border-radius: var(--radius-sm);
+    }
+
+    .sim-status-badge.blocked {
+      background: var(--status-danger-subtle);
+      color: var(--status-danger);
+      border: 1px solid var(--status-danger);
+    }
+
+    .sim-status-badge.approved {
+      background: var(--status-success-subtle);
+      color: var(--status-success);
+      border: 1px solid var(--status-success);
+    }
+
+    /* Simulator Switch (Custom Warm Toggle) */
+    .warm-switch {
+      position: relative;
+      display: inline-block;
+      width: 46px;
+      height: 24px;
+    }
+
+    .warm-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .warm-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: var(--bg-elevated);
+      border: 2px solid var(--border-active);
+      border-radius: var(--radius-full);
+      transition: .2s;
+    }
+
+    .warm-slider:before {
+      position: absolute;
+      content: "";
+      height: 14px;
+      width: 14px;
+      left: 3px;
+      bottom: 3px;
+      background-color: var(--border-active);
+      border-radius: 50%;
+      transition: .2s;
+    }
+
+    input:checked + .warm-slider {
+      background-color: var(--bg-surface-1);
+    }
+
+    input:checked + .warm-slider:before {
+      transform: translateX(22px);
+      background-color: var(--status-success);
+    }
+
+    /* Console Terminal output styling */
+    .console-box {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-md);
+      padding: var(--space-4);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      line-height: 1.5;
+      min-height: 120px;
+    }
+
+    .console-header {
+      font-weight: 700;
+      margin-bottom: var(--space-2);
+      color: var(--text-secondary);
+      border-bottom: 1px solid var(--border-default);
+      padding-bottom: 4px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .console-log {
+      max-height: 180px;
+      overflow-y: auto;
+    }
+
+    .log-success { color: var(--status-success); }
+    .log-error { color: var(--status-danger); }
+    .log-info { color: var(--status-info); }
+
+    /* Onboarding wizard styling */
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+      margin-bottom: var(--space-4);
+    }
+
+    .form-group label {
+      font-size: var(--text-xs);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-secondary);
+    }
+
+    .form-group input, .form-group select {
+      padding: var(--space-3);
+      font-size: var(--text-base);
+      font-family: inherit;
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-sm);
+      background: var(--bg-input);
+      color: var(--text-primary);
+      transition: all var(--duration-fast);
+    }
+
+    .form-group input:focus, .form-group select:focus {
+      border-color: var(--border-active);
+      box-shadow: var(--shadow-sm);
+      outline: none;
+    }
+
+    .wizard-modules {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-2);
+      padding: var(--space-2) 0;
+    }
+
+    .module-choice {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      font-size: var(--text-sm);
+      color: var(--text-secondary);
+      cursor: pointer;
+    }
+
+    .module-choice input {
+      accent-color: var(--border-active);
+    }
+
+    .error-row {
+      color: var(--status-danger);
+      background: var(--status-danger-subtle);
+      border: 1px solid var(--status-danger);
+      border-radius: var(--radius-sm);
+      padding: var(--space-2) var(--space-3);
+      font-size: var(--text-xs);
+      display: none;
+      margin-bottom: var(--space-4);
+    }
+
+    /* Editorial Features Matrix */
+    .features-section {
+      background: var(--bg-surface-2);
+      border-top: 1px solid var(--border-default);
+      border-bottom: 1px solid var(--border-default);
+      padding: var(--space-8) 0;
+      margin-top: var(--space-8);
+    }
+
+    .features-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 var(--space-6);
+    }
+
+    .section-title {
+      font-size: 2.25rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin-bottom: var(--space-3);
+      text-align: center;
+    }
+
+    .section-subtitle {
+      font-size: var(--text-md);
+      color: var(--text-secondary);
+      text-align: center;
+      max-width: 600px;
+      margin: 0 auto var(--space-7) auto;
+    }
+
+    .features-matrix {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: var(--space-6);
+    }
+
+    .feature-card {
+      background: var(--bg-surface-1);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-md);
+      padding: var(--space-5);
+      transition: all var(--duration-fast);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .feature-card:hover {
+      border-color: var(--border-active);
+      box-shadow: var(--shadow-md);
+      transform: translateY(-1px);
+    }
+
+    .feature-header {
+      font-size: 1.5rem;
+      margin-bottom: var(--space-3);
+    }
+
+    .feature-name {
+      font-size: var(--text-base);
+      font-weight: 700;
+      margin-bottom: var(--space-2);
+      letter-spacing: -0.01em;
+    }
+
+    .feature-desc {
+      font-size: var(--text-sm);
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
+    /* Footer */
+    .landing-footer {
+      border-top: 1px solid var(--border-default);
+      padding: var(--space-6) 0;
+      text-align: center;
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      margin-top: auto;
+    }
+  </style>
+</head>
+<body class="landing-body">
+  <div class="bg-grid"></div>
+
+  <!-- Header Navigation -->
+  <header class="landing-header">
+    <div class="header-container">
+      <a href="/" class="landing-logo">
+        <span class="logo-mark">▲</span>
+        <span class="logo-text">LoanOS India</span>
+      </a>
+      <nav class="landing-nav">
+        <a href="#features" class="landing-nav-link">Architecture</a>
+        <a href="/t/dev/portal/" class="landing-nav-link" style="color: var(--status-info); font-weight: 600;">Demo Customer Portal</a>
+        <a href="#simulator" class="landing-nav-link">Compliance Demo</a>
+        <a href="#provision" class="landing-nav-link">Tenant Sandbox</a>
+        <a href="/t/dev/staff/" class="btn btn-secondary">Staff Console</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <!-- Hero Header -->
+    <section class="hero-section">
+      <div class="badge-rbi">🛡️ RBI Directions 2025 Compliant</div>
+      <h1 class="hero-title">Greenfield Lending OS for India</h1>
+      <p class="hero-desc">
+        A secure, multi-tenant loan origination & servicing platform. Architected with strict regulatory guardrails: rejects unsafe fund flows, Aadhaar leakage, unvalidated credit models, and non-compliance by design.
+      </p>
+      <div class="hero-actions">
+        <a href="#provision" class="btn btn-primary">Provision a Tenant</a>
+        <a href="/t/dev/" class="btn btn-secondary">Dev Tenant Portal</a>
+      </div>
+    </section>
+
+    <!-- Core Interactive Grid -->
+    <div class="main-grid">
+      
+      <!-- Interactive Compliance Panel -->
+      <section class="landing-card" id="simulator">
+        <div class="card-title-bar">
+          <h3 class="card-title">RBI Preflight Sandbox</h3>
+          <span class="sim-status-badge blocked" id="sim-verdict">Blocked</span>
+        </div>
+
+        <div class="sim-panel">
+          <!-- Item 1 -->
+          <div class="sim-row">
+            <div class="sim-info">
+              <span class="sim-name">Borrower Location</span>
+              <span class="sim-desc">Must reside inside India limits</span>
+            </div>
+            <label class="warm-switch">
+              <input type="checkbox" id="sim-residency" checked>
+              <span class="warm-slider"></span>
+            </label>
+          </div>
+
+          <!-- Item 2 -->
+          <div class="sim-row">
+            <div class="sim-info">
+              <span class="sim-name">Key Fact Statement (KFS)</span>
+              <span class="sim-desc">Itemized charges & APR disclosure</span>
+            </div>
+            <label class="warm-switch">
+              <input type="checkbox" id="sim-kfs">
+              <span class="warm-slider"></span>
+            </label>
+          </div>
+
+          <!-- Item 3 -->
+          <div class="sim-row">
+            <div class="sim-info">
+              <span class="sim-name">Aadhaar Data Posture</span>
+              <span class="sim-desc">Restricted storage, masked vaults only</span>
+            </div>
+            <label class="warm-switch">
+              <input type="checkbox" id="sim-aadhaar" checked>
+              <span class="warm-slider"></span>
+            </label>
+          </div>
+
+          <!-- Item 4 -->
+          <div class="sim-row">
+            <div class="sim-info">
+              <span class="sim-name">Credit Scoring Model</span>
+              <span class="sim-desc">Validated models only; blocks drift</span>
+            </div>
+            <label class="warm-switch">
+              <input type="checkbox" id="sim-model" checked>
+              <span class="warm-slider"></span>
+            </label>
+          </div>
+
+          <!-- Simulation Console -->
+          <div class="console-box">
+            <div class="console-header">
+              <span>Lending Engine Pre-Check</span>
+              <span style="font-size: var(--text-2xs)">v1.0.0</span>
+            </div>
+            <div class="console-log" id="sim-log">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tenant Provisioning Card -->
+      <section class="landing-card" id="provision">
+        <div class="card-title-bar">
+          <h3 class="card-title">Tenant Provisioning Wizard</h3>
+          <span style="font-size: var(--text-xs); color: var(--text-muted); font-weight: bold;">Step 1 of 1</span>
+        </div>
+
+        <form id="provision-form">
+          <div class="error-row" id="form-error"></div>
+
+          <div class="form-group">
+            <label for="tenant-id">Tenant ID</label>
+            <input type="text" id="tenant-id" placeholder="e.g. bank-delhi" required>
+          </div>
+
+          <div class="form-group">
+            <label for="tenant-name">Regulated Entity Name</label>
+            <input type="text" id="tenant-name" placeholder="e.g. Delhi Commercial Bank" required>
+          </div>
+
+          <div class="form-group">
+            <label for="owner-email">Admin Login Email</label>
+            <input type="email" id="owner-email" value="admin@dev.local" required>
+          </div>
+
+          <div class="form-group">
+            <label for="owner-password">Admin Temporary Password</label>
+            <input type="password" id="owner-password" value="dev-admin-password" required>
+          </div>
+
+          <div class="form-group">
+            <label>Seeded Blueprint Modules</label>
+            <div class="wizard-modules">
+              <label class="module-choice"><input type="checkbox" checked disabled> LOS (Origination)</label>
+              <label class="module-choice"><input type="checkbox" checked disabled> LMS (Servicing)</label>
+              <label class="module-choice"><input type="checkbox" checked disabled> LWS (Workflows)</label>
+              <label class="module-choice"><input type="checkbox" checked disabled> Compliance Engine</label>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: var(--space-2);" id="btn-submit">
+            Provision & Log In
+          </button>
+        </form>
+      </section>
+
+    </div>
+
+    <!-- Compliance Features Matrix Section -->
+    <section class="features-section" id="features">
+      <div class="features-container">
+        <h2 class="section-title">Compliance Controls Core</h2>
+        <p class="section-subtitle">
+          LoanOS India builds regulatory mandates directly into the transactional layer rather than depending on post-facto audit reports.
+        </p>
+
+        <div class="features-matrix">
+          <!-- Card 1 -->
+          <div class="feature-card">
+            <div class="feature-header">🏢</div>
+            <div class="feature-name">Regulated Entity Trust</div>
+            <div class="feature-desc">Ensures every transaction belongs to an active, licensed RBI RE with grievance officer details and board policies.</div>
+          </div>
+
+          <!-- Card 2 -->
+          <div class="feature-card">
+            <div class="feature-header">🚫</div>
+            <div class="feature-name">LSP Fund-Flow Isolation</div>
+            <div class="feature-desc">Hard-blocks lending service provider pass-through accounts. Enforces direct bank-to-borrower fund routing.</div>
+          </div>
+
+          <!-- Card 3 -->
+          <div class="feature-card">
+            <div class="feature-header">📄</div>
+            <div class="feature-name">KFS & Charge Ceiling</div>
+            <div class="feature-desc">Locks charges to pre-disclosed limits, blocks undiagnosed penal interest compounding, and validates floating interest resets.</div>
+          </div>
+
+          <!-- Card 4 -->
+          <div class="feature-card">
+            <div class="feature-header">🔏</div>
+            <div class="feature-name">DPDP Retention & Rights</div>
+            <div class="feature-desc">Gates data erasure against the 5-year PMLA/RBI retention clock. Restricts sharing to active purpose-based consent logs.</div>
+          </div>
+
+          <!-- Card 5 -->
+          <div class="feature-card">
+            <div class="feature-header">🤖</div>
+            <div class="feature-name">AI Model Risk Safeguards</div>
+            <div class="feature-desc">Monitors drift, forces validation signoffs for credit models, and houses automated model and global kill switches.</div>
+          </div>
+
+          <!-- Card 6 -->
+          <div class="feature-card">
+            <div class="feature-header">⛓️</div>
+            <div class="feature-name">Verifiable Audit Spine</div>
+            <div class="feature-desc">Attests transaction truth by sealing every event into a cryptographic, SHA-256 chain mapped directly to the RE.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="landing-footer">
+    <div class="container">
+      &copy; 2026 LoanOS India. Editorial Compliance Core.
+    </div>
+  </footer>
+
+  <script>
+    // --- Interactive Preflight Simulation ---
+    const checkResidency = document.getElementById('sim-residency');
+    const checkKfs = document.getElementById('sim-kfs');
+    const checkAadhaar = document.getElementById('sim-aadhaar');
+    const checkModel = document.getElementById('sim-model');
+    const logBox = document.getElementById('sim-log');
+    const verdict = document.getElementById('sim-verdict');
+
+    function runSimulation() {
+      let isBlocked = false;
+      let logs = [];
+
+      logs.push('<span class="log-info">[INFO] Initializing rules validation engine...</span>');
+
+      if (checkResidency.checked) {
+        logs.push('<span class="log-success">[PASS] India residency check clean.</span>');
+      } else {
+        logs.push('<span class="log-error">[FAIL] RBI-DL-2025: Non-India resident profile is ineligible.</span>');
+        isBlocked = true;
+      }
+
+      if (checkKfs.checked) {
+        logs.push('<span class="log-success">[PASS] KFS generated and accepted. APR cap matches.</span>');
+      } else {
+        logs.push('<span class="log-error">[FAIL] RBI-KFS-2025: Missing borrower acceptance of Key Fact Statement.</span>');
+        isBlocked = true;
+      }
+
+      if (checkAadhaar.checked) {
+        logs.push('<span class="log-success">[PASS] Aadhaar data stored safely in masked token vault.</span>');
+      } else {
+        logs.push('<span class="log-error">[FAIL] UIDAI-SEC: Raw Aadhaar numbers found in cleartext records.</span>');
+        isBlocked = true;
+      }
+
+      if (checkModel.checked) {
+        logs.push('<span class="log-success">[PASS] AI Underwriting model credit_score_v2 is validated.</span>');
+      } else {
+        logs.push('<span class="log-error">[FAIL] RBI-MR-2026: Model has validation drift or switch is offline.</span>');
+        isBlocked = true;
+      }
+
+      if (isBlocked) {
+        verdict.className = 'sim-status-badge blocked';
+        verdict.textContent = 'Blocked';
+        logs.push('<span class="log-error" style="font-weight:700;">[STATUS] PREFLIGHT SANCTION BLOCKED</span>');
+      } else {
+        verdict.className = 'sim-status-badge approved';
+        verdict.textContent = 'Approved';
+        logs.push('<span class="log-success" style="font-weight:700;">[STATUS] SANCTION ISSUED & READY TO DISBURSE</span>');
+      }
+
+      logBox.innerHTML = logs.map(line => `<div>${line}</div>`).join('');
+    }
+
+    [checkResidency, checkKfs, checkAadhaar, checkModel].forEach(el => {
+      el.addEventListener('change', runSimulation);
+    });
+
+    runSimulation();
+
+    // --- Onboarding Provisioner Wizard ---
+    const randSuffix = Math.random().toString(36).substring(2, 6);
+    document.getElementById('tenant-id').value = `bank-${randSuffix}`;
+    document.getElementById('tenant-name').value = `Retail Lending Bank ${randSuffix.toUpperCase()}`;
+
+    const form = document.getElementById('provision-form');
+    const formError = document.getElementById('form-error');
+    const btnSubmit = document.getElementById('btn-submit');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      formError.style.display = 'none';
+      btnSubmit.disabled = true;
+      btnSubmit.textContent = 'Provisioning Regulated Tenant...';
+
+      const tenantId = document.getElementById('tenant-id').value.trim().toLowerCase();
+      const tenantName = document.getElementById('tenant-name').value.trim();
+      const email = document.getElementById('owner-email').value.trim();
+      const password = document.getElementById('owner-password').value;
+
+      try {
+        const provisionRes = await fetch('/platform/tenants', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-platform-admin-key': 'platform-secret-key'
+          },
+          body: JSON.stringify({
+            tenantId,
+            name: tenantName,
+            ownerUser: {
+              email,
+              displayName: tenantName.split(' ')[0] + ' Admin',
+              password
+            },
+            regulatedEntity: {
+              regulatedEntityId: `re_${tenantId}`,
+              name: tenantName,
+              entityType: 'nbfc',
+              country: 'IN',
+              website: `https://${tenantId}.local`,
+              privacyPolicyUrl: `https://${tenantId}.local/privacy`,
+              grievanceOfficerName: 'Grievance Officer Team',
+              grievanceOfficerEmail: `grievance@${tenantId}.local`,
+              boardApprovedPolicies: ['credit_policy', 'data_retention_policy'],
+              dataResidencyPosture: 'IN',
+              status: 'active'
+            }
+          })
+        });
+
+        const provisionData = await provisionRes.json();
+        if (!provisionRes.ok) {
+          throw new Error(provisionData.error?.message || 'Provisioning failed.');
+        }
+
+        const loginRes = await fetch('/auth/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ tenantId, email, password })
+        });
+
+        const loginData = await loginRes.json();
+        if (!loginRes.ok) {
+          throw new Error(loginData.error?.message || 'Auto-login failed after setup.');
+        }
+
+        window.location.href = `/t/${tenantId}/staff/`;
+      } catch (err) {
+        formError.textContent = err.message;
+        formError.style.display = 'block';
+        btnSubmit.disabled = false;
+        btnSubmit.textContent = 'Provision & Log In';
+      }
+    });
+  </script>
+</body>
+</html>
