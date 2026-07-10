@@ -367,7 +367,7 @@ npm run dev:api
 ## Known Limitations
 
 - Persistence defaults to local JSON (tenant-partitioned); an optional Postgres/RLS driver exists (`LOANOS_STORAGE_DRIVER=postgres`, see the [Postgres migration doc](postgres-migration.md)) but sandbox management and the platform control plane (`routePlatform`/`routeAuth`) still use whole-state load/save even on that driver — genuinely cross-tenant by design and admin-frequency, not migrated to per-tenant fetching.
-- Data at rest (either driver) is not encrypted by the application; the tenancy doc's per-tenant encryption-key commitment is not yet implemented.
+- Per-tenant encryption at rest is implemented for the file store (opt-in via `LOANOS_MASTER_KEY`): each tenant's data-plane partition is sealed with a per-tenant AES-256-GCM key derived from the root key via HKDF-SHA256 (`apps/api/src/encryption.js`), so no two tenants share a key and purging a tenant's ciphertext makes its data unrecoverable. With no master key set, the store writes plaintext as before. The control plane stays plaintext (cross-tenant by construction), and wiring the same envelope into the Postgres driver's per-tenant rows is a follow-on.
 - Tenant human login/session auth is implemented locally, but external IAM/SSO, enforced MFA, SCIM, and production-grade password policy are still integration work.
 - Tenant service api keys are hashed at rest and rotatable, but there is still one active service key per tenant/environment rather than multiple named integration keys with independent scopes.
 - The platform admin key remains as a bootstrap/emergency secret; individual platform users and roles are implemented for normal platform administration.

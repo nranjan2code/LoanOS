@@ -87,7 +87,7 @@ import {
   CTR_THRESHOLD_INR
 } from "../packages/core/src/index.js";
 import { createLoanOsServer } from "../apps/api/src/server.js";
-import { loadState, saveState } from "../apps/api/src/file-store.js";
+import { loadState, saveState, createEmptyTenantData } from "../apps/api/src/file-store.js";
 
 // Every data-plane request runs inside a tenant. Tests bootstrap a primary
 // tenant (A) and inject its api key by default; the isolation suite adds a
@@ -113,6 +113,34 @@ test("valid India-only loan application passes preflight", () => {
 
   assert.equal(result.summary.status, "ready");
   assert.equal(result.summary.errorCount, 0);
+});
+
+test("per-tenant encryption at rest writes ciphertext and round-trips under a master key", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-enc-"));
+  const priorKey = process.env.LOANOS_MASTER_KEY;
+  process.env.LOANOS_MASTER_KEY = "a".repeat(64); // 32 bytes in hex
+  t.after(() => {
+    if (priorKey === undefined) delete process.env.LOANOS_MASTER_KEY;
+    else process.env.LOANOS_MASTER_KEY = priorKey;
+  });
+
+  const state = await loadState(dataDir);
+  state.tenants.tnt_enc = createEmptyTenantData();
+  state.tenants.tnt_enc.borrowerProfiles = {
+    b1: { borrowerId: "b1", secretField: "PLAINTEXT_MARKER_9F3A" }
+  };
+  await saveState(state, dataDir);
+
+  const raw = await readFile(join(dataDir, "state.json"), "utf8");
+  assert.equal(raw.includes("PLAINTEXT_MARKER_9F3A"), false, "tenant data must not be plaintext on disk");
+  assert.equal(raw.includes("\"__enc\""), true, "tenant partition must be stored as an encryption envelope");
+
+  const reloaded = await loadState(dataDir);
+  assert.equal(reloaded.tenants.tnt_enc.borrowerProfiles.b1.secretField, "PLAINTEXT_MARKER_9F3A");
+
+  // Without the key, encrypted state cannot be silently read as empty.
+  delete process.env.LOANOS_MASTER_KEY;
+  await assert.rejects(() => loadState(dataDir), /encrypted but LOANOS_MASTER_KEY is not set/);
 });
 
 test("non-India borrower and currency are blocked", () => {

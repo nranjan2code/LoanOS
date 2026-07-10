@@ -45,7 +45,7 @@ Export packs for auditors, RE compliance teams, and supervisors are generated fr
 ## Data Residency, Privacy, and Keys
 
 - All data classes from the [blueprint](loanos-india-blueprint.md#data-residency-and-privacy) apply per tenant: identity/KYC, credit/application, payment/ledger, model input/output, audit evidence.
-- Per-tenant encryption keys; a dedicated-tier tenant gets its own key hierarchy. Key destruction is part of tenant offboarding evidence.
+- Per-tenant encryption keys. *Implemented (file store, opt-in via `LOANOS_MASTER_KEY`).* Each tenant's data-plane partition is encrypted at rest under a per-tenant AES-256-GCM key derived from the root key via HKDF-SHA256 keyed on the tenantId (`apps/api/src/encryption.js`), so no two tenants share a key and destroying a tenant's ciphertext at offboarding renders its data unrecoverable even if the root key survives. A dedicated-tier tenant gets its own key hierarchy as a deployment choice. The root key is a KMS-held secret in production; wiring the same envelope into the Postgres driver's per-tenant rows is a follow-on.
 - DPDP roles: the RE is the data fiduciary; LoanOS is the data processor. Processor obligations (security safeguards, breach support, processing only on instruction, deletion on instruction) are contract terms backed by platform features: retention jobs, deletion workflows, and breach-notification tooling are per-tenant.
 - Retention and deletion jobs run per tenant against tenant-declared retention policies and leave evidence in the audit spine.
 

@@ -30,7 +30,7 @@ Or use the provided orchestration script to start, stop, or reset the local plat
 ./loanos.sh clean    # stops the server and wipes all local state database files
 ```
 
-The API uses a local JSON store under `.loanos-data/` by default. Set `LOANOS_DATA_DIR` to use another location.
+The API uses a local JSON store under `.loanos-data/` by default. Set `LOANOS_DATA_DIR` to use another location. Set `LOANOS_MASTER_KEY` (64 hex chars or base64 of 32 bytes) to encrypt each tenant's data-plane partition at rest under a per-tenant AES-256-GCM key derived from that root key; with no master key the store writes plaintext.
 
 The API is multi-tenant and supports both human sessions and service credentials. Data-plane routes accept a tenant user session cookie from `POST /auth/login`, or a tenant service key sent as `x-api-key: <key>` / `Authorization: Bearer <key>`; calls without a valid tenant context return 401. Tenants are onboarded through the platform control plane behind `LOANOS_PLATFORM_ADMIN_KEY` or a logged-in platform admin. The platform onboarding flow can create the tenant shell, first owner, regulated entity profile, initial product policy, enabled modules/flows, readiness checklist, and one-time service key in one transaction.
 

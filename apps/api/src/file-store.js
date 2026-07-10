@@ -12,6 +12,12 @@ import {
   verifyAuditChain
 } from "../../../packages/core/src/index.js";
 import {
+  encryptTenantData,
+  decryptTenantData,
+  getMasterKey,
+  isEncryptedEnvelope
+} from "./encryption.js";
+import {
   normalizeAccessReviews,
   normalizeLoginAttempts,
   normalizePlatformUsers,
@@ -273,7 +279,7 @@ export async function loadState(dataDir = resolveDataDir()) {
   try {
     const raw = await readFile(path, "utf8");
     const parsed = JSON.parse(raw);
-    return normalizeState(parsed);
+    return normalizeState(decryptStateTenants(parsed));
   } catch (error) {
     if (error.code === "ENOENT") {
       return createEmptyState();
@@ -286,8 +292,39 @@ export async function saveState(state, dataDir = resolveDataDir()) {
   const path = statePath(dataDir);
   await mkdir(dirname(path), { recursive: true });
   const tmpPath = `${path}.${process.pid}.${Date.now()}.tmp`;
-  await writeFile(tmpPath, `${JSON.stringify(normalizeState(state), null, 2)}\n`, "utf8");
+  const persisted = encryptStateTenants(normalizeState(state));
+  await writeFile(tmpPath, `${JSON.stringify(persisted, null, 2)}\n`, "utf8");
   await rename(tmpPath, path);
+}
+
+// Transparently encrypt each tenant's data-plane partition under its own
+// per-tenant key before the state is written to disk (no-op when no master key
+// is configured, so dev/test behavior is unchanged). The control plane stays
+// plaintext because it is cross-tenant by construction (tenant registry,
+// sessions) and cannot be scoped to a single tenant key.
+function encryptStateTenants(state) {
+  const masterKey = getMasterKey();
+  if (!masterKey) return state;
+  const tenants = {};
+  for (const [tenantId, data] of Object.entries(state.tenants ?? {})) {
+    tenants[tenantId] = isEncryptedEnvelope(data) ? data : encryptTenantData(masterKey, tenantId, data);
+  }
+  return { ...state, tenants };
+}
+
+function decryptStateTenants(parsed) {
+  const tenants = parsed?.tenants ?? {};
+  const hasEnvelope = Object.values(tenants).some(isEncryptedEnvelope);
+  const masterKey = getMasterKey();
+  if (!hasEnvelope) return parsed;
+  if (!masterKey) {
+    throw new Error("State on disk is encrypted but LOANOS_MASTER_KEY is not set — cannot decrypt tenant data.");
+  }
+  const decrypted = {};
+  for (const [tenantId, data] of Object.entries(tenants)) {
+    decrypted[tenantId] = isEncryptedEnvelope(data) ? decryptTenantData(masterKey, tenantId, data) : data;
+  }
+  return { ...parsed, tenants: decrypted };
 }
 
 // --- Tenant control plane -------------------------------------------------
