@@ -246,7 +246,12 @@ export function buildPlatformAuditEvidencePack(state, { now = new Date(), filter
 // makes the single-file store correct under concurrent requests.
 const stateLocks = new Map();
 
-export function withStateLock(dataDir, fn) {
+// lockKey exists so the postgres driver can serialize per-tenant instead of
+// platform-wide (see postgres-store.js); the file driver ignores it and
+// keeps locking by dataDir alone — every save here rewrites the whole file
+// regardless of which tenant changed, so there is no finer granularity a
+// lock key could actually buy this driver.
+export function withStateLock(dataDir, _lockKey, fn) {
   const key = dataDir ?? "";
   const prior = stateLocks.get(key) ?? Promise.resolve();
   const result = prior.then(fn, fn);

@@ -21,14 +21,21 @@ import * as fileStore from "./file-store.js";
 
 const driver = (process.env.LOANOS_STORAGE_DRIVER ?? "file").toLowerCase();
 
-let ioFunctions = fileStore;
+// peekControlPlaneState: a lock-free, tenant_data-free read used only to
+// pick a per-tenant advisory-lock key before any lock is taken (see
+// resolveLockKey in server.js). The file driver has no equivalent notion —
+// its lock is keyed by dataDir alone regardless — so it exposes `null`,
+// which resolveLockKey treats as "this driver doesn't support/need
+// tenant-scoped locking; use the global key."
+let ioFunctions = { ...fileStore, peekControlPlaneState: null };
 if (driver === "postgres") {
   const postgresStore = await import("./postgres-store.js");
   ioFunctions = {
     loadState: postgresStore.loadState,
     saveState: postgresStore.saveState,
     withStateLock: postgresStore.withStateLock,
-    ensureBootstrapTenants: postgresStore.ensureBootstrapTenants
+    ensureBootstrapTenants: postgresStore.ensureBootstrapTenants,
+    peekControlPlaneState: postgresStore.peekControlPlaneState
   };
 } else if (driver !== "file") {
   throw new Error(`Unknown LOANOS_STORAGE_DRIVER "${driver}". Expected "file" or "postgres".`);
@@ -38,3 +45,4 @@ export const loadState = ioFunctions.loadState;
 export const saveState = ioFunctions.saveState;
 export const withStateLock = ioFunctions.withStateLock;
 export const ensureBootstrapTenants = ioFunctions.ensureBootstrapTenants;
+export const peekControlPlaneState = ioFunctions.peekControlPlaneState;

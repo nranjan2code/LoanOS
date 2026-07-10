@@ -175,6 +175,7 @@ import {
   deleteSandbox,
   loadState as loadWholeState,
   offboardTenant,
+  peekControlPlaneState,
   publicBreakGlassGrant,
   publicSubProcessor,
   publicTenant,
@@ -205,6 +206,7 @@ import {
   disableMfa,
   hasPlatformRole,
   hasTenantAdminRole,
+  hashSecret,
   isLastActiveTenantAdmin,
   isLoginLocked,
   loginAttemptKey,
@@ -215,6 +217,7 @@ import {
   recordLoginFailure,
   resolveSession,
   revokeSession,
+  sessionEffectiveStatus,
   upsertPlatformUser,
   upsertTenantUser,
   verifyTotpCode
@@ -222,6 +225,99 @@ import {
 
 const DEFAULT_PORT = Number(process.env.PORT || 3040);
 const SESSION_COOKIE = "loanos_session";
+
+// Shared with postgres-store.js's GLOBAL_LOCK_LABEL by value (not by
+// import, to avoid coupling server.js to a postgres-only export): both
+// identify "no specific tenant — serialize against the whole-state control
+// plane instead." The file driver ignores the lock key entirely, so this
+// constant only matters when LOANOS_STORAGE_DRIVER=postgres.
+const GLOBAL_LOCK_KEY = "loanos:state";
+
+// A session's tenantId lives directly on the control-plane session record
+// (see createSessionRecord in identity.js), so picking a lock key for a
+// tenant_user session never needs the full resolveSession() validity check
+// (active tenant, active user) — that check requires reading the target
+// tenant's `users` map, which lives in tenant_data, exactly what this probe
+// exists to avoid touching. An expired/revoked/mismatched session simply
+// falls through to the global key below; route()'s real, unchanged
+// resolveSession() call is still what decides whether the request actually
+// authenticates.
+function peekSessionTenantId(controlPlaneState, token, now = new Date()) {
+  if (!token) return null;
+  const tokenHash = hashSecret(token);
+  const session = Object.values(controlPlaneState.controlPlane.sessions ?? {}).find(
+    (candidate) => candidate.tokenHash === tokenHash && sessionEffectiveStatus(candidate, now) === "active"
+  );
+  if (session?.principalType === "tenant_user" && session.tenantId) {
+    return session.tenantId;
+  }
+  return null;
+}
+
+// Picks the (Postgres) advisory-lock key for a request BEFORE any lock is
+// taken, so concurrent requests for *different* tenants can run under
+// different locks instead of all serializing behind one process-wide lock —
+// see docs/architecture/postgres-migration.md, "v2". This performs its own
+// read-only, unlocked, control-plane-only probe (peekControlPlaneState never
+// touches tenant_data, so it needs no lock and no per-tenant fetch) —
+// deliberately duplicating, not sharing state with, route()'s real
+// resolution below. Getting this probe "wrong" — picking the global key, or
+// even a stale/mistaken tenant id — is never a correctness issue: it only
+// affects which peers a request serializes against, never which tenant's
+// data a request can see or modify (route()'s unchanged, still-authoritative
+// resolveSession/resolveTenantByApiKey/resolveBreakGlass calls own that).
+//
+// The file driver has no notion of a lock key (peekControlPlaneState is
+// `null` for it — see storage.js), so this short-circuits to a constant
+// immediately, adding no extra work to the file-backed path.
+async function resolveLockKey(req, dataDir) {
+  if (typeof peekControlPlaneState !== "function") {
+    return GLOBAL_LOCK_KEY;
+  }
+
+  const url = new URL(req.url ?? "/", "http://localhost");
+  const path = url.pathname;
+
+  // Control-plane routes legitimately touch more than one tenant's data in
+  // a single request (tenant provisioning, break-glass grants, sub-processor
+  // registration) and operate through their own whole-state loadWholeState/
+  // saveWholeState calls regardless of any tenant-specific key, so scope
+  // them to the global key rather than guessing at a single tenant.
+  if (path === "/auth" || path.startsWith("/auth/") || path === "/platform" || path.startsWith("/platform/")) {
+    return GLOBAL_LOCK_KEY;
+  }
+
+  let controlPlaneState;
+  try {
+    controlPlaneState = await peekControlPlaneState();
+  } catch {
+    // The real read (inside the lock, in route()) will hit and correctly
+    // report the same failure — this probe just falls back to safe/global.
+    return GLOBAL_LOCK_KEY;
+  }
+
+  let tenantId =
+    peekSessionTenantId(controlPlaneState, sessionTokenFromRequest(req)) ??
+    resolveTenantByApiKey(controlPlaneState, tenantApiKeyFromRequest(req))?.tenantId ??
+    resolveBreakGlass(controlPlaneState, breakGlassKeyFromRequest(req))?.tenant?.tenantId ??
+    null;
+  if (!tenantId) {
+    return GLOBAL_LOCK_KEY;
+  }
+
+  // Mirror route()'s sandbox-header swap so a sandbox request locks its own
+  // sandbox tenant row, not its parent's.
+  const sandboxNameHeader = req.headers["x-sandbox-name"];
+  const sandboxName = Array.isArray(sandboxNameHeader) ? sandboxNameHeader[0] : sandboxNameHeader;
+  if (sandboxName && !controlPlaneState.controlPlane.tenants[tenantId]?.isSandbox) {
+    const sandboxId = `${tenantId}_sandbox_${sandboxName}`;
+    if (controlPlaneState.controlPlane.tenants[sandboxId]) {
+      tenantId = sandboxId;
+    }
+  }
+
+  return tenantId;
+}
 
 export function createLoanOsServer({ dataDir, bootstrapTenants = [], platformAdminKey } = {}) {
   const adminKey = platformAdminKey ?? process.env.LOANOS_PLATFORM_ADMIN_KEY ?? null;
@@ -247,9 +343,12 @@ export function createLoanOsServer({ dataDir, bootstrapTenants = [], platformAdm
       // from the buffered, already-drained stream.
       await bufferRequestBody(req);
       // Serialize this request's full load-modify-save span against every other
-      // request touching the same dataDir, so concurrent requests can't race a
-      // lost update against the single state.json file.
-      await withStateLock(dataDir, () => route(req, res, dataDir, adminKey));
+      // request touching the same dataDir/tenant, so concurrent requests can't
+      // race a lost update. The lock key is resolved up front so the postgres
+      // driver can serialize per-tenant instead of platform-wide; the file
+      // driver ignores it (see withStateLock in file-store.js).
+      const lockKey = await resolveLockKey(req, dataDir);
+      await withStateLock(dataDir, lockKey, () => route(req, res, dataDir, adminKey));
     } catch (error) {
       console.error(`[${requestId}]`, error);
       if (res.headersSent) {

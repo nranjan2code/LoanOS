@@ -37,74 +37,95 @@ two problems directly and lays the foundation for the first:
   of promises — works across multiple application processes/instances
   talking to the same database.
 
-## Scope of this migration (v1)
+## Scope of this migration
 
-This is deliberately a bounded first slice, not a full re-architecture. Two
-things are true at once:
+Delivered incrementally, each slice verified against a live PostgreSQL 18
+instance before being considered done:
 
-1. **Delivered now:** tenant data is durably stored in Postgres with RLS
-   policies defined and enforceable, and `withStateLock` no longer requires
-   a single Node process. The `tenant_isolation` RLS policy is real and
-   tested (see `tests/postgres-store.test.js`) — any connection using the
-   `loanos_app` role that hasn't set `app.current_tenant_id` sees zero rows
-   in `tenant_data`; a connection scoped to tenant A cannot read or write
-   tenant B's row even if it tries.
+### v1 — durable, RLS-isolated storage behind the existing seam
 
-2. **Not yet delivered — a documented v2 follow-up:** the application's own
-   `loadState()`/`saveState()` calls (used by the control plane —
-   `routePlatform`, `routeAuth`, and tenant resolution in `route()`) still
-   load and save *every* tenant's data-plane document on each call,
-   mirroring the file driver's "load everything, mutate in memory, save
-   everything" pattern exactly. This is necessary in v1 because those code
-   paths — routed through `server.js`'s existing `loadWholeState`/
-   `saveWholeState` calls — were not restructured to resolve which single
-   tenant a request needs before loading. Control-plane operations
-   (tenant provisioning, break-glass, sub-processor registration) are
-   platform-admin-frequency, not hot-path, so this is a real (not
-   theoretical) tradeoff, not a bug — but it does mean:
-   - The RLS-scoped `loanos_app` role is not actually the role the running
-     application connects as for these whole-state operations (a
-     control-plane-privileged connection is required to see every tenant's
-     row at once, exactly mirroring the cross-tenant authority a platform
-     admin key/session already has at the application layer today).
-   - The per-tenant advisory-lock and per-tenant-only-fetch optimizations
-     that would let concurrent requests for *different* tenants stop
-     serializing behind one lock are not yet realized — v1 still has one
-     global lock, just a Postgres-backed one instead of a JS one.
+Tenant data is durably stored in Postgres with RLS policies defined and
+enforceable. The `tenant_isolation` RLS policy is real and tested (see
+`tests/postgres-store.test.js`) — any connection using the `loanos_app` role
+that hasn't set `app.current_tenant_id` sees zero rows in `tenant_data`; a
+connection scoped to tenant A cannot read or write tenant B's row even if it
+tries. `loadState`/`saveState` return and accept the exact same in-memory
+shape the file driver does, so every pure control-plane function
+(`registerTenant`, `grantBreakGlass`, `offboardTenant`, `buildTenantExport`,
+...) works unchanged regardless of which driver is active.
 
-   Realizing that optimization requires restructuring `route()`'s
-   tenant-resolution flow (used by essentially every test in
-   `tests/compliance.test.js`) to resolve the tenant *before* deciding what
-   to load — a change with wide blast radius that deserves its own focused
-   session with a live database to verify against, not a bundled change
-   alongside the initial storage swap.
+v1's own known limitation, which v2 addresses: `loadState`/`saveState` still
+load and save *every* tenant's data-plane document on each call (mirroring
+the file driver's "load everything, mutate in memory, save everything"
+pattern) — including for the per-request `store.load()/store.save()` closure
+in `route()`'s hot path, not just admin-frequency control-plane operations.
+
+### v2 — per-tenant advisory locking
+
+`withStateLock` now takes a lock key. `server.js`'s `resolveLockKey`
+resolves which tenant a request belongs to *before* any lock is taken — via
+`peekControlPlaneState`, a lock-free, `tenant_data`-free read used purely to
+pick a key — and passes that tenantId through. Concurrent requests for
+*different* tenants now serialize under *different* Postgres advisory locks
+(`pg_advisory_xact_lock`) instead of all queuing behind one process-wide
+lock; concurrent requests for the *same* tenant still correctly serialize
+against each other (protecting against the lost-update race the lock exists
+for in the first place). Control-plane routes (`/auth/*`, `/platform/*`),
+whose writes are not confined to one tenant's row, still use a fixed global
+lock key.
+
+Getting the lock-key *probe* wrong is never a correctness issue — worst case
+a request serializes against a broader or narrower set of peers than ideal.
+`route()`'s own, unchanged, authoritative tenant resolution
+(`resolveSession`/`resolveTenantByApiKey`/`resolveBreakGlass`) still runs
+for real, under whichever lock was acquired, and is what actually decides
+which tenant's data a request can see or modify — the probe was deliberately
+written to reuse the same underlying functions and data (just a lighter,
+`tenant_data`-free path for the one case, tenant_user sessions, that would
+otherwise need it) rather than risk the two diverging over time.
+
+**v2's own known limitation, tracked as v3:** `loadState`/`saveState` still
+fetch and write every tenant's data-plane document on every call — v2 only
+changed which *lock* guards that work, not what it reads/writes. Fetching
+only the one tenant a request actually touches requires restructuring
+`route()`'s `store.load()/store.save()` closure itself (not just the lock
+acquired around it), which is a larger, more invasive change to code
+exercised by the entire test suite end-to-end.
 
 ## What has and has not been verified
 
-This driver was implemented in an environment without a running Postgres
-instance available initially. A scratch PostgreSQL 18 instance was then
-provisioned locally and used to:
+Both v1 and v2 were verified against a scratch PostgreSQL 18 instance
+provisioned locally, via `tests/postgres-store.test.js`:
 
-- Apply `db/schema.sql` cleanly (idempotently — rerunning it against an
-  already-migrated database is a no-op, verified directly).
-- Run `tests/postgres-store.test.js`, which:
-  - Proves the RLS policy blocks cross-tenant reads *and* writes at the
-    database level, independent of any application code, by connecting
-    directly as the `loanos_app` role.
-  - Proves `withStateLock` genuinely serializes concurrent callers (a
-    non-atomic shared-counter race that only produces the correct result
-    under real mutual exclusion).
-  - Runs a full HTTP round-trip through `createLoanOsServer` with
-    `LOANOS_STORAGE_DRIVER=postgres`, provisions two tenants, and proves
-    tenant B cannot read tenant A's borrower record over the API — the same
-    invariant `tests/compliance.test.js` already proves for the file driver,
-    now proved for the Postgres driver too.
+- `db/schema.sql` applies cleanly and idempotently (rerunning it against an
+  already-migrated database is a no-op).
+- The RLS policy blocks cross-tenant reads *and* writes at the database
+  level, independent of any application code, verified by connecting
+  directly as the `loanos_app` role.
+- `withStateLock` genuinely serializes concurrent callers sharing a lock key
+  (a non-atomic shared-counter race that only produces the correct result
+  under real mutual exclusion) — **and** does *not* serialize callers using
+  *different* lock keys (two 150ms-held locks under different keys complete
+  in ~150ms total, not ~300ms, proving they ran concurrently).
+- A full HTTP round-trip through `createLoanOsServer` with
+  `LOANOS_STORAGE_DRIVER=postgres` provisions two tenants and proves tenant B
+  cannot read tenant A's borrower record over the API — the same invariant
+  `tests/compliance.test.js` already proves for the file driver, now proved
+  for the Postgres driver too.
+
+Three real bugs were caught and fixed by this live verification that a
+read-through-only review would have missed: `SET LOCAL` does not accept bind
+parameters (must use `set_config()` instead), `getPool()` threw before
+checking whether a pool already existed (breaking every call after the
+first), and two call sites issued concurrent queries on a single connection
+(`Promise.all` over `client.query()`, which Postgres/node-postgres don't
+support — queries on one connection must be sequential).
 
 **Before trusting this driver in any real deployment**, run
 `tests/postgres-store.test.js` yourself against your target Postgres version
 and hosting environment (managed Postgres services, connection pooling
 proxies like PgBouncer, and different Postgres major versions can all behave
-differently around session-scoped `SET LOCAL` variables and advisory locks).
+differently around session-scoped variables and advisory locks).
 
 ## Running the migration
 

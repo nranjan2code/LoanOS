@@ -1,9 +1,7 @@
 // Postgres-backed implementation of the same load/save/lock boundary that
 // file-store.js provides over a local JSON file. See db/schema.sql for the
-// schema and the row-level-security design this module relies on.
-//
-// Scope of this v1 migration (deliberately bounded — see
-// docs/architecture/postgres-migration.md for the full rationale):
+// schema and the row-level-security design this module relies on, and
+// docs/architecture/postgres-migration.md for the full v1/v2 rationale.
 //
 //   - `loadState`/`saveState` return and accept the EXACT SAME `{ version,
 //     controlPlane, tenants }` shape file-store.js's `loadState`/`saveState`
@@ -12,13 +10,20 @@
 //     buildTenantExport, ...) and every call site in server.js keeps working
 //     completely unchanged. Swapping the storage driver is a one-line import
 //     change, not a rewrite of the request-handling code.
-//   - `withStateLock` is re-implemented with a Postgres advisory lock (via
-//     `pg_advisory_xact_lock`, transaction-scoped so a crashed process can
-//     never leave a lock held) instead of an in-process `Map` of promises.
-//     This is a genuine improvement over the file store even at v1's
-//     "one global lock" granularity: the lock now works across multiple
-//     application processes/instances, not just within one Node process —
-//     which the file-backed lock explicitly cannot do.
+//   - `withStateLock` takes a lock key (v2): callers resolve which tenant a
+//     request belongs to *before* any lock is taken (see resolveLockKey in
+//     server.js, which uses peekControlPlaneState below to do that
+//     lock-free) and pass the tenantId through, so concurrent requests for
+//     *different* tenants serialize under *different* Postgres advisory
+//     locks instead of all queuing behind one process-wide lock — verified
+//     directly in tests/postgres-store.test.js ("does not serialize callers
+//     using different lock keys"). Control-plane routes (tenant
+//     provisioning, break-glass, sub-processor registration), whose writes
+//     aren't confined to one tenant's row, still use GLOBAL_LOCK_LABEL.
+//     `pg_advisory_xact_lock` is transaction-scoped, so a crashed process
+//     can never leave a lock held — a further improvement over the file
+//     store's in-process `Map`, which also only ever worked within one
+//     Node process to begin with.
 //   - Tenant data-plane documents live in `tenant_data`, one JSONB row per
 //     tenant, under Postgres Row-Level Security (see db/schema.sql). This
 //     module's whole-state load/save intentionally reads and writes that
@@ -30,20 +35,23 @@
 //     microservice split off from this monolith) gets real, database-
 //     enforced tenant isolation by default, without having to re-implement
 //     this module's care around which rows to touch.
-//   - Deliberately NOT implemented in v1: per-tenant-scoped loading/locking
-//     (only fetching/locking the one tenant a request actually touches,
-//     instead of the whole tenant_data table on every request). That
-//     optimization requires restructuring server.js's `route()` dispatcher,
-//     which is exercised by the entire test suite end-to-end; making that
-//     change safely needs its own focused pass with a live database to
-//     verify against, not a same-session bundled change. Tracked as a v2
-//     follow-up in docs/architecture/postgres-migration.md.
+//   - Deliberately NOT yet implemented (a v3 follow-up): per-tenant-scoped
+//     *fetching* — `loadState`/`saveState` still read and write every
+//     tenant's data-plane document on every whole-state call, matching the
+//     file driver's "load everything, mutate in memory, save everything"
+//     pattern exactly (v2 only changed which *lock* guards that work, not
+//     what it reads/writes). Fetching only the one tenant a request actually
+//     touches requires restructuring server.js's `route()` dispatcher's
+//     store.load()/store.save() closure, which is exercised by the entire
+//     test suite end-to-end — its own focused pass, tracked in
+//     docs/architecture/postgres-migration.md.
 //
-// This module is loaded only when LOANOS_STORAGE_DRIVER=postgres. It has NOT
-// been exercised against a live Postgres instance in this environment (none
-// was available) — the accompanying tests/postgres-store.test.js integration
-// suite is written to run against a real database (set DATABASE_URL_TEST)
-// and must pass before this driver is used in any real deployment.
+// This module is loaded only when LOANOS_STORAGE_DRIVER=postgres. It has
+// been exercised against a live PostgreSQL 18 instance (see
+// tests/postgres-store.test.js, which self-skips without DATABASE_URL_TEST)
+// — run that suite against your own target environment before trusting this
+// driver in any deployment; different Postgres versions/hosting can behave
+// differently around session variables and advisory locks.
 
 import { AsyncLocalStorage } from "node:async_hooks";
 import pg from "pg";
@@ -87,14 +95,25 @@ export async function resetPoolForTests(connectionString) {
 // instead of each opening — and needing to coordinate — their own.
 const requestContext = new AsyncLocalStorage();
 
-// A single, fixed advisory-lock key for v1's "one global lock" granularity
-// (see the module-level comment above: per-tenant locking is a v2 follow-up).
+// Fallback advisory-lock key for callers with no specific tenant to scope
+// to (control-plane routes, bootstrap, or a request whose tenant couldn't be
+// resolved) — these still need to serialize against each other and against
+// the whole-state loadState/saveState pattern's control-plane writes.
 // pg_advisory_xact_lock takes a bigint; hashtext() derives a stable one from
 // a label so multiple LoanOS deployments sharing infrastructure conventions
 // don't collide by accident.
-const GLOBAL_LOCK_LABEL = "loanos:state";
+export const GLOBAL_LOCK_LABEL = "loanos:state";
 
-export async function withStateLock(_dataDir, fn) {
+// v2: the caller picks a lockKey — typically the resolved tenantId — so
+// concurrent requests for *different* tenants no longer serialize behind one
+// process-wide lock the way the file driver's withStateLock necessarily
+// does. Requests that legitimately touch more than one tenant at a time
+// (tenant provisioning, break-glass grant issuance, sub-processor
+// registration — anything routed through routePlatform/routeAuth) pass
+// GLOBAL_LOCK_LABEL instead, since their writes aren't confined to one
+// tenant's row. See docs/architecture/postgres-migration.md for how the
+// lock key is chosen before this is called.
+export async function withStateLock(_dataDir, lockKey, fn) {
   const existing = requestContext.getStore();
   if (existing) {
     // Re-entrant call within the same request span (server.js's route()
@@ -106,7 +125,7 @@ export async function withStateLock(_dataDir, fn) {
   const client = await getPool().connect();
   try {
     await client.query("BEGIN");
-    await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [GLOBAL_LOCK_LABEL]);
+    await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [lockKey ?? GLOBAL_LOCK_LABEL]);
     const result = await requestContext.run({ client }, fn);
     await client.query("COMMIT");
     return result;
@@ -253,12 +272,7 @@ async function loadAllTenantData(client) {
   return tenants;
 }
 
-export async function loadState(_dataDirIgnored) {
-  const client = currentClient();
-  // Sequential, not Promise.all: both functions issue queries against the
-  // same single connection (see the comment in loadControlPlane).
-  const controlPlane = await loadControlPlane(client);
-  const tenantData = await loadAllTenantData(client);
+function assembleState(controlPlane, tenants) {
   return fileStoreNormalizeState({
     version: undefined,
     controlPlane: {
@@ -271,8 +285,36 @@ export async function loadState(_dataDirIgnored) {
       platformEvents: controlPlane.platformEvents,
       ckycRegistry: controlPlane.ckycRegistry
     },
-    tenants: tenantData
+    tenants
   });
+}
+
+export async function loadState(_dataDirIgnored) {
+  const client = currentClient();
+  // Sequential, not Promise.all: both functions issue queries against the
+  // same single connection (see the comment in loadControlPlane).
+  const controlPlane = await loadControlPlane(client);
+  const tenantData = await loadAllTenantData(client);
+  return assembleState(controlPlane, tenantData);
+}
+
+// A lock-free, control-plane-only snapshot (no tenant_data at all) used
+// solely by server.js's resolveLockKey to pick which advisory-lock key a
+// request should serialize under, BEFORE any lock is taken. It intentionally
+// does not go through withStateLock/currentClient() — it needs no
+// transaction or lock of its own (it's a read of data nothing here ever
+// mutates outside a real, separately-locked control-plane save), and
+// skipping the tenant_data fetch is what makes the probe cheap. It is NOT a
+// substitute for loadState()'s real, authoritative read, which route() still
+// performs for-real under the request's actual lock.
+export async function peekControlPlaneState() {
+  const client = await getPool().connect();
+  try {
+    const controlPlane = await loadControlPlane(client);
+    return assembleState(controlPlane, {});
+  } finally {
+    client.release();
+  }
 }
 
 export async function saveState(state, _dataDirIgnored) {
@@ -413,7 +455,7 @@ export async function ensureBootstrapTenants(dataDir, bootstrapTenants = []) {
     return;
   }
   const { ensureBootstrapTenants: fileStoreEnsureBootstrapTenants } = await import("./file-store.js");
-  await withStateLock(dataDir, () =>
+  await withStateLock(dataDir, GLOBAL_LOCK_LABEL, () =>
     fileStoreEnsureBootstrapTenants(dataDir, bootstrapTenants, { loadStateFn: loadState, saveStateFn: saveState })
   );
 }

@@ -134,16 +134,43 @@ test("withStateLock serializes concurrent state mutations via a Postgres advisor
   // writes 1, and the final value is 1 instead of 2. If the lock genuinely
   // serializes them, the final value is deterministically 2.
   let sharedCounter = 0;
-  async function incrementUnderLock() {
-    return postgresStore.withStateLock("ignored", async () => {
+  async function incrementUnderLock(lockKey) {
+    return postgresStore.withStateLock("ignored", lockKey, async () => {
       const observed = sharedCounter;
       await new Promise((resolve) => setTimeout(resolve, 20));
       sharedCounter = observed + 1;
     });
   }
 
-  await Promise.all([incrementUnderLock(), incrementUnderLock()]);
+  await Promise.all([incrementUnderLock("same-key"), incrementUnderLock("same-key")]);
   assert.equal(sharedCounter, 2);
+});
+
+test("withStateLock does not serialize callers using different lock keys", { skip: describeSkip && skipReason }, async (t) => {
+  const postgresStore = await import("../apps/api/src/postgres-store.js");
+  await postgresStore.resetPoolForTests(DATABASE_URL_TEST);
+  t.after(() => postgresStore.resetPoolForTests(DATABASE_URL_TEST));
+
+  // The whole point of tenant-scoped locking (v2): two callers using
+  // *different* lock keys (as two different tenants' requests would) must
+  // run concurrently, not queue behind each other. Prove it directly by
+  // timing two 150ms-held locks under different keys and asserting the
+  // total wall-clock time is close to one hold, not the sum of both — the
+  // sum would mean they serialized despite using different keys.
+  async function holdLockFor(lockKey, ms) {
+    return postgresStore.withStateLock("ignored", lockKey, async () => {
+      await new Promise((resolve) => setTimeout(resolve, ms));
+    });
+  }
+
+  const startedAt = Date.now();
+  await Promise.all([holdLockFor("tenant_x", 150), holdLockFor("tenant_y", 150)]);
+  const elapsedMs = Date.now() - startedAt;
+
+  // Serialized would take >=300ms; concurrent should land close to 150ms.
+  // A generous ceiling (250ms) absorbs scheduling/connection-setup jitter
+  // without being loose enough to pass if they'd actually serialized.
+  assert(elapsedMs < 250, `expected concurrent locks to overlap, took ${elapsedMs}ms`);
 });
 
 test("storage.js with LOANOS_STORAGE_DRIVER=postgres serves a full multi-tenant API round-trip", { skip: describeSkip && skipReason }, async (t) => {
