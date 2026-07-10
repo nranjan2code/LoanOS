@@ -1,0 +1,8 @@
+[package]
+name = "rules-wasm"
+description = "wasm32 build of the expression evaluator for sandboxed authoring previews"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]

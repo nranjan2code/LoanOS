@@ -1,0 +1,8 @@
+[package]
+name = "rules-napi"
+description = "Node bindings for dev/test and single-tenant embeds only (DEC-3); never load in a multi-tenant process"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]

@@ -1,0 +1,8 @@
+[package]
+name = "rules-compile"
+description = "Compiles decision models to executable plans: acyclicity, cross-node type-check, exhaustiveness, overlay legality"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]

@@ -1,0 +1,8 @@
+[package]
+name = "rules-service"
+description = "Per-tenant engine instance: mTLS tenant binding, kill-switch cache, audit emitter (primary deployment shape)"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]

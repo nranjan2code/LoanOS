@@ -15,6 +15,7 @@ The current implementation is intentionally small:
   - **Postgres-backed** (opt-in, `LOANOS_STORAGE_DRIVER=postgres`): tenant data-plane documents live one-per-row in a `tenant_data` table under Postgres Row-Level Security — a second, database-enforced isolation layer beneath the application-layer one — with per-tenant advisory locking and per-tenant fetching so concurrent requests for different tenants no longer serialize behind one global lock. See [`db/schema.sql`](../../db/schema.sql), [`apps/api/src/postgres-store.js`](../../apps/api/src/postgres-store.js), and the [Postgres migration doc](postgres-migration.md) for the full v1/v2/v3 design and live-verification results.
 - Multi-tenant: every data-plane request runs inside exactly one tenant, resolved from a tenant user session or `x-api-key`/bearer service token; cross-tenant access is impossible by construction because each request only ever receives its own tenant's partition (and, on the Postgres driver, is also blocked at the database layer by RLS).
 - Core domain logic in `packages/core/src`.
+- Decision engine (Rust) in `rules/`: PH-0 scaffold only — cargo workspace with crate skeletons, the `rules-core` decision-contract types with round-trip tests, and a dedicated CI lane (fmt, clippy with an f32/f64 deny gate, tests, `cargo audit`). Not yet wired into the API; see the [decision engine design](decision-engine-design.md) for phases and invariants.
 - Pure backend API in `apps/api/src`.
 - Public platform website in `apps/web/`.
 - Tenant-branded landing template in `apps/tenant/`.
@@ -35,6 +36,7 @@ npm run dev:api
 | Path | Role |
 | --- | --- |
 | `packages/core/src/compliance-controls.js` | Regulatory control catalog and finding helpers. |
+| `rules/crates/rules-core/` | Decision engine contract types (`DecisionRequest`/`DecisionResponse`, decimal newtypes, reasons, outcomes, errors) — PH-0 of the [decision engine design](decision-engine-design.md). |
 | `packages/core/src/audit.js` | Tenant-scoped, append-only audit hash chain: tenant-bound genesis, canonical hashing, `sealAuditChain`, `verifyAuditChain`, and `buildAuditEvidencePack`. |
 | `packages/core/src/access-control.js` | Staff actor registry, role checks, queue assignment authority, and regulated-action actor validation. |
 | `packages/core/src/grievance.js` | Complaint registry, grievance lifecycle, 30-day RBI Ombudsman clock, and RBI CMS escalation evidence. |

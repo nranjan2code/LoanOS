@@ -19,10 +19,11 @@ This folder is the working documentation set for the LoanOS India build. It expl
 | [Build backlog](/Users/nisheethranjan/Projects/AIBank/docs/product/build-backlog.md) | Actionable engineering backlog grouped by epic. |
 | [Architecture blueprint](/Users/nisheethranjan/Projects/AIBank/docs/architecture/loanos-india-blueprint.md) | Target architecture across LOS, LMS, LWS, and compliance control plane. |
 | [SaaS tenancy and operating model](/Users/nisheethranjan/Projects/AIBank/docs/architecture/saas-tenancy-and-operating-model.md) | Multi-tenant SaaS delivery: tenant isolation, audit spine, tenant lifecycle, and LoanOS's own vendor-compliance posture. |
+| [Decision engine design](/Users/nisheethranjan/Projects/AIBank/docs/architecture/decision-engine-design.md) | Pure-Rust decision engine: per-tenant isolated runtimes, decision contract, invariants, kill-switch enforcement, agent guardrails, security threat model, and phased delivery plan. Source of truth for engine implementation. |
 | [Current implementation map](/Users/nisheethranjan/Projects/AIBank/docs/architecture/current-implementation.md) | What code exists today, how it runs, and where each current control lives. |
 | [India regulatory register](/Users/nisheethranjan/Projects/AIBank/docs/compliance/india-regulatory-register.md) | Source-grounded control families and implementation anchors. |
 | [Compliance build checklist](/Users/nisheethranjan/Projects/AIBank/docs/compliance/compliance-build-checklist.md) | Regulatory control-to-platform checklist with build status. |
-| [Decision records](/Users/nisheethranjan/Projects/AIBank/docs/decisions/0001-india-only-compliance-first.md) | Architecture decisions and why they were made. ADR 0002 covers the multi-tenant SaaS delivery model. |
+| [Decision records](/Users/nisheethranjan/Projects/AIBank/docs/decisions/0001-india-only-compliance-first.md) | Architecture decisions and why they were made. ADR 0002 covers the multi-tenant SaaS delivery model. ADR 0003 covers the pure-Rust per-tenant decision engine. |
 
 ## Definition of Done for Documentation
 

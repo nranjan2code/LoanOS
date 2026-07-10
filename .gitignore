@@ -16,6 +16,9 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Rust (rules engine workspace)
+rules/target/
+
 # Runtime data & DBs
 .loanos-data/
 *.db

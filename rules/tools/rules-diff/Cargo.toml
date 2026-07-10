@@ -1,0 +1,8 @@
+[package]
+name = "rules-diff"
+description = "Shadow-mode and migration trace diffing"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]

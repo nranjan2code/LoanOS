@@ -1,0 +1,8 @@
+[package]
+name = "rules-bundle"
+description = "Canonical bundle bytes, ed25519 sign/verify, encryption envelope, bundle load protocol"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]

@@ -1,0 +1,8 @@
+[package]
+name = "rules-model"
+description = "Decision-graph model types, JSON (de)serialization, canonicalization, and content hashing"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]

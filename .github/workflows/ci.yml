@@ -7,6 +7,29 @@ on:
     branches: [main]
 
 jobs:
+  rules-engine:
+    name: Rules engine (Rust)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: rules
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rules
+      - run: cargo fmt --all --check
+      # clippy.toml disallows f32/f64 on eval-path crates (INV-6 float-deny lane).
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo test --workspace
+      - name: cargo audit
+        run: |
+          cargo install cargo-audit --locked
+          cargo audit
+
   test:
     name: Test (file store)
     runs-on: ubuntu-latest

@@ -1,0 +1,8 @@
+[package]
+name = "rules-eval"
+description = "Pure plan evaluator: fuel metering, trace emission, shadow mode, guardrail pre/post wrapping"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]

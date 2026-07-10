@@ -1,0 +1,4 @@
+disallowed-types = [
+    { path = "f32", reason = "INV-6: binary floating point is forbidden on the evaluation path; use rust_decimal via rules-core newtypes" },
+    { path = "f64", reason = "INV-6: binary floating point is forbidden on the evaluation path; use rust_decimal via rules-core newtypes" },
+]

@@ -1,0 +1,8 @@
+[package]
+name = "rules-expr"
+description = "Total, typed expression language for the LoanOS decision engine: lexer, parser, typechecker, fuel-bounded evaluator, versioned stdlib"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
