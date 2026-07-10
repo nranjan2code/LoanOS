@@ -7,9 +7,10 @@ LOG_FILE="server.log"
 export LOANOS_DEV_TENANT_KEY=${LOANOS_DEV_TENANT_KEY:-"dev-secret-key"}
 export LOANOS_DEV_ADMIN_PASSWORD=${LOANOS_DEV_ADMIN_PASSWORD:-"dev-admin-password"}
 export LOANOS_PLATFORM_ADMIN_KEY=${LOANOS_PLATFORM_ADMIN_KEY:-"platform-secret-key"}
+export LOANOS_PLATFORM_ADMIN_PASSWORD=${LOANOS_PLATFORM_ADMIN_PASSWORD:-"platform-admin-password"}
 
 usage() {
-    echo "Usage: $0 {build|start|stop|restart|status|logs}"
+    echo "Usage: $0 {build|start|stop|restart|status|logs|clean}"
     exit 1
 }
 
@@ -166,6 +167,16 @@ logs() {
     fi
 }
 
+clean() {
+    echo "==> Stopping server if running..."
+    stop
+    echo "==> Cleaning up local state data..."
+    rm -rf .loanos-data/
+    rm -f "$PID_FILE"
+    rm -f "$LOG_FILE"
+    echo "==> Clean complete."
+}
+
 # Parse command
 case "$1" in
     build)
@@ -176,6 +187,9 @@ case "$1" in
         ;;
     stop)
         stop
+        ;;
+    clean)
+        clean
         ;;
     restart)
         stop

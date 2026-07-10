@@ -53,3 +53,6 @@ temp/
 .env.production.local
 *.pem
 *.key
+
+# Runtime PIDs
+*.pid

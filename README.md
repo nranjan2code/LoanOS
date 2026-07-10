@@ -22,9 +22,56 @@ npm test
 npm run dev:api
 ```
 
+Or use the provided orchestration script to start, stop, or reset the local platform state:
+```bash
+./loanos.sh build
+./loanos.sh start
+./loanos.sh stop
+./loanos.sh clean    # stops the server and wipes all local state database files
+```
+
 The API uses a local JSON store under `.loanos-data/` by default. Set `LOANOS_DATA_DIR` to use another location.
 
-The API is multi-tenant and supports both human sessions and service credentials. Data-plane routes accept a tenant user session cookie from `POST /auth/login`, or a tenant service key sent as `x-api-key: <key>` / `Authorization: Bearer <key>`; calls without a valid tenant context return 401. Tenants are onboarded through the platform control plane behind `LOANOS_PLATFORM_ADMIN_KEY` or a logged-in platform admin. The platform onboarding flow can create the tenant shell, first owner, regulated entity profile, initial product policy, enabled modules/flows, readiness checklist, and one-time service key in one transaction. For local dev, set `LOANOS_DEV_TENANT_KEY` to boot a ready-to-use `dev` tenant with login `admin@dev.local` / `dev-admin-password` (override with `LOANOS_DEV_ADMIN_PASSWORD`).
+The API is multi-tenant and supports both human sessions and service credentials. Data-plane routes accept a tenant user session cookie from `POST /auth/login`, or a tenant service key sent as `x-api-key: <key>` / `Authorization: Bearer <key>`; calls without a valid tenant context return 401. Tenants are onboarded through the platform control plane behind `LOANOS_PLATFORM_ADMIN_KEY` or a logged-in platform admin. The platform onboarding flow can create the tenant shell, first owner, regulated entity profile, initial product policy, enabled modules/flows, readiness checklist, and one-time service key in one transaction.
+
+For local development and testing:
+
+### 1. Platform Admin User
+* **Endpoint**: `/auth/login` (with `scope: "platform"`)
+* **Email**: `admin@platform.local`
+* **Password**: `platform-admin-password` (override with `LOANOS_PLATFORM_ADMIN_PASSWORD` env variable)
+* **Roles**: `["platform_admin", "tenant_provisioner", "security_admin", "auditor"]`
+
+### 2. Demo Tenant Staff Users (`dev` tenant)
+* **Endpoint**: `/auth/login` (with `scope: "tenant"` and `tenantId: "dev"`)
+* **Default Password**: `dev-admin-password` (override with `LOANOS_DEV_ADMIN_PASSWORD` env variable)
+* **Seeded Bank Staff Members**:
+
+| User ID | Email | Display Name | Staff Roles | Queue Subscriptions | Admin Roles |
+|---|---|---|---|---|---|
+| `tenant_admin_1` | `admin@dev.local` | Dev Tenant Admin | `workflow_admin` | `*` | `tenant_admin`, `user_admin`, `security_admin`, `auditor` |
+| `credit_maker_1` | `credit-maker-1@dev.local` | Credit Maker | `credit_officer` | `credit_ops` | *None* |
+| `credit_checker_1` | `credit-checker-1@dev.local` | Credit Checker | `credit_checker` | `credit_checker` | *None* |
+| `credit_lead_1` | `credit-lead-1@dev.local` | Credit Lead | `workflow_admin` | `*` | *None* |
+| `credit_reviewer_1` | `credit-reviewer-1@dev.local` | Credit Human Reviewer | `human_reviewer` | `model_risk` | *None* |
+| `loan_officer_1` | `loan-officer-1@dev.local` | Loan Officer | `loan_officer` | `loan_ops` | *None* |
+| `disbursement_maker_1` | `disbursement-maker-1@dev.local` | Disbursement Maker | `disbursement_maker` | `disbursement_ops` | *None* |
+| `compliance_analyst_1` | `compliance-analyst-1@dev.local` | Compliance Analyst | `compliance_analyst` | `compliance_ops` | *None* |
+| `collections_manager_1` | `collections-manager-1@dev.local` | Collections Manager | `collections_manager` | `collections_ops` | *None* |
+| `collections_lead_1` | `collections-lead-1@dev.local` | Collections Lead | `workflow_admin` | `*` | *None* |
+| `portfolio_risk_1` | `portfolio-risk-1@dev.local` | Portfolio Risk Manager | `portfolio_risk_manager` | `risk_ops` | *None* |
+| `grievance_officer_1` | `grievance-officer-1@dev.local` | Grievance Officer | `grievance_officer` | `grievance_ops` | *None* |
+| `grievance_lead_1` | `grievance-lead-1@dev.local` | Grievance Lead | `workflow_admin` | `*` | *None* |
+| `kyc_officer_1` | `kyc-officer-1@dev.local` | KYC Officer | `kyc_officer` | `kyc_ops` | *None* |
+
+### 3. Demo Tenant Pre-Seeded Customer Profiles (`dev` tenant)
+These borrower profiles are pre-linked to the pre-seeded Regulated Entity (`re_1` - India Retail Lending Corp) and Product Policy (`prod_1` - `RETAIL_PERSONAL_LOAN` in INR).
+
+| Borrower ID | Name | Email | Residency | Occupation | Monthly Income | KYC Status | Consent Status |
+|---|---|---|---|---|---|---|---|
+| `borrower_1` | Rajesh Kumar | `rajesh@example.com` | India (`IN`) | Salaried | ₹45,000 | Verified (Medium Risk) | Accepted |
+| `borrower_2` | Asha Sharma | `asha@example.in` | India (`IN`) | Self-Employed | ₹85,000 | Verified (Low Risk) | Accepted |
+| `borrower_3` | Amit Patel | `amit@example.com` | India (`IN`) | Student | ₹12,000 | Verified (Low Risk) | Accepted |
 
 Human auth endpoints:
 

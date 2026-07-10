@@ -17,6 +17,7 @@ import {
   normalizePlatformUsers,
   normalizeSessions,
   normalizeTenantUsers,
+  upsertPlatformUser,
   upsertTenantUser
 } from "./identity.js";
 
@@ -758,11 +759,40 @@ export async function ensureBootstrapTenants(
   bootstrapTenants = [],
   { loadStateFn = loadState, saveStateFn = saveState } = {}
 ) {
-  if (!bootstrapTenants.length) {
-    return;
-  }
   let state = await loadStateFn(dataDir);
   let changed = false;
+
+  // Bootstrap platform administrator user if it doesn't exist
+  if (!state.controlPlane.platformUsers || Object.keys(state.controlPlane.platformUsers).length === 0) {
+    const platformPassword = process.env.LOANOS_PLATFORM_ADMIN_PASSWORD || "platform-admin-password";
+    const result = upsertPlatformUser(state.controlPlane.platformUsers ?? {}, {
+      userId: "platform_admin_1",
+      email: "admin@platform.local",
+      displayName: "Platform Administrator",
+      password: platformPassword,
+      mustChangePassword: false,
+      mfaRequired: false,
+      roles: ["platform_admin", "tenant_provisioner", "security_admin", "auditor"],
+      country: "IN"
+    });
+    if (result.findings.length === 0) {
+      state = {
+        ...state,
+        controlPlane: {
+          ...state.controlPlane,
+          platformUsers: result.users
+        }
+      };
+      changed = true;
+    }
+  }
+
+  if (!bootstrapTenants.length) {
+    if (changed) {
+      await saveStateFn(state, dataDir);
+    }
+    return;
+  }
   for (const tenant of bootstrapTenants) {
     const existing = state.controlPlane.tenants[tenant.tenantId];
     // Keep a bootstrap tenant idempotent, but (re)bind its api key each start so
@@ -775,21 +805,169 @@ export async function ensureBootstrapTenants(
     if (tenant.tenantId === "dev" && state.tenants["dev"]) {
       const devData = state.tenants["dev"];
       if (!devData.users || Object.keys(devData.users).length === 0) {
-        // One identity: the login user IS the staff actor. userId is set
-        // explicitly to "tenant_admin_1" so it reads as a familiar actor id
-        // wherever it's referenced (workflow assignment, proposedBy, etc.).
-        const result = upsertTenantUser(devData.users ?? {}, {
+        const password = process.env.LOANOS_DEV_ADMIN_PASSWORD ?? "dev-admin-password";
+        let users = { ...devData.users };
+        
+        // 1. Tenant Admin
+        users = upsertTenantUser(users, {
           userId: "tenant_admin_1",
           email: "admin@dev.local",
           displayName: "Dev Tenant Admin",
-          password: process.env.LOANOS_DEV_ADMIN_PASSWORD ?? "dev-admin-password",
+          password,
           adminRoles: ["tenant_admin", "user_admin", "security_admin", "auditor"],
           roles: ["workflow_admin"],
           queues: ["*"],
           canAssignQueues: ["*"],
           country: "IN"
-        });
-        devData.users = result.users;
+        }).users;
+
+        // 2. Credit Maker
+        users = upsertTenantUser(users, {
+          userId: "credit_maker_1",
+          email: "credit-maker-1@dev.local",
+          displayName: "Credit Maker",
+          password,
+          roles: ["credit_officer"],
+          queues: ["credit_ops"],
+          country: "IN"
+        }).users;
+
+        // 3. Credit Checker
+        users = upsertTenantUser(users, {
+          userId: "credit_checker_1",
+          email: "credit-checker-1@dev.local",
+          displayName: "Credit Checker",
+          password,
+          roles: ["credit_checker"],
+          queues: ["credit_checker"],
+          country: "IN"
+        }).users;
+
+        // 4. Credit Lead
+        users = upsertTenantUser(users, {
+          userId: "credit_lead_1",
+          email: "credit-lead-1@dev.local",
+          displayName: "Credit Lead",
+          password,
+          roles: ["workflow_admin"],
+          queues: ["*"],
+          canAssignQueues: ["credit_checker"],
+          country: "IN"
+        }).users;
+
+        // 5. Credit Human Reviewer
+        users = upsertTenantUser(users, {
+          userId: "credit_reviewer_1",
+          email: "credit-reviewer-1@dev.local",
+          displayName: "Credit Human Reviewer",
+          password,
+          roles: ["human_reviewer"],
+          queues: ["model_risk"],
+          country: "IN"
+        }).users;
+
+        // 6. Loan Officer
+        users = upsertTenantUser(users, {
+          userId: "loan_officer_1",
+          email: "loan-officer-1@dev.local",
+          displayName: "Loan Officer",
+          password,
+          roles: ["loan_officer"],
+          queues: ["loan_ops"],
+          country: "IN"
+        }).users;
+
+        // 7. Disbursement Maker
+        users = upsertTenantUser(users, {
+          userId: "disbursement_maker_1",
+          email: "disbursement-maker-1@dev.local",
+          displayName: "Disbursement Maker",
+          password,
+          roles: ["disbursement_maker"],
+          queues: ["disbursement_ops"],
+          country: "IN"
+        }).users;
+
+        // 8. Compliance Analyst
+        users = upsertTenantUser(users, {
+          userId: "compliance_analyst_1",
+          email: "compliance-analyst-1@dev.local",
+          displayName: "Compliance Analyst",
+          password,
+          roles: ["compliance_analyst"],
+          queues: ["compliance_ops"],
+          country: "IN"
+        }).users;
+
+        // 9. Collections Manager
+        users = upsertTenantUser(users, {
+          userId: "collections_manager_1",
+          email: "collections-manager-1@dev.local",
+          displayName: "Collections Manager",
+          password,
+          roles: ["collections_manager"],
+          queues: ["collections_ops"],
+          country: "IN"
+        }).users;
+
+        // 10. Collections Lead
+        users = upsertTenantUser(users, {
+          userId: "collections_lead_1",
+          email: "collections-lead-1@dev.local",
+          displayName: "Collections Lead",
+          password,
+          roles: ["workflow_admin"],
+          queues: ["*"],
+          canAssignQueues: ["collections_ops"],
+          country: "IN"
+        }).users;
+
+        // 11. Portfolio Risk Manager
+        users = upsertTenantUser(users, {
+          userId: "portfolio_risk_1",
+          email: "portfolio-risk-1@dev.local",
+          displayName: "Portfolio Risk Manager",
+          password,
+          roles: ["portfolio_risk_manager"],
+          queues: ["risk_ops"],
+          country: "IN"
+        }).users;
+
+        // 12. Grievance Officer
+        users = upsertTenantUser(users, {
+          userId: "grievance_officer_1",
+          email: "grievance-officer-1@dev.local",
+          displayName: "Grievance Officer",
+          password,
+          roles: ["grievance_officer"],
+          queues: ["grievance_ops"],
+          country: "IN"
+        }).users;
+
+        // 13. Grievance Lead
+        users = upsertTenantUser(users, {
+          userId: "grievance_lead_1",
+          email: "grievance-lead-1@dev.local",
+          displayName: "Grievance Lead",
+          password,
+          roles: ["workflow_admin"],
+          queues: ["*"],
+          canAssignQueues: ["grievance_ops"],
+          country: "IN"
+        }).users;
+
+        // 14. KYC Officer
+        users = upsertTenantUser(users, {
+          userId: "kyc_officer_1",
+          email: "kyc-officer-1@dev.local",
+          displayName: "KYC Officer",
+          password,
+          roles: ["kyc_officer"],
+          queues: ["kyc_ops"],
+          country: "IN"
+        }).users;
+
+        devData.users = users;
         changed = true;
       }
       if (!devData.loanApplications || Object.keys(devData.loanApplications).length === 0) {
@@ -844,6 +1022,28 @@ export async function ensureBootstrapTenants(
             occupation: "salaried",
             monthlyIncome: 45000,
             status: "active"
+          },
+          "borrower_2": {
+            borrowerId: "borrower_2",
+            name: "Asha Sharma",
+            residencyCountry: "IN",
+            address: "456, Linking Road, Mumbai, MH, India",
+            email: "asha@example.in",
+            phone: "+919988776655",
+            occupation: "self_employed",
+            monthlyIncome: 85000,
+            status: "active"
+          },
+          "borrower_3": {
+            borrowerId: "borrower_3",
+            name: "Amit Patel",
+            residencyCountry: "IN",
+            address: "789, CG Road, Ahmedabad, GJ, India",
+            email: "amit@example.com",
+            phone: "+919123456789",
+            occupation: "student",
+            monthlyIncome: 12000,
+            status: "active"
           }
         };
 
@@ -855,6 +1055,22 @@ export async function ensureBootstrapTenants(
             riskCategory: "medium",
             verifiedAt: "2026-01-10T10:00:00.000Z",
             reviewDueAt: "2034-01-10T10:00:00.000Z"
+          },
+          "kyc_2": {
+            kycRecordId: "kyc_2",
+            borrowerId: "borrower_2",
+            status: "verified",
+            riskCategory: "low",
+            verifiedAt: "2026-03-15T09:00:00.000Z",
+            reviewDueAt: "2034-03-15T09:00:00.000Z"
+          },
+          "kyc_3": {
+            kycRecordId: "kyc_3",
+            borrowerId: "borrower_3",
+            status: "verified",
+            riskCategory: "low",
+            verifiedAt: "2026-05-20T11:30:00.000Z",
+            reviewDueAt: "2034-05-20T11:30:00.000Z"
           }
         };
 
@@ -866,6 +1082,22 @@ export async function ensureBootstrapTenants(
             noticeVersion: "v1.0",
             status: "accepted",
             grantedAt: "2026-07-01T12:00:00.000Z"
+          },
+          "consent_2": {
+            consentId: "consent_2",
+            borrowerId: "borrower_2",
+            purpose: "credit_assessment",
+            noticeVersion: "v1.0",
+            status: "accepted",
+            grantedAt: "2026-07-02T10:00:00.000Z"
+          },
+          "consent_3": {
+            consentId: "consent_3",
+            borrowerId: "borrower_3",
+            purpose: "credit_assessment",
+            noticeVersion: "v1.0",
+            status: "accepted",
+            grantedAt: "2026-07-03T14:00:00.000Z"
           }
         };
 
