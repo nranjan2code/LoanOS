@@ -6253,15 +6253,37 @@ test("API dispatches communications with masked ledger evidence", async (t) => {
   });
   assert.equal(invalid.status, 422);
 
+  // TRAI DLT: an SMS without registered entity/template/header is blocked.
+  const smsNoDlt = await postJson(`${base}/integrations/communications`, {
+    channel: "sms",
+    to: "+919876543210",
+    message: "Your EMI is due.",
+    purpose: "payment_reminder"
+  });
+  assert.equal(smsNoDlt.status, 422);
+
+  const smsWithDlt = await postJson(`${base}/integrations/communications`, {
+    channel: "sms",
+    to: "+919876543210",
+    message: "Your EMI is due.",
+    purpose: "payment_reminder",
+    borrowerId: "bor_001",
+    dltEntityId: "1101100000000012345",
+    dltTemplateId: "1107100000000067890",
+    senderId: "LOANOS"
+  });
+  assert.equal(smsWithDlt.status, 201);
+  assert.equal(smsWithDlt.body.communication.dlt.senderId, "LOANOS");
+
   const ledgerResponse = await apiFetch(`${base}/communications?borrowerId=bor_001`);
   assert.equal(ledgerResponse.status, 200);
   const ledger = await ledgerResponse.json();
-  assert.equal(ledger.count, 2);
+  assert.equal(ledger.count, 3);
   assert(ledger.communications.every((record) => record.status === "sent"));
 
   const events = await (await apiFetch(`${base}/audit/events?type=integration.communication.sent`)).json();
   assert.equal(events.chainValid, true);
-  assert.equal(events.count, 2);
+  assert.equal(events.count, 3);
   assert(events.events.every((event) => event.dataClass === "personal_data"));
 });
 

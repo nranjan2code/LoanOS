@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Test (file store)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - run: npm test
+
+  test-postgres:
+    name: Test (Postgres/RLS driver)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_DB: loanos_test
+          # Trust auth: the test connects as the superuser (to apply the schema
+          # and create roles) AND, on a second pool, as loanos_control_plane
+          # with no password (rewriteRole drops it). A disposable CI database
+          # authenticates every role by trust so both connections succeed.
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      # Presence of DATABASE_URL_TEST un-skips tests/postgres-store.test.js,
+      # which applies db/schema.sql (including the two-role model) itself as
+      # the superuser, then re-connects as loanos_control_plane for the
+      # RLS-scoped assertions.
+      DATABASE_URL_TEST: postgres://postgres@localhost:5432/loanos_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - run: npm test

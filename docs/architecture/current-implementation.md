@@ -7,7 +7,9 @@ This document describes what exists in the repository today.
 The current implementation is intentionally small:
 
 - One external npm dependency (`pg`), used only by the optional Postgres storage driver — see below.
-- Node.js built-in HTTP server.
+- Node.js built-in HTTP server. Routes are served both unprefixed and under an explicit `/v1` API-version namespace (stripped once at the dispatch seam) so a future `/v2` can be added within a documented deprecation window; `GET /health` reports `apiVersion`.
+- Containerized: a slim `Dockerfile` (`npm ci --omit=dev`, non-root `node` user, `/health` HEALTHCHECK) and a `docker-compose.yml` bringing up the API on the Postgres/RLS driver against a schema-seeded Postgres 18.
+- CI: `.github/workflows/ci.yml` runs `npm test` on the file store, plus a second job with a Postgres 18 service (trust auth) and `DATABASE_URL_TEST` set so the previously-skipped `tests/postgres-store.test.js` RLS/advisory-lock suite actually executes.
 - Two interchangeable storage drivers, selected via `LOANOS_STORAGE_DRIVER` (defaults to `file`, zero behavior change):
   - **File-backed** (default): JSON state under `.loanos-data/state.json`, partitioned into a control plane (tenant registry) and one data plane per tenant.
   - **Postgres-backed** (opt-in, `LOANOS_STORAGE_DRIVER=postgres`): tenant data-plane documents live one-per-row in a `tenant_data` table under Postgres Row-Level Security — a second, database-enforced isolation layer beneath the application-layer one — with per-tenant advisory locking and per-tenant fetching so concurrent requests for different tenants no longer serialize behind one global lock. See [`db/schema.sql`](../../db/schema.sql), [`apps/api/src/postgres-store.js`](../../apps/api/src/postgres-store.js), and the [Postgres migration doc](postgres-migration.md) for the full v1/v2/v3 design and live-verification results.

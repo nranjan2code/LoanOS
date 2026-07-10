@@ -1,0 +1,42 @@
+# Local Postgres-backed LoanOS stack. Brings up the API on the Postgres/RLS
+# storage driver against a Postgres 18 instance seeded from db/schema.sql.
+# For the default file-store driver, run the api service without the postgres
+# env overrides (or use `node apps/api/src/server.js` directly).
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: loanos
+    ports:
+      - "5432:5432"
+    volumes:
+      - loanos-pg:/var/lib/postgresql/data
+      # Applied once on first init: creates tables, RLS policies, and the
+      # two-role model (loanos_control_plane / loanos_app).
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/10-schema.sql:ro
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: "3040"
+      LOANOS_STORAGE_DRIVER: postgres
+      # The app authenticates as loanos_control_plane (BYPASSRLS) and SET ROLEs
+      # to loanos_app for per-tenant statements — see db/schema.sql.
+      DATABASE_URL: postgres://loanos_control_plane@postgres:5432/loanos
+      LOANOS_PLATFORM_ADMIN_KEY: ${LOANOS_PLATFORM_ADMIN_KEY:-platform-admin-key}
+    ports:
+      - "3040:3040"
+
+volumes:
+  loanos-pg:

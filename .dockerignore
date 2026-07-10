@@ -1,0 +1,9 @@
+node_modules
+.git
+.github
+.loanos-data
+*.log
+tests
+docs
+.claude
+scratchpad

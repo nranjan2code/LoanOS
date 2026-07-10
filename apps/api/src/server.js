@@ -240,6 +240,7 @@ import {
 } from "./identity.js";
 
 const DEFAULT_PORT = Number(process.env.PORT || 3040);
+const API_VERSION = "v1";
 const SESSION_COOKIE = "loanos_session";
 
 // Shared with postgres-store.js's GLOBAL_LOCK_LABEL by value (not by
@@ -454,13 +455,24 @@ function bufferRequestBody(req) {
 async function route(req, res, dataDir, platformAdminKey) {
   const method = req.method ?? "GET";
   const url = new URL(req.url ?? "/", "http://localhost");
-  const path = url.pathname;
+  // API versioning: routes are served both unprefixed and under an explicit
+  // /v1 namespace so a documented deprecation window can add /v2 later without
+  // breaking regulated flows. The version prefix is stripped once, here, so
+  // every downstream matcher stays version-agnostic.
+  const rawPath = url.pathname;
+  const path =
+    rawPath === `/${API_VERSION}`
+      ? "/"
+      : rawPath.startsWith(`/${API_VERSION}/`)
+        ? rawPath.slice(API_VERSION.length + 1)
+        : rawPath;
 
   // --- Open routes: no tenant context required. ---
   if (method === "GET" && path === "/health") {
     sendJson(res, 200, {
       status: "ok",
-      service: "loanos-india-api"
+      service: "loanos-india-api",
+      apiVersion: API_VERSION
     });
     return;
   }
@@ -6968,11 +6980,27 @@ function normalizeCommunicationPayload(input = {}) {
   if (channel === "email" && !input.subject) {
     throw new Error("Email communication requires subject.");
   }
+  // TRAI TCCCPR / DLT: commercial SMS in India must be sent from a registered
+  // principal entity (Entity ID), a registered header/sender ID, and against a
+  // DLT-registered content template. Block an SMS dispatch that is missing any
+  // of these so unregistered traffic can never leave the platform.
+  let dlt = null;
+  if (channel === "sms") {
+    if (!input.dltEntityId || !input.dltTemplateId || !input.senderId) {
+      throw new Error("SMS requires TRAI DLT registration: dltEntityId, dltTemplateId, and a registered senderId (header).");
+    }
+    dlt = {
+      entityId: input.dltEntityId,
+      templateId: input.dltTemplateId,
+      senderId: input.senderId
+    };
+  }
   return {
     channel,
     to,
     subject: input.subject ?? null,
-    message: input.message
+    message: input.message,
+    dlt
   };
 }
 
@@ -6987,6 +7015,7 @@ function buildCommunicationRecord(input, payload, dispatch, now = new Date()) {
     applicationId: input.applicationId ?? null,
     loanAccountId: input.loanAccountId ?? null,
     templateId: input.templateId ?? null,
+    dlt: payload.dlt ?? null,
     recipientMasked: maskRecipient(payload.channel, payload.to),
     subjectSha256: subject ? hashString(subject) : null,
     subjectLength: subject.length,
