@@ -52,6 +52,13 @@ const dom = {
   filterMyQueues: document.getElementById('filter-my-queues'),
   filterStatus: document.getElementById('filter-status'),
   taskSearch: document.getElementById('task-search'),
+  taskSort: document.getElementById('task-sort'),
+  visibleTaskCount: document.getElementById('visible-task-count'),
+  btnClearFilters: document.getElementById('btn-clear-filters'),
+  btnEmptyClear: document.getElementById('btn-empty-clear'),
+  tasksError: document.getElementById('tasks-error'),
+  tasksErrorText: document.getElementById('tasks-error-text'),
+  btnRetryTasks: document.getElementById('btn-retry-tasks'),
   tasksGrid: document.getElementById('tasks-grid-list'),
   tasksEmptyState: document.getElementById('tasks-empty-state'),
   tasksSkeleton: document.getElementById('tasks-skeleton'),
@@ -60,6 +67,7 @@ const dom = {
   detailContainer: document.getElementById('task-detail-container'),
   detailEmptyState: document.getElementById('detail-empty-state'),
   detailContent: document.getElementById('task-details-content'),
+  btnDetailClose: document.getElementById('btn-detail-close'),
   
   detailPriority: document.getElementById('detail-priority'),
   detailTitle: document.getElementById('detail-title'),
@@ -307,17 +315,18 @@ function showToast(message, type = 'info') {
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
   
-  let icon = 'ℹ️';
-  if (type === 'success') icon = '✅';
-  if (type === 'error') icon = '❌';
-  if (type === 'warning') icon = '⚠️';
+  let icon = 'i';
+  if (type === 'success') icon = '✓';
+  if (type === 'error') icon = '!';
+  if (type === 'warning') icon = '!';
   
   toast.innerHTML = `
-    <span aria-hidden="true">${icon}</span>
-    <span class="toast-message">${message}</span>
+    <span class="toast-symbol" aria-hidden="true">${icon}</span>
+    <span class="toast-message"></span>
     <button class="toast-dismiss" aria-label="Dismiss notification">×</button>
     <div class="toast-progress"></div>
   `;
+  toast.querySelector('.toast-message').textContent = String(message);
   
   // Dismiss button
   toast.querySelector('.toast-dismiss').addEventListener('click', () => dismissToast(toast));
@@ -545,8 +554,10 @@ async function loadTasks(silent = false) {
   
   // Show skeleton
   if (!silent) {
+    dom.tasksGrid.closest('.tasks-panel')?.setAttribute('aria-busy', 'true');
     dom.tasksSkeleton.classList.remove('hidden');
     dom.tasksEmptyState.classList.add('hidden');
+    dom.tasksError.classList.add('hidden');
     dom.tasksGrid.innerHTML = '';
   }
   
@@ -573,9 +584,12 @@ async function loadTasks(silent = false) {
     }
   } catch (err) {
     if (!silent) showToast(`Load tasks failed: ${err.message}`, 'error');
+    dom.tasksErrorText.textContent = err.message || 'Check your connection and try again.';
+    dom.tasksError.classList.remove('hidden');
     updateConnectionStatus(false);
   } finally {
     dom.tasksSkeleton.classList.add('hidden');
+    dom.tasksGrid.closest('.tasks-panel')?.setAttribute('aria-busy', 'false');
   }
 }
 
@@ -687,7 +701,15 @@ function renderTasksList() {
     }
 
     return true;
+  }).sort((a, b) => {
+    if (dom.taskSort.value === 'due') return new Date(a.dueAt || 8640000000000000) - new Date(b.dueAt || 8640000000000000);
+    if (dom.taskSort.value === 'newest') return new Date(b.openedAt) - new Date(a.openedAt);
+    if (dom.taskSort.value === 'oldest') return new Date(a.openedAt) - new Date(b.openedAt);
+    const priorityRank = { critical: 0, high: 1, medium: 2, low: 3 };
+    return (priorityRank[a.priority] ?? 2) - (priorityRank[b.priority] ?? 2) || new Date(a.dueAt || 8640000000000000) - new Date(b.dueAt || 8640000000000000);
   });
+
+  dom.visibleTaskCount.textContent = `${filtered.length} shown`;
   
   if (filtered.length === 0) {
     dom.tasksEmptyState.classList.remove('hidden');
@@ -702,6 +724,9 @@ function renderTasksList() {
     card.className = `task-card animate-in ${apiState.selectedTaskId === task.taskId ? 'active' : ''} ${actionable ? '' : 'out-of-role'}`;
     card.dataset.id = task.taskId;
     card.dataset.type = task.type || '';
+    card.setAttribute('role', 'button');
+    card.setAttribute('tabindex', '0');
+    card.setAttribute('aria-label', `${task.title}. ${getSlaLabel(task.slaStatus)}. ${getPriorityLabel(task.priority)} priority.`);
     card.style.animationDelay = `${index * 40}ms`;
 
     const formattedDate = new Date(task.openedAt).toLocaleDateString(undefined, {
@@ -715,27 +740,31 @@ function renderTasksList() {
 
     card.innerHTML = `
       <div class="task-card-header">
-        <span class="task-card-title">${task.title}</span>
+        <span class="task-card-title">${escapeHtml(task.title)}</span>
         ${actionable ? '' : '<span class="task-card-view-only-badge">View Only</span>'}
         <span class="sla-badge ${task.slaStatus || 'within_sla'}">${getSlaLabel(task.slaStatus)}</span>
       </div>
-      <div class="task-card-body">${task.description}</div>
+      <div class="task-card-body">${escapeHtml(task.description)}</div>
       <div class="task-card-footer">
         <div class="task-meta-left">
-          <span class="priority-marker ${task.priority || 'medium'}">${getPriorityLabel(task.priority)}</span>
+          <span class="priority-marker ${escapeHtml(task.priority || 'medium')}">${escapeHtml(getPriorityLabel(task.priority))}</span>
           <span>·</span>
-          <span>${assignedLabel}</span>
+          <span>${escapeHtml(assignedLabel)}</span>
         </div>
         <div class="task-meta-right">${formattedDate}</div>
       </div>
     `;
     
-    card.addEventListener('click', () => {
+    const openTask = () => {
       document.querySelectorAll('.task-card').forEach(c => c.classList.remove('active'));
       card.classList.add('active');
       selectTask(task);
       // Mobile: open detail panel
       dom.detailContainer.classList.add('panel-open');
+    };
+    card.addEventListener('click', openTask);
+    card.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openTask(); }
     });
     
     dom.tasksGrid.appendChild(card);
@@ -765,7 +794,7 @@ function selectTask(task) {
   // Regulatory reference tags
   if (task.regulatoryRefs && task.regulatoryRefs.length > 0) {
     dom.detailRegulatoryBox.classList.remove('hidden');
-    dom.detailRegulatoryTags.innerHTML = task.regulatoryRefs.map(ref => `<span class="ref-tag">${ref}</span>`).join('');
+    dom.detailRegulatoryTags.innerHTML = task.regulatoryRefs.map(ref => `<span class="ref-tag">${escapeHtml(ref)}</span>`).join('');
   } else {
     dom.detailRegulatoryBox.classList.add('hidden');
   }
@@ -782,6 +811,22 @@ function closeDetails() {
   dom.detailEmptyState.classList.remove('hidden');
   dom.detailContent.classList.add('hidden');
   dom.detailContainer.classList.remove('panel-open');
+}
+
+function clearTaskFilters() {
+  apiState.activeQueue = 'all';
+  apiState.statusFilter = '';
+  dom.taskSearch.value = '';
+  dom.taskSort.value = 'priority';
+  dom.filterStatus.value = '';
+  dom.filterMyQueues.checked = false;
+  document.querySelectorAll('.queue-item').forEach(item => {
+    const active = item.dataset.queue === 'all';
+    item.classList.toggle('active', active);
+    item.setAttribute('aria-selected', String(active));
+  });
+  renderSidebarCounts();
+  renderTasksList();
 }
 
 // ─── Populate Assignee Actors ───────────────────────────────────────────────
@@ -840,9 +885,9 @@ function renderTimeline(events) {
     let actorLabel = ev.actor || ev.assignedTo || 'System';
     
     let extraText = '';
-    if (ev.notes) extraText = `<div class="event-notes">${ev.notes}</div>`;
-    if (ev.comment) extraText = `<div class="event-notes">"${ev.comment}"</div>`;
-    if (ev.reason) extraText = `<div class="event-notes">Reason: ${ev.reason}</div>`;
+    if (ev.notes) extraText = `<div class="event-notes">${escapeHtml(ev.notes)}</div>`;
+    if (ev.comment) extraText = `<div class="event-notes">“${escapeHtml(ev.comment)}”</div>`;
+    if (ev.reason) extraText = `<div class="event-notes">Reason: ${escapeHtml(ev.reason)}</div>`;
     
     // Icon glyphs
     let dotIcon = '●';
@@ -854,10 +899,10 @@ function renderTimeline(events) {
       <div class="event-dot">${dotIcon}</div>
       <div class="event-content">
         <div class="event-meta">
-          <span>${text}</span>
-          <span>${time}</span>
+          <span>${escapeHtml(text)}</span>
+          <span>${escapeHtml(time)}</span>
         </div>
-        <div class="event-text">Actor: <strong>${actorLabel}</strong></div>
+        <div class="event-text">Actor: <strong>${escapeHtml(actorLabel)}</strong></div>
         ${extraText}
       </div>
     `;
@@ -2100,11 +2145,25 @@ function setOnboardingStep(nextStep) {
   });
   dom.onboardingDots.forEach((dot, index) => {
     dot.classList.toggle('active', index === apiState.onboardingStep);
+    dot.classList.toggle('complete', index < apiState.onboardingStep);
+    if (index === apiState.onboardingStep) dot.setAttribute('aria-current', 'step');
+    else dot.removeAttribute('aria-current');
   });
   dom.onboardingStepLabel.textContent = `Step ${apiState.onboardingStep + 1} of ${maxStep + 1}`;
   dom.btnOnboardingPrev.disabled = apiState.onboardingStep === 0;
   dom.btnOnboardingNext.classList.toggle('hidden', apiState.onboardingStep === maxStep);
   dom.btnOnboardingSubmit.classList.toggle('hidden', apiState.onboardingStep !== maxStep);
+}
+
+function validateCurrentOnboardingStep() {
+  const panel = Array.from(dom.onboardingPanels).find(item => Number(item.dataset.wizardStep) === apiState.onboardingStep);
+  if (!panel) return true;
+  const invalid = Array.from(panel.querySelectorAll('input, select, textarea')).find(field => !field.checkValidity());
+  if (!invalid) return true;
+  invalid.reportValidity();
+  invalid.focus();
+  showToast('Complete the required information before continuing.', 'warning');
+  return false;
 }
 
 function selectedCheckboxValues(name) {
@@ -2235,6 +2294,18 @@ function parseCommaList(value) {
     .filter(Boolean);
 }
 
+function enhanceAccessibleForms() {
+  document.querySelectorAll('dialog').forEach(dialog => {
+    const heading = dialog.querySelector('h2, h3');
+    if (heading?.id) dialog.setAttribute('aria-labelledby', heading.id);
+  });
+  document.querySelectorAll('.admin-dialog input, .admin-dialog select, .admin-dialog textarea').forEach(field => {
+    if (field.getAttribute('aria-label') || field.getAttribute('aria-labelledby') || (field.id && document.querySelector(`label[for="${field.id}"]`))) return;
+    const readable = field.getAttribute('placeholder') || field.id.replaceAll('-', ' ').replace(/^platform |^admin |^account /, '');
+    field.setAttribute('aria-label', readable);
+  });
+}
+
 
 // ─── Event Handlers & Initializers ──────────────────────────────────────────
 
@@ -2317,7 +2388,9 @@ dom.adminTabs.forEach(tab => {
 });
 
 dom.btnOnboardingPrev.addEventListener('click', () => setOnboardingStep(apiState.onboardingStep - 1));
-dom.btnOnboardingNext.addEventListener('click', () => setOnboardingStep(apiState.onboardingStep + 1));
+dom.btnOnboardingNext.addEventListener('click', () => {
+  if (validateCurrentOnboardingStep()) setOnboardingStep(apiState.onboardingStep + 1);
+});
 
 dom.adminUserForm.addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -2668,6 +2741,12 @@ dom.taskSearch.addEventListener('input', () => {
   renderTasksList();
 });
 
+dom.taskSort.addEventListener('change', renderTasksList);
+dom.btnClearFilters.addEventListener('click', clearTaskFilters);
+dom.btnEmptyClear.addEventListener('click', clearTaskFilters);
+dom.btnRetryTasks.addEventListener('click', () => loadTasks());
+dom.btnDetailClose.addEventListener('click', closeDetails);
+
 dom.filterStatus.addEventListener('change', () => {
   apiState.statusFilter = dom.filterStatus.value;
   renderTasksList();
@@ -2722,6 +2801,10 @@ document.addEventListener('keydown', (e) => {
 
 // Boot
 window.addEventListener('DOMContentLoaded', () => {
+  enhanceAccessibleForms();
+  if (new URLSearchParams(window.location.search).get('scope') === 'platform') {
+    setLoginScope('platform');
+  }
   initConfig();
   setOnboardingStep(0);
 });

@@ -2171,3 +2171,165 @@ body.platform-mode .workspace-layout::before {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ═══ LoanOS editorial workspace refresh ══════════════════════════════════ */
+:root {
+  --font-sans: 'DM Sans', system-ui, -apple-system, sans-serif;
+  --bg-base: #f7f4ec;
+  --bg-surface-1: #ffffff;
+  --bg-surface-2: #fbfaf6;
+  --bg-surface-3: #f1ecdf;
+  --bg-elevated: #e5e9df;
+  --text-primary: #17201d;
+  --text-secondary: #46534e;
+  --text-muted: #68736f;
+  --border-active: #173f35;
+  --accent-primary: #173f35;
+  --accent-indigo: #173f35;
+  --accent-cyan: #28705c;
+  --accent-gradient: #173f35;
+  --shadow-sm: 0 4px 14px rgba(12,45,38,.06);
+  --shadow-md: 0 12px 32px rgba(12,45,38,.09);
+  --shadow-lg: 0 24px 64px rgba(12,45,38,.14);
+  --shadow-glow-indigo: 0 10px 24px rgba(23,63,53,.16);
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+}
+
+body { background-image: none; }
+.login-screen {
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(90deg, rgba(12,45,38,.94), rgba(12,45,38,.74)),
+    url('/shared/images/loanos-india-operations-team.jpg') center/cover;
+}
+.login-screen::before {
+  content: 'Every decision, handoff and customer promise—together.';
+  position: absolute;
+  left: clamp(30px, 7vw, 110px);
+  top: 50%;
+  width: min(440px, 34vw);
+  transform: translateY(-50%);
+  color: white;
+  font-family: 'DM Serif Display', Georgia, serif;
+  font-size: clamp(2.8rem, 4.5vw, 5.4rem);
+  line-height: .98;
+  letter-spacing: -.035em;
+}
+.login-card { position: relative; z-index: 1; margin-left: min(48vw, 640px); border: 0; border-radius: 24px; padding: 36px; box-shadow: 0 32px 90px rgba(0,0,0,.24); backdrop-filter: none; }
+.login-brand .logo-icon, .brand .logo-icon { border-radius: 50% 50% 50% 12px; background: #173f35; color: #d8ef88; box-shadow: none; }
+.login-brand h1 { color: #173f35; font-family: 'DM Serif Display', Georgia, serif; font-size: 2.15rem; font-weight: 400; }
+.login-tabs { padding: 4px; border-radius: 12px; background: var(--bg-surface-3); }
+.login-tab { border: 0; background: transparent; }
+.login-tab.active { border: 0; background: white; color: #173f35; box-shadow: var(--shadow-sm); }
+.login-scope-note { margin: -2px 0 2px; color: var(--text-muted); font-size: var(--text-xs); line-height: 1.45; }
+.btn { border-radius: 100px; }
+.app-header { background: #173f35; border-bottom: 0; color: white; box-shadow: 0 5px 24px rgba(12,45,38,.16); }
+.app-header .brand h1, .app-header .sub-brand, .app-header .control-group label, .app-header .connection-status { color: white; }
+.app-header .sub-brand, .app-header .control-group label { opacity: .68; }
+.app-header .btn-secondary { border-color: rgba(255,255,255,.2); background: rgba(255,255,255,.1); color: white; }
+.app-header .btn-secondary:hover { background: rgba(255,255,255,.18); }
+.workspace-layout { background: #f7f4ec; }
+.sidebar { background: #fbfaf6; }
+.metric-card, .task-card, .op-card { box-shadow: none; }
+.task-card { border-radius: 12px; }
+.task-card:hover { border-color: #28705c; transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+.detail-panel { background: #fbfaf6; }
+.panel-header h2, .detail-title { color: #173f35; }
+
+.admin-dialog { width: min(1180px, 95vw); border: 0; border-radius: 22px; box-shadow: 0 35px 100px rgba(12,45,38,.25); }
+.admin-dialog::backdrop { background: rgba(12,45,38,.58); backdrop-filter: blur(5px); }
+.admin-dialog .dialog-header { padding: 24px 28px 18px; background: #173f35; color: white; }
+.admin-dialog .dialog-header h3 { font-family: 'DM Serif Display', Georgia, serif; font-size: 2rem; font-weight: 400; }
+.admin-dialog .dialog-header p { color: rgba(255,255,255,.65); }
+.admin-layout { display: grid; grid-template-columns: 190px minmax(0,1fr); gap: 24px; padding: 24px 28px; }
+.admin-tabs { flex-direction: column; align-items: stretch; margin: 0; }
+.admin-tab { flex: none; min-height: 42px; border: 0; background: transparent; text-align: left; }
+.admin-tab.active { border: 0; background: #173f35; color: white; }
+.admin-panel { grid-column: 2; min-height: 520px; max-height: 65vh; }
+.admin-summary-card, .admin-row, .admin-form { border-color: rgba(23,63,53,.12); background: #fbfaf6; }
+.onboarding-wizard { padding: 24px; }
+.wizard-title-row h4 { color: #173f35; font-family: 'DM Serif Display', Georgia, serif; font-size: 1.7rem; font-weight: 400; }
+.wizard-steps { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; }
+.wizard-dot { position: relative; min-width: max-content; border: 0; border-radius: 0; background: transparent; color: var(--text-muted); }
+.wizard-dot.active { border-bottom: 2px solid #28705c; background: transparent; color: #173f35; }
+.wizard-panel legend { color: #173f35; font-size: 1rem; }
+.wizard-choice-grid label:has(input:checked) { border-color: #28705c; background: #eef4ea; color: #173f35; }
+.dialog-footer { padding: 16px 28px; }
+
+body.platform-mode .workspace-layout::before { content: 'Platform administration is open. Set up organisations, manage platform access and review governance activity from the secure administration window.'; color: #46534e; }
+
+@media (max-width: 800px) {
+  .login-screen::before { display: none; }
+  .login-card { margin-left: 0; }
+  .admin-layout { display: block; padding: 18px; }
+  .admin-tabs { flex-direction: row; overflow-x: auto; margin-bottom: 18px; }
+  .admin-tab { min-width: max-content; text-align: center; }
+  .admin-panel { min-height: 0; }
+}
+
+/* ═══ Workflow usability and state system ═════════════════════════════════ */
+.metric-icon {
+  min-width: 30px;
+  min-height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-full);
+  background: rgba(23,63,53,.08);
+  color: var(--accent-primary);
+  font-size: 9px;
+  font-family: var(--font-sans);
+  font-weight: 800;
+  letter-spacing: .04em;
+  opacity: 1;
+}
+.metric-card.danger .metric-icon { background: var(--status-danger-subtle); color: var(--status-danger); }
+.metric-card.warning .metric-icon { background: var(--status-warning-subtle); color: #9a5b00; }
+.metric-card.info .metric-icon { background: rgba(40,112,92,.1); color: var(--accent-cyan); }
+.tasks-heading { display: flex; align-items: end; justify-content: space-between; gap: var(--space-5); padding: var(--space-6) var(--space-5) var(--space-3); background: var(--bg-base); }
+.workspace-eyebrow { display: block; margin-bottom: 3px; color: var(--accent-cyan); font-size: var(--text-2xs); font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+.tasks-heading h2 { color: var(--accent-primary); font-family: 'DM Serif Display', Georgia, serif; font-size: 1.75rem; font-weight: 400; line-height: 1.1; }
+.tasks-heading p { margin-top: 4px; color: var(--text-muted); font-size: var(--text-xs); }
+.visible-task-count { flex: 0 0 auto; padding: 6px 10px; border: 1px solid var(--border-default); border-radius: var(--radius-full); background: var(--bg-surface-1); color: var(--text-secondary); font-size: var(--text-xs); font-weight: 700; }
+.search-bar-container { display: grid; grid-template-columns: minmax(220px,1fr) auto auto; gap: var(--space-2); align-items: end; padding-top: var(--space-2); }
+.search-field { position: relative; }
+.search-field > span { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 1.15rem; pointer-events: none; }
+.search-field input { padding-left: 38px; }
+.toolbar-field { display: grid; gap: 3px; color: var(--text-muted); font-size: var(--text-2xs); font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+.toolbar-field select { min-height: 42px; padding: 0 32px 0 12px; border: 1px solid var(--border-default); border-radius: var(--radius-md); background: var(--bg-input); color: var(--text-primary); }
+.workspace-message { display: grid; grid-template-columns: 1fr auto; gap: 4px 16px; align-items: center; margin-bottom: var(--space-4); padding: var(--space-4); border: 1px solid rgba(239,68,68,.22); border-radius: var(--radius-md); background: var(--status-danger-subtle); color: var(--status-danger); }
+.workspace-message strong, .workspace-message span { grid-column: 1; }
+.workspace-message span { font-size: var(--text-xs); }
+.workspace-message button { grid-column: 2; grid-row: 1 / 3; }
+.toast-symbol { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; background: var(--bg-surface-3); color: var(--text-primary); font-size: var(--text-xs); font-weight: 900; }
+.empty-state h3 { color: var(--accent-primary); font-family: 'DM Serif Display', Georgia, serif; font-size: 1.4rem; font-weight: 400; }
+.empty-icon { width: 64px; height: 52px; position: relative; border: 2px solid rgba(23,63,53,.25); border-radius: 10px; font-size: 0; filter: none; opacity: 1; }
+.empty-icon::before { content: ''; position: absolute; width: 24px; height: 7px; top: -8px; left: 8px; border: 2px solid rgba(23,63,53,.25); border-bottom: 0; border-radius: 6px 6px 0 0; }
+.empty-icon span { position: absolute; width: 22px; height: 2px; left: 19px; top: 24px; background: rgba(23,63,53,.25); }
+.empty-state-photo { width: min(260px, 88%); height: 130px; object-fit: cover; border-radius: var(--radius-lg); filter: saturate(.65); }
+.detail-close { display: none; position: absolute; top: var(--space-3); right: var(--space-3); width: 36px; height: 36px; border: 1px solid var(--border-default); border-radius: 50%; background: var(--bg-surface-1); color: var(--text-primary); cursor: pointer; font-size: 1.25rem; }
+.task-card:focus-visible { outline: 3px solid rgba(40,112,92,.35); outline-offset: 2px; }
+.task-card-header { align-items: flex-start; }
+.task-card-title { line-height: 1.35; }
+.task-card-body { line-height: 1.5; }
+.op-card { background: var(--bg-surface-1); border-radius: var(--radius-md); }
+.operations-box > h4, .resolution-box > h4, .timeline-box > h4 { color: var(--accent-primary); font-size: var(--text-sm); }
+.wizard-dot.complete { color: var(--status-success); }
+.wizard-dot.complete::before { content: '✓ '; }
+.admin-form-grid input:focus-visible, .admin-form-grid select:focus-visible, .onboarding-wizard textarea:focus-visible { outline: 3px solid rgba(40,112,92,.22); outline-offset: 1px; border-color: var(--accent-cyan); }
+
+@media (max-width: 900px) {
+  .detail-close { display: grid; place-items: center; }
+  .detail-header { position: relative; padding-right: 42px; }
+}
+@media (max-width: 700px) {
+  .tasks-heading { align-items: flex-start; padding: var(--space-5) var(--space-4) var(--space-3); }
+  .tasks-heading p { display: none; }
+  .search-bar-container { grid-template-columns: 1fr 1fr; padding-inline: var(--space-4); }
+  .search-field { grid-column: 1 / -1; }
+  .tasks-list-scroll { padding-inline: var(--space-4); }
+  .workspace-message { grid-template-columns: 1fr; }
+  .workspace-message button { grid-column: 1; grid-row: auto; justify-self: start; }
+}

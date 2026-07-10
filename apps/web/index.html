@@ -1,818 +1,475 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LoanOS India — Compliance-First Lending OS</title>
-  <meta name="description" content="A greenfield loan origination, servicing, and workflow operating system built specifically for India digital lending regulations.">
-  
-  <!-- Favicon -->
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230a1018'/><text x='50' y='68' font-size='50' text-anchor='middle' fill='%23faf9f1' font-weight='bold'>L</text></svg>">
-
-  <!-- Fonts -->
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LoanOS India — Lending, made clear</title>
+  <meta name="description" content="One trusted platform for loan origination, servicing, collections and customer care—built for lending in India.">
+  <meta name="theme-color" content="#173f35">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="LoanOS India — Lending, made clear">
+  <meta property="og:description" content="One trusted platform for loan origination, servicing, collections and customer care—built for lending in India.">
+  <meta property="og:image" content="https://loanos.in/shared/images/loanos-india-social-preview.jpg">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="LoanOS India — Lending, made clear">
+  <meta name="twitter:description" content="A clearer lending journey for customers and every team behind them.">
+  <meta name="twitter:image" content="https://loanos.in/shared/images/loanos-india-social-preview.jpg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-
-  <!-- Shared Design Tokens -->
-  <link rel="stylesheet" href="/shared/design-tokens.css">
-
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet">
   <style>
-    /* Custom Landing Layout on top of Core Tokens */
-    .landing-body {
-      background-color: var(--bg-base);
-      color: var(--text-primary);
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
+    :root {
+      --forest: #173f35;
+      --forest-deep: #0c2d26;
+      --leaf: #28705c;
+      --lime: #d8ef88;
+      --sand: #f1ecdf;
+      --paper: #fbfaf6;
+      --white: #fff;
+      --ink: #17201d;
+      --muted: #59635f;
+      --line: rgba(23, 63, 53, .15);
+      --serif: "DM Serif Display", Georgia, serif;
+      --sans: "DM Sans", system-ui, sans-serif;
+      --max: 1240px;
     }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--sans); line-height: 1.55; -webkit-font-smoothing: antialiased; }
+    a { color: inherit; }
+    img, video { display: block; width: 100%; }
+    button, input { font: inherit; }
+    :focus-visible { outline: 3px solid var(--lime); outline-offset: 3px; }
+    .wrap { width: min(var(--max), calc(100% - 48px)); margin-inline: auto; }
+    .eyebrow { margin: 0 0 14px; color: var(--leaf); font-size: .76rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+    .eyebrow.light { color: var(--lime); }
+    .display { margin: 0; font-family: var(--serif); font-weight: 400; letter-spacing: -.035em; line-height: .98; }
+    .button { min-height: 48px; display: inline-flex; align-items: center; justify-content: center; gap: 10px; padding: 0 21px; border: 1px solid transparent; border-radius: 100px; font-weight: 700; text-decoration: none; transition: transform .2s, background .2s, color .2s; }
+    .button:hover { transform: translateY(-2px); }
+    .button.primary { background: var(--lime); color: var(--forest-deep); }
+    .button.ink { background: var(--forest); color: var(--white); }
+    .button.ghost { border-color: var(--line); background: rgba(255,255,255,.65); color: var(--forest); }
+    .button.text { min-height: auto; padding: 0; border-radius: 0; color: var(--forest); }
+    .arrow { transition: transform .2s; }
+    a:hover .arrow { transform: translateX(4px); }
 
-    .landing-header {
-      background: var(--bg-surface-1);
-      border-bottom: 1px solid var(--border-default);
-      padding: var(--space-4) 0;
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      backdrop-filter: blur(8px);
+    .announcement { background: var(--forest-deep); color: rgba(255,255,255,.84); font-size: .82rem; }
+    .announcement .wrap { min-height: 38px; display: flex; align-items: center; justify-content: center; gap: 8px; text-align: center; }
+    .announcement strong { color: var(--lime); }
+    header { position: sticky; top: 0; z-index: 20; background: rgba(251,250,246,.92); border-bottom: 1px solid var(--line); backdrop-filter: blur(16px); }
+    .nav { height: 74px; display: flex; align-items: center; justify-content: space-between; gap: 32px; }
+    .brand { display: flex; align-items: center; gap: 12px; text-decoration: none; font-weight: 700; letter-spacing: -.02em; }
+    .brand-mark { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 50% 50% 50% 12px; background: var(--forest); color: var(--lime); font-family: var(--serif); font-size: 1.25rem; transform: rotate(-8deg); }
+    .brand-mark span { transform: rotate(8deg); }
+    .brand small { display: block; color: var(--muted); font-size: .64rem; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; }
+    .nav-links { display: flex; align-items: center; gap: 28px; }
+    .nav-links > a:not(.button) { color: #34413d; font-size: .9rem; font-weight: 600; text-decoration: none; }
+    .nav-links > a:not(.button):hover { color: var(--leaf); }
+    .menu { display: none; width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 50%; background: transparent; color: var(--forest); cursor: pointer; }
+
+    .hero { padding: 34px 0 92px; overflow: hidden; }
+    .hero-grid { display: grid; grid-template-columns: .86fr 1.14fr; gap: 70px; align-items: center; }
+    .hero-copy { padding: 56px 0; }
+    .hero h1 { max-width: 660px; font-size: clamp(3.9rem, 6.7vw, 7.1rem); }
+    .hero h1 em { color: var(--leaf); font-style: normal; }
+    .hero-copy > p:not(.eyebrow) { max-width: 550px; margin: 28px 0 30px; color: var(--muted); font-size: 1.1rem; }
+    .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+    .hero-note { display: flex; align-items: center; gap: 12px; margin-top: 30px; color: var(--muted); font-size: .82rem; }
+    .faces { display: flex; }
+    .faces img { width: 34px; height: 34px; object-fit: cover; border: 2px solid var(--paper); border-radius: 50%; margin-left: -8px; }
+    .faces img:first-child { margin-left: 0; }
+    .hero-visual { position: relative; min-height: 660px; }
+    .hero-photo { height: 620px; object-fit: cover; object-position: center; border-radius: 210px 210px 24px 24px; filter: saturate(.78) contrast(.95); }
+    .hero-card { position: absolute; left: -48px; bottom: 34px; width: 280px; padding: 24px; border-radius: 18px; background: var(--white); box-shadow: 0 24px 70px rgba(12,45,38,.18); }
+    .hero-card .label { color: var(--muted); font-size: .74rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+    .hero-card strong { display: block; margin: 8px 0 3px; color: var(--forest); font-family: var(--serif); font-size: 2.1rem; font-weight: 400; }
+    .hero-card p { margin: 0; color: var(--muted); font-size: .8rem; }
+    .approval { position: absolute; top: 42px; right: -18px; display: flex; align-items: center; gap: 10px; padding: 11px 16px 11px 11px; border-radius: 100px; background: var(--lime); color: var(--forest-deep); font-size: .78rem; font-weight: 700; box-shadow: 0 15px 40px rgba(12,45,38,.18); }
+    .approval i { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; background: var(--forest); color: var(--lime); font-style: normal; }
+
+    .trust { padding: 26px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+    .trust .wrap { display: grid; grid-template-columns: .7fr repeat(4, 1fr); align-items: center; gap: 24px; }
+    .trust p { margin: 0; color: var(--muted); font-size: .76rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+    .trust span { color: rgba(23,63,53,.62); font-family: var(--serif); font-size: 1.12rem; text-align: center; }
+
+    .story { padding: 130px 0; }
+    .story-head { display: grid; grid-template-columns: .7fr 1.3fr; gap: 80px; margin-bottom: 58px; }
+    .story h2 { max-width: 780px; font-size: clamp(3rem, 5vw, 5.4rem); }
+    .story-lede { align-self: end; max-width: 470px; margin: 0; color: var(--muted); font-size: 1.03rem; }
+    .journeys { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--line); }
+    .journey { min-height: 250px; padding: 30px 26px 28px 0; border-right: 1px solid var(--line); }
+    .journey + .journey { padding-left: 26px; }
+    .journey:last-child { border-right: 0; }
+    .journey:nth-child(3n) { border-right: 0; }
+    .journey:nth-child(n+4) { border-top: 1px solid var(--line); }
+    .number { display: block; margin-bottom: 52px; color: var(--leaf); font-family: var(--serif); font-size: 1.5rem; }
+    .journey h3 { margin: 0 0 10px; color: var(--forest); font-size: 1.06rem; }
+    .journey p { margin: 0; color: var(--muted); font-size: .86rem; }
+
+    .film { padding-bottom: 130px; }
+    .film-shell { position: relative; min-height: 680px; overflow: hidden; border-radius: 28px; background: var(--forest-deep); }
+    .film-shell video, .film-shell img { position: absolute; inset: 0; height: 100%; object-fit: cover; filter: saturate(.62); opacity: .65; }
+    .film-shell::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(12,45,38,.88) 0%, rgba(12,45,38,.58) 46%, rgba(12,45,38,.08) 100%); }
+    .film-copy { position: relative; z-index: 2; max-width: 650px; padding: 80px; color: var(--white); }
+    .film h2 { font-size: clamp(3.2rem, 5.2vw, 5.7rem); }
+    .film p:not(.eyebrow) { max-width: 520px; margin: 24px 0 34px; color: rgba(255,255,255,.76); font-size: 1.04rem; }
+    .film .button.ghost { border-color: rgba(255,255,255,.38); background: rgba(255,255,255,.1); color: white; }
+
+    .platform { padding: 130px 0; background: var(--sand); }
+    .section-top { display: flex; align-items: end; justify-content: space-between; gap: 40px; margin-bottom: 55px; }
+    .section-top h2 { max-width: 720px; font-size: clamp(3rem, 4.7vw, 5.2rem); }
+    .section-top p { max-width: 380px; margin: 0 0 8px; color: var(--muted); }
+    .platform-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
+    .platform-card { position: relative; min-height: 430px; overflow: hidden; padding: 38px; border: 1px solid var(--line); border-radius: 22px; background: var(--paper); }
+    .platform-card.dark { background: var(--forest); color: white; }
+    .platform-card.photo { padding: 0; }
+    .platform-card.photo img { height: 100%; object-fit: cover; filter: saturate(.72); }
+    .platform-card.photo::after { content: ""; position: absolute; inset: 0; background: linear-gradient(0deg, rgba(12,45,38,.9), transparent 72%); }
+    .platform-card.photo .card-copy { position: absolute; z-index: 2; left: 38px; right: 38px; bottom: 35px; color: white; }
+    .card-kicker { color: var(--leaf); font-size: .72rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+    .dark .card-kicker { color: var(--lime); }
+    .platform-card h3 { max-width: 420px; margin: 88px 0 14px; font-family: var(--serif); font-size: 2.5rem; font-weight: 400; line-height: 1.05; }
+    .platform-card.photo h3 { margin: 0 0 10px; }
+    .platform-card p { max-width: 500px; margin: 0; color: var(--muted); }
+    .platform-card.dark p, .platform-card.photo p { color: rgba(255,255,255,.7); }
+    .mini-flow { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 34px; }
+    .mini-flow span { padding: 8px 12px; border: 1px solid var(--line); border-radius: 100px; background: white; color: var(--forest); font-size: .75rem; font-weight: 600; }
+    .dark .mini-flow span { border-color: rgba(255,255,255,.18); background: rgba(255,255,255,.07); color: white; }
+
+    .product-tour { padding: 130px 0; background: var(--paper); }
+    .tour-layout { display: grid; grid-template-columns: 330px minmax(0, 1fr); gap: 52px; align-items: start; }
+    .tour-intro { position: sticky; top: 116px; }
+    .tour-intro h2 { font-size: clamp(3rem, 4.6vw, 5.1rem); }
+    .tour-intro > p:not(.eyebrow) { margin: 22px 0 28px; color: var(--muted); }
+    .tour-tabs { display: grid; gap: 7px; }
+    .tour-tab { width: 100%; display: grid; grid-template-columns: 30px 1fr auto; align-items: center; gap: 10px; padding: 13px 14px; border: 1px solid transparent; border-radius: 12px; background: transparent; color: var(--muted); cursor: pointer; text-align: left; font-weight: 600; }
+    .tour-tab span:first-child { font-family: var(--serif); font-size: 1.05rem; }
+    .tour-tab.active { border-color: var(--line); background: var(--white); color: var(--forest); box-shadow: 0 10px 30px rgba(12,45,38,.07); }
+    .tour-stage { overflow: hidden; border: 1px solid var(--line); border-radius: 24px; background: var(--sand); box-shadow: 0 28px 75px rgba(12,45,38,.12); }
+    .tour-bar { height: 56px; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; border-bottom: 1px solid var(--line); background: var(--white); }
+    .tour-dots { display: flex; gap: 6px; } .tour-dots i { width: 8px; height: 8px; border-radius: 50%; background: #c7cec9; }
+    .tour-bar strong { color: var(--forest); font-size: .78rem; }
+    .tour-window { min-height: 580px; padding: 22px; }
+    .product-screen { display: none; animation: screenIn .45s ease both; }
+    .product-screen.active { display: block; }
+    @keyframes screenIn { from { opacity: 0; transform: translateY(8px); } }
+    .screen-head { display: flex; align-items: end; justify-content: space-between; gap: 22px; margin-bottom: 20px; }
+    .screen-head small { display: block; color: var(--leaf); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+    .screen-head h3 { margin: 4px 0 0; color: var(--forest); font-family: var(--serif); font-size: 2rem; font-weight: 400; }
+    .screen-head .screen-action { padding: 9px 13px; border-radius: 100px; background: var(--forest); color: white; font-size: .72rem; font-weight: 700; }
+    .screen-grid { display: grid; grid-template-columns: 1.2fr .8fr; gap: 14px; }
+    .screen-card { padding: 18px; border: 1px solid var(--line); border-radius: 15px; background: var(--white); }
+    .screen-card h4 { margin: 0 0 13px; color: var(--forest); font-size: .8rem; }
+    .screen-card.wide { grid-column: 1 / -1; }
+    .applicant { display: flex; gap: 12px; align-items: center; padding-bottom: 15px; border-bottom: 1px solid var(--line); }
+    .applicant-photo { width: 44px; height: 44px; object-fit: cover; border-radius: 50%; }
+    .applicant strong, .applicant span { display: block; } .applicant span { color: var(--muted); font-size: .7rem; }
+    .screen-status { margin-left: auto; padding: 5px 8px; border-radius: 100px; background: #edf5dd; color: var(--forest); font-size: .63rem; font-weight: 700; }
+    .check-list { display: grid; gap: 9px; margin-top: 14px; }
+    .check-item { display: flex; justify-content: space-between; gap: 14px; padding: 9px 0; border-bottom: 1px solid rgba(23,63,53,.08); color: var(--muted); font-size: .72rem; }
+    .check-item:last-child { border: 0; } .check-item b { color: var(--forest); font-weight: 600; }
+    .metric-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 9px; }
+    .mini-metric { padding: 13px; border-radius: 11px; background: var(--sand); }
+    .mini-metric strong { display: block; color: var(--forest); font-family: var(--serif); font-size: 1.45rem; font-weight: 400; }
+    .mini-metric span { color: var(--muted); font-size: .63rem; }
+    .queue-lines { display: grid; gap: 8px; }
+    .queue-line { display: grid; grid-template-columns: 8px 1fr auto; gap: 9px; align-items: center; padding: 11px; border-radius: 10px; background: var(--paper); font-size: .7rem; }
+    .queue-line i { width: 8px; height: 8px; border-radius: 50%; background: var(--leaf); }
+    .queue-line span { color: var(--muted); }
+    .timeline { display: grid; grid-template-columns: repeat(4,1fr); gap: 7px; }
+    .timeline span { position: relative; padding: 32px 8px 10px; border-radius: 10px; background: var(--sand); color: var(--muted); font-size: .64rem; text-align: center; }
+    .timeline span::before { content: '✓'; position: absolute; top: 8px; left: 50%; width: 18px; height: 18px; display: grid; place-items: center; border-radius: 50%; transform: translateX(-50%); background: var(--forest); color: var(--lime); font-size: .6rem; }
+    .tour-caption { display: none; padding: 18px 22px; border-top: 1px solid var(--line); background: var(--white); color: var(--muted); font-size: .8rem; }
+    .tour-caption.active { display: block; }
+
+    .solutions { padding: 130px 0; background: var(--sand); }
+    .solution-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; }
+    .solution-card { min-height: 290px; display: flex; flex-direction: column; padding: 25px; border: 1px solid var(--line); border-radius: 18px; background: var(--paper); transition: transform .2s, box-shadow .2s; }
+    .solution-card:hover { transform: translateY(-4px); box-shadow: 0 20px 45px rgba(12,45,38,.09); }
+    .solution-card .solution-no { color: var(--leaf); font-family: var(--serif); font-size: 1.25rem; }
+    .solution-card h3 { margin: auto 0 10px; color: var(--forest); font-family: var(--serif); font-size: 1.85rem; font-weight: 400; line-height: 1.05; }
+    .solution-card p { margin: 0; color: var(--muted); font-size: .8rem; }
+    .solution-card a { margin-top: 18px; color: var(--forest); font-size: .76rem; font-weight: 700; text-decoration: none; }
+
+    .india-stories { padding: 130px 0; }
+    .story-gallery { display: grid; grid-template-columns: 1.2fr .8fr .8fr; grid-template-rows: 260px 260px; gap: 14px; }
+    .story-photo { position: relative; overflow: hidden; border-radius: 18px; background: var(--forest); }
+    .story-photo:first-child { grid-row: 1 / 3; }
+    .story-photo:last-child { grid-column: 2 / 4; }
+    .story-photo img { height: 100%; object-fit: cover; filter: saturate(.72); transition: transform .7s ease; }
+    .story-photo:hover img { transform: scale(1.035); }
+    .story-photo::after { content: ''; position: absolute; inset: 0; background: linear-gradient(0deg, rgba(12,45,38,.86), transparent 65%); }
+    .story-label { position: absolute; z-index: 2; left: 22px; right: 22px; bottom: 20px; color: white; }
+    .story-label strong { display: block; font-family: var(--serif); font-size: 1.55rem; font-weight: 400; }
+    .story-label span { color: rgba(255,255,255,.68); font-size: .72rem; }
+
+    .readiness { padding: 130px 0; background: var(--forest); color: white; }
+    .readiness-grid { display: grid; grid-template-columns: .8fr 1.2fr; gap: 80px; align-items: start; }
+    .readiness h2 { font-size: clamp(3rem,4.5vw,5.1rem); }
+    .readiness-copy > p:not(.eyebrow) { color: rgba(255,255,255,.65); }
+    .assessment { padding: 28px; border: 1px solid rgba(255,255,255,.18); border-radius: 22px; background: rgba(255,255,255,.06); }
+    .assessment h3 { margin: 0 0 6px; font-family: var(--serif); font-size: 2rem; font-weight: 400; }
+    .assessment > p { margin: 0 0 22px; color: rgba(255,255,255,.62); font-size: .82rem; }
+    .assessment-options { display: grid; gap: 9px; }
+    .assessment-option { display: flex; align-items: center; gap: 12px; padding: 13px 14px; border: 1px solid rgba(255,255,255,.14); border-radius: 11px; color: rgba(255,255,255,.78); font-size: .78rem; cursor: pointer; }
+    .assessment-option:has(input:checked) { border-color: var(--lime); background: rgba(216,239,136,.1); color: white; }
+    .assessment-option input { accent-color: var(--lime); }
+    .assessment-actions { display: flex; align-items: center; gap: 14px; margin-top: 20px; }
+    .assessment button { border: 0; cursor: pointer; }
+    .assessment-result { display: none; margin-top: 20px; padding: 18px; border-radius: 13px; background: var(--lime); color: var(--forest-deep); }
+    .assessment-result.visible { display: block; }
+    .assessment-result strong { display: block; font-family: var(--serif); font-size: 1.55rem; font-weight: 400; }
+    .assessment-result p { margin: 5px 0 0; font-size: .78rem; }
+
+    .resources { padding: 110px 0; background: var(--paper); }
+    .resource-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 15px; }
+    .resource-card { min-height: 280px; display: flex; flex-direction: column; padding: 26px; border: 1px solid var(--line); border-radius: 18px; background: var(--white); }
+    .resource-type { color: var(--leaf); font-size: .68rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+    .resource-card h3 { margin: 62px 0 12px; color: var(--forest); font-family: var(--serif); font-size: 2rem; font-weight: 400; line-height: 1.05; }
+    .resource-card p { margin: 0; color: var(--muted); font-size: .8rem; }
+    .resource-card a { margin-top: auto; padding-top: 20px; color: var(--forest); font-size: .76rem; font-weight: 700; text-decoration: none; }
+
+    .reveal { opacity: 0; transform: translateY(24px); transition: opacity .7s ease, transform .7s ease; }
+    .reveal.visible { opacity: 1; transform: none; }
+
+    .proof { padding: 125px 0; background: var(--forest-deep); color: white; }
+    .proof-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 110px; align-items: center; }
+    .proof h2 { font-size: clamp(3.2rem, 5vw, 5.7rem); }
+    .quote { margin: 32px 0; color: rgba(255,255,255,.72); font-size: 1.12rem; }
+    .quote-by { display: flex; align-items: center; gap: 14px; }
+    .quote-by img { width: 50px; height: 50px; border-radius: 50%; object-fit: cover; }
+    .quote-by strong, .quote-by span { display: block; }
+    .quote-by span { color: rgba(255,255,255,.55); font-size: .78rem; }
+    .proof-list { border-top: 1px solid rgba(255,255,255,.18); }
+    .proof-row { display: grid; grid-template-columns: 88px 1fr; gap: 22px; padding: 27px 0; border-bottom: 1px solid rgba(255,255,255,.18); }
+    .proof-row strong { color: var(--lime); font-family: var(--serif); font-size: 2.15rem; font-weight: 400; }
+    .proof-row h3 { margin: 0 0 5px; font-size: .94rem; }
+    .proof-row p { margin: 0; color: rgba(255,255,255,.6); font-size: .82rem; }
+
+    .cta { padding: 130px 0; text-align: center; }
+    .cta-inner { max-width: 880px; margin: auto; }
+    .cta h2 { font-size: clamp(3.4rem, 6vw, 6.6rem); }
+    .cta p:not(.eyebrow) { max-width: 600px; margin: 25px auto 32px; color: var(--muted); font-size: 1.04rem; }
+    .cta-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; }
+
+    footer { padding: 70px 0 28px; background: var(--forest); color: white; }
+    .footer-grid { display: grid; grid-template-columns: 1.5fr repeat(3, 1fr); gap: 60px; padding-bottom: 65px; }
+    footer .brand { margin-bottom: 20px; }
+    footer .brand-mark { background: var(--lime); color: var(--forest); }
+    footer .brand small { color: rgba(255,255,255,.5); }
+    .footer-intro { max-width: 310px; margin: 0; color: rgba(255,255,255,.58); font-size: .85rem; }
+    .footer-col h3 { margin: 0 0 18px; color: var(--lime); font-size: .7rem; letter-spacing: .12em; text-transform: uppercase; }
+    .footer-col a { display: block; margin: 11px 0; color: rgba(255,255,255,.72); font-size: .84rem; text-decoration: none; }
+    .footer-bottom { display: flex; justify-content: space-between; gap: 20px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,.13); color: rgba(255,255,255,.48); font-size: .74rem; }
+
+    @media (max-width: 980px) {
+      .nav-links { display: none; position: absolute; inset: 74px 0 auto; padding: 24px; background: var(--paper); border-bottom: 1px solid var(--line); flex-direction: column; align-items: stretch; }
+      .nav-links.open { display: flex; }
+      .menu { display: grid; place-items: center; }
+      .hero-grid, .story-head, .proof-grid, .tour-layout, .readiness-grid { grid-template-columns: 1fr; }
+      .hero { padding-top: 18px; }
+      .hero-copy { padding-bottom: 5px; }
+      .hero h1 { font-size: clamp(3.7rem, 11vw, 6.5rem); }
+      .hero-visual { width: 86%; margin-left: auto; }
+      .journeys { grid-template-columns: 1fr 1fr; }
+      .journey:nth-child(odd) { border-right: 1px solid var(--line); }
+      .journey:nth-child(even) { border-right: 0; }
+      .journey:nth-child(n+3) { border-top: 1px solid var(--line); }
+      .trust .wrap { grid-template-columns: 1fr 1fr; }
+      .trust p { grid-column: 1 / -1; text-align: center; }
+      .section-top { align-items: start; flex-direction: column; }
+      .tour-intro { position: static; }
+      .tour-tabs { grid-template-columns: 1fr 1fr; }
+      .solution-grid { grid-template-columns: 1fr 1fr; }
+      .resource-grid { grid-template-columns: 1fr 1fr; }
+      .footer-grid { grid-template-columns: 1.5fr 1fr 1fr; }
+      .footer-brand { grid-column: 1 / -1; }
     }
-
-    .header-container {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 0 var(--space-6);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+    @media (max-width: 680px) {
+      .wrap { width: min(100% - 30px, var(--max)); }
+      .announcement { display: none; }
+      .nav { height: 66px; }
+      .nav-links { top: 66px; }
+      .brand small { display: none; }
+      .hero { padding-bottom: 68px; }
+      .hero-copy { padding-top: 40px; }
+      .hero h1 { font-size: clamp(3.2rem, 16vw, 5rem); }
+      .hero-visual { width: 100%; min-height: 470px; }
+      .hero-photo { height: 460px; border-radius: 120px 120px 18px 18px; }
+      .hero-card { left: 12px; bottom: -20px; width: 235px; padding: 18px; }
+      .approval { top: 20px; right: 10px; }
+      .story, .platform, .product-tour, .solutions, .india-stories, .readiness, .resources, .proof, .cta { padding: 86px 0; }
+      .story-head { gap: 28px; }
+      .journeys, .platform-grid { grid-template-columns: 1fr; }
+      .journey, .journey + .journey { min-height: auto; padding: 25px 0; border-right: 0; border-top: 1px solid var(--line); }
+      .number { margin-bottom: 24px; }
+      .film { padding-bottom: 85px; }
+      .film-shell { min-height: 600px; border-radius: 18px; }
+      .film-copy { padding: 46px 28px; }
+      .platform-card { min-height: 390px; padding: 28px; }
+      .platform-card.photo .card-copy { left: 28px; right: 28px; }
+      .platform-card h3 { margin-top: 65px; }
+      .proof-grid { gap: 55px; }
+      .tour-tabs { grid-template-columns: 1fr; }
+      .tour-window { min-height: 0; padding: 14px; }
+      .screen-grid, .metric-row { grid-template-columns: 1fr; }
+      .screen-card.wide { grid-column: auto; }
+      .timeline { grid-template-columns: 1fr 1fr; }
+      .solution-grid { grid-template-columns: 1fr; }
+      .resource-grid { grid-template-columns: 1fr; }
+      .solution-card { min-height: 230px; }
+      .story-gallery { grid-template-columns: 1fr; grid-template-rows: repeat(4,340px); }
+      .story-photo:first-child, .story-photo:last-child { grid-row: auto; grid-column: auto; }
+      .footer-grid { grid-template-columns: 1fr 1fr; gap: 42px 26px; }
+      .footer-brand { grid-column: 1 / -1; }
+      .footer-bottom { flex-direction: column; }
     }
-
-    .landing-logo {
-      display: flex;
-      align-items: center;
-      gap: var(--space-3);
-      text-decoration: none;
-      color: var(--text-primary);
-    }
-
-    .landing-logo .logo-mark {
-      background: var(--accent-primary);
-      color: #fff;
-      font-size: 1.1rem;
-      font-weight: bold;
-      width: 32px;
-      height: 32px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: var(--radius-sm);
-      box-shadow: var(--shadow-sm);
-    }
-
-    .landing-logo .logo-text {
-      font-weight: 700;
-      font-size: var(--text-lg);
-      letter-spacing: -0.03em;
-    }
-
-    .landing-nav {
-      display: flex;
-      gap: var(--space-5);
-      align-items: center;
-    }
-
-    .landing-nav-link {
-      color: var(--text-secondary);
-      text-decoration: none;
-      font-size: var(--text-sm);
-      font-weight: 500;
-      transition: color var(--duration-fast);
-    }
-
-    .landing-nav-link:hover {
-      color: var(--text-primary);
-    }
-
-    /* Hero Section */
-    .hero-section {
-      padding: var(--space-8) 0;
-      text-align: center;
-      max-width: 800px;
-      margin: 0 auto;
-    }
-
-    .badge-rbi {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-2);
-      padding: var(--space-1) var(--space-3);
-      background: var(--status-success-subtle);
-      border: 1px solid var(--status-success);
-      color: var(--status-success);
-      font-size: var(--text-xs);
-      font-weight: 700;
-      border-radius: var(--radius-full);
-      margin-bottom: var(--space-5);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-
-    .hero-title {
-      font-size: 2.75rem;
-      font-weight: 800;
-      line-height: 1.15;
-      letter-spacing: -0.04em;
-      color: var(--text-primary);
-      margin-bottom: var(--space-4);
-    }
-
-    .hero-desc {
-      font-size: var(--text-md);
-      color: var(--text-secondary);
-      line-height: 1.6;
-      margin-bottom: var(--space-6);
-    }
-
-    .hero-actions {
-      display: flex;
-      gap: var(--space-4);
-      justify-content: center;
-    }
-
-    /* Product Grid */
-    .main-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: var(--space-7);
-      margin: var(--space-7) auto;
-      max-width: 1200px;
-      padding: 0 var(--space-6);
-      align-items: start;
-    }
-
-    @media (max-width: 968px) {
-      .main-grid {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    /* Core Panel / Card */
-    .landing-card {
-      background: var(--bg-surface-1);
-      border: 2px solid var(--border-active);
-      border-radius: var(--radius-lg);
-      padding: var(--space-6);
-      box-shadow: var(--shadow-md);
-    }
-
-    .card-title-bar {
-      border-bottom: 1px solid var(--border-default);
-      padding-bottom: var(--space-3);
-      margin-bottom: var(--space-5);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .card-title {
-      font-size: var(--text-lg);
-      font-weight: 700;
-      letter-spacing: -0.02em;
-    }
-
-    /* Simulator Styling */
-    .sim-panel {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-4);
-    }
-
-    .sim-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: var(--bg-surface-2);
-      border: 1px solid var(--border-default);
-      border-radius: var(--radius-md);
-      padding: var(--space-3);
-      transition: all var(--duration-fast);
-    }
-
-    .sim-row:hover {
-      background: var(--bg-surface-3);
-      border-color: var(--border-hover);
-    }
-
-    .sim-info {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-
-    .sim-name {
-      font-size: var(--text-base);
-      font-weight: 600;
-    }
-
-    .sim-desc {
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-    }
-
-    .sim-status-badge {
-      font-size: var(--text-xs);
-      font-weight: 700;
-      text-transform: uppercase;
-      padding: var(--space-1) var(--space-2);
-      border-radius: var(--radius-sm);
-    }
-
-    .sim-status-badge.blocked {
-      background: var(--status-danger-subtle);
-      color: var(--status-danger);
-      border: 1px solid var(--status-danger);
-    }
-
-    .sim-status-badge.approved {
-      background: var(--status-success-subtle);
-      color: var(--status-success);
-      border: 1px solid var(--status-success);
-    }
-
-    /* Simulator Switch (Custom Warm Toggle) */
-    .warm-switch {
-      position: relative;
-      display: inline-block;
-      width: 46px;
-      height: 24px;
-    }
-
-    .warm-switch input {
-      opacity: 0;
-      width: 0;
-      height: 0;
-    }
-
-    .warm-slider {
-      position: absolute;
-      cursor: pointer;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background-color: var(--bg-elevated);
-      border: 2px solid var(--border-active);
-      border-radius: var(--radius-full);
-      transition: .2s;
-    }
-
-    .warm-slider:before {
-      position: absolute;
-      content: "";
-      height: 14px;
-      width: 14px;
-      left: 3px;
-      bottom: 3px;
-      background-color: var(--border-active);
-      border-radius: 50%;
-      transition: .2s;
-    }
-
-    input:checked + .warm-slider {
-      background-color: var(--bg-surface-1);
-    }
-
-    input:checked + .warm-slider:before {
-      transform: translateX(22px);
-      background-color: var(--status-success);
-    }
-
-    /* Console Terminal output styling */
-    .console-box {
-      background: var(--bg-elevated);
-      border: 1px solid var(--border-default);
-      border-radius: var(--radius-md);
-      padding: var(--space-4);
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      line-height: 1.5;
-      min-height: 120px;
-    }
-
-    .console-header {
-      font-weight: 700;
-      margin-bottom: var(--space-2);
-      color: var(--text-secondary);
-      border-bottom: 1px solid var(--border-default);
-      padding-bottom: 4px;
-      display: flex;
-      justify-content: space-between;
-    }
-
-    .console-log {
-      max-height: 180px;
-      overflow-y: auto;
-    }
-
-    .log-success { color: var(--status-success); }
-    .log-error { color: var(--status-danger); }
-    .log-info { color: var(--status-info); }
-
-    /* Onboarding wizard styling */
-    .form-group {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-2);
-      margin-bottom: var(--space-4);
-    }
-
-    .form-group label {
-      font-size: var(--text-xs);
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--text-secondary);
-    }
-
-    .form-group input, .form-group select {
-      padding: var(--space-3);
-      font-size: var(--text-base);
-      font-family: inherit;
-      border: 1px solid var(--border-default);
-      border-radius: var(--radius-sm);
-      background: var(--bg-input);
-      color: var(--text-primary);
-      transition: all var(--duration-fast);
-    }
-
-    .form-group input:focus, .form-group select:focus {
-      border-color: var(--border-active);
-      box-shadow: var(--shadow-sm);
-      outline: none;
-    }
-
-    .wizard-modules {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: var(--space-2);
-      padding: var(--space-2) 0;
-    }
-
-    .module-choice {
-      display: flex;
-      align-items: center;
-      gap: var(--space-2);
-      font-size: var(--text-sm);
-      color: var(--text-secondary);
-      cursor: pointer;
-    }
-
-    .module-choice input {
-      accent-color: var(--border-active);
-    }
-
-    .error-row {
-      color: var(--status-danger);
-      background: var(--status-danger-subtle);
-      border: 1px solid var(--status-danger);
-      border-radius: var(--radius-sm);
-      padding: var(--space-2) var(--space-3);
-      font-size: var(--text-xs);
-      display: none;
-      margin-bottom: var(--space-4);
-    }
-
-    /* Editorial Features Matrix */
-    .features-section {
-      background: var(--bg-surface-2);
-      border-top: 1px solid var(--border-default);
-      border-bottom: 1px solid var(--border-default);
-      padding: var(--space-8) 0;
-      margin-top: var(--space-8);
-    }
-
-    .features-container {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 0 var(--space-6);
-    }
-
-    .section-title {
-      font-size: 2.25rem;
-      font-weight: 800;
-      letter-spacing: -0.03em;
-      margin-bottom: var(--space-3);
-      text-align: center;
-    }
-
-    .section-subtitle {
-      font-size: var(--text-md);
-      color: var(--text-secondary);
-      text-align: center;
-      max-width: 600px;
-      margin: 0 auto var(--space-7) auto;
-    }
-
-    .features-matrix {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: var(--space-6);
-    }
-
-    .feature-card {
-      background: var(--bg-surface-1);
-      border: 1px solid var(--border-default);
-      border-radius: var(--radius-md);
-      padding: var(--space-5);
-      transition: all var(--duration-fast);
-      box-shadow: var(--shadow-sm);
-    }
-
-    .feature-card:hover {
-      border-color: var(--border-active);
-      box-shadow: var(--shadow-md);
-      transform: translateY(-1px);
-    }
-
-    .feature-header {
-      font-size: 1.5rem;
-      margin-bottom: var(--space-3);
-    }
-
-    .feature-name {
-      font-size: var(--text-base);
-      font-weight: 700;
-      margin-bottom: var(--space-2);
-      letter-spacing: -0.01em;
-    }
-
-    .feature-desc {
-      font-size: var(--text-sm);
-      color: var(--text-secondary);
-      line-height: 1.5;
-    }
-
-    /* Footer */
-    .landing-footer {
-      border-top: 1px solid var(--border-default);
-      padding: var(--space-6) 0;
-      text-align: center;
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-      margin-top: auto;
-    }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } * { transition: none !important; } video { display: none; } }
   </style>
 </head>
-<body class="landing-body">
-  <div class="bg-grid"></div>
-
-  <!-- Header Navigation -->
-  <header class="landing-header">
-    <div class="header-container">
-      <a href="/" class="landing-logo">
-        <span class="logo-mark">▲</span>
-        <span class="logo-text">LoanOS India</span>
-      </a>
-      <nav class="landing-nav">
-        <a href="#features" class="landing-nav-link">Architecture</a>
-        <a href="/t/dev/portal/" class="landing-nav-link" style="color: var(--status-info); font-weight: 600;">Demo Customer Portal</a>
-        <a href="#simulator" class="landing-nav-link">Compliance Demo</a>
-        <a href="#provision" class="landing-nav-link">Tenant Sandbox</a>
-        <a href="/t/dev/staff/" class="btn btn-secondary">Staff Console</a>
+<body>
+  <div class="announcement"><div class="wrap"><strong>India-first lending.</strong> Thoughtful experiences for every borrower and every team behind them.</div></div>
+  <header>
+    <div class="wrap nav">
+      <a class="brand" href="/" aria-label="LoanOS India home"><span class="brand-mark"><span>L</span></span><span>LoanOS <small>India lending platform</small></span></a>
+      <button class="menu" id="menu" aria-label="Open navigation" aria-expanded="false">☰</button>
+      <nav class="nav-links" id="nav-links" aria-label="Main navigation">
+        <a href="#platform">Platform</a><a href="#journey">Loan journey</a><a href="#solutions">Solutions</a><a href="#trust">Trust</a><a href="#resources">Resources</a>
+        <a class="button ghost" href="/t/dev/staff/">Sign in</a><a class="button ink" href="mailto:hello@loanos.in?subject=LoanOS%20conversation">Talk to our team <span class="arrow">→</span></a>
       </nav>
     </div>
   </header>
-
   <main>
-    <!-- Hero Header -->
-    <section class="hero-section">
-      <div class="badge-rbi">🛡️ RBI Directions 2025 Compliant</div>
-      <h1 class="hero-title">Greenfield Lending OS for India</h1>
-      <p class="hero-desc">
-        A secure, multi-tenant loan origination & servicing platform. Architected with strict regulatory guardrails: rejects unsafe fund flows, Aadhaar leakage, unvalidated credit models, and non-compliance by design.
-      </p>
-      <div class="hero-actions">
-        <a href="#provision" class="btn btn-primary">Provision a Tenant</a>
-        <a href="/t/dev/" class="btn btn-secondary">Dev Tenant Portal</a>
-      </div>
-    </section>
-
-    <!-- Core Interactive Grid -->
-    <div class="main-grid">
-      
-      <!-- Interactive Compliance Panel -->
-      <section class="landing-card" id="simulator">
-        <div class="card-title-bar">
-          <h3 class="card-title">RBI Preflight Sandbox</h3>
-          <span class="sim-status-badge blocked" id="sim-verdict">Blocked</span>
+    <section class="hero">
+      <div class="wrap hero-grid">
+        <div class="hero-copy">
+          <p class="eyebrow">One lending platform. Every meaningful moment.</p>
+          <h1 class="display">Lending,<br><em>made clear.</em></h1>
+          <p>Give borrowers a simpler journey and your teams one dependable place to originate, service and manage every loan—built around how lending works in India.</p>
+          <div class="hero-actions"><a class="button primary" href="mailto:hello@loanos.in?subject=Show%20me%20LoanOS">See LoanOS in action <span class="arrow">→</span></a><a class="button ghost" href="#platform">Explore the platform</a></div>
+          <div class="hero-note"><div class="faces"><img src="/shared/images/loanos-india-entrepreneur.jpg" alt=""><img src="/shared/images/loanos-india-shop-owner.jpg" alt=""><img src="/shared/images/loanos-india-operations-team.jpg" alt=""></div><span>Designed with lending, service and compliance teams.</span></div>
         </div>
-
-        <div class="sim-panel">
-          <!-- Item 1 -->
-          <div class="sim-row">
-            <div class="sim-info">
-              <span class="sim-name">Borrower Location</span>
-              <span class="sim-desc">Must reside inside India limits</span>
-            </div>
-            <label class="warm-switch">
-              <input type="checkbox" id="sim-residency" checked>
-              <span class="warm-slider"></span>
-            </label>
-          </div>
-
-          <!-- Item 2 -->
-          <div class="sim-row">
-            <div class="sim-info">
-              <span class="sim-name">Key Fact Statement (KFS)</span>
-              <span class="sim-desc">Itemized charges & APR disclosure</span>
-            </div>
-            <label class="warm-switch">
-              <input type="checkbox" id="sim-kfs">
-              <span class="warm-slider"></span>
-            </label>
-          </div>
-
-          <!-- Item 3 -->
-          <div class="sim-row">
-            <div class="sim-info">
-              <span class="sim-name">Aadhaar Data Posture</span>
-              <span class="sim-desc">Restricted storage, masked vaults only</span>
-            </div>
-            <label class="warm-switch">
-              <input type="checkbox" id="sim-aadhaar" checked>
-              <span class="warm-slider"></span>
-            </label>
-          </div>
-
-          <!-- Item 4 -->
-          <div class="sim-row">
-            <div class="sim-info">
-              <span class="sim-name">Credit Scoring Model</span>
-              <span class="sim-desc">Validated models only; blocks drift</span>
-            </div>
-            <label class="warm-switch">
-              <input type="checkbox" id="sim-model" checked>
-              <span class="warm-slider"></span>
-            </label>
-          </div>
-
-          <!-- Simulation Console -->
-          <div class="console-box">
-            <div class="console-header">
-              <span>Lending Engine Pre-Check</span>
-              <span style="font-size: var(--text-2xs)">v1.0.0</span>
-            </div>
-            <div class="console-log" id="sim-log">
-              <!-- Dynamically populated -->
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- Tenant Provisioning Card -->
-      <section class="landing-card" id="provision">
-        <div class="card-title-bar">
-          <h3 class="card-title">Tenant Provisioning Wizard</h3>
-          <span style="font-size: var(--text-xs); color: var(--text-muted); font-weight: bold;">Step 1 of 1</span>
-        </div>
-
-        <form id="provision-form">
-          <div class="error-row" id="form-error"></div>
-
-          <div class="form-group">
-            <label for="tenant-id">Tenant ID</label>
-            <input type="text" id="tenant-id" placeholder="e.g. bank-delhi" required>
-          </div>
-
-          <div class="form-group">
-            <label for="tenant-name">Regulated Entity Name</label>
-            <input type="text" id="tenant-name" placeholder="e.g. Delhi Commercial Bank" required>
-          </div>
-
-          <div class="form-group">
-            <label for="owner-email">Admin Login Email</label>
-            <input type="email" id="owner-email" value="admin@dev.local" required>
-          </div>
-
-          <div class="form-group">
-            <label for="owner-password">Admin Temporary Password</label>
-            <input type="password" id="owner-password" value="dev-admin-password" required>
-          </div>
-
-          <div class="form-group">
-            <label>Seeded Blueprint Modules</label>
-            <div class="wizard-modules">
-              <label class="module-choice"><input type="checkbox" checked disabled> LOS (Origination)</label>
-              <label class="module-choice"><input type="checkbox" checked disabled> LMS (Servicing)</label>
-              <label class="module-choice"><input type="checkbox" checked disabled> LWS (Workflows)</label>
-              <label class="module-choice"><input type="checkbox" checked disabled> Compliance Engine</label>
-            </div>
-          </div>
-
-          <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: var(--space-2);" id="btn-submit">
-            Provision & Log In
-          </button>
-        </form>
-      </section>
-
-    </div>
-
-    <!-- Compliance Features Matrix Section -->
-    <section class="features-section" id="features">
-      <div class="features-container">
-        <h2 class="section-title">Compliance Controls Core</h2>
-        <p class="section-subtitle">
-          LoanOS India builds regulatory mandates directly into the transactional layer rather than depending on post-facto audit reports.
-        </p>
-
-        <div class="features-matrix">
-          <!-- Card 1 -->
-          <div class="feature-card">
-            <div class="feature-header">🏢</div>
-            <div class="feature-name">Regulated Entity Trust</div>
-            <div class="feature-desc">Ensures every transaction belongs to an active, licensed RBI RE with grievance officer details and board policies.</div>
-          </div>
-
-          <!-- Card 2 -->
-          <div class="feature-card">
-            <div class="feature-header">🚫</div>
-            <div class="feature-name">LSP Fund-Flow Isolation</div>
-            <div class="feature-desc">Hard-blocks lending service provider pass-through accounts. Enforces direct bank-to-borrower fund routing.</div>
-          </div>
-
-          <!-- Card 3 -->
-          <div class="feature-card">
-            <div class="feature-header">📄</div>
-            <div class="feature-name">KFS & Charge Ceiling</div>
-            <div class="feature-desc">Locks charges to pre-disclosed limits, blocks undiagnosed penal interest compounding, and validates floating interest resets.</div>
-          </div>
-
-          <!-- Card 4 -->
-          <div class="feature-card">
-            <div class="feature-header">🔏</div>
-            <div class="feature-name">DPDP Retention & Rights</div>
-            <div class="feature-desc">Gates data erasure against the 5-year PMLA/RBI retention clock. Restricts sharing to active purpose-based consent logs.</div>
-          </div>
-
-          <!-- Card 5 -->
-          <div class="feature-card">
-            <div class="feature-header">🤖</div>
-            <div class="feature-name">AI Model Risk Safeguards</div>
-            <div class="feature-desc">Monitors drift, forces validation signoffs for credit models, and houses automated model and global kill switches.</div>
-          </div>
-
-          <!-- Card 6 -->
-          <div class="feature-card">
-            <div class="feature-header">⛓️</div>
-            <div class="feature-name">Verifiable Audit Spine</div>
-            <div class="feature-desc">Attests transaction truth by sealing every event into a cryptographic, SHA-256 chain mapped directly to the RE.</div>
-          </div>
+        <div class="hero-visual">
+          <img class="hero-photo" src="/shared/images/loanos-india-entrepreneur.jpg" alt="Indian textile business owner in her Bengaluru workshop">
+          <div class="approval"><i>✓</i> Ready for the next step</div>
+          <div class="hero-card"><span class="label">A complete view</span><strong>One customer</strong><p>Applications, documents, conversations and repayments—together.</p></div>
         </div>
       </div>
     </section>
+    <section class="trust" aria-label="Built for lending institutions"><div class="wrap"><p>Purpose-built for</p><span>Banks</span><span>NBFCs</span><span>Housing finance</span><span>Fintech lenders</span></div></section>
+
+    <section class="story" id="journey">
+      <div class="wrap">
+        <div class="story-head"><div><p class="eyebrow">The whole lending journey</p><h2 class="display">From first application to final repayment.</h2></div><p class="story-lede">Customers should not feel your organisation chart. LoanOS connects every handoff so each experience feels considered, consistent and complete.</p></div>
+        <div class="journeys reveal">
+          <article class="journey"><span class="number">01</span><h3>Welcome & understand</h3><p>Simple applications, clear consent and the right information at the right time.</p></article>
+          <article class="journey"><span class="number">02</span><h3>Verify without friction</h3><p>Bring identity, consent, income and documents together without making customers repeat themselves.</p></article>
+          <article class="journey"><span class="number">03</span><h3>Decide with confidence</h3><p>Bring policy, documents and human judgement into one transparent decision.</p></article>
+          <article class="journey"><span class="number">04</span><h3>Explain the offer</h3><p>Share cost, terms and repayment expectations clearly before commitment.</p></article>
+          <article class="journey"><span class="number">05</span><h3>Serve with context</h3><p>Statements, requests, repayments and conversations in one customer history.</p></article>
+          <article class="journey"><span class="number">06</span><h3>Support with empathy</h3><p>Help teams act early, offer the right resolution and treat customers fairly.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="film" id="customers"><div class="wrap"><div class="film-shell">
+      <img src="/shared/images/loanos-india-operations-team.jpg" alt="Indian lending operations team reviewing a customer file together">
+      <div class="film-copy"><p class="eyebrow light">Built around people, not processes</p><h2 class="display">A better day for every team behind the loan.</h2><p>Less hunting for information. Fewer missed handoffs. More time for the conversations and decisions that need a person.</p><a class="button ghost" href="/t/dev/staff/">Visit the working demo <span class="arrow">→</span></a></div>
+    </div></div></section>
+
+    <section class="platform" id="platform"><div class="wrap">
+      <div class="section-top"><div><p class="eyebrow">One connected platform</p><h2 class="display">Four experiences.<br>One source of truth.</h2></div><p>Each workspace is shaped for the person using it, while every team works from the same trusted customer story.</p></div>
+      <div class="platform-grid">
+        <article class="platform-card photo"><img src="/shared/images/loanos-india-shop-owner.jpg" alt="Indian shop owner reviewing her finances on her phone"><div class="card-copy"><span class="card-kicker">For customers</span><h3>A calm, clear place to manage a loan.</h3><p>Apply, understand an offer, find documents and ask for help without unnecessary complexity.</p></div></article>
+        <article class="platform-card"><span class="card-kicker">For lending teams</span><h3>Today’s work, in the right order.</h3><p>Focused queues, complete context and clear next actions help teams move confidently from review to resolution.</p><div class="mini-flow"><span>Applications</span><span>Approvals</span><span>Service</span><span>Collections</span></div></article>
+        <article class="platform-card dark"><span class="card-kicker">For operations</span><h3>See what needs attention before it becomes a problem.</h3><p>Understand service levels, exceptions and emerging risk without turning the workday into a wall of charts.</p><div class="mini-flow"><span>Team health</span><span>Exceptions</span><span>Customer care</span></div></article>
+        <article class="platform-card"><span class="card-kicker">For administrators</span><h3>Control that stays understandable.</h3><p>Manage people, permissions, products and oversight with a clear record of who changed what—and why.</p><div class="mini-flow"><span>Access</span><span>Products</span><span>Policies</span><span>Evidence</span></div></article>
+      </div>
+    </div></section>
+
+    <section class="product-tour" id="product-tour"><div class="wrap tour-layout">
+      <div class="tour-intro"><p class="eyebrow">See the work, not just the promise</p><h2 class="display">A clearer place to run lending.</h2><p>Follow a customer from application through servicing. Each workspace keeps the next decision visible and the full story close by.</p>
+        <div class="tour-tabs" role="tablist" aria-label="Product tour">
+          <button class="tour-tab active" data-tour="application" role="tab" aria-selected="true"><span>01</span><span>Application review</span><span>→</span></button>
+          <button class="tour-tab" data-tour="operations" role="tab" aria-selected="false"><span>02</span><span>Operations queue</span><span>→</span></button>
+          <button class="tour-tab" data-tour="customer" role="tab" aria-selected="false"><span>03</span><span>Customer servicing</span><span>→</span></button>
+          <button class="tour-tab" data-tour="governance" role="tab" aria-selected="false"><span>04</span><span>Governance record</span><span>→</span></button>
+        </div>
+      </div>
+      <div class="tour-stage reveal">
+        <div class="tour-bar"><div class="tour-dots"><i></i><i></i><i></i></div><strong>LoanOS workspace preview</strong><span></span></div>
+        <div class="tour-window">
+          <div class="product-screen active" data-screen="application"><div class="screen-head"><div><small>Application AP-2841</small><h3>Asha Textiles</h3></div><span class="screen-action">Ready for review</span></div><div class="screen-grid"><div class="screen-card"><div class="applicant"><img class="applicant-photo" src="/shared/images/loanos-india-entrepreneur.jpg" alt=""><div><strong>Asha Nair</strong><span>MSME working-capital application</span></div><span class="screen-status">Verified</span></div><div class="check-list"><div class="check-item"><span>Identity and business profile</span><b>Complete</b></div><div class="check-item"><span>Bank-account evidence</span><b>Matched</b></div><div class="check-item"><span>Affordability assessment</span><b>Within policy</b></div><div class="check-item"><span>Human review</span><b>Next</b></div></div></div><div class="screen-card"><h4>Application summary</h4><div class="metric-row"><div class="mini-metric"><strong>₹4L</strong><span>Requested</span></div><div class="mini-metric"><strong>24m</strong><span>Tenor</span></div><div class="mini-metric"><strong>1</strong><span>Open task</span></div></div></div><div class="screen-card wide"><h4>Journey</h4><div class="timeline"><span>Application</span><span>Verification</span><span>Decision</span><span>Offer</span></div></div></div></div>
+          <div class="product-screen" data-screen="operations"><div class="screen-head"><div><small>Today’s work</small><h3>Lending operations</h3></div><span class="screen-action">18 in progress</span></div><div class="screen-grid"><div class="screen-card wide"><h4>Priority queue</h4><div class="queue-lines"><div class="queue-line"><i></i><b>Review income variance</b><span>Due in 42 min</span></div><div class="queue-line"><i></i><b>Confirm offer acceptance</b><span>Customer replied</span></div><div class="queue-line"><i></i><b>Resolve bank-account mismatch</b><span>Needs attention</span></div><div class="queue-line"><i></i><b>Approve document packet</b><span>Due today</span></div></div></div><div class="screen-card"><h4>Team view</h4><div class="metric-row"><div class="mini-metric"><strong>32</strong><span>Open</span></div><div class="mini-metric"><strong>4</strong><span>Due soon</span></div><div class="mini-metric"><strong>0</strong><span>Breached</span></div></div></div><div class="screen-card"><h4>Focus</h4><div class="check-list"><div class="check-item"><span>Applications</span><b>12</b></div><div class="check-item"><span>Customer requests</span><b>8</b></div><div class="check-item"><span>Exceptions</span><b>3</b></div></div></div></div></div>
+          <div class="product-screen" data-screen="customer"><div class="screen-head"><div><small>Customer view</small><h3>Your business loan</h3></div><span class="screen-action">On track</span></div><div class="screen-grid"><div class="screen-card"><h4>Next payment</h4><div class="mini-metric"><strong>₹18,420</strong><span>Due 5 August</span></div><div class="check-list"><div class="check-item"><span>Mandate</span><b>Active</b></div><div class="check-item"><span>Payment account</span><b>•• 4821</b></div></div></div><div class="screen-card"><h4>Quick help</h4><div class="queue-lines"><div class="queue-line"><i></i><b>Download statement</b><span>→</span></div><div class="queue-line"><i></i><b>Update details</b><span>→</span></div><div class="queue-line"><i></i><b>Ask for support</b><span>→</span></div></div></div><div class="screen-card wide"><h4>Loan progress</h4><div class="timeline"><span>Disbursed</span><span>6 paid</span><span>18 remaining</span><span>Closure</span></div></div></div></div>
+          <div class="product-screen" data-screen="governance"><div class="screen-head"><div><small>Decision record</small><h3>Why this decision is ready</h3></div><span class="screen-action">Evidence complete</span></div><div class="screen-grid"><div class="screen-card wide"><h4>Decision evidence</h4><div class="check-list"><div class="check-item"><span>Policy version used</span><b>MSME-APR-07</b></div><div class="check-item"><span>Customer disclosures delivered</span><b>Confirmed</b></div><div class="check-item"><span>Credit assessment reviewed by</span><b>Meera Rao</b></div><div class="check-item"><span>Approval recorded by</span><b>Vikram Shah</b></div><div class="check-item"><span>Customer consent</span><b>Active</b></div></div></div><div class="screen-card"><h4>Control status</h4><div class="mini-metric"><strong>12/12</strong><span>Checks complete</span></div></div><div class="screen-card"><h4>Record</h4><div class="mini-metric"><strong>1</strong><span>Complete audit trail</span></div></div></div></div>
+        </div>
+        <div class="tour-caption active" data-caption="application">See customer context, policy checks and the next human decision without opening five different systems.</div><div class="tour-caption" data-caption="operations">Prioritise work by customer impact and due time, while keeping exceptions visible.</div><div class="tour-caption" data-caption="customer">Give customers a calm, plain-language view of repayments, documents and support.</div><div class="tour-caption" data-caption="governance">Create the evidence trail while work happens, with clear ownership and review.</div>
+      </div>
+    </section>
+
+    <section class="solutions" id="solutions"><div class="wrap"><div class="section-top"><div><p class="eyebrow">Designed for your institution</p><h2 class="display">Different models.<br>The same need for clarity.</h2></div><p>Start with the operating model you have today, then improve journeys without losing control.</p></div><div class="solution-grid reveal">
+      <article class="solution-card"><span class="solution-no">01</span><h3>Banks</h3><p>Connect lending teams, branches and service operations around one accountable customer record.</p><a href="mailto:hello@loanos.in?subject=LoanOS%20for%20banks">Explore for banks →</a></article>
+      <article class="solution-card"><span class="solution-no">02</span><h3>NBFCs</h3><p>Launch and manage products quickly while keeping policy, partners and customer treatment visible.</p><a href="mailto:hello@loanos.in?subject=LoanOS%20for%20NBFCs">Explore for NBFCs →</a></article>
+      <article class="solution-card"><span class="solution-no">03</span><h3>Housing finance</h3><p>Coordinate longer, document-heavy journeys across customers, properties and approval teams.</p><a href="mailto:hello@loanos.in?subject=LoanOS%20for%20housing%20finance">Explore housing finance →</a></article>
+      <article class="solution-card"><span class="solution-no">04</span><h3>Fintech lenders</h3><p>Deliver simple digital journeys while regulated entities retain oversight and evidence.</p><a href="mailto:hello@loanos.in?subject=LoanOS%20for%20fintech%20lenders">Explore fintech lending →</a></article>
+    </div></div></section>
+
+    <section class="india-stories" id="india"><div class="wrap"><div class="section-top"><div><p class="eyebrow">Built for the India you serve</p><h2 class="display">Every loan begins with a real ambition.</h2></div><p>From household milestones to growing businesses, the experience should respect the person behind the application.</p></div><div class="story-gallery reveal">
+      <article class="story-photo"><img src="/shared/images/loanos-india-entrepreneur.jpg" alt="Indian textile entrepreneur in her workshop"><div class="story-label"><strong>Women-led enterprise</strong><span>Working capital and business growth</span></div></article>
+      <article class="story-photo"><img src="/shared/images/loanos-india-shop-owner.jpg" alt="Indian neighbourhood shop owner"><div class="story-label"><strong>MSME retail</strong><span>Simple finance for everyday businesses</span></div></article>
+      <article class="story-photo"><img src="/shared/images/loanos-india-customer-home.jpg" alt="Indian couple reviewing loan information"><div class="story-label"><strong>Household goals</strong><span>Clear decisions for important moments</span></div></article>
+      <article class="story-photo"><img src="/shared/images/loanos-india-operations-team.jpg" alt="Indian lending operations team"><div class="story-label"><strong>Human judgement</strong><span>Teams equipped to decide and support responsibly</span></div></article>
+    </div></div></section>
+
+    <section class="readiness" id="readiness"><div class="wrap readiness-grid"><div class="readiness-copy"><p class="eyebrow light">A useful place to start</p><h2 class="display">Where is lending friction slowing you down?</h2><p>Select the challenges your teams experience today. We’ll suggest the most useful first conversation—without asking for your details.</p></div><form class="assessment" id="assessment"><h3>Quick lending health check</h3><p>Choose everything that feels familiar.</p><div class="assessment-options">
+      <label class="assessment-option"><input type="checkbox" value="handoffs"> Customers repeat information across teams</label>
+      <label class="assessment-option"><input type="checkbox" value="visibility"> Teams cannot see the full customer history</label>
+      <label class="assessment-option"><input type="checkbox" value="exceptions"> Exceptions are found too late</label>
+      <label class="assessment-option"><input type="checkbox" value="evidence"> Audit evidence requires manual reconstruction</label>
+      <label class="assessment-option"><input type="checkbox" value="service"> Customer requests move between disconnected channels</label>
+    </div><div class="assessment-actions"><button class="button primary" type="submit">See where to start</button></div><div class="assessment-result" id="assessment-result" aria-live="polite"></div></form></div></section>
+
+    <section class="resources" id="resources"><div class="wrap"><div class="section-top"><div><p class="eyebrow">Practical thinking for lending teams</p><h2 class="display">Useful before the first meeting.</h2></div><p>Short, plain-language tools for teams evaluating a new lending operating model.</p></div><div class="resource-grid reveal"><article class="resource-card"><span class="resource-type">Field guide</span><h3>Mapping the end-to-end loan journey</h3><p>A practical structure for finding repeated questions, unclear ownership and avoidable customer waiting.</p><a href="mailto:hello@loanos.in?subject=Loan%20journey%20field%20guide">Request the guide →</a></article><article class="resource-card"><span class="resource-type">Checklist</span><h3>What to examine in a lending platform</h3><p>Questions for product, operations, risk, compliance and technology teams to review together.</p><a href="mailto:hello@loanos.in?subject=Lending%20platform%20checklist">Request the checklist →</a></article><article class="resource-card"><span class="resource-type">Workshop</span><h3>Designing a responsible lending pilot</h3><p>Choose one journey, define a meaningful outcome and create evidence without over-scoping the first release.</p><a href="mailto:hello@loanos.in?subject=Responsible%20lending%20pilot">Plan a workshop →</a></article></div></div></section>
+
+    <section class="proof" id="trust"><div class="wrap proof-grid">
+      <div><p class="eyebrow light">Trust is a product experience</p><h2 class="display">Clear for customers. Accountable for institutions.</h2><p class="quote">“The strongest lending experience is one where good service and good governance feel like the same thing.”</p><div class="quote-by"><img src="/shared/images/loanos-india-operations-team.jpg" alt="Indian lending team"><div><strong>LoanOS product principle</strong><span>Designed for responsible lending in India</span></div></div></div>
+      <div class="proof-list"><div class="proof-row"><strong>01</strong><div><h3>Clarity before commitment</h3><p>Customers see the cost, terms and next step before they agree.</p></div></div><div class="proof-row"><strong>02</strong><div><h3>People stay in command</h3><p>Important decisions remain reviewable, explainable and accountable.</p></div></div><div class="proof-row"><strong>03</strong><div><h3>Evidence follows every action</h3><p>The record is created as work happens, not reconstructed after it.</p></div></div><div class="proof-row"><strong>04</strong><div><h3>Access stays intentional</h3><p>People see only the customers and actions their role requires.</p></div></div><div class="proof-row"><strong>05</strong><div><h3>Customer rights stay visible</h3><p>Privacy, corrections, complaints and support are part of the journey.</p></div></div><div class="proof-row"><strong>06</strong><div><h3>Institutions remain accountable</h3><p>Partners can participate without obscuring ownership or responsibility.</p></div></div></div>
+    </div></section>
+
+    <section class="cta"><div class="wrap cta-inner"><p class="eyebrow">A better lending experience starts here</p><h2 class="display">Let’s make every loan feel well run.</h2><p>Tell us where your customers and teams feel the most friction. We’ll show you what a clearer journey can look like.</p><div class="cta-actions"><a class="button primary" href="mailto:hello@loanos.in?subject=Let%27s%20talk%20about%20LoanOS">Start a conversation <span class="arrow">→</span></a><a class="button ghost" href="/t/dev/portal/">Explore customer demo</a></div></div></section>
   </main>
-
-  <footer class="landing-footer">
-    <div class="container">
-      &copy; 2026 LoanOS India. Editorial Compliance Core.
-    </div>
-  </footer>
-
+  <footer><div class="wrap"><div class="footer-grid"><div class="footer-brand"><a class="brand" href="/"><span class="brand-mark"><span>L</span></span><span>LoanOS <small>India lending platform</small></span></a><p class="footer-intro">Thoughtful lending technology for institutions that want better customer outcomes and stronger operations.</p></div><div class="footer-col"><h3>Platform</h3><a href="#journey">Loan journey</a><a href="#product-tour">Product tour</a><a href="#platform">Four experiences</a><a href="#trust">Trust</a></div><div class="footer-col"><h3>Solutions</h3><a href="#solutions">Banks</a><a href="#solutions">NBFCs</a><a href="#solutions">Housing finance</a><a href="#solutions">Fintech lenders</a></div><div class="footer-col"><h3>Explore</h3><a href="#readiness">Lending health check</a><a href="/t/dev/portal/">Customer portal</a><a href="/t/dev/staff/">Team workspace</a><a href="/t/dev/staff/?scope=platform">Platform administration</a></div></div><div class="footer-bottom"><span>© 2026 LoanOS India. All rights reserved.</span><span>Made for responsible lending in India.</span></div></div></footer>
   <script>
-    // --- Interactive Preflight Simulation ---
-    const checkResidency = document.getElementById('sim-residency');
-    const checkKfs = document.getElementById('sim-kfs');
-    const checkAadhaar = document.getElementById('sim-aadhaar');
-    const checkModel = document.getElementById('sim-model');
-    const logBox = document.getElementById('sim-log');
-    const verdict = document.getElementById('sim-verdict');
-
-    function runSimulation() {
-      let isBlocked = false;
-      let logs = [];
-
-      logs.push('<span class="log-info">[INFO] Initializing rules validation engine...</span>');
-
-      if (checkResidency.checked) {
-        logs.push('<span class="log-success">[PASS] India residency check clean.</span>');
-      } else {
-        logs.push('<span class="log-error">[FAIL] RBI-DL-2025: Non-India resident profile is ineligible.</span>');
-        isBlocked = true;
-      }
-
-      if (checkKfs.checked) {
-        logs.push('<span class="log-success">[PASS] KFS generated and accepted. APR cap matches.</span>');
-      } else {
-        logs.push('<span class="log-error">[FAIL] RBI-KFS-2025: Missing borrower acceptance of Key Fact Statement.</span>');
-        isBlocked = true;
-      }
-
-      if (checkAadhaar.checked) {
-        logs.push('<span class="log-success">[PASS] Aadhaar data stored safely in masked token vault.</span>');
-      } else {
-        logs.push('<span class="log-error">[FAIL] UIDAI-SEC: Raw Aadhaar numbers found in cleartext records.</span>');
-        isBlocked = true;
-      }
-
-      if (checkModel.checked) {
-        logs.push('<span class="log-success">[PASS] AI Underwriting model credit_score_v2 is validated.</span>');
-      } else {
-        logs.push('<span class="log-error">[FAIL] RBI-MR-2026: Model has validation drift or switch is offline.</span>');
-        isBlocked = true;
-      }
-
-      if (isBlocked) {
-        verdict.className = 'sim-status-badge blocked';
-        verdict.textContent = 'Blocked';
-        logs.push('<span class="log-error" style="font-weight:700;">[STATUS] PREFLIGHT SANCTION BLOCKED</span>');
-      } else {
-        verdict.className = 'sim-status-badge approved';
-        verdict.textContent = 'Approved';
-        logs.push('<span class="log-success" style="font-weight:700;">[STATUS] SANCTION ISSUED & READY TO DISBURSE</span>');
-      }
-
-      logBox.innerHTML = logs.map(line => `<div>${line}</div>`).join('');
-    }
-
-    [checkResidency, checkKfs, checkAadhaar, checkModel].forEach(el => {
-      el.addEventListener('change', runSimulation);
+    const menu = document.getElementById('menu');
+    const links = document.getElementById('nav-links');
+    menu.addEventListener('click', () => { const open = links.classList.toggle('open'); menu.setAttribute('aria-expanded', String(open)); menu.textContent = open ? '×' : '☰'; });
+    links.addEventListener('click', () => { links.classList.remove('open'); menu.setAttribute('aria-expanded', 'false'); menu.textContent = '☰'; });
+    const tourTabs = [...document.querySelectorAll('[data-tour]')];
+    tourTabs.forEach(tab => tab.addEventListener('click', () => {
+      const target = tab.dataset.tour;
+      tourTabs.forEach(item => { const active = item === tab; item.classList.toggle('active', active); item.setAttribute('aria-selected', String(active)); });
+      document.querySelectorAll('[data-screen]').forEach(screen => screen.classList.toggle('active', screen.dataset.screen === target));
+      document.querySelectorAll('[data-caption]').forEach(caption => caption.classList.toggle('active', caption.dataset.caption === target));
+    }));
+    document.getElementById('assessment').addEventListener('submit', event => {
+      event.preventDefault();
+      const selected = [...event.currentTarget.querySelectorAll('input:checked')].map(input => input.value);
+      const result = document.getElementById('assessment-result');
+      const messages = {
+        handoffs: ['Start with the customer journey', 'Map repeated questions and handoffs first. A shared application and customer record will remove the most visible friction.'],
+        visibility: ['Start with the operating workspace', 'Bring customer history, open work and decisions into one team view before changing individual processes.'],
+        exceptions: ['Start with operations visibility', 'Define which exceptions need attention, who owns them and when they become urgent.'],
+        evidence: ['Start with evidence by design', 'Capture policy, review and approval evidence during the decision instead of rebuilding it later.'],
+        service: ['Start with customer servicing', 'Unify requests, conversations, documents and repayments around one customer history.']
+      };
+      const priority = selected.includes('evidence') ? 'evidence' : selected[0];
+      const message = priority ? messages[priority] : ['Start with one real customer journey', 'Choose a representative lending product and follow it from application to servicing. The biggest friction will become visible quickly.'];
+      result.innerHTML = `<strong>${message[0]}</strong><p>${message[1]} ${selected.length > 2 ? 'Because several areas are connected, use one end-to-end pilot rather than separate point fixes.' : ''}</p>`;
+      result.classList.add('visible');
     });
-
-    runSimulation();
-
-    // --- Onboarding Provisioner Wizard ---
-    const randSuffix = Math.random().toString(36).substring(2, 6);
-    document.getElementById('tenant-id').value = `bank-${randSuffix}`;
-    document.getElementById('tenant-name').value = `Retail Lending Bank ${randSuffix.toUpperCase()}`;
-
-    const form = document.getElementById('provision-form');
-    const formError = document.getElementById('form-error');
-    const btnSubmit = document.getElementById('btn-submit');
-
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      formError.style.display = 'none';
-      btnSubmit.disabled = true;
-      btnSubmit.textContent = 'Provisioning Regulated Tenant...';
-
-      const tenantId = document.getElementById('tenant-id').value.trim().toLowerCase();
-      const tenantName = document.getElementById('tenant-name').value.trim();
-      const email = document.getElementById('owner-email').value.trim();
-      const password = document.getElementById('owner-password').value;
-
-      try {
-        const provisionRes = await fetch('/platform/tenants', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-platform-admin-key': 'platform-secret-key'
-          },
-          body: JSON.stringify({
-            tenantId,
-            name: tenantName,
-            ownerUser: {
-              email,
-              displayName: tenantName.split(' ')[0] + ' Admin',
-              password
-            },
-            regulatedEntity: {
-              regulatedEntityId: `re_${tenantId}`,
-              name: tenantName,
-              entityType: 'nbfc',
-              country: 'IN',
-              website: `https://${tenantId}.local`,
-              privacyPolicyUrl: `https://${tenantId}.local/privacy`,
-              grievanceOfficerName: 'Grievance Officer Team',
-              grievanceOfficerEmail: `grievance@${tenantId}.local`,
-              boardApprovedPolicies: ['credit_policy', 'data_retention_policy'],
-              dataResidencyPosture: 'IN',
-              status: 'active'
-            }
-          })
-        });
-
-        const provisionData = await provisionRes.json();
-        if (!provisionRes.ok) {
-          throw new Error(provisionData.error?.message || 'Provisioning failed.');
-        }
-
-        const loginRes = await fetch('/auth/login', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ tenantId, email, password })
-        });
-
-        const loginData = await loginRes.json();
-        if (!loginRes.ok) {
-          throw new Error(loginData.error?.message || 'Auto-login failed after setup.');
-        }
-
-        window.location.href = `/t/${tenantId}/staff/`;
-      } catch (err) {
-        formError.textContent = err.message;
-        formError.style.display = 'block';
-        btnSubmit.disabled = false;
-        btnSubmit.textContent = 'Provision & Log In';
-      }
-    });
+    const revealObserver = 'IntersectionObserver' in window ? new IntersectionObserver(entries => entries.forEach(entry => { if (entry.isIntersecting) { entry.target.classList.add('visible'); revealObserver.unobserve(entry.target); } }), { threshold: .14 }) : null;
+    document.querySelectorAll('.reveal').forEach(element => revealObserver ? revealObserver.observe(element) : element.classList.add('visible'));
   </script>
 </body>
 </html>

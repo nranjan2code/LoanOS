@@ -10,10 +10,10 @@
   <!-- Favicon -->
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230a1018'/><text x='50' y='68' font-size='50' text-anchor='middle' fill='%23faf9f1' font-weight='bold'>L</text></svg>">
 
-  <!-- Inter + JetBrains Mono -->
+  <!-- LoanOS type system -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   
   <link rel="stylesheet" href="/dashboard/index.css">
 </head>
@@ -23,14 +23,14 @@
       <div class="login-brand">
         <span class="logo-icon" aria-hidden="true">▲</span>
         <div>
-          <h1>LoanOS India</h1>
-          <p>Secure multi-tenant lending operations</p>
+          <h1>Welcome to LoanOS</h1>
+          <p>One secure workspace for lending teams</p>
         </div>
       </div>
 
       <div class="login-tabs" role="tablist" aria-label="Login scope">
-        <button class="login-tab active" type="button" data-login-scope="tenant">Tenant user</button>
-        <button class="login-tab" type="button" data-login-scope="platform">Platform admin</button>
+        <button class="login-tab active" type="button" data-login-scope="tenant">Team workspace</button>
+        <button class="login-tab" type="button" data-login-scope="platform">Platform administration</button>
       </div>
 
       <form id="tenant-login-form" class="login-form">
@@ -68,7 +68,8 @@
           <input id="platform-login-mfa-code" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" placeholder="6-digit code">
         </div>
         <p class="login-form-error hidden" id="platform-login-error" role="alert"></p>
-        <button class="btn btn-primary login-submit" type="submit">Open Platform Console</button>
+        <p class="login-scope-note">For authorised LoanOS staff who set up and govern tenant organisations.</p>
+        <button class="btn btn-primary login-submit" type="submit">Open Administration</button>
       </form>
 
       <details class="service-key-login">
@@ -213,22 +214,22 @@
           <h3>Overview</h3>
           <div class="metrics-grid">
             <div class="metric-card" id="metric-total">
-              <span class="metric-icon" aria-hidden="true">📋</span>
+              <span class="metric-icon" aria-hidden="true">ALL</span>
               <span class="metric-val">0</span>
               <span class="metric-lbl">Total Tasks</span>
             </div>
             <div class="metric-card danger" id="metric-breached">
-              <span class="metric-icon" aria-hidden="true">🔴</span>
+              <span class="metric-icon" aria-hidden="true">!</span>
               <span class="metric-val">0</span>
               <span class="metric-lbl">Breached</span>
             </div>
             <div class="metric-card warning" id="metric-due-soon">
-              <span class="metric-icon" aria-hidden="true">⏰</span>
+              <span class="metric-icon" aria-hidden="true">DUE</span>
               <span class="metric-val">0</span>
               <span class="metric-lbl">Due Soon</span>
             </div>
             <div class="metric-card info" id="metric-assigned">
-              <span class="metric-icon" aria-hidden="true">👤</span>
+              <span class="metric-icon" aria-hidden="true">ME</span>
               <span class="metric-val">0</span>
               <span class="metric-lbl">Assigned</span>
             </div>
@@ -314,11 +315,18 @@
 
       <!-- ─── Task List Area ──────────────────────────────────────────── -->
       <main class="tasks-panel" role="main" aria-label="Task list">
+        <div class="tasks-heading">
+          <div><span class="workspace-eyebrow">Daily workspace</span><h2>Work that needs attention</h2><p>Prioritised by due time, customer impact and your assigned queues.</p></div>
+          <span class="visible-task-count" id="visible-task-count" aria-live="polite">0 shown</span>
+        </div>
         <div class="search-bar-container">
-          <input type="text" id="task-search" placeholder="Search tasks by ID, name, borrower or loan account…" aria-label="Search tasks">
+          <div class="search-field"><span aria-hidden="true">⌕</span><input type="search" id="task-search" placeholder="Search by customer, loan or task ID" aria-label="Search tasks"></div>
+          <label class="toolbar-field"><span>Sort</span><select id="task-sort" aria-label="Sort tasks"><option value="priority">Priority</option><option value="due">Due time</option><option value="newest">Newest</option><option value="oldest">Oldest</option></select></label>
+          <button class="btn btn-secondary btn-sm" id="btn-clear-filters" type="button">Clear filters</button>
         </div>
 
         <div class="tasks-list-scroll">
+          <div class="workspace-message error hidden" id="tasks-error" role="alert"><strong>We couldn’t refresh this workspace.</strong><span id="tasks-error-text">Check your connection and try again.</span><button class="btn btn-secondary btn-sm" id="btn-retry-tasks" type="button">Try again</button></div>
           <!-- Skeleton loading state -->
           <div id="tasks-skeleton" class="hidden">
             <div class="skeleton skeleton-card"></div>
@@ -328,8 +336,10 @@
           </div>
 
           <div class="empty-state" id="tasks-empty-state">
-            <div class="empty-icon">📂</div>
-            <p>No active tasks found in the selected queue.</p>
+            <div class="empty-icon" aria-hidden="true"><span></span></div>
+            <h3>Nothing needs attention here</h3>
+            <p>No tasks match the selected queue and filters.</p>
+            <button class="btn btn-secondary btn-sm" id="btn-empty-clear" type="button">Show all work</button>
           </div>
           <div class="tasks-grid" id="tasks-grid-list">
             <!-- Dynamic task items go here -->
@@ -340,13 +350,15 @@
       <!-- ─── Detail Panel ────────────────────────────────────────────── -->
       <section class="detail-panel" id="task-detail-container" aria-label="Task details">
         <div class="empty-state" id="detail-empty-state">
-          <div class="empty-icon">🔍</div>
-          <p>Select a task from the list to view compliance context and run actions.</p>
+          <img class="empty-state-photo" src="/shared/images/loanos-india-operations-team.jpg" alt="Indian lending operations team reviewing customer work">
+          <h3>Choose a task to begin</h3>
+          <p>Its customer context, due time, decision history and available actions will appear here.</p>
         </div>
 
         <div class="task-details hidden" id="task-details-content">
           <!-- Header Area -->
           <div class="detail-header">
+            <button type="button" class="detail-close" id="btn-detail-close" aria-label="Close task details">×</button>
             <div class="detail-title-row">
               <span class="priority-badge" id="detail-priority">High</span>
               <h2 id="detail-title">Task Title</h2>
@@ -375,7 +387,7 @@
 
           <!-- Compliance Framework Reference -->
           <div class="compliance-refs-box hidden" id="detail-regulatory-box">
-            <h4>Regulatory Compliance Anchor</h4>
+            <h4>Policy and regulatory references</h4>
             <div class="ref-tags" id="detail-regulatory-tags">
               <!-- Regulatory markers -->
             </div>
@@ -383,12 +395,12 @@
 
           <!-- Task Assignment & State Mutation Operations -->
           <div class="operations-box">
-            <h4>Task Control Actions</h4>
+            <h4>Ownership and work status</h4>
             
             <div class="operations-grid">
               <!-- Assign Form -->
               <div class="op-card" id="op-assign-card">
-                <h5>Assign Task</h5>
+                <h5>Assign to a colleague</h5>
                 <div class="form-row">
                   <select id="op-assign-to-select" aria-label="Select actor to assign">
                     <option value="">— Select Actor —</option>
@@ -399,7 +411,7 @@
 
               <!-- Start / Progress Form -->
               <div class="op-card" id="op-start-card">
-                <h5>Work Status</h5>
+                <h5>Update work status</h5>
                 <div class="op-buttons">
                   <button id="btn-op-start" class="btn btn-success btn-sm">Start Task</button>
                   <button id="btn-op-release" class="btn btn-warning btn-sm">Release to Queue</button>
@@ -408,7 +420,7 @@
 
               <!-- Comment Form -->
               <div class="op-card span-all">
-                <h5>Audit Trail Comment</h5>
+                <h5>Add an official note</h5>
                 <div class="form-row">
                   <input type="text" id="op-comment-text" placeholder="Add an official audit comment…" aria-label="Audit comment text">
                   <button id="btn-op-comment" class="btn btn-secondary btn-sm">Post Comment</button>
@@ -419,7 +431,7 @@
 
           <!-- Action Resolution Area (Dynamic Forms per Task Type) -->
           <div class="resolution-box">
-            <h4>Action Panel</h4>
+            <h4>Complete this task</h4>
             <div class="resolution-card" id="resolution-forms-container">
               <!-- Dynamic resolve actions form based on type -->
             </div>
@@ -427,7 +439,7 @@
 
           <!-- Task Timeline Events / History -->
           <div class="timeline-box">
-            <h4>Audit History Trail</h4>
+            <h4>Activity history</h4>
             <div class="timeline" id="detail-timeline-events">
               <!-- Event rows -->
             </div>
@@ -435,7 +447,7 @@
 
           <!-- Raw Task Context (Collapsible for developers) -->
           <details class="context-details">
-            <summary>View Structured Context JSON</summary>
+            <summary>View technical record</summary>
             <pre><code id="detail-context-json">{}</code></pre>
           </details>
 
@@ -472,8 +484,8 @@
         <button class="admin-tab" type="button" data-admin-tab="reviews">Access Reviews</button>
         <button class="admin-tab" type="button" data-admin-tab="service">Service Access</button>
         <button class="admin-tab" type="button" data-admin-tab="audit">Audit</button>
-        <button class="admin-tab" type="button" data-admin-tab="platform">Platform</button>
-        <button class="admin-tab" type="button" data-admin-tab="platform-access">Platform Access</button>
+        <button class="admin-tab" type="button" data-admin-tab="platform">Organisations</button>
+        <button class="admin-tab" type="button" data-admin-tab="platform-access">Platform Team</button>
       </nav>
 
       <section class="admin-panel active" id="admin-panel-users">
@@ -568,22 +580,22 @@
         <form id="platform-tenant-form" class="admin-form onboarding-wizard">
           <div class="wizard-title-row">
             <div>
-              <h4>New Tenant Onboarding</h4>
-              <p>Provision the tenant shell, regulated entity profile, first product, enabled flows, and owner access together.</p>
+              <h4>Set up a new organisation</h4>
+              <p>Create its secure workspace, legal profile, first lending product and owner access in one guided flow.</p>
             </div>
             <span class="admin-pill" id="onboarding-step-label">Step 1 of 5</span>
           </div>
 
           <div class="wizard-steps" aria-label="Tenant onboarding steps">
-            <span class="wizard-dot active">Tenant</span>
-            <span class="wizard-dot">RE</span>
+            <span class="wizard-dot active">Organisation</span>
+            <span class="wizard-dot">Legal profile</span>
             <span class="wizard-dot">Product</span>
-            <span class="wizard-dot">Flows</span>
-            <span class="wizard-dot">Owner</span>
+            <span class="wizard-dot">Capabilities</span>
+            <span class="wizard-dot">Review</span>
           </div>
 
           <fieldset class="wizard-panel active" data-wizard-step="0">
-            <legend>Tenant Basics</legend>
+            <legend>Organisation basics</legend>
             <div class="admin-form-grid">
               <input id="platform-tenant-id" placeholder="tenant_id" required>
               <input id="platform-tenant-name" placeholder="Tenant display name" required>
@@ -600,7 +612,7 @@
           </fieldset>
 
           <fieldset class="wizard-panel" data-wizard-step="1">
-            <legend>Regulated Entity</legend>
+            <legend>Legal and regulatory profile</legend>
             <div class="admin-form-grid">
               <input id="platform-re-id" placeholder="regulated_entity_id">
               <input id="platform-re-name" placeholder="RE legal name" required>
@@ -653,7 +665,7 @@
           </fieldset>
 
           <fieldset class="wizard-panel" data-wizard-step="3">
-            <legend>Enabled Modules and Flows</legend>
+            <legend>Capabilities for launch</legend>
             <div class="wizard-choice-grid">
               <label><input type="checkbox" name="onboarding-modules" value="los" checked> Loan Origination</label>
               <label><input type="checkbox" name="onboarding-modules" value="lms" checked> Loan Management</label>
@@ -683,7 +695,7 @@
           </fieldset>
 
           <fieldset class="wizard-panel" data-wizard-step="4">
-            <legend>Owner and Review</legend>
+            <legend>Owner access and final review</legend>
             <div class="admin-form-grid">
               <input id="platform-owner-email" type="email" placeholder="owner@example.in" required>
               <input id="platform-owner-password" type="password" placeholder="Owner temporary password" required>
@@ -698,7 +710,7 @@
           <div class="wizard-actions">
             <button class="btn btn-secondary" type="button" id="btn-onboarding-prev">Back</button>
             <button class="btn btn-secondary" type="button" id="btn-onboarding-next">Next</button>
-            <button class="btn btn-primary hidden" type="submit" id="btn-onboarding-submit">Provision Tenant</button>
+            <button class="btn btn-primary hidden" type="submit" id="btn-onboarding-submit">Create Organisation</button>
           </div>
         </form>
         <div class="admin-row">
