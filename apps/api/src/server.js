@@ -105,6 +105,16 @@ import {
   upsertKycRecord,
   upsertProductPolicy,
   upsertRecoveryAgent,
+  upsertDlgArrangement,
+  invokeDlg,
+  computeDlgPortfolioExposure,
+  upsertCoLendingArrangement,
+  recordCoLendingLoanAllocation,
+  computeCoLendingExposure,
+  createAccountAggregatorConsent,
+  approveAccountAggregatorConsent,
+  fetchAccountAggregatorData,
+  revokeAccountAggregatorConsent,
   upsertRegulatedEntity,
   validateDisbursement,
   searchCkyc,
@@ -1847,6 +1857,261 @@ async function route(req, res, dataDir, platformAdminKey) {
       return;
     }
     sendJson(res, 200, recoveryAgent);
+    return;
+  }
+
+  // Default Loss Guarantee (DLG) — RBI Digital Lending Directions 2025: an LSP
+  // guarantees the RE against portfolio default up to a 5% cap, in a permitted
+  // form, with a 120-day invocation window; NPA classification stays the RE's.
+  if (method === "GET" && path === "/dlg-arrangements") {
+    const state = await store.load();
+    sendJson(res, 200, {
+      dlgArrangements: Object.values(state.dlgArrangements).map((a) => ({
+        ...a,
+        exposure: computeDlgPortfolioExposure(a)
+      }))
+    });
+    return;
+  }
+
+  if (method === "POST" && path === "/dlg-arrangements") {
+    const body = await readJson(req);
+    const state = await store.load();
+    const result = upsertDlgArrangement(state.dlgArrangements, body, state);
+    if (result.summary.status === "blocked") {
+      sendJson(res, 422, {
+        error: { code: "dlg_arrangement_invalid", message: "DLG arrangement is invalid." },
+        findings: result.findings
+      });
+      return;
+    }
+    const nextState = appendEvent(
+      { ...state, dlgArrangements: result.registry },
+      {
+        type: "dlg_arrangement.upserted",
+        dlgArrangementId: result.dlgArrangement.dlgArrangementId,
+        regulatedEntityId: result.dlgArrangement.regulatedEntityId,
+        providerLspId: result.dlgArrangement.providerLspId
+      }
+    );
+    await store.save(nextState);
+    sendJson(res, 201, result);
+    return;
+  }
+
+  const dlgByIdMatch = path.match(/^\/dlg-arrangements\/([^/]+)$/);
+  if (method === "GET" && dlgByIdMatch) {
+    const state = await store.load();
+    const arrangement = state.dlgArrangements[decodeURIComponent(dlgByIdMatch[1])];
+    if (!arrangement) {
+      sendJson(res, 404, { error: { code: "not_found", message: "DLG arrangement not found." } });
+      return;
+    }
+    sendJson(res, 200, { ...arrangement, exposure: computeDlgPortfolioExposure(arrangement) });
+    return;
+  }
+
+  const dlgInvokeMatch = path.match(/^\/dlg-arrangements\/([^/]+)\/invocations$/);
+  if (method === "POST" && dlgInvokeMatch) {
+    const body = await readJson(req);
+    const state = await store.load();
+    const arrangementId = decodeURIComponent(dlgInvokeMatch[1]);
+    const arrangement = state.dlgArrangements[arrangementId];
+    if (!arrangement) {
+      sendJson(res, 404, { error: { code: "not_found", message: "DLG arrangement not found." } });
+      return;
+    }
+    const result = invokeDlg(arrangement, { ...body, invokedBy: resolveSessionActorId(authContext, body.invokedBy) });
+    if (result.summary.status === "blocked") {
+      sendJson(res, 422, {
+        error: { code: "dlg_invocation_blocked", message: "DLG invocation is blocked." },
+        findings: result.findings
+      });
+      return;
+    }
+    const nextState = appendEvent(
+      { ...state, dlgArrangements: { ...state.dlgArrangements, [arrangementId]: result.arrangement } },
+      {
+        type: "dlg_arrangement.invoked",
+        dlgArrangementId: arrangementId,
+        loanAccountId: result.invocation.loanAccountId,
+        amountInr: result.invocation.amountInr
+      }
+    );
+    await store.save(nextState);
+    sendJson(res, 200, result);
+    return;
+  }
+
+  // Co-Lending — RBI Co-Lending Arrangements Directions 2025: partner shares
+  // sum to 100%, the originating RE retains a floor share, single blended rate,
+  // escrow pass-through, and each loan reconciled to the partner proportions.
+  if (method === "GET" && path === "/co-lending-arrangements") {
+    const state = await store.load();
+    sendJson(res, 200, {
+      coLendingArrangements: Object.values(state.coLendingArrangements).map((a) => ({
+        ...a,
+        exposure: computeCoLendingExposure(a)
+      }))
+    });
+    return;
+  }
+
+  if (method === "POST" && path === "/co-lending-arrangements") {
+    const body = await readJson(req);
+    const state = await store.load();
+    const result = upsertCoLendingArrangement(state.coLendingArrangements, body, state);
+    if (result.summary.status === "blocked") {
+      sendJson(res, 422, {
+        error: { code: "co_lending_arrangement_invalid", message: "Co-lending arrangement is invalid." },
+        findings: result.findings
+      });
+      return;
+    }
+    const nextState = appendEvent(
+      { ...state, coLendingArrangements: result.registry },
+      {
+        type: "co_lending_arrangement.upserted",
+        coLendingArrangementId: result.coLendingArrangement.coLendingArrangementId
+      }
+    );
+    await store.save(nextState);
+    sendJson(res, 201, result);
+    return;
+  }
+
+  const coLendingByIdMatch = path.match(/^\/co-lending-arrangements\/([^/]+)$/);
+  if (method === "GET" && coLendingByIdMatch) {
+    const state = await store.load();
+    const arrangement = state.coLendingArrangements[decodeURIComponent(coLendingByIdMatch[1])];
+    if (!arrangement) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Co-lending arrangement not found." } });
+      return;
+    }
+    sendJson(res, 200, { ...arrangement, exposure: computeCoLendingExposure(arrangement) });
+    return;
+  }
+
+  const coLendingAllocMatch = path.match(/^\/co-lending-arrangements\/([^/]+)\/allocations$/);
+  if (method === "POST" && coLendingAllocMatch) {
+    const body = await readJson(req);
+    const state = await store.load();
+    const arrangementId = decodeURIComponent(coLendingAllocMatch[1]);
+    const arrangement = state.coLendingArrangements[arrangementId];
+    if (!arrangement) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Co-lending arrangement not found." } });
+      return;
+    }
+    const result = recordCoLendingLoanAllocation(arrangement, body);
+    if (result.summary.status === "blocked") {
+      sendJson(res, 422, {
+        error: { code: "co_lending_allocation_blocked", message: "Co-lending allocation is blocked." },
+        findings: result.findings
+      });
+      return;
+    }
+    const nextState = appendEvent(
+      { ...state, coLendingArrangements: { ...state.coLendingArrangements, [arrangementId]: result.arrangement } },
+      {
+        type: "co_lending_arrangement.allocated",
+        coLendingArrangementId: arrangementId,
+        loanAccountId: result.allocation.loanAccountId,
+        principalInr: result.allocation.principalInr
+      }
+    );
+    await store.save(nextState);
+    sendJson(res, 200, result);
+    return;
+  }
+
+  // Account Aggregator (AA) — RBI NBFC-AA framework: consent-artefact lifecycle
+  // (requested → active → revoked/expired) governing consent-based FI data
+  // sharing from the borrower's FIP to the RE (FIU), India-resident, with fetch
+  // limited to the consent's validity and fetch type.
+  if (method === "GET" && path === "/account-aggregator/consents") {
+    const state = await store.load();
+    const borrowerId = url.searchParams.get("borrowerId");
+    let consents = Object.values(state.accountAggregatorConsents);
+    if (borrowerId) consents = consents.filter((c) => c.borrowerId === borrowerId);
+    sendJson(res, 200, { consents });
+    return;
+  }
+
+  if (method === "POST" && path === "/account-aggregator/consents") {
+    const body = await readJson(req);
+    const state = await store.load();
+    const result = createAccountAggregatorConsent(state.accountAggregatorConsents, body, state);
+    if (result.summary.status === "blocked") {
+      sendJson(res, 422, {
+        error: { code: "aa_consent_invalid", message: "AA consent is invalid." },
+        findings: result.findings
+      });
+      return;
+    }
+    const nextState = appendEvent(
+      { ...state, accountAggregatorConsents: result.registry },
+      {
+        type: "account_aggregator.consent_requested",
+        consentId: result.consent.consentId,
+        borrowerId: result.consent.borrowerId
+      }
+    );
+    await store.save(nextState);
+    sendJson(res, 201, result);
+    return;
+  }
+
+  const aaByIdMatch = path.match(/^\/account-aggregator\/consents\/([^/]+)$/);
+  if (method === "GET" && aaByIdMatch) {
+    const state = await store.load();
+    const consent = state.accountAggregatorConsents[decodeURIComponent(aaByIdMatch[1])];
+    if (!consent) {
+      sendJson(res, 404, { error: { code: "not_found", message: "AA consent not found." } });
+      return;
+    }
+    sendJson(res, 200, consent);
+    return;
+  }
+
+  const aaActionMatch = path.match(/^\/account-aggregator\/consents\/([^/]+)\/(approval|fetch|revocation)$/);
+  if (method === "POST" && aaActionMatch) {
+    const body = await readJson(req);
+    const state = await store.load();
+    const consentId = decodeURIComponent(aaActionMatch[1]);
+    const action = aaActionMatch[2];
+    const consent = state.accountAggregatorConsents[consentId];
+    if (!consent) {
+      sendJson(res, 404, { error: { code: "not_found", message: "AA consent not found." } });
+      return;
+    }
+    let result;
+    let eventType;
+    if (action === "approval") {
+      result = approveAccountAggregatorConsent(consent, body);
+      eventType = "account_aggregator.consent_activated";
+    } else if (action === "fetch") {
+      result = fetchAccountAggregatorData(consent, body);
+      eventType = "account_aggregator.data_fetched";
+    } else {
+      result = revokeAccountAggregatorConsent(consent, body);
+      eventType = "account_aggregator.consent_revoked";
+    }
+    if (result.summary.status === "blocked") {
+      sendJson(res, 422, {
+        error: { code: "aa_consent_action_blocked", message: "AA consent action is blocked." },
+        findings: result.findings
+      });
+      return;
+    }
+    const nextState = appendEvent(
+      {
+        ...state,
+        accountAggregatorConsents: { ...state.accountAggregatorConsents, [consentId]: result.consent }
+      },
+      { type: eventType, consentId, borrowerId: result.consent.borrowerId }
+    );
+    await store.save(nextState);
+    sendJson(res, 200, result);
     return;
   }
 
@@ -5082,6 +5347,9 @@ function requiredModuleForPath(path) {
   if (path.startsWith("/integrations/")) return "integrations";
   if (path === "/recovery-agents" || path.startsWith("/recovery-agents/")) return "collections";
   if (path === "/loans/marketplace-offers" || path.startsWith("/loans/marketplace-offers/")) return "marketplace";
+  if (path === "/dlg-arrangements" || path.startsWith("/dlg-arrangements/")) return "dlg";
+  if (path === "/co-lending-arrangements" || path.startsWith("/co-lending-arrangements/")) return "co_lending";
+  if (path.startsWith("/account-aggregator/")) return "integrations";
   return null;
 }
 

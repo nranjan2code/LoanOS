@@ -36,6 +36,8 @@ export const TENANT_ONBOARDING_MODULES = [
   { id: "ai_governance", label: "AI Governance", defaultEnabled: true },
   { id: "collections", label: "Collections and Recovery", defaultEnabled: true },
   { id: "marketplace", label: "Marketplace Offers", defaultEnabled: true },
+  { id: "dlg", label: "Default Loss Guarantee", defaultEnabled: true },
+  { id: "co_lending", label: "Co-Lending", defaultEnabled: true },
   { id: "integrations", label: "External Integrations", defaultEnabled: true }
 ];
 
@@ -89,6 +91,9 @@ export function createEmptyTenantData() {
     erasureRequests: {},
     dataDisclosures: {},
     recoveryAgents: {},
+    dlgArrangements: {},
+    coLendingArrangements: {},
+    accountAggregatorConsents: {},
     complaints: {},
     incidents: {},
     fraudCases: {},
@@ -124,6 +129,9 @@ function normalizeTenantData(data) {
     erasureRequests: data?.erasureRequests ?? {},
     dataDisclosures: data?.dataDisclosures ?? {},
     recoveryAgents: data?.recoveryAgents ?? {},
+    dlgArrangements: data?.dlgArrangements ?? {},
+    coLendingArrangements: data?.coLendingArrangements ?? {},
+    accountAggregatorConsents: data?.accountAggregatorConsents ?? {},
     complaints: data?.complaints ?? {},
     incidents: data?.incidents ?? {},
     fraudCases: data?.fraudCases ?? {},
@@ -456,6 +464,8 @@ export function resetSandbox(state, sandboxId, preserveConfig = false) {
       digitalLendingApps: tenantData.digitalLendingApps ?? {},
       productPolicies: tenantData.productPolicies ?? {},
       recoveryAgents: tenantData.recoveryAgents ?? {},
+      dlgArrangements: tenantData.dlgArrangements ?? {},
+      coLendingArrangements: tenantData.coLendingArrangements ?? {},
       users: tenantData.users ?? {},
       accessReviews: tenantData.accessReviews ?? {},
     };

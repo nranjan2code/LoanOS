@@ -17,6 +17,9 @@ Legend:
 | Active RE setup before origination | Regulated entity registry validates RE type, India country, website, privacy policy, grievance officer, board policies, and data residency. | Done |
 | LSP agreement and due diligence | LSP registry validates agreement/scope, enhanced due diligence, periodic review, portfolio monitoring, borrower-facing grievance/privacy disclosure, and recovery guidance where applicable. | Done |
 | Multiple-lender LSP offer neutrality | Offer marketplace with ranking disclosure and dark-pattern checks. | Done |
+| Default Loss Guarantee (DLG) | `dlg.js` empanels a DLG arrangement against an eligible LSP provider governed by the RE, enforces the 5% portfolio cap, permitted forms (cash deposit / FD lien / bank guarantee), and a cover-tenor floor; invocation enforces the 120-day window from overdue and consumes cover up to the cap without deferring the RE's own NPA classification. | Done |
+| Co-lending arrangements | `co-lending.js` validates that partner funding shares sum to 100%, the originating RE retains at least the minimum floor, a single blended rate is disclosed, and funds route through escrow; each loan allocation reconciles exactly to the partner shares. | Done |
+| Account Aggregator (AA) data sharing | `account-aggregator.js` runs the consent-artefact lifecycle (requested → active → revoked/expired), enforces India residency, and gates FI-data fetch by consent validity and fetch type (one-time single use, periodic per-day frequency); the live FIP pull is a mocked integration boundary storing only a hashed evidence record. | Partial |
 | Borrower economic profile | Age, occupation, income required in preflight. | Done |
 | Creditworthiness assessment before sanction | Eligibility engine computes EMI/FOIR affordability, age-at-maturity, and amount/tenor bounds; ineligible borrowers cannot be approved. | Done |
 | KFS before execution | KFS validation and acceptance gate. | Done |

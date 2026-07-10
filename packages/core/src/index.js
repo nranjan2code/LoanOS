@@ -182,6 +182,42 @@ export {
 } from "./recovery-agent.js";
 
 export {
+  DLG_CAP_PERCENT,
+  DLG_FORMS,
+  DLG_INVOCATION_WINDOW_DAYS,
+  DLG_STATUSES,
+  computeDlgPortfolioExposure,
+  invokeDlg,
+  normalizeDlgArrangement,
+  upsertDlgArrangement,
+  validateDlgArrangement
+} from "./dlg.js";
+
+export {
+  CO_LENDING_ROLES,
+  CO_LENDING_STATUSES,
+  MIN_ORIGINATING_RETENTION_PERCENT,
+  computeCoLendingExposure,
+  normalizeCoLendingArrangement,
+  recordCoLendingLoanAllocation,
+  upsertCoLendingArrangement,
+  validateCoLendingArrangement
+} from "./co-lending.js";
+
+export {
+  AA_CONSENT_MODES,
+  AA_CONSENT_STATUSES,
+  AA_FETCH_TYPES,
+  AA_FI_TYPES,
+  approveAccountAggregatorConsent,
+  createAccountAggregatorConsent,
+  fetchAccountAggregatorData,
+  normalizeAccountAggregatorConsent,
+  revokeAccountAggregatorConsent,
+  validateAccountAggregatorConsent
+} from "./account-aggregator.js";
+
+export {
   COMPLAINT_CATEGORIES,
   COMPLAINT_EFFECTIVE_STATUSES,
   COMPLAINT_STATUSES,

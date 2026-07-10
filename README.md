@@ -116,7 +116,7 @@ Control-plane endpoints (platform admin key via `x-platform-admin-key` or platfo
 - `POST /platform/sub-processors`
 - `GET /platform/sub-processors`
 
-Module entitlements: a tenant's `onboarding.enabledModules` defaults to every module (opt-out), but a platform admin can narrow it during onboarding. `ai_governance` gates `/ai/*`, `collections` gates `/recovery-agents*`, `marketplace` gates `/loans/marketplace-offers*`, and `integrations` gates `/integrations/*`; a disabled module returns `403 module_disabled`.
+Module entitlements: a tenant's `onboarding.enabledModules` defaults to every module (opt-out), but a platform admin can narrow it during onboarding. `ai_governance` gates `/ai/*`, `collections` gates `/recovery-agents*`, `marketplace` gates `/loans/marketplace-offers*`, `dlg` gates `/dlg-arrangements*`, `co_lending` gates `/co-lending-arrangements*`, and `integrations` gates `/integrations/*` and `/account-aggregator/*`; a disabled module returns `403 module_disabled`.
 
 Storage: two interchangeable drivers, selected via `LOANOS_STORAGE_DRIVER` (defaults to `file`). By default, all state lives in one `state.json`; each request's full load-modify-save span is serialized per `LOANOS_DATA_DIR` via an in-process lock (`withStateLock` in `apps/api/src/file-store.js`), so concurrent requests queue instead of racing a lost update — correctness, not scale. Set `LOANOS_STORAGE_DRIVER=postgres` (with `DATABASE_URL`) for the Postgres-backed driver: tenant data lives one-row-per-tenant under Row-Level Security, with per-tenant advisory locking and per-tenant fetching, so concurrent requests for different tenants no longer serialize behind one lock. See [`db/schema.sql`](db/schema.sql) and [`docs/architecture/postgres-migration.md`](docs/architecture/postgres-migration.md) before switching a real deployment over — run `tests/postgres-store.test.js` against your target environment first (`DATABASE_URL_TEST=... npm test`).
 
@@ -194,6 +194,15 @@ Useful data-plane endpoints (tenant session or service key required):
 - `GET /recovery-agents`
 - `POST /recovery-agents`
 - `GET /recovery-agents/:id`
+- `GET|POST /dlg-arrangements`
+- `GET /dlg-arrangements/:id`
+- `POST /dlg-arrangements/:id/invocations`
+- `GET|POST /co-lending-arrangements`
+- `GET /co-lending-arrangements/:id`
+- `POST /co-lending-arrangements/:id/allocations`
+- `GET|POST /account-aggregator/consents`
+- `GET /account-aggregator/consents/:id`
+- `POST /account-aggregator/consents/:id/(approval|fetch|revocation)`
 - `GET /complaints`
 - `POST /complaints`
 - `GET /complaints/:id`
@@ -294,6 +303,9 @@ Phase 0 has a working executable foundation, and Epics 1-8 and 11 (S1-S6) each h
 - Compliance control catalog.
 - Regulated entity registry with board-policy and grievance-officer gates.
 - LSP registry with RE agreement, enhanced due diligence, periodic review, borrower-facing grievance, data, recovery, and fee-control gates.
+- Default Loss Guarantee (DLG) arrangements: eligible-LSP provider, 5% portfolio cap, permitted forms, cover-tenor floor, and a 120-day invocation window that consumes cover up to the cap while leaving NPA classification with the RE.
+- Co-lending arrangements: partner shares summing to 100%, an originating-RE retention floor, a disclosed single blended rate, escrow pass-through, and per-loan allocation reconciled to the partner proportions.
+- Account Aggregator (AA) consent artefacts: requested → active → revoked/expired lifecycle with India residency, and FI-data fetch gated by consent validity and fetch type (one-time single use, periodic per-day frequency); the FIP pull is mocked and stores only a hashed evidence record.
 - DLA registry for own and LSP app/web surfaces, with CIMS-ready export rows and compliance attestation gates.
 - Product policy registry with pricing, KFS, eligibility, cooling-off, and penal-charge gates, plus versioning with effective dates so an application prices against the policy governing its date.
 - Registry-backed loan application resolution through `regulatedEntityId` and `productId`/`productCode`.

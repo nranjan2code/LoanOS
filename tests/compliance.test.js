@@ -5,6 +5,17 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import {
+  DLG_STATUSES,
+  CO_LENDING_ROLES,
+  upsertDlgArrangement,
+  invokeDlg,
+  computeDlgPortfolioExposure,
+  upsertCoLendingArrangement,
+  recordCoLendingLoanAllocation,
+  createAccountAggregatorConsent,
+  approveAccountAggregatorConsent,
+  fetchAccountAggregatorData,
+  revokeAccountAggregatorConsent,
   attachKfs,
   buildAuditEvidencePack,
   buildKeyFactStatement,
@@ -1253,6 +1264,216 @@ test("recovery-agent registry requires empanelment evidence for an active agent"
   );
   assert.equal(unknownRe.summary.status, "blocked");
   assert(unknownRe.findings.some((finding) => finding.path === "regulatedEntityId"));
+});
+
+test("DLG arrangement enforces the 5% portfolio cap, eligible provider, and tenor floor", () => {
+  const reResult = upsertRegulatedEntity({}, validRegulatedEntity());
+  const lspResult = upsertLendingServiceProvider({}, validLendingServiceProvider(), reResult.registry);
+  const context = { regulatedEntities: reResult.registry, lendingServiceProviders: lspResult.registry };
+
+  const base = {
+    dlgArrangementId: "dlg_1",
+    regulatedEntityId: "re_example_nbfc",
+    providerLspId: "lsp_example_001",
+    agreementRef: "board_dlg_agreement_1",
+    form: "fixed_deposit_lien",
+    identifiablePortfolioId: "portfolio_q3_2026",
+    portfolioAmountInr: 10000000,
+    coverAmountInr: 500000, // exactly 5%
+    coverTenorMonths: 24,
+    longestLoanTenorMonths: 24,
+    status: "active"
+  };
+
+  const overCap = upsertDlgArrangement({}, merge(base, { coverAmountInr: 600001 }), context);
+  assert.equal(overCap.summary.status, "blocked");
+  assert(overCap.findings.some((f) => f.path === "coverAmountInr"));
+
+  const shortTenor = upsertDlgArrangement({}, merge(base, { coverTenorMonths: 12 }), context);
+  assert.equal(shortTenor.summary.status, "blocked");
+  assert(shortTenor.findings.some((f) => f.path === "coverTenorMonths"));
+
+  const badForm = upsertDlgArrangement({}, merge(base, { form: "corporate_indemnity" }), context);
+  assert.equal(badForm.summary.status, "blocked");
+  assert(badForm.findings.some((f) => f.path === "form"));
+
+  const ok = upsertDlgArrangement({}, base, context);
+  assert.equal(ok.summary.status, "ready");
+  assert.equal(ok.exposure.capAmountInr, 500000);
+  assert.equal(ok.exposure.remainingCoverInr, 500000);
+});
+
+test("DLG invocation enforces the 120-day window and consumes cover up to the cap", () => {
+  const reResult = upsertRegulatedEntity({}, validRegulatedEntity());
+  const lspResult = upsertLendingServiceProvider({}, validLendingServiceProvider(), reResult.registry);
+  const context = { regulatedEntities: reResult.registry, lendingServiceProviders: lspResult.registry };
+  const upsert = upsertDlgArrangement(
+    {},
+    {
+      dlgArrangementId: "dlg_2",
+      regulatedEntityId: "re_example_nbfc",
+      providerLspId: "lsp_example_001",
+      agreementRef: "board_dlg_agreement_2",
+      form: "bank_guarantee",
+      identifiablePortfolioId: "portfolio_x",
+      portfolioAmountInr: 10000000,
+      coverAmountInr: 500000,
+      coverTenorMonths: 36,
+      longestLoanTenorMonths: 36,
+      status: "active"
+    },
+    context
+  );
+  const arrangement = upsert.dlgArrangement;
+
+  const tooLate = invokeDlg(arrangement, {
+    loanAccountId: "loan_1",
+    amountInr: 100000,
+    overdueSince: "2026-01-01T00:00:00.000Z",
+    invokedAt: "2026-06-01T00:00:00.000Z" // ~151 days
+  });
+  assert.equal(tooLate.summary.status, "blocked");
+  assert(tooLate.findings.some((f) => f.path === "invokedAt"));
+
+  const first = invokeDlg(arrangement, {
+    loanAccountId: "loan_1",
+    amountInr: 300000,
+    overdueSince: "2026-01-01T00:00:00.000Z",
+    invokedAt: "2026-02-01T00:00:00.000Z"
+  });
+  assert.equal(first.summary.status, "ready");
+  assert.equal(first.exposure.invokedAmountInr, 300000);
+  assert.equal(first.exposure.remainingCoverInr, 200000);
+
+  const overRemaining = invokeDlg(first.arrangement, {
+    loanAccountId: "loan_2",
+    amountInr: 250000,
+    overdueSince: "2026-03-01T00:00:00.000Z",
+    invokedAt: "2026-04-01T00:00:00.000Z"
+  });
+  assert.equal(overRemaining.summary.status, "blocked");
+  assert(overRemaining.findings.some((f) => f.path === "amountInr"));
+
+  const exhausting = invokeDlg(first.arrangement, {
+    loanAccountId: "loan_2",
+    amountInr: 200000,
+    overdueSince: "2026-03-01T00:00:00.000Z",
+    invokedAt: "2026-04-01T00:00:00.000Z"
+  });
+  assert.equal(exhausting.summary.status, "ready");
+  assert.equal(exhausting.arrangement.status, DLG_STATUSES.EXHAUSTED);
+  assert.equal(exhausting.exposure.remainingCoverInr, 0);
+});
+
+test("co-lending arrangement requires shares summing to 100 and the originating retention floor", () => {
+  const reA = upsertRegulatedEntity({}, validRegulatedEntity());
+  const reB = upsertRegulatedEntity(reA.registry, merge(validRegulatedEntity(), {
+    regulatedEntityId: "re_partner_bank",
+    regulatedEntityName: "Partner NBFC Ltd"
+  }));
+  assert.equal(reB.summary.status, "ready");
+  const context = { regulatedEntities: reB.registry };
+
+  const base = {
+    coLendingArrangementId: "cla_1",
+    agreementRef: "cla_agreement_1",
+    escrowAccountRef: "escrow_1",
+    blendedRateDisclosed: true,
+    status: "active",
+    partners: [
+      { regulatedEntityId: "re_example_nbfc", role: CO_LENDING_ROLES.ORIGINATING, sharePercent: 20 },
+      { regulatedEntityId: "re_partner_bank", role: CO_LENDING_ROLES.PARTNER, sharePercent: 80 }
+    ]
+  };
+
+  const notHundred = upsertCoLendingArrangement({}, merge(base, {
+    partners: [
+      { regulatedEntityId: "re_example_nbfc", role: CO_LENDING_ROLES.ORIGINATING, sharePercent: 20 },
+      { regulatedEntityId: "re_partner_bank", role: CO_LENDING_ROLES.PARTNER, sharePercent: 70 }
+    ]
+  }), context);
+  assert.equal(notHundred.summary.status, "blocked");
+
+  const belowFloor = upsertCoLendingArrangement({}, merge(base, {
+    partners: [
+      { regulatedEntityId: "re_example_nbfc", role: CO_LENDING_ROLES.ORIGINATING, sharePercent: 5 },
+      { regulatedEntityId: "re_partner_bank", role: CO_LENDING_ROLES.PARTNER, sharePercent: 95 }
+    ]
+  }), context);
+  assert.equal(belowFloor.summary.status, "blocked");
+
+  const noEscrow = upsertCoLendingArrangement({}, merge(base, { escrowAccountRef: null }), context);
+  assert.equal(noEscrow.summary.status, "blocked");
+  assert(noEscrow.findings.some((f) => f.path === "escrowAccountRef"));
+
+  const ok = upsertCoLendingArrangement({}, base, context);
+  assert.equal(ok.summary.status, "ready");
+
+  const allocation = recordCoLendingLoanAllocation(ok.coLendingArrangement, {
+    loanAccountId: "loan_cl_1",
+    principalInr: 100000,
+    blendedRateBps: 1800
+  });
+  assert.equal(allocation.summary.status, "ready");
+  const total = allocation.allocation.legs.reduce((s, l) => s + l.amountInr, 0);
+  assert.equal(total, 100000); // legs reconcile exactly to principal
+  const originatingLeg = allocation.allocation.legs.find((l) => l.role === CO_LENDING_ROLES.ORIGINATING);
+  assert.equal(originatingLeg.amountInr, 20000);
+});
+
+test("Account Aggregator consent governs fetch by lifecycle, validity, and fetch type", () => {
+  const borrower = upsertBorrowerProfile({}, validBorrowerProfile());
+  const context = { borrowerProfiles: borrower.registry };
+
+  const nonIndia = createAccountAggregatorConsent({}, {
+    consentId: "aa_1",
+    borrowerId: "bor_001",
+    purposeCode: "101",
+    purposeText: "Loan underwriting",
+    fiTypes: ["deposit"],
+    fetchType: "onetime",
+    consentExpiry: "2026-12-31T00:00:00.000Z",
+    dataLifeDays: 30,
+    dataResidency: "SG"
+  }, context);
+  assert.equal(nonIndia.summary.status, "blocked");
+  assert(nonIndia.findings.some((f) => f.path === "dataResidency"));
+
+  const created = createAccountAggregatorConsent({}, {
+    consentId: "aa_2",
+    borrowerId: "bor_001",
+    purposeCode: "101",
+    purposeText: "Loan underwriting",
+    fiTypes: ["deposit", "term_deposit"],
+    fetchType: "onetime",
+    consentStart: "2026-07-01T00:00:00.000Z",
+    consentExpiry: "2026-09-30T00:00:00.000Z",
+    dataLifeDays: 90
+  }, context);
+  assert.equal(created.summary.status, "ready");
+
+  // Cannot fetch before the borrower approves at the AA.
+  const earlyFetch = fetchAccountAggregatorData(created.consent, { asOf: "2026-07-05T00:00:00.000Z" });
+  assert.equal(earlyFetch.summary.status, "blocked");
+
+  const approved = approveAccountAggregatorConsent(created.consent, {
+    aaConsentHandle: "aa-handle-xyz",
+    approvedAt: "2026-07-02T00:00:00.000Z"
+  });
+  assert.equal(approved.summary.status, "ready");
+  assert.equal(approved.consent.status, "active");
+
+  const firstFetch = fetchAccountAggregatorData(approved.consent, { asOf: "2026-07-05T00:00:00.000Z" });
+  assert.equal(firstFetch.summary.status, "ready");
+  assert(firstFetch.fetch.dataHash);
+
+  // One-time consent cannot be reused.
+  const secondFetch = fetchAccountAggregatorData(firstFetch.consent, { asOf: "2026-07-06T00:00:00.000Z" });
+  assert.equal(secondFetch.summary.status, "blocked");
+
+  // Expired consent cannot be fetched.
+  const revoked = revokeAccountAggregatorConsent(approved.consent, { reason: "borrower withdrew" });
+  assert.equal(revoked.consent.status, "revoked");
 });
 
 test("DLA registry exports own and LSP apps in CIMS-ready shape", () => {
