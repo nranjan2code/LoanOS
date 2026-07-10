@@ -367,6 +367,13 @@ export function resolveSessionRecord(state, token, now = new Date()) {
     }
     return { session, tenant };
   }
+  if (session.principalType === "borrower") {
+    const tenant = state.controlPlane.tenants?.[session.tenantId];
+    if (!tenant || tenant.status !== "active") {
+      return null;
+    }
+    return { session, tenant };
+  }
   if (session.principalType === "platform_user") {
     const user = state.controlPlane.platformUsers?.[session.userId];
     if (!user || user.status !== "active") {

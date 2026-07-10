@@ -643,6 +643,27 @@ async function route(req, res, dataDir, platformAdminKey) {
     }
   }
 
+  // Borrower sessions: the customer portal logs in via /auth/borrower-connect.
+  // The borrower is verified against borrowerProfiles, not tenant users.
+  if (!tenant && sessionRecord?.session?.principalType === "borrower") {
+    tenantData = await loadTenantDataOnly(dataDir, sessionRecord.session.tenantId);
+    const borrower = tenantData?.borrowerProfiles?.[sessionRecord.session.userId];
+    if (borrower) {
+      tenant = sessionRecord.tenant;
+      authContext = {
+        principalType: "borrower",
+        tenantId: tenant.tenantId,
+        userId: borrower.borrowerId,
+        email: borrower.email,
+        displayName: borrower.name,
+        roles: [],
+        sessionId: sessionRecord.session.sessionId
+      };
+    } else {
+      tenantData = null;
+    }
+  }
+
   // A tenant session is the human path. A tenant api key remains the service
   // integration path. Failing both, platform staff may present a break-glass
   // credential scoped to exactly one tenant.
@@ -3288,6 +3309,14 @@ async function route(req, res, dataDir, platformAdminKey) {
     return;
   }
 
+  if (method === "GET" && path === "/loans/applications") {
+    const state = await store.load();
+    sendJson(res, 200, {
+      applications: Object.values(state.loanApplications || {})
+    });
+    return;
+  }
+
   if (method === "POST" && path === "/loans/marketplace-offers") {
     const body = await readJson(req);
     const state = await store.load();
@@ -5742,6 +5771,57 @@ async function routeAuth(req, res, { dataDir, method, path }) {
       res,
       200,
       { scope, tenant: publicTenant(tenant), user: authenticated.user, session: publicSession(session) },
+      { "set-cookie": sessionCookie(token, session.expiresAt) }
+    );
+    return;
+  }
+
+  if (method === "POST" && path === "/auth/borrower-connect") {
+    const body = await readJson(req);
+    const tenantId = body.tenantId;
+    const borrowerId = body.borrowerId;
+    const email = body.email;
+
+    const state = await loadWholeState(dataDir);
+    const tenant = state.controlPlane.tenants?.[tenantId];
+    const tenantData = state.tenants?.[tenantId];
+    if (!tenant || tenant.status !== "active" || !tenantData) {
+      sendJson(res, 401, { error: { code: "invalid_credentials", message: "Invalid tenant ID." } });
+      return;
+    }
+
+    const borrower = tenantData.borrowerProfiles?.[borrowerId];
+    if (!borrower || borrower.email.toLowerCase() !== email.toLowerCase()) {
+      sendJson(res, 401, { error: { code: "invalid_credentials", message: "We could not match those customer details." } });
+      return;
+    }
+
+    const now = new Date();
+    const { token, session } = createSessionRecord({
+      principalType: "borrower",
+      tenantId,
+      userId: borrower.borrowerId,
+      email: borrower.email,
+      displayName: borrower.name,
+      roles: []
+    }, now);
+
+    const nextState = {
+      ...state,
+      controlPlane: {
+        ...state.controlPlane,
+        sessions: {
+          ...state.controlPlane.sessions,
+          [session.sessionId]: session
+        }
+      }
+    };
+    await saveWholeState(nextState, dataDir);
+
+    sendJson(
+      res,
+      200,
+      { scope: "borrower", borrower, session: publicSession(session) },
       { "set-cookie": sessionCookie(token, session.expiresAt) }
     );
     return;

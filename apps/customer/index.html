@@ -796,13 +796,18 @@
       const email = document.getElementById('borrower-email').value.trim();
 
       try {
-        // Authenticate context setup (simulated auth check by loading the borrower profile from endpoint)
-        const meRes = await fetch(`/borrowers/${borrowerId}`);
-        if (!meRes.ok) {
-          if (meRes.status === 401) throw new Error('Secure customer sign-in has not been connected in this environment yet.');
-          throw new Error('We could not match those customer details.');
+        // Authenticate context setup via /auth/borrower-connect which establishes the session cookie
+        const connectRes = await fetch('/auth/borrower-connect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tenantId, borrowerId, email })
+        });
+        if (!connectRes.ok) {
+          const errData = await connectRes.json().catch(() => ({}));
+          throw new Error(errData.error?.message || 'We could not match those customer details.');
         }
-        const me = await meRes.json();
+        const connectData = await connectRes.json();
+        const me = connectData.borrower;
         
         authContext = { tenantId, borrowerId, email, name: me.name };
         dom.welcomeName.textContent = `Welcome, ${authContext.name || 'customer'}`;
