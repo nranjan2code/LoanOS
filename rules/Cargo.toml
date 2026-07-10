@@ -13,6 +13,7 @@ serde_json = "1"
 rust_decimal = { version = "1", features = ["serde-with-str"] }
 chrono = { version = "0.4", default-features = false, features = ["serde", "clock"] }
 thiserror = "2"
+sha2 = "0.10"
 
 rules-core = { path = "crates/rules-core" }
 rules-expr = { path = "crates/rules-expr" }

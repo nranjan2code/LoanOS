@@ -14,7 +14,7 @@ const REQUEST_JSON: &str = r#"{
     "borrower": { "date_of_birth": "1991-04-02" },
     "economic_profile": {
       "monthly_income": "85000.00",
-      "existing_monthly_obligations": "12000.00"
+      "existing_monthly_obligations": "22000.00"
     },
     "product": {
       "requested_amount": "300000.00",
@@ -41,8 +41,8 @@ const RESPONSE_JSON: &str = r#"{
   "request_id": "req_01JZX4Y8K2",
   "decision": "refer",
   "outputs": {
-    "foir": "0.4136",
-    "estimated_emi": "15031.94",
+    "foir": "0.4359",
+    "estimated_emi": "15049.81",
     "max_eligible_amount": "250000.00"
   },
   "reasons": [

@@ -104,7 +104,7 @@ Isolation tiers (same binary, escalating boundary): supervised process with cgro
 - DEC-7 Federation via `DecisionProvider`. The native engine is one provider among adapters (legacy BRMS REST, OPA, GoRules ZEN, DMN). A per-tenant router binds each decision key to a provider, enabling proxy-first onboarding and strangler-fig migration with trace diffing. All providers emit the same trace envelope.
 - DEC-8 Small total expression language. CEL-like, statically typed, with a vetted domain standard library (`emi`, `age_years`, `round` with explicit rounding mode, date/tenor arithmetic). No tenant-defined functions in v1; stdlib grows only via platform release.
 - DEC-9 JSON everywhere, decimals as strings. Wire format, canonical form, and authoring format are JSON. Canonicalization: UTF-8 NFC, lexicographically sorted keys, no insignificant whitespace, decimals as strings. The canonical bytes are what gets hashed and signed.
-- DEC-10 Evaluation-core spike deferred. Phase 1 includes a time-boxed spike: embed GoRules ZEN as the evaluation core behind `DecisionProvider` versus first-party `rules-eval`. Decision criteria: ability to uphold INV-1/5/6/7 unmodified, trace fidelity, and authoring-format fit. The trait boundary makes either choice reversible.
+- DEC-10 Evaluation core: first-party. Resolved 2026-07-10 during PH-1. Rationale: (a) INV-6 requires decimals-as-strings and decimal-only arithmetic through the entire evaluation path — ZEN's JDM evaluates JSON numbers natively and would need forking to uphold INV-5/INV-6 semantics unmodified; (b) SEC-7's minimal-dependency policy for eval-path crates is trivially met by the first-party core (serde, rust_decimal, chrono, sha2 only); (c) the v1 node set proved small enough that the eligibility port plus differential harness cost less than adapter integration would have. JDM format compatibility at the model layer remains open for authoring-tool reuse, and the `DecisionProvider` trait (DEC-7) keeps a future ZEN adapter possible per tenant.
 
 ## 7. The Decision Contract
 
@@ -123,7 +123,7 @@ One request/response envelope for every decision, every provider, every deployme
     "borrower": { "date_of_birth": "1991-04-02" },
     "economic_profile": {
       "monthly_income": "85000.00",
-      "existing_monthly_obligations": "12000.00"
+      "existing_monthly_obligations": "22000.00"
     },
     "product": {
       "requested_amount": "300000.00",
@@ -162,8 +162,8 @@ Contract rules:
   "request_id": "req_01JZX4Y8K2",
   "decision": "refer",
   "outputs": {
-    "foir": "0.4136",
-    "estimated_emi": "15031.94",
+    "foir": "0.4359",
+    "estimated_emi": "15049.81",
     "max_eligible_amount": "250000.00"
   },
   "reasons": [
@@ -352,12 +352,12 @@ Each phase has acceptance criteria; a phase is done when all its criteria have a
 - [x] `rules/` workspace scaffolded with crate skeletons (all crates `publish = false`), CI lanes (fmt, clippy, test, `cargo audit`, float-deny lint via `rules/clippy.toml` disallowed-types + `clippy::float_arithmetic`).
 - [x] `rules-core` contract types compile; JSON round-trip tests for DecisionRequest/Response pass (fixtures are the section 7 examples).
 
-### PH-1 — Prove the spine
-- [ ] `rules-expr` v1 (grammar, typechecker, evaluator, stdlib incl. `emi`, `age_years`) with fuzz targets running in CI.
-- [ ] `rules-model` + `rules-compile` + `rules-eval` evaluate the ported `lending.eligibility` graph.
-- [ ] DEC-10 spike report: ZEN embed vs first-party core, decided and recorded as an amendment to this document.
-- [ ] Differential harness: eligibility graph vs `eligibility.js` over the seed corpus, zero unexplained divergence.
-- [ ] INV-1, INV-5, INV-6, INV-7 test suites green.
+### PH-1 — Prove the spine — complete 2026-07-10
+- [x] `rules-expr` v1 (grammar per `rules/crates/rules-expr/SPEC.md`, typechecker, fuel-bounded evaluator, stdlib incl. `emi`, `age_years`, `coalesce`) with a 20k-case seeded adversarial parser-robustness corpus in CI. (Amendment: dedicated cargo-fuzz targets deferred to a hardening pass — the in-tree corpus is deterministic and runs on every CI build, which full nightly fuzzing would not.)
+- [x] `rules-model` + `rules-compile` + `rules-eval` evaluate the ported `lending.eligibility` graph (`rules/fixtures/lending-eligibility.json`, content-hashed per DEC-5).
+- [x] DEC-10 resolved: first-party evaluation core; rationale recorded in section 6.
+- [x] Differential harness: 542-case corpus generated from `eligibility.js` by `rules/tools/gen-eligibility-corpus.mjs` (seeded, fixed `now`, checked in), replayed by `rules-eval/tests/differential_eligibility.rs` — zero divergence.
+- [x] INV-1, INV-5, INV-6, INV-7 test suites green (`rules-eval/tests/invariants.rs`, `rules-expr/tests/language.rs`).
 
 ### PH-2 — Governance and bundles
 - [ ] `rules-bundle`: canonicalization, hashing, sign/verify, encryption envelope (SEC-1/2 tests green).

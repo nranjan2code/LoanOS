@@ -6,3 +6,8 @@ edition.workspace = true
 publish.workspace = true
 
 [dependencies]
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+rules-core = { workspace = true }
+rules-expr = { workspace = true }
+rules-model = { workspace = true }
