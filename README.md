@@ -71,7 +71,9 @@ Control-plane endpoints (platform admin key via `x-platform-admin-key` or platfo
 
 Module entitlements: a tenant's `onboarding.enabledModules` defaults to every module (opt-out), but a platform admin can narrow it during onboarding. `ai_governance` gates `/ai/*`, `collections` gates `/recovery-agents*`, `marketplace` gates `/loans/marketplace-offers*`, and `integrations` gates `/integrations/*`; a disabled module returns `403 module_disabled`.
 
-Concurrency: all state lives in one `state.json`; each request's full load-modify-save span is serialized per `LOANOS_DATA_DIR` via an in-process lock (`withStateLock` in `apps/api/src/file-store.js`), so concurrent requests queue instead of racing a lost update. This is correctness, not scale — production would need per-record storage.
+Storage: two interchangeable drivers, selected via `LOANOS_STORAGE_DRIVER` (defaults to `file`). By default, all state lives in one `state.json`; each request's full load-modify-save span is serialized per `LOANOS_DATA_DIR` via an in-process lock (`withStateLock` in `apps/api/src/file-store.js`), so concurrent requests queue instead of racing a lost update — correctness, not scale. Set `LOANOS_STORAGE_DRIVER=postgres` (with `DATABASE_URL`) for the Postgres-backed driver: tenant data lives one-row-per-tenant under Row-Level Security, with per-tenant advisory locking and per-tenant fetching, so concurrent requests for different tenants no longer serialize behind one lock. See [`db/schema.sql`](db/schema.sql) and [`docs/architecture/postgres-migration.md`](docs/architecture/postgres-migration.md) before switching a real deployment over — run `tests/postgres-store.test.js` against your target environment first (`DATABASE_URL_TEST=... npm test`).
+
+Every request body is size-capped (5MB) and time-boxed (15s) before the state lock is acquired, so a slow or oversized client can't hold every tenant's requests hostage. Login lockout applies both per-account (5 failed attempts / 15 min) and per-source-IP (20 / 15 min) throttles.
 
 Useful data-plane endpoints (tenant session or service key required):
 
@@ -233,6 +235,9 @@ Useful data-plane endpoints (tenant session or service key required):
 
 Phase 0 has a working executable foundation, and Epics 1-8 and 11 (S1-S6) each have at least a first executable slice:
 
+- Optional Postgres/RLS storage driver (`LOANOS_STORAGE_DRIVER=postgres`, default remains the file store): tenant data isolated by database-enforced Row-Level Security beneath the existing application-layer isolation, per-tenant advisory locking, and per-tenant fetching (a request touches only its own tenant's row, not every tenant's). Verified against a live PostgreSQL instance — see [`docs/architecture/postgres-migration.md`](docs/architecture/postgres-migration.md).
+- API hardening: request bodies are size/time-capped before the state lock is acquired, login lockout adds a per-source-IP throttle alongside the existing per-account one, a failed startup no longer wedges every future request, and 500 responses no longer leak internal error details.
+- LMS ledger integrity: duplicate `paymentRef` retries (payment, prepayment, foreclosure, settlement, cash recovery) are rejected rather than double-crediting a loan account; ledger/statement summation uses exact integer-paise arithmetic instead of float-sum-then-round.
 - Multi-tenant SaaS foundation: state partitioned per tenant, tenant-scoped api-key authentication with 401 on missing/invalid keys, a platform control plane that mints tenants behind an admin key, and a cross-tenant isolation regression suite.
 - Tamper-evident audit spine: every save seals the tenant's events into a per-tenant SHA-256 hash chain (tenant-bound genesis), with a chain-validity endpoint, an integrity-attested evidence export pack, and uniform actor/actorType/dataClass provenance stamped on every event.
 - Tenant portability export and evidenced offboarding: a reproducible full-tenant export (control record, data plane, audit evidence) and an offboarding workflow that purges the data plane, revokes the api key, and retains a deletion attestation.

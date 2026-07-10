@@ -6,10 +6,12 @@ This document describes what exists in the repository today.
 
 The current implementation is intentionally small:
 
-- No external npm dependencies.
+- One external npm dependency (`pg`), used only by the optional Postgres storage driver — see below.
 - Node.js built-in HTTP server.
-- File-backed JSON state under `.loanos-data/state.json`, partitioned into a control plane (tenant registry) and one data plane per tenant.
-- Multi-tenant: every data-plane request runs inside exactly one tenant, resolved from a tenant user session or `x-api-key`/bearer service token; cross-tenant access is impossible by construction because each request only ever receives its own tenant's partition.
+- Two interchangeable storage drivers, selected via `LOANOS_STORAGE_DRIVER` (defaults to `file`, zero behavior change):
+  - **File-backed** (default): JSON state under `.loanos-data/state.json`, partitioned into a control plane (tenant registry) and one data plane per tenant.
+  - **Postgres-backed** (opt-in, `LOANOS_STORAGE_DRIVER=postgres`): tenant data-plane documents live one-per-row in a `tenant_data` table under Postgres Row-Level Security — a second, database-enforced isolation layer beneath the application-layer one — with per-tenant advisory locking and per-tenant fetching so concurrent requests for different tenants no longer serialize behind one global lock. See [`db/schema.sql`](../../db/schema.sql), [`apps/api/src/postgres-store.js`](../../apps/api/src/postgres-store.js), and the [Postgres migration doc](postgres-migration.md) for the full v1/v2/v3 design and live-verification results.
+- Multi-tenant: every data-plane request runs inside exactly one tenant, resolved from a tenant user session or `x-api-key`/bearer service token; cross-tenant access is impossible by construction because each request only ever receives its own tenant's partition (and, on the Postgres driver, is also blocked at the database layer by RLS).
 - Core domain logic in `packages/core/src`.
 - Pure backend API in `apps/api/src`.
 - Public platform website in `apps/web/`.
@@ -17,7 +19,7 @@ The current implementation is intentionally small:
 - Internal staff workspace in `apps/dashboard/`.
 - Borrower customer portal in `apps/customer/`.
 - Shared design system tokens in `apps/shared/`.
-- Automated tests in `tests/` (140 tests as of the latest commit).
+- Automated tests in `tests/`: 143 file-driver/domain tests (`compliance.test.js`, `external-services.test.js`) that always run, plus 5 Postgres integration tests (`postgres-store.test.js`) that self-skip unless `DATABASE_URL_TEST` is set.
 
 Run it:
 
@@ -62,11 +64,15 @@ npm run dev:api
 | `apps/tenant/index.html` | Dynamic template for a tenant's own landing page (white-labeled via `/t/{tenantId}/branding`). |
 | `apps/customer/index.html` | Dynamic template for a borrower/customer self-service portal (white-labeled). |
 | `apps/dashboard/index.html` | Tenant staff workspace dashboard. |
-| `apps/api/src/identity.js` | Local IAM helpers for tenant/platform users, PBKDF2 password hashes, HTTP session records, tenant access reviews, and role checks. |
-| `apps/api/src/file-store.js` | Local JSON state load/save helpers; control-plane tenant registry (api-key hashing, tenant resolution), sub-processor register, and break-glass grants; per-tenant data partitions and tenant-scoped accessors; `buildTenantExport`/`offboardTenant` for portability and evidenced deletion. |
-| `apps/api/src/server.js` | HTTP API: auth/session routes, tenant admin routes, platform control plane (tenant minting, export, offboarding, break-glass, sub-processors), tenant-context resolution with session/api-key/break-glass fallback and 401 gate, tenant-scoped store with centralized audit stamping, plus endpoints for compliance controls, AI models, kill switch, workflow tasks, applications, loan accounts, document vault, communications, payment rails, fraud cases, erasure requests, data disclosures, incidents, bank-account verification, CERSAI security interests, DPDP access/correction requests, and FIU-IND reports. |
+| `apps/api/src/identity.js` | Local IAM helpers for tenant/platform users, PBKDF2 password hashes, HTTP session records, tenant access reviews, and role checks. `resolveSession` splits into `resolveSessionRecord` (control-plane only — session lookup and tenant validation) and `resolveSessionUser` (given one tenant's already-fetched data, validates the login record), so a caller that doesn't have every tenant's data loaded can still resolve a session. |
+| `apps/api/src/file-store.js` | Local JSON state load/save helpers; control-plane tenant registry (api-key hashing, tenant resolution), sub-processor register, and break-glass grants; per-tenant data partitions and tenant-scoped accessors; `buildTenantExport`/`offboardTenant` for portability and evidenced deletion; targeted `loadControlPlaneOnly`/`loadTenantDataOnly`/`saveTenantDataOnly`/`saveControlPlaneOnly` accessors (thin wrappers here — the file driver can't do partial I/O — but a real optimization on the Postgres driver). `ensureBootstrapTenants` accepts injectable `loadStateFn`/`saveStateFn` so the Postgres driver can reuse its seeding logic. |
+| `apps/api/src/postgres-store.js` | Postgres-backed storage driver (opt-in via `LOANOS_STORAGE_DRIVER=postgres`): `loadState`/`saveState`/`withStateLock` (now lock-key-scoped) mirror file-store.js's whole-state interface for control-plane operations; `loadControlPlaneOnly`/`loadTenantDataOnly`/`saveTenantDataOnly`/`saveControlPlaneOnly` are genuine per-tenant, RLS-scoped accessors used by `route()`'s hot path, switching to the `loanos_app` role via `SET ROLE` for exactly the tenant-scoped statement. Verified against a live PostgreSQL 18 instance; see the [Postgres migration doc](postgres-migration.md). |
+| `apps/api/src/storage.js` | Storage-driver façade: re-exports every pure, in-memory function from `file-store.js` unchanged, and selects the file- or Postgres-backed I/O functions (`loadState`/`saveState`/`withStateLock`/`ensureBootstrapTenants`/`peekControlPlaneState`/the four per-tenant accessors) based on `LOANOS_STORAGE_DRIVER`. `server.js` imports from here, not `file-store.js` directly. |
+| `db/schema.sql` | Postgres schema for the optional storage driver: `tenant_data` (one JSONB row per tenant, Row-Level Security), the control-plane tables (tenant registry, sessions, platform users, append-only audit events, sub-processors, break-glass grants), and the two-role model (`loanos_control_plane`, `BYPASSRLS`, what the app authenticates as; `loanos_app`, `NOBYPASSRLS`, reached only via `SET ROLE`, RLS-enforced for the per-tenant hot path). |
+| `apps/api/src/server.js` | HTTP API: auth/session routes, tenant admin routes, platform control plane (tenant minting, export, offboarding, break-glass, sub-processors), tenant-context resolution with session/api-key/break-glass fallback and 401 gate, `resolveLockKey` (picks a per-tenant Postgres advisory-lock key before any lock is taken), tenant-scoped store with centralized audit stamping fetching only the resolved tenant's data, request-body size/time capping ahead of the state lock, a per-source-IP login throttle alongside the per-account one, plus endpoints for compliance controls, AI models, kill switch, workflow tasks, applications, loan accounts, document vault, communications, payment rails, fraud cases, erasure requests, data disclosures, incidents, bank-account verification, CERSAI security interests, DPDP access/correction requests, and FIU-IND reports. |
 | `tests/compliance.test.js` | Regression tests for compliance, API, tenancy, audit, LOS/LMS/LWS, and integration-ledger gates. |
 | `tests/external-services.test.js` | Provider-boundary tests for `ExternalServiceManager` mock/real dispatch and residency guards. |
+| `tests/postgres-store.test.js` | Integration tests for the Postgres storage driver — RLS enforcement (direct and via the two-role model), advisory-lock serialization (same key) and non-serialization (different keys), and a full multi-tenant HTTP round-trip. Self-skips unless `DATABASE_URL_TEST` is set; not part of the default `npm test` gate but part of the `tests/*.test.js` glob it runs. |
 
 ## Implemented API Endpoints
 
@@ -264,6 +270,8 @@ npm run dev:api
 | Tenant isolation | State is partitioned per tenant; each data-plane request receives only its own tenant's partition, so a handler has no code path to another tenant's records. |
 | Tenant authentication | Data-plane routes require either a tenant user session cookie or a valid `x-api-key`/bearer token mapping to an active tenant; missing or invalid tenant context returns 401. Only health and static reference routes are open. |
 | Tenant users and sessions | `POST /auth/login` authenticates tenant users with PBKDF2-hashed passwords, issues HTTP-only session cookies, and stamps session-backed events as `tenant_user` in the audit chain. |
+| Login lockout | Failed logins are throttled two ways: per-account (5 attempts / 15 min, keyed by scope+email) and per-source-IP (20 attempts / 15 min) — the IP throttle catches both credential stuffing across many accounts from one source and the fact that knowing someone's email alone is enough to trigger the per-account lock. |
+| Request body hardening | Every request body is buffered with a 5MB cap and a 15s deadline before the state lock is acquired, so a slow or oversized client can't hold every tenant's requests hostage; oversized/slow bodies return 413 without tearing down the connection mid-write. |
 | Tenant administration | Tenant admins manage users, linked staff actors, access reviews, and service-key rotation through `/admin/*`; tenant service keys remain valid for integrations and bootstrap administration. |
 | Tenant provisioning and onboarding | The platform control plane onboards tenants behind an admin key or platform admin session, optionally creates the first tenant owner, seeds the regulated entity and first product policies through the same compliance validators as data-plane APIs, captures enabled modules/flows, computes readiness, and returns a one-time api key stored only as a SHA-256 hash. |
 | Platform administration | Platform users can log in with sessions, list/provision tenants, administer platform users, manage sub-processors, and mint/revoke break-glass grants according to platform roles. |
@@ -316,7 +324,8 @@ npm run dev:api
 | Interest accrual | Recognizes scheduled interest as immutable `interest_accrual` ledger events once each installment period closes; idempotent per installment, reconstructable from the ledger, and reconciled against the schedule in the balance summary. |
 | Foreclosure | Quotes a payoff of outstanding principal plus interest and charges already due (no future interest); any foreclosure charge must be KFS-disclosed, and enforces lock-in period and floating-rate individual retail fee prohibitions. Execution requires the amount to cover the payoff, settles it through the ledger, and closes the account. |
 | Closure NOC | A settled (closed, zero-dues) account can issue a checksum-sealed No-Objection Certificate declaring no dues remain and no objection to releasing securities; re-issue returns the same certificate. |
-| Payment posting | Posts payment events, allocates to due interest first and principal next, and updates account status. |
+| Payment posting | Posts payment events, allocates to due interest first and principal next, and updates account status. A duplicate `paymentRef` on the same loan account (payment, prepayment, foreclosure, settlement, or cash recovery — all funnel through `postPaymentToLoanAccount`) is rejected as a blocking finding rather than double-crediting the ledger, so a client retry after a network timeout is safe. |
+| Ledger summation exactness | `summarizeLoanAccount` and `generateLoanStatement` sum ledger/schedule amounts using exact integer-paise arithmetic (`sumMoney`) rather than float-sum-then-round, eliminating dependence on `roundMoney`'s epsilon-rounding heuristic continuing to absorb accumulated floating-point drift as ledgers grow. |
 | Part-prepayment | Enforces lock-in period and floating-rate individual retail fee prohibitions, clears dues then reduces principal, requiring a real principal reduction, and rebuilds the future schedule either to lower each EMI over the same term (`reduce_emi`) or keep the EMI and shorten the tenure (`reduce_tenure`). |
 | Borrower statements | Generates period statement from schedule and ledger transactions. |
 | Rendered statement document | Renders the period statement into a checksum-sealed HTML/text borrower document (opening/closing balances, dues, transactions, totals) in the same shape as the execution packet. |
@@ -355,7 +364,8 @@ npm run dev:api
 
 ## Known Limitations
 
-- Persistence is local JSON only (now tenant-partitioned), not a production database.
+- Persistence defaults to local JSON (tenant-partitioned); an optional Postgres/RLS driver exists (`LOANOS_STORAGE_DRIVER=postgres`, see the [Postgres migration doc](postgres-migration.md)) but sandbox management and the platform control plane (`routePlatform`/`routeAuth`) still use whole-state load/save even on that driver — genuinely cross-tenant by design and admin-frequency, not migrated to per-tenant fetching.
+- Data at rest (either driver) is not encrypted by the application; the tenancy doc's per-tenant encryption-key commitment is not yet implemented.
 - Tenant human login/session auth is implemented locally, but external IAM/SSO, enforced MFA, SCIM, and production-grade password policy are still integration work.
 - Tenant service api keys are hashed at rest and rotatable, but there is still one active service key per tenant/environment rather than multiple named integration keys with independent scopes.
 - The platform admin key remains as a bootstrap/emergency secret; individual platform users and roles are implemented for normal platform administration.
@@ -374,6 +384,11 @@ npm run dev:api
 
 Current tests prove:
 
+- A duplicate `paymentRef` retry on an already-posted payment is blocked (422) rather than double-crediting the ledger, and the account balance/ledger are unchanged after the retry.
+- `summarizeLoanAccount` sums 5,000 ledger events to an exact match against an independently-computed BigInt total, proving the integer-paise summation is exact by construction rather than dependent on `roundMoney`'s rounding heuristic continuing to work at scale.
+- An oversized request body (over the 5MB cap) is rejected with 413 before reaching any handler, and the server remains responsive to subsequent requests.
+- Login lockout enforces both a per-account threshold (independent of whether the password was ever guessed) and a per-source-IP threshold (independent of which account was targeted).
+- (Postgres driver, `tests/postgres-store.test.js`, requires `DATABASE_URL_TEST`) The RLS policy blocks cross-tenant reads and writes at the database level, both connecting directly as the RLS-enforced role and via the application's actual `SET ROLE` switching from its bypass-capable connection role; the bypass-capable role genuinely bypasses RLS directly (required for legitimately cross-tenant control-plane operations); advisory locks serialize callers sharing a lock key and do not serialize callers using different keys; and a full HTTP round-trip proves cross-tenant isolation over the API while connected as the actual production role (not a superuser, so the test cannot pass on a broken role grant).
 - Data-plane routes reject missing or invalid tenant context with 401, while health and compliance-controls stay open.
 - Sealing events produces a verifiable hash chain; editing, dropping, or reordering an event breaks verification, a chain does not verify under another tenant's genesis, and re-sealing is idempotent.
 - The API seals origination events into an audit chain, reports chain validity, exports an integrity-attested (and filterable) evidence pack, and keeps the audit spine tenant-scoped.
