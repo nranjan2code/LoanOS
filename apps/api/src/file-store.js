@@ -166,7 +166,12 @@ const MOCK_CKYC_PRESEED = {
   }
 };
 
-function normalizeState(state) {
+// Exported so other storage drivers (e.g. postgres-store.js) can normalize a
+// state object assembled from a different backing store into the exact same
+// defaulted shape this module produces from a JSON file — every pure
+// function elsewhere in this file (registerTenant, grantBreakGlass, ...)
+// depends on that shape being fully defaulted, not on *how* it was loaded.
+export function normalizeState(state) {
   const tenants = {};
   for (const [tenantId, data] of Object.entries(state?.tenants ?? {})) {
     tenants[tenantId] = normalizeTenantData(data);
@@ -709,11 +714,20 @@ export function setTenantData(state, tenantId, tenantData) {
   };
 }
 
-export async function ensureBootstrapTenants(dataDir, bootstrapTenants = []) {
+// loadStateFn/saveStateFn default to this module's own file-backed
+// loadState/saveState, so every existing caller (and every test) is
+// completely unaffected. A different storage driver (postgres-store.js)
+// injects its own load/save so this one seeding implementation — the "dev"
+// tenant's demo data in particular — is not duplicated per driver.
+export async function ensureBootstrapTenants(
+  dataDir,
+  bootstrapTenants = [],
+  { loadStateFn = loadState, saveStateFn = saveState } = {}
+) {
   if (!bootstrapTenants.length) {
     return;
   }
-  let state = await loadState(dataDir);
+  let state = await loadStateFn(dataDir);
   let changed = false;
   for (const tenant of bootstrapTenants) {
     const existing = state.controlPlane.tenants[tenant.tenantId];
@@ -913,7 +927,7 @@ export async function ensureBootstrapTenants(dataDir, bootstrapTenants = []) {
     }
   }
   if (changed) {
-    await saveState(state, dataDir);
+    await saveStateFn(state, dataDir);
   }
 }
 

@@ -146,29 +146,24 @@ export function summarizeLoanAccount(account, asOf = new Date()) {
   const ledger = (Array.isArray(account?.ledger) ? account.ledger : []).filter(
     (event) => new Date(event.eventDate).getTime() <= asOf.getTime()
   );
-  const principalDisbursed = roundMoney(ledger.reduce((sum, event) => sum + (event.principalDebit ?? 0), 0));
-  const principalPaid = roundMoney(ledger.reduce((sum, event) => sum + (event.principalCredit ?? 0), 0));
-  const interestPaid = roundMoney(ledger.reduce((sum, event) => sum + (event.interestCredit ?? 0), 0));
-  const interestAccrued = roundMoney(ledger.reduce((sum, event) => sum + (event.interestDebit ?? 0), 0));
-  const chargesAssessed = roundMoney(ledger.reduce((sum, event) => sum + (event.chargesDebit ?? 0), 0));
-  const chargesWaived = roundMoney(ledger.reduce((sum, event) => sum + (event.chargesWaiverCredit ?? 0), 0));
-  const chargesPaid = roundMoney(ledger.reduce((sum, event) => sum + (event.chargesCredit ?? 0), 0));
+  const principalDisbursed = sumMoney(ledger, (event) => event.principalDebit);
+  const principalPaid = sumMoney(ledger, (event) => event.principalCredit);
+  const interestPaid = sumMoney(ledger, (event) => event.interestCredit);
+  const interestAccrued = sumMoney(ledger, (event) => event.interestDebit);
+  const chargesAssessed = sumMoney(ledger, (event) => event.chargesDebit);
+  const chargesWaived = sumMoney(ledger, (event) => event.chargesWaiverCredit);
+  const chargesPaid = sumMoney(ledger, (event) => event.chargesCredit);
   // Principal and interest waived (e.g. a settlement sacrifice) reduce what is
   // owed without counting as cash paid, so payoff figures stay honest.
-  const principalWaived = roundMoney(ledger.reduce((sum, event) => sum + (event.principalWaiverCredit ?? 0), 0));
-  const interestWaived = roundMoney(ledger.reduce((sum, event) => sum + (event.interestWaiverCredit ?? 0), 0));
+  const principalWaived = sumMoney(ledger, (event) => event.principalWaiverCredit);
+  const interestWaived = sumMoney(ledger, (event) => event.interestWaiverCredit);
   const totalPaid = roundMoney(principalPaid + interestPaid + chargesPaid);
   const principalOutstanding = roundMoney(Math.max(0, principalDisbursed - principalPaid - principalWaived));
-  const interestDueAsOf = roundMoney(
-    (account.schedule ?? [])
-      .filter((installment) => new Date(`${installment.dueDate}T00:00:00.000Z`).getTime() <= asOf.getTime())
-      .reduce((sum, installment) => sum + installment.interestDue, 0)
+  const dueInstallmentsAsOf = (account.schedule ?? []).filter(
+    (installment) => new Date(`${installment.dueDate}T00:00:00.000Z`).getTime() <= asOf.getTime()
   );
-  const principalDueAsOf = roundMoney(
-    (account.schedule ?? [])
-      .filter((installment) => new Date(`${installment.dueDate}T00:00:00.000Z`).getTime() <= asOf.getTime())
-      .reduce((sum, installment) => sum + installment.principalDue, 0)
-  );
+  const interestDueAsOf = sumMoney(dueInstallmentsAsOf, (installment) => installment.interestDue);
+  const principalDueAsOf = sumMoney(dueInstallmentsAsOf, (installment) => installment.principalDue);
   const interestOutstanding = roundMoney(Math.max(0, interestDueAsOf - interestPaid - interestWaived));
   const chargesOutstanding = roundMoney(Math.max(0, chargesAssessed - chargesWaived - chargesPaid));
   const principalOverdue = roundMoney(Math.max(0, principalDueAsOf - principalPaid - principalWaived));
@@ -464,6 +459,24 @@ export function assignRecoveryAgent(account, input, recoveryAgents = {}, now = n
   };
 }
 
+// A payment posting is a financial-effect event a client can legitimately
+// retry (network timeout, gateway ambiguity). Every caller in this module —
+// direct payment, cash recovery, foreclosure, part-prepayment, settlement —
+// funnels through here with a caller-supplied paymentRef, so this is the one
+// place a duplicate-post guard needs to live. A ledger event's paymentRef
+// namespace is distinct from a disbursement's (a client never mints a
+// disbursementId), so only prior *payment-family* events are checked.
+const PAYMENT_FAMILY_LEDGER_TYPES = new Set(["payment", "cash_recovery_payment"]);
+
+export function findDuplicatePaymentEvent(account, paymentRef) {
+  if (!paymentRef) return null;
+  return (
+    (account?.ledger ?? []).find(
+      (event) => PAYMENT_FAMILY_LEDGER_TYPES.has(event.type) && event.paymentRef === paymentRef
+    ) ?? null
+  );
+}
+
 export function postPaymentToLoanAccount(account, input, now = new Date()) {
   const findings = [];
 
@@ -479,12 +492,24 @@ export function postPaymentToLoanAccount(account, input, now = new Date()) {
   if (!input?.paymentRef) {
     findings.push(createFinding("error", "RBI-IT-GRC", "Payment reference is required.", "paymentRef"));
   }
+  const duplicateEvent = account ? findDuplicatePaymentEvent(account, input?.paymentRef) : null;
+  if (duplicateEvent) {
+    findings.push(
+      createFinding(
+        "error",
+        "RBI-IT-GRC",
+        "A payment with this paymentRef has already been posted to this loan account; retry with a new reference or treat the original as successful.",
+        "paymentRef"
+      )
+    );
+  }
 
   const initialSummary = summarizeFindings(findings);
   if (initialSummary.status === "blocked") {
     return {
       loanAccount: account,
-      paymentEvent: null,
+      paymentEvent: duplicateEvent ?? null,
+      duplicate: Boolean(duplicateEvent),
       findings,
       summary: initialSummary
     };
@@ -529,6 +554,7 @@ export function postPaymentToLoanAccount(account, input, now = new Date()) {
   return {
     loanAccount: updated,
     paymentEvent,
+    duplicate: false,
     findings,
     summary: summarizeFindings(findings)
   };
@@ -1912,14 +1938,13 @@ export function generateLoanStatement(account, input = {}, now = new Date()) {
     scheduledDues,
     transactions,
     totals: {
-      principalDue: roundMoney(scheduledDues.reduce((sum, installment) => sum + installment.principalDue, 0)),
-      interestDue: roundMoney(scheduledDues.reduce((sum, installment) => sum + installment.interestDue, 0)),
-      chargesAssessed: roundMoney(transactions.reduce((sum, event) => sum + (event.chargesDebit ?? 0), 0)),
-      chargesWaived: roundMoney(transactions.reduce((sum, event) => sum + (event.chargesWaiverCredit ?? 0), 0)),
-      payments: roundMoney(
-        transactions
-          .filter((event) => event.type === "payment")
-          .reduce((sum, event) => sum + (event.amount ?? 0), 0)
+      principalDue: sumMoney(scheduledDues, (installment) => installment.principalDue),
+      interestDue: sumMoney(scheduledDues, (installment) => installment.interestDue),
+      chargesAssessed: sumMoney(transactions, (event) => event.chargesDebit),
+      chargesWaived: sumMoney(transactions, (event) => event.chargesWaiverCredit),
+      payments: sumMoney(
+        transactions.filter((event) => event.type === "payment"),
+        (event) => event.amount
       )
     }
   };
@@ -2035,4 +2060,30 @@ function findDisclosedCharge(catalog, name) {
 
 function roundMoney(value) {
   return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+}
+
+// Money is transported as rupee floats rounded to 2 decimal places (paisa),
+// but 0.01 has no exact binary floating-point representation — the classic
+// 0.1 + 0.2 !== 0.3 problem — so summing many already-rounded ledger amounts
+// with plain `+` can drift by fractions of a paisa, especially over a ledger
+// with hundreds of events across a loan's life. toPaise/fromPaise convert to
+// and from integer paise, where addition is exact (values here stay far
+// below Number.MAX_SAFE_INTEGER), so sumMoney below eliminates that drift
+// class without changing the external rupee-float representation any
+// existing caller or test observes.
+function toPaise(rupees) {
+  return Math.round((Number(rupees) || 0) * 100);
+}
+
+function fromPaise(paise) {
+  return paise / 100;
+}
+
+// Sums a `selector(item)` rupee amount across `items` using exact integer
+// paise arithmetic, returning a rupee float rounded to 2 decimals — a
+// drop-in, drift-free replacement for `roundMoney(items.reduce((s, x) => s +
+// (selector(x) ?? 0), 0))`.
+function sumMoney(items, selector) {
+  const totalPaise = (items ?? []).reduce((sum, item) => sum + toPaise(selector(item) ?? 0), 0);
+  return fromPaise(totalPaise);
 }

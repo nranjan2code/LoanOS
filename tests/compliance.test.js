@@ -49,6 +49,7 @@ import {
   upsertConsentRecord,
   upsertKycRecord,
   selectProductPolicyVersion,
+  summarizeLoanAccount,
   upsertProductPolicy,
   upsertRecoveryAgent,
   upsertRegulatedEntity,
@@ -2283,6 +2284,94 @@ test("API opens loan account on disbursement and posts ledger payment", async (t
   assert.equal(scheduleResponse.status, 200);
   const scheduleBody = await scheduleResponse.json();
   assert.equal(scheduleBody.schedule.length, 12);
+
+  // A client retry (network timeout, gateway ambiguity) resubmitting the same
+  // paymentRef must not double-credit the ledger: the second post is blocked,
+  // and the outstanding balance is unchanged from the first successful post.
+  const balanceAfterFirstPayment = paymentResponse.body.summary.principalOutstanding;
+  const duplicateResponse = await postJson(`${base}/loan-accounts/${account.loanAccountId}/payments`, {
+    amount: firstInstallment.totalDue,
+    receivedAt: `${firstInstallment.dueDate}T00:00:00.000Z`,
+    paymentRef: "nach_payment_001",
+    channel: "nach"
+  });
+  assert.equal(duplicateResponse.status, 422);
+  assert.equal(duplicateResponse.body.error.code, "payment_blocked");
+  assert(duplicateResponse.body.findings.some((finding) => finding.path === "paymentRef"));
+
+  // summarizeLoanAccount's balance is computed as-of a point in time (it
+  // excludes ledger events dated after `asOf`), so compare at the same asOf
+  // the payment itself was posted at rather than "now" (which may fall before
+  // the backdated installment due date and hide the event entirely).
+  const accountAfterDuplicate = await (
+    await apiFetch(`${base}/loan-accounts/${account.loanAccountId}?asOf=${firstInstallment.dueDate}`)
+  ).json();
+  assert.equal(accountAfterDuplicate.summary.principalOutstanding, balanceAfterFirstPayment);
+  assert.equal(
+    accountAfterDuplicate.ledger.filter((event) => event.paymentRef === "nach_payment_001").length,
+    1
+  );
+});
+
+test("summarizeLoanAccount sums thousands of ledger events exactly (integer-paise arithmetic)", () => {
+  // Money is transported as rupee floats rounded to 2 decimals (paisa), and
+  // 0.01 has no exact binary floating-point representation, so summing many
+  // already-rounded amounts with plain `+` is only *empirically* safe, not
+  // exact by construction — the old `roundMoney(reduce(+))` pattern held up
+  // against extensive adversarial testing at realistic ledger sizes/values,
+  // but relied on a single final rounding step absorbing whatever error had
+  // accumulated. summarizeLoanAccount now sums in integer paise internally
+  // (sumMoney), which is exact regardless of ledger size or magnitude. This
+  // test locks that guarantee in against an independently-computed exact
+  // total (BigInt), rather than depending on the rounding heuristic still
+  // happening to work as the codebase grows.
+  let seed = 987654321;
+  function nextPaise() {
+    // Deterministic LCG so the test is reproducible across runs/machines.
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    return 1 + (seed % 999999); // 0.01 to 9,999.99 rupees, in paise
+  }
+
+  const eventCount = 5000;
+  const ledger = [];
+  let expectedInterestPaidPaise = 0n;
+  let expectedPrincipalPaidPaise = 0n;
+  for (let i = 0; i < eventCount; i += 1) {
+    const interestPaise = nextPaise();
+    const principalPaise = nextPaise();
+    expectedInterestPaidPaise += BigInt(interestPaise);
+    expectedPrincipalPaidPaise += BigInt(principalPaise);
+    ledger.push({
+      type: "payment",
+      eventDate: "2026-01-01T00:00:00.000Z",
+      interestCredit: interestPaise / 100,
+      principalCredit: principalPaise / 100,
+      principalDebit: 0,
+      chargesDebit: 0,
+      chargesWaiverCredit: 0,
+      chargesCredit: 0
+    });
+  }
+  // Disbursement large enough that principalOutstanding never floors at zero,
+  // so principalPaid (not clamped) is the value under test.
+  ledger.unshift({
+    type: "disbursement",
+    eventDate: "2025-01-01T00:00:00.000Z",
+    principalDebit: 999999999.99,
+    principalCredit: 0,
+    interestCredit: 0,
+    chargesDebit: 0,
+    chargesWaiverCredit: 0,
+    chargesCredit: 0
+  });
+
+  const account = { ledger, schedule: [] };
+  const summary = summarizeLoanAccount(account, new Date("2026-12-31T00:00:00.000Z"));
+
+  const expectedInterestPaid = Number(expectedInterestPaidPaise) / 100;
+  const expectedPrincipalPaid = Number(expectedPrincipalPaidPaise) / 100;
+  assert.equal(summary.interestPaid, expectedInterestPaid);
+  assert.equal(summary.principalPaid, expectedPrincipalPaid);
 });
 
 test("API generates borrower statement from schedule and ledger", async (t) => {
@@ -4724,6 +4813,76 @@ test("platform users log in with sessions and provision tenant owners", async (t
   const users = await rawFetch(`${base}/admin/users`, { headers: { cookie: ownerCookie } });
   assert.equal(users.status, 200);
   assert.equal((await users.json()).users.length, 1);
+});
+
+test("login lockout enforces both a per-account and a per-source-IP threshold", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-login-lockout-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const adminKey = "platform-admin-secret";
+  const server = createLoanOsServer({ dataDir, platformAdminKey: adminKey });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const created = await rawFetch(`${base}/platform/tenants`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-platform-admin-key": adminKey },
+    body: JSON.stringify({
+      tenantId: "tnt_lockout",
+      name: "Lockout Test RE",
+      ownerUser: {
+        email: "owner@lockout.example.in",
+        displayName: "Tenant Owner",
+        password: "OwnerPass1!"
+      }
+    })
+  });
+  assert.equal(created.status, 201);
+
+  const attemptLogin = (email, password) =>
+    rawFetch(`${base}/auth/login`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ scope: "tenant", tenantId: "tnt_lockout", email, password })
+    });
+
+  // Five wrong-password attempts against the real account lock it, even
+  // though the password was never guessed — this is the existing
+  // per-account control (anyone who knows the email can trigger it).
+  for (let i = 0; i < 5; i += 1) {
+    const attempt = await attemptLogin("owner@lockout.example.in", "wrong-password");
+    assert.equal(attempt.status, 401);
+  }
+  const lockedAccount = await attemptLogin("owner@lockout.example.in", "OwnerPass1!");
+  assert.equal(lockedAccount.status, 429);
+  assert.equal((await lockedAccount.json()).error.code, "login_locked");
+
+  // A *different* account, guessed at from the same source IP, is still
+  // reachable on its own merits (proves the account lock above is scoped to
+  // one email, not a blanket IP block) — right up until enough failures
+  // accumulate from this IP across accounts to trip the IP-level throttle.
+  const otherAccountAttempt = await attemptLogin("nonexistent@lockout.example.in", "irrelevant");
+  assert.equal(otherAccountAttempt.status, 401);
+
+  // Drive the shared per-IP counter (already at 6: 5 for the first account +
+  // 1 for the second) past its 20-attempt threshold using further distinct,
+  // never-locked accounts so only the IP dimension can be responsible.
+  let ipLockedResponse = null;
+  for (let i = 0; i < 20 && !ipLockedResponse; i += 1) {
+    const attempt = await attemptLogin(`spray-${i}@lockout.example.in`, "irrelevant");
+    if (attempt.status === 429) {
+      ipLockedResponse = attempt;
+    } else {
+      assert.equal(attempt.status, 401);
+    }
+  }
+  assert.ok(ipLockedResponse, "expected the per-IP login throttle to trip");
+  assert.equal((await ipLockedResponse.json()).error.code, "login_locked");
 });
 
 test("audit spine hash-chains events with a verifiable, tamper-evident chain", () => {
@@ -8690,4 +8849,34 @@ test("LMS loan balance reconstruction statement accuracy and CIC snapshots", asy
   const sma2Cic = await (await apiFetch(`${base}/loan-accounts/${loanAccountId}/cic-snapshot?asOf=${sma2AsOf}`)).json();
   assert.equal(sma2Cic.assetClass, "sma_2");
   assert.equal(sma2Cic.daysPastDue, 75);
+});
+
+test("API rejects an oversized request body before it reaches any handler", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+
+  // A single request body over the 5MB cap must be rejected with 413 rather
+  // than buffered in full — otherwise one oversized or slow-loris client
+  // could hold the process-wide state lock (withStateLock) hostage for every
+  // tenant on the platform.
+  const oversizedPayload = { name: "x".repeat(6 * 1024 * 1024) };
+  const response = await postJson(`${base}/borrowers`, oversizedPayload);
+  assert.equal(response.status, 413);
+  assert.equal(response.body.error.code, "request_body_too_large");
+
+  // The connection getting torn down mid-request must not wedge the server:
+  // a normal, well-formed request afterward still succeeds.
+  const health = await apiFetch(`${base}/health`);
+  assert.equal(health.status, 200);
 });

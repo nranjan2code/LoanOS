@@ -189,7 +189,7 @@ import {
   TENANT_ONBOARDING_MODULES,
   validateSubProcessor,
   withStateLock
-} from "./file-store.js";
+} from "./storage.js";
 import {
   acceptTenantUserInvite,
   authenticatePlatformUser,
@@ -227,23 +227,112 @@ export function createLoanOsServer({ dataDir, bootstrapTenants = [], platformAdm
   const adminKey = platformAdminKey ?? process.env.LOANOS_PLATFORM_ADMIN_KEY ?? null;
   let bootstrapPromise = null;
   return createServer(async (req, res) => {
+    const requestId = `req_${randomBytes(8).toString("hex")}`;
     try {
       if (!bootstrapPromise) {
-        bootstrapPromise = ensureBootstrapTenants(dataDir, bootstrapTenants);
+        // Cache the in-flight promise so concurrent early requests share one
+        // bootstrap run, but never cache a *rejection* — a transient failure
+        // (e.g. a slow disk on first boot) must not permanently wedge every
+        // request behind a promise that will never resolve again.
+        bootstrapPromise = ensureBootstrapTenants(dataDir, bootstrapTenants).catch((error) => {
+          bootstrapPromise = null;
+          throw error;
+        });
       }
       await bootstrapPromise;
+      // Read and size-cap the request body before taking the state lock: the
+      // lock serializes every tenant's requests against one file, so a slow or
+      // oversized client body must not be able to hold it hostage. Handlers
+      // read the body again via readJson(req), which now resolves instantly
+      // from the buffered, already-drained stream.
+      await bufferRequestBody(req);
       // Serialize this request's full load-modify-save span against every other
       // request touching the same dataDir, so concurrent requests can't race a
       // lost update against the single state.json file.
       await withStateLock(dataDir, () => route(req, res, dataDir, adminKey));
     } catch (error) {
-      sendJson(res, 500, {
+      console.error(`[${requestId}]`, error);
+      if (res.headersSent) {
+        res.end();
+        return;
+      }
+      const isClientBodyError = error?.code === "request_body_too_large" || error?.code === "request_body_timeout";
+      sendJson(res, isClientBodyError ? 413 : 500, {
         error: {
-          code: "internal_error",
-          message: error.message
+          code: isClientBodyError ? error.code : "internal_error",
+          message: isClientBodyError ? error.message : "An internal error occurred.",
+          requestId
         }
       });
     }
+  });
+}
+
+// Request bodies are untrusted input from a single client, but the whole
+// load-modify-save span downstream is serialized behind one process-wide
+// lock (withStateLock) — without a cap and a deadline here, one slow-loris
+// client or one oversized upload would hold every tenant's requests hostage.
+// Buffering here (before the lock is acquired) also means every downstream
+// readJson(req) call resolves from memory instead of re-reading the socket.
+const MAX_REQUEST_BODY_BYTES = 5 * 1024 * 1024; // 5 MB: generous for JSON payloads, small next to a DoS budget.
+const REQUEST_BODY_TIMEOUT_MS = 15000;
+
+function bufferRequestBody(req) {
+  if (req.method === "GET" || req.method === "HEAD") {
+    return Promise.resolve();
+  }
+  if (req._bufferedBody !== undefined) {
+    return Promise.resolve();
+  }
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let size = 0;
+    let exceeded = false;
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      req.destroy();
+      const error = new Error("Request body took too long to arrive.");
+      error.code = "request_body_timeout";
+      reject(error);
+    }, REQUEST_BODY_TIMEOUT_MS);
+    const finish = (err, buffer) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (err) {
+        reject(err);
+      } else {
+        req._bufferedBody = buffer;
+        resolve();
+      }
+    };
+    req.on("data", (chunk) => {
+      size += chunk.length;
+      if (size > MAX_REQUEST_BODY_BYTES) {
+        // Don't req.destroy() here: the client may still be mid-write, and
+        // tearing down the socket while bytes are in flight surfaces as an
+        // ECONNRESET/EPIPE on their end instead of the 413 we want them to
+        // see. Instead, stop retaining chunks (bounding memory) but keep
+        // draining the stream so it reaches a clean 'end', then reject.
+        exceeded = true;
+        chunks.length = 0;
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on("end", () => {
+      if (exceeded) {
+        const error = new Error(`Request body exceeds the ${MAX_REQUEST_BODY_BYTES}-byte limit.`);
+        error.code = "request_body_too_large";
+        finish(error);
+        return;
+      }
+      finish(null, Buffer.concat(chunks));
+    });
+    req.on("error", (err) => finish(err));
+    req.on("aborted", () => finish(new Error("Request aborted.")));
   });
 }
 
@@ -4711,6 +4800,19 @@ function setFieldPath(obj, path, value) {
   return root;
 }
 
+// Only trusts X-Forwarded-For when explicitly told a reverse proxy sits in
+// front (LOANOS_TRUST_PROXY=true) — otherwise a client could spoof the
+// header to evade or frame another IP under the per-IP login throttle.
+function clientIp(req) {
+  if ((process.env.LOANOS_TRUST_PROXY ?? "").toLowerCase() === "true") {
+    const forwarded = req.headers["x-forwarded-for"];
+    const value = Array.isArray(forwarded) ? forwarded[0] : forwarded;
+    const first = value?.split(",")[0]?.trim();
+    if (first) return first;
+  }
+  return req.socket?.remoteAddress ?? "unknown";
+}
+
 function tenantApiKeyFromRequest(req) {
   const headerKey = req.headers["x-api-key"];
   if (headerKey) {
@@ -5056,7 +5158,23 @@ async function routeAuth(req, res, { dataDir, method, path }) {
     const state = await loadWholeState(dataDir);
     const now = new Date();
     const attemptKey = loginAttemptKey(scope === "platform" ? "platform" : `tenant:${body.tenantId ?? ""}`, body.email);
+    // A per-account lock alone lets anyone who merely knows a victim's email
+    // (no password needed) force them into a 15-minute lockout. This
+    // second, per-source-IP counter with a wider window/threshold catches
+    // that abuse pattern (and credential-stuffing across many emails from
+    // one source) without making a shared account lockout the only lever —
+    // it is additive, not a replacement for the per-account check below.
+    const ipAttemptKey = `ip:${clientIp(req)}`;
 
+    if (isLoginLocked(state.controlPlane.loginAttempts, ipAttemptKey, now)) {
+      sendJson(res, 429, {
+        error: {
+          code: "login_locked",
+          message: "Too many failed login attempts from this network. Try again later."
+        }
+      });
+      return;
+    }
     if (isLoginLocked(state.controlPlane.loginAttempts, attemptKey, now)) {
       sendJson(res, 429, {
         error: {
@@ -5072,7 +5190,12 @@ async function routeAuth(req, res, { dataDir, method, path }) {
         ...state,
         controlPlane: {
           ...state.controlPlane,
-          loginAttempts: recordLoginFailure(state.controlPlane.loginAttempts, attemptKey, now)
+          loginAttempts: recordLoginFailure(
+            recordLoginFailure(state.controlPlane.loginAttempts, attemptKey, now),
+            ipAttemptKey,
+            now,
+            { maxAttempts: 20, lockoutMinutes: 15 }
+          )
         }
       };
       await saveWholeState(nextState, dataDir);
@@ -5110,7 +5233,7 @@ async function routeAuth(req, res, { dataDir, method, path }) {
             ...state.controlPlane.sessions,
             [session.sessionId]: session
           },
-          loginAttempts: clearLoginAttempts(state.controlPlane.loginAttempts, attemptKey)
+          loginAttempts: clearLoginAttempts(clearLoginAttempts(state.controlPlane.loginAttempts, attemptKey), ipAttemptKey)
         }
       };
       await saveWholeState(nextState, dataDir);
@@ -5166,7 +5289,7 @@ async function routeAuth(req, res, { dataDir, method, path }) {
           ...state.controlPlane.sessions,
           [session.sessionId]: session
         },
-        loginAttempts: clearLoginAttempts(state.controlPlane.loginAttempts, attemptKey)
+        loginAttempts: clearLoginAttempts(clearLoginAttempts(state.controlPlane.loginAttempts, attemptKey), ipAttemptKey)
       },
       tenants: {
         ...state.tenants,
@@ -6224,14 +6347,14 @@ async function routePlatform(req, res, { dataDir, platformAdminKey, method, path
 }
 
 async function readJson(req) {
-  const chunks = [];
-  for await (const chunk of req) {
-    chunks.push(chunk);
-  }
-  if (chunks.length === 0) {
+  // bufferRequestBody() already drained and size/time-capped the socket before
+  // the state lock was acquired; every route handler reads that buffer here
+  // rather than re-consuming the (now-empty) stream.
+  const buffer = req._bufferedBody ?? Buffer.alloc(0);
+  if (buffer.length === 0) {
     return {};
   }
-  const raw = Buffer.concat(chunks).toString("utf8");
+  const raw = buffer.toString("utf8");
   if (!raw.trim()) {
     return {};
   }
