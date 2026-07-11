@@ -320,6 +320,9 @@ rules/
                         # guardrail pre/post wrapping. No I/O; pure function of (plan, request).
     rules-bundle        # canonical bytes, ed25519 sign/verify, encryption envelope,
                         # bundle fetch/load protocol.
+    rules-governance    # version lifecycle: four-eyes review, golden-corpus gate,
+                        # IST effective dating, append-only activation schedule.
+                        # (Added during PH-2 — not in the original crate list.)
     rules-provider      # DecisionProvider trait, per-tenant router, remote adapters.
     rules-service       # axum service: the per-tenant instance. mTLS, tenant binding,
                         # kill-switch cache, audit emitter, health/metrics. PRIMARY shape.
@@ -359,11 +362,11 @@ Each phase has acceptance criteria; a phase is done when all its criteria have a
 - [x] Differential harness: 542-case corpus generated from `eligibility.js` by `rules/tools/gen-eligibility-corpus.mjs` (seeded, fixed `now`, checked in), replayed by `rules-eval/tests/differential_eligibility.rs` — zero divergence.
 - [x] INV-1, INV-5, INV-6, INV-7 test suites green (`rules-eval/tests/invariants.rs`, `rules-expr/tests/language.rs`).
 
-### PH-2 — Governance and bundles
-- [ ] `rules-bundle`: canonicalization, hashing, sign/verify, encryption envelope (SEC-1/2 tests green).
-- [ ] Control-plane store: version lifecycle, four-eyes (INV-9), effective dating (IST), golden-corpus gate on approval.
-- [ ] Tenant overlay compile checks + runtime post-check overrides (INV-4 tests green).
-- [ ] Shadow mode + `rules-diff` operational.
+### PH-2 — Governance and bundles — complete 2026-07-10
+- [x] `rules-bundle`: canonicalization, content hashing, ed25519 sign/verify, AES-256-GCM envelope; tamper/wrong-key/downgrade tests green (SEC-1/SEC-2/INV-3). Structural gates enforced at signing AND verification: four-eyes (INV-9), IST effective dates, tenant packs may not carry `guardrail.*` models (DEC-6 static leg).
+- [x] Version lifecycle in `rules-governance`: draft → in_review → approved → activation schedule, four-eyes approval gated on a green golden-corpus report, IST effective dating with boundary tests, append-only emergency rollback requiring two distinct operators. (Amendment: v1 store is in-memory; the Postgres-backed control-plane store and KMS key custody land in PH-3 with the fleet controller.)
+- [x] Runtime overlay enforcement (INV-4): `decide_with_guardrails` in `rules-eval` — the guardrail pack always evaluates, sees tenant outputs under `/tenant_outputs/`, downgrades breaching outcomes with a `GUARDRAIL_OVERRIDE` audit reason, never upgrades, and an unevaluable guardrail fails the decision closed.
+- [x] Shadow mode (`shadow()` — candidate decides nothing) + `rules-diff` CLI operational: verified 0 divergences on identical models (exit 0) and detected 3 divergences on a threshold-mutated eligibility model (exit 1) over the 542-case corpus.
 
 ### PH-3 — Per-tenant runtime
 - [ ] `rules-service` instance: boot-time tenant binding, mTLS identity, mismatch rejection + alarm (INV-2).

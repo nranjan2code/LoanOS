@@ -1,0 +1,11 @@
+[package]
+name = "rules-governance"
+description = "Ruleset version lifecycle: four-eyes review, golden-corpus gate, IST effective dating, activation schedule"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }

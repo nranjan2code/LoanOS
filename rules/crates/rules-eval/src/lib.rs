@@ -285,3 +285,130 @@ fn to_json(v: &Value) -> serde_json::Value {
         Value::Null => serde_json::Value::Null,
     }
 }
+
+/// Combined decision with the platform guardrail pack (INV-4, DEC-6 dynamic
+/// leg). The guardrail plan ALWAYS evaluates — there is no code path that
+/// skips it, and an unevaluable guardrail fails the whole decision closed
+/// (INV-5): a guardrail that cannot run is a guardrail that denies.
+///
+/// The guardrail model sees the original facts plus the tenant decision's
+/// outputs under `/tenant_outputs/...`, so post-checks can clamp or override
+/// breaching tenant outputs. A guardrail-forced downgrade appends a
+/// `GUARDRAIL_OVERRIDE` reason (operational alert per design section 9).
+pub fn decide_with_guardrails(
+    tenant_plan: &Plan,
+    guardrail_plan: &Plan,
+    request: &DecisionRequest,
+    config: &DecideConfig,
+) -> DecisionResponse {
+    let mut response = decide(tenant_plan, request, config);
+    response.ruleset.platform_pack = guardrail_plan.hash.clone();
+
+    // Build the guardrail view: facts + tenant outputs.
+    let guardrail_outcome = (|| -> Result<(Outcome, Vec<Reason>), DecisionError> {
+        let mut facts = match &request.facts {
+            serde_json::Value::Object(map) => map.clone(),
+            _ => {
+                return Err(DecisionError::InvalidRequest {
+                    detail: "facts must be a JSON object".into(),
+                })
+            }
+        };
+        facts.insert("tenant_outputs".into(), response.outputs.clone());
+        let mut guardrail_request = request.clone();
+        guardrail_request.facts = serde_json::Value::Object(facts);
+        guardrail_request.decision_key = guardrail_plan.model.key.clone();
+        let eval = evaluate(guardrail_plan, &guardrail_request, config.fuel)?;
+        Ok((eval.outcome, eval.reasons))
+    })();
+
+    match guardrail_outcome {
+        Ok((Outcome::Allow, _)) => response,
+        Ok((verdict, mut guardrail_reasons)) => {
+            // Downgrade to the more restrictive of the two outcomes.
+            let forced = match verdict {
+                Outcome::RequireHuman => Outcome::Refer,
+                _ => Outcome::Ineligible,
+            };
+            let downgraded = restrictiveness(forced) > restrictiveness(response.decision);
+            if downgraded {
+                response.decision = forced;
+                response.reasons.push(Reason {
+                    severity: Severity::Error,
+                    code: "GUARDRAIL_OVERRIDE".into(),
+                    regulation: "PLATFORM".into(),
+                    message: format!(
+                        "Platform guardrail {} overrode the tenant outcome.",
+                        guardrail_plan.model.key
+                    ),
+                    path: String::new(),
+                    audience: Audience::Internal,
+                });
+            }
+            response.reasons.append(&mut guardrail_reasons);
+            response
+        }
+        Err(err) => {
+            // INV-4 + INV-5: guardrails must run; if they cannot, fail closed.
+            response.decision = tenant_plan.family.fail_closed_outcome();
+            response.outputs = serde_json::Value::Object(serde_json::Map::new());
+            response.reasons = vec![Reason {
+                severity: Severity::Error,
+                code: "EVALUATION_ERROR".into(),
+                regulation: "PLATFORM".into(),
+                message: format!("guardrail evaluation failed: {err}"),
+                path: String::new(),
+                audience: Audience::Internal,
+            }];
+            response
+        }
+    }
+}
+
+fn restrictiveness(outcome: Outcome) -> u8 {
+    match outcome {
+        Outcome::Eligible | Outcome::Allow => 0,
+        Outcome::Refer | Outcome::RequireHuman => 1,
+        Outcome::Ineligible | Outcome::Deny => 2,
+    }
+}
+
+/// Shadow-mode comparison (design section 8): the candidate evaluates on live
+/// traffic but decides nothing — the returned `active` response is the only
+/// one that acts. Divergence in outcome or outputs is recorded for the
+/// activation review. A candidate that errors is a divergence by definition.
+#[derive(Debug, Clone, Serialize)]
+pub struct ShadowReport {
+    pub active: DecisionResponse,
+    pub candidate_hash: String,
+    pub candidate_outcome: Outcome,
+    pub candidate_outputs: serde_json::Value,
+    pub diverged: bool,
+}
+
+pub fn shadow(
+    active_plan: &Plan,
+    candidate_plan: &Plan,
+    request: &DecisionRequest,
+    config: &DecideConfig,
+) -> ShadowReport {
+    let active = decide(active_plan, request, config);
+    let mut candidate_request = request.clone();
+    candidate_request.decision_key = candidate_plan.model.key.clone();
+    let (candidate_outcome, candidate_outputs) =
+        match evaluate(candidate_plan, &candidate_request, config.fuel) {
+            Ok(eval) => (eval.outcome, eval.outputs),
+            Err(_) => (
+                candidate_plan.family.fail_closed_outcome(),
+                serde_json::Value::Object(serde_json::Map::new()),
+            ),
+        };
+    let diverged = candidate_outcome != active.decision || candidate_outputs != active.outputs;
+    ShadowReport {
+        active,
+        candidate_hash: candidate_plan.hash.clone(),
+        candidate_outcome,
+        candidate_outputs,
+        diverged,
+    }
+}

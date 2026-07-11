@@ -14,6 +14,8 @@ rust_decimal = { version = "1", features = ["serde-with-str"] }
 chrono = { version = "0.4", default-features = false, features = ["serde", "clock"] }
 thiserror = "2"
 sha2 = "0.10"
+ed25519-dalek = "2"
+aes-gcm = "0.10"
 
 rules-core = { path = "crates/rules-core" }
 rules-expr = { path = "crates/rules-expr" }
@@ -22,3 +24,4 @@ rules-compile = { path = "crates/rules-compile" }
 rules-eval = { path = "crates/rules-eval" }
 rules-bundle = { path = "crates/rules-bundle" }
 rules-provider = { path = "crates/rules-provider" }
+rules-governance = { path = "crates/rules-governance" }
