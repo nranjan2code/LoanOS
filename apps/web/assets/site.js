@@ -10,23 +10,23 @@ const header = `
         <span class="brand-copy">LoanOS <small>India lending operating system</small></span>
       </a>
       <nav class="nav-main" id="site-nav" aria-label="Main navigation">
+        <a data-route="/platform" href="/platform/">Platform</a>
         <div class="nav-group">
-          <button type="button">Who it’s for</button>
+          <button type="button">Solutions</button>
           <div class="mega">
-            <a href="/for-msmes/"><strong>MSMEs & borrowers</strong><span>See what a clearer loan journey should feel like.</span></a>
-            <a href="/financial-institutions/"><strong>Financial institutions</strong><span>Banks, NBFCs, HFCs, co-operatives and AIFIs.</span></a>
+            <a href="/financial-institutions/"><strong>Financial institutions</strong><span>Banks, NBFCs, HFCs, co-operatives and programme lenders.</span></a>
             <a href="/partners/"><strong>Lending partners</strong><span>LSPs, DLAs, fintechs, DSAs, vendors and co-lenders.</span></a>
-            <a href="/loan-types/"><strong>Loan & product library</strong><span>Explore business, retail, secured and specialised journeys.</span></a>
+            <a href="/for-msmes/"><strong>Borrower experience</strong><span>See the application and servicing journey institutions can deliver.</span></a>
+            <a href="/loan-types/"><strong>Products and journeys</strong><span>Business, retail, secured and specialised lending patterns.</span></a>
           </div>
         </div>
-        <a data-route="/platform" href="/platform/">Platform</a>
-        <a data-route="/loan-types" href="/loan-types/">Loan types</a>
+        <a data-route="/loan-types" href="/loan-types/">Capabilities</a>
         <a data-route="/trust" href="/trust/">Trust centre</a>
-        <a data-route="/resources" href="/resources/">Learn</a>
+        <a data-route="/resources" href="/resources/">Resources</a>
+        <a class="mobile-nav-cta" href="mailto:hello@loanos.in?subject=LoanOS%20platform%20demo">Book a demo <span class="arrow">→</span></a>
       </nav>
       <div class="nav-actions">
-        <a class="button ghost" href="/t/dev/staff/">Sign in</a>
-        <a class="button ink" href="mailto:hello@loanos.in?subject=Show%20me%20LoanOS">Book a walkthrough <span class="arrow">→</span></a>
+        <a class="button ink" href="mailto:hello@loanos.in?subject=LoanOS%20platform%20demo">Book a demo <span class="arrow">→</span></a>
         <button class="menu" id="menu" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="site-nav">☰</button>
       </div>
     </div>
@@ -38,12 +38,12 @@ const footer = `
       <div class="footer-grid">
         <div class="footer-brand">
           <a class="brand" href="/"><span class="brand-mark"><span>L</span></span><span class="brand-copy">LoanOS <small>India lending operating system</small></span></a>
-          <p class="footer-intro">One accountable operating system for lending journeys, teams, partners and evidence—built around India.</p>
+          <p class="footer-intro">India-first SaaS for loan origination, servicing, workflow orchestration and compliance control.</p>
         </div>
-        <div class="footer-col"><h3>Audiences</h3><a href="/for-msmes/">MSMEs & borrowers</a><a href="/financial-institutions/">Banks & institutions</a><a href="/partners/">Partners & fintechs</a></div>
+        <div class="footer-col"><h3>Solutions</h3><a href="/financial-institutions/">Financial institutions</a><a href="/partners/">Partners & fintechs</a><a href="/for-msmes/">Borrower experience</a></div>
         <div class="footer-col"><h3>Explore</h3><a href="/platform/">Platform</a><a href="/loan-types/">Loan types</a><a href="/trust/">Trust centre</a></div>
         <div class="footer-col"><h3>Learn</h3><a href="/resources/">Resource room</a><a href="/resources/#glossary">Plain-language glossary</a><a href="/resources/#faq">Common questions</a></div>
-        <div class="footer-col"><h3>Product</h3><a href="/t/dev/portal/">Customer demo</a><a href="/t/dev/staff/">Team workspace</a><a href="mailto:hello@loanos.in?subject=LoanOS%20partnership">Contact us</a></div>
+        <div class="footer-col"><h3>Contact</h3><a href="mailto:hello@loanos.in?subject=LoanOS%20platform%20demo">Book a demo</a><a href="mailto:hello@loanos.in?subject=LoanOS%20trust%20review">Request a trust review</a><a href="mailto:hello@loanos.in?subject=LoanOS%20partnership">Discuss a partnership</a></div>
       </div>
       <div class="footer-bottom"><span>© 2026 LoanOS India. All rights reserved.</span><span>India-only • INR-first • Human-governed AI</span></div>
     </div>
