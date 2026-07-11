@@ -34,6 +34,9 @@ fn request(facts: serde_json::Value, id: &str) -> DecisionRequest {
         "decision_key": "lending.eligibility",
         "effective_at": "2026-07-10T00:00:00+00:00",
         "facts": facts,
+        "fact_provenance": {
+            "/bureau_report/score": { "source": "model", "model_id": "cibil_gateway", "model_version": "2" }
+        },
         "context": {
             "channel": "test",
             "caller": "differential-harness",

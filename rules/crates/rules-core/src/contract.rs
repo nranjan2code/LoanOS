@@ -65,6 +65,12 @@ pub struct RequestContext {
     /// Stamped by the instance from its local cache; a caller-supplied value
     /// is ignored and alarmed (design section 7).
     pub kill_switch: KillSwitchSnapshot,
+    /// Caller audience level, set by the gateway (INV-10). When present the
+    /// instance strips reasons above this level from the RESPONSE; the audit
+    /// record always keeps the full set. Absent means internal (trusted
+    /// platform caller).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub audience: Option<crate::reason::Audience>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -99,6 +105,13 @@ impl ModelSwitchState {
     /// affirmative `active` is a no (INV-5): unknown states fail closed.
     pub fn consumable(self) -> bool {
         matches!(self, ModelSwitchState::Active)
+    }
+}
+
+impl DecisionResponse {
+    /// INV-10 audience filtering: retain only reasons visible to the caller.
+    pub fn retain_reasons_for(&mut self, caller: crate::reason::Audience) {
+        self.reasons.retain(|r| r.visible_to(caller));
     }
 }
 

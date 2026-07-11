@@ -145,6 +145,7 @@ mod tests {
                 path: "/income".into(),
                 ty: BindingType::Decimal,
                 required: false,
+                requires_model_provenance: false,
             }],
             expressions: vec![NamedExpression {
                 name: "low".into(),

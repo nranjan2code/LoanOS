@@ -51,6 +51,7 @@ fn tenant_model() -> DecisionModel {
             path: "/requested".into(),
             ty: BindingType::Decimal,
             required: true,
+            requires_model_provenance: false,
         }],
         expressions: vec![NamedExpression {
             name: "sanctioned".into(),
@@ -72,6 +73,7 @@ fn guardrail_model() -> DecisionModel {
             path: "/tenant_outputs/sanctioned".into(),
             ty: BindingType::Decimal,
             required: true,
+            requires_model_provenance: false,
         }],
         expressions: vec![],
         findings: vec![FindingRow {

@@ -53,12 +53,14 @@ fn model() -> DecisionModel {
                 path: "/income".into(),
                 ty: BindingType::Decimal,
                 required: true,
+                requires_model_provenance: false,
             },
             Binding {
                 name: "amount".into(),
                 path: "/amount".into(),
                 ty: BindingType::Decimal,
                 required: false,
+                requires_model_provenance: false,
             },
         ],
         expressions: vec![

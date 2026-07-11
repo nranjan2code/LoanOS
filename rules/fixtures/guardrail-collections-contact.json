@@ -1,0 +1,25 @@
+{
+  "key": "guardrail.collections_contact",
+  "bindings": [
+    { "name": "proposed_hour_ist", "path": "/action/proposed_hour_ist", "type": "int", "required": true },
+    { "name": "contacts_today", "path": "/borrower_state/contacts_today", "type": "int", "required": true },
+    { "name": "contacts_this_week", "path": "/borrower_state/contacts_this_week", "type": "int", "required": true },
+    { "name": "hardship_flag", "path": "/borrower_state/hardship_flag", "type": "bool", "required": false },
+    { "name": "grievance_open", "path": "/borrower_state/grievance_open", "type": "bool", "required": false }
+  ],
+  "expressions": [
+    { "name": "outside_window", "expr": "proposed_hour_ist < 8 or proposed_hour_ist >= 19" }
+  ],
+  "findings": [
+    { "id": "g_contact_window", "when": ["outside_window"], "severity": "error", "code": "CONTACT_OUTSIDE_WINDOW", "regulation": "RBI-DL-2025", "message": "Collections contact is only permitted between 08:00 and 19:00 IST.", "path": "action.proposed_hour_ist", "audience": "borrower" },
+    { "id": "g_daily_cap", "when": ["contacts_today >= 3"], "severity": "error", "code": "DAILY_CONTACT_CAP", "regulation": "RBI-DL-2025", "message": "Daily contact cap reached; further contact today is harassment risk.", "path": "borrower_state.contacts_today", "audience": "tenant_ops" },
+    { "id": "g_weekly_review", "when": ["contacts_today < 3", "contacts_this_week >= 7"], "severity": "warn", "code": "WEEKLY_CONTACT_REVIEW", "regulation": "RBI-DL-2025", "message": "Weekly contact frequency requires human review before further outreach.", "path": "borrower_state.contacts_this_week", "audience": "tenant_ops" },
+    { "id": "g_hardship_review", "when": ["hardship_flag != null", "hardship_flag"], "severity": "warn", "code": "HARDSHIP_HUMAN_REVIEW", "regulation": "RBI-DL-2025", "message": "Borrower has a hardship flag; a human must approve collections contact.", "path": "borrower_state.hardship_flag", "audience": "tenant_ops" },
+    { "id": "g_grievance_block", "when": ["grievance_open != null", "grievance_open"], "severity": "error", "code": "GRIEVANCE_OPEN_BLOCK", "regulation": "RBI-DL-2025", "message": "An open grievance blocks agent-initiated collections contact.", "path": "borrower_state.grievance_open", "audience": "internal" }
+  ],
+  "outcome": "severity_fold",
+  "outputs": {
+    "contacts_today": "contacts_today",
+    "contacts_this_week": "contacts_this_week"
+  }
+}

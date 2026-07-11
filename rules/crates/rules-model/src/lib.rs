@@ -49,6 +49,11 @@ pub struct Binding {
     /// A missing required binding fails closed (INV-5); a missing optional
     /// binding is null.
     pub required: bool,
+    /// DEC-4: when true, a present value at `path` must carry a
+    /// `source: model` provenance tag on the request or evaluation fails
+    /// closed. Absent-when-false so pre-PH-4 model hashes are unchanged.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub requires_model_provenance: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -131,6 +136,7 @@ mod tests {
                 path: "/economic_profile/monthly_income".into(),
                 ty: BindingType::Decimal,
                 required: false,
+                requires_model_provenance: false,
             }],
             expressions: vec![NamedExpression {
                 name: "low".into(),

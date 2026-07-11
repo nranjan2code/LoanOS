@@ -124,6 +124,19 @@ pub fn evaluate(
 
     for binding in &plan.model.bindings {
         let value = extract(&request.facts, &binding.path, binding.ty, binding.required)?;
+        // DEC-4: a present value on a model-sourced path must be tagged.
+        if binding.requires_model_provenance && value != Value::Null {
+            let tagged = request
+                .fact_provenance
+                .get(&binding.path)
+                .map(|p| p.source == rules_core::ProvenanceSource::Model)
+                .unwrap_or(false);
+            if !tagged {
+                return Err(DecisionError::UntaggedModelFact {
+                    path: binding.path.clone(),
+                });
+            }
+        }
         trace.bindings.insert(binding.name.clone(), render(&value));
         env.insert(binding.name.clone(), value);
     }

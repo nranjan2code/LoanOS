@@ -250,7 +250,20 @@ impl Instance {
                 "KILL_SWITCH_MODEL",
                 "a consumed model is suspended or unknown to the kill-switch registry",
             )
-        } else if let Some(plan) = self.plans.get(&request.decision_key) {
+        } else if request.decision_key == "guardrail.model_consumption" {
+            // DEC-4 standalone gate: given provenance-tagged facts, may these
+            // model outputs be consumed right now? The kill-switch checks
+            // above already denied stale/global/dead states, so reaching
+            // here means every tagged model is fresh and consumable.
+            let mut response = self.fail_closed(&request, "MODEL_CONSUMPTION_OK", "");
+            response.decision = rules_core::Outcome::Allow;
+            response.reasons.clear();
+            response
+        } else if let Some(plan) = self
+            .plans
+            .get(&request.decision_key)
+            .or_else(|| self.guardrails.get(&request.decision_key))
+        {
             let config = DecideConfig {
                 engine: self.engine.clone(),
                 version_label: self.version_label.clone(),
@@ -258,7 +271,14 @@ impl Instance {
                 platform_pack: self.platform_hash.clone(),
                 fuel: DEFAULT_FUEL,
             };
-            let mut response = match self.guardrail_for(&request.decision_key) {
+            // A guardrail-family decision is never wrapped again: the
+            // naming convention would pair it with itself and evaluate it
+            // twice. Overlays apply to tenant decisions only.
+            let guardrail = match plan.family {
+                DecisionFamily::Guardrail => None,
+                _ => self.guardrail_for(&request.decision_key),
+            };
+            let mut response = match guardrail {
                 Some(guardrail) => decide_with_guardrails(plan, guardrail, &request, &config),
                 None => decide(plan, &request, &config),
             };
@@ -287,6 +307,13 @@ impl Instance {
             let line = serde_json::to_string(&record).expect("audit record serializes");
             let _ = writeln!(audit, "{line}");
             let _ = audit.flush();
+        }
+
+        // INV-10: the audit record above keeps every reason; the caller only
+        // receives reasons at or below its audience level.
+        let mut response = response;
+        if let Some(audience) = request.context.audience {
+            response.retain_reasons_for(audience);
         }
         Ok(response)
     }

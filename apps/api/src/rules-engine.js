@@ -77,7 +77,11 @@ export async function decideEligibilityWithEngine({
   channel = "api",
   caller = "workflow:underwriting",
   bureauModelId = "cibil_gateway",
-  bureauModelVersion = "1"
+  bureauModelVersion = "1",
+  // INV-10: set to "tenant_ops" or "borrower" for agent/borrower-facing
+  // callers; the instance strips reasons above this level from the response
+  // (the audit record always keeps the full set).
+  audience = undefined
 }) {
   const factProvenance = application.bureauReport
     ? {
@@ -98,6 +102,7 @@ export async function decideEligibilityWithEngine({
     context: {
       channel,
       caller,
+      audience,
       // Placeholder only: the instance ignores caller-supplied kill-switch
       // state and stamps its own (design section 7).
       kill_switch: {

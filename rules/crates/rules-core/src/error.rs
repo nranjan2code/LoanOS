@@ -21,6 +21,10 @@ pub enum DecisionError {
     #[error("fact type mismatch at {path}: expected {expected}")]
     TypeMismatch { path: String, expected: String },
 
+    /// DEC-4: a model-sourced fact arrived without a model provenance tag.
+    #[error("fact at {path} requires model provenance tagging")]
+    UntaggedModelFact { path: String },
+
     /// INV-7: evaluation exceeded its fuel budget.
     #[error("fuel exhausted during evaluation")]
     FuelExhausted,
