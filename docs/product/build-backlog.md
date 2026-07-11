@@ -83,7 +83,7 @@ Goal: complete origination from application to sanction and disbursement readine
 Tasks:
 
 - Application state machine. Done.
-- Eligibility rules engine. First slice done: EMI/FOIR affordability, age-at-maturity, and amount/tenor bounds gate approval.
+- Eligibility rules engine. Done, twice over: the JS first slice (EMI/FOIR affordability, age-at-maturity, amount/tenor bounds) remains the default path, and the same policy is ported to the Rust decision engine (`rules/fixtures/lending-eligibility.json`, verified by a 542-case zero-divergence differential corpus). API call sites are wired through `LOANOS_RULES_ENGINE=off|shadow|active`; run shadow to a clean window, then flip per tenant. See docs/architecture/decision-engine-design.md.
 - Underwriting policy rules. First slice done: approving a refer-band application requires a recorded manual underwriting override (underwriter, reason, policy reference), the named underwriter must be a registered, active credit officer, and a declined decision must cite a coded reason from the decline-reason taxonomy.
 - Manual review queue. Done: Eligibility `refer` outcomes route to a manual underwriting LWS task, task resolution/approval is gated on manual underwriting task assignment matching the override underwriter, and task completion is recorded.
 - Maker-checker decision approval. Done.

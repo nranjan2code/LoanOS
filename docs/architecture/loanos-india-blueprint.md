@@ -32,7 +32,8 @@ Required tenant objects:
 | Consent service | Control | DPDP notice, explicit consent, revocation, third-party sharing, retention choices |
 | KYC service | LOS | CKYC, V-CIP evidence, Aadhaar boundary, beneficial owner checks, risk category |
 | Product and pricing service | LOS | Eligibility, fees, APR, penal charges, loan terms, cooling-off |
-| Underwriting service | LOS | Rules, scorecards, AI model calls, human review, decision evidence |
+| Underwriting service | LOS | Workflow around decisions: human review, decision evidence, maker-checker |
+| Decision engine | LOS/Control | Deterministic policy evaluation (eligibility, pricing bounds, agent guardrails): per-tenant isolated Rust runtimes, signed policy bundles, kill-switch enforcement, replayable traces — see decision-engine-design.md |
 | KFS/document service | LOS/LMS | KFS, sanction letter, agreement, statements, privacy policy delivery |
 | Fund-flow service | LOS/LMS | Disbursement validation, direct repayment rails, LSP/pass-through prevention |
 | Loan account service | LMS | Ledger, amortization, repayment schedule, balances, closures |

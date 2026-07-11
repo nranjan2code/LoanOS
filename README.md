@@ -15,6 +15,14 @@ The source of truth for current digital lending is the RBI `Reserve Bank of Indi
 
 The AI kill-switch requirement is included as a hard platform control. As of July 8, 2026, the RBI model-risk guidance found during research is a June 24, 2026 draft/public-consultation item, not a final circular. We still implement it as a mandatory design constraint because the platform must be ready for RBI-supervised model risk management.
 
+## Decision Engine (the platform brain)
+
+Lending policy and AI guardrails are evaluated by a pure-Rust decision engine in [`rules/`](rules/README.md): one fully isolated runtime instance per tenant, policy shipped as content-hashed, four-eyes-approved, ed25519-signed bundles, exact decimal arithmetic, fail-closed evaluation, and byte-replayable audit traces. It is also the enforcement point for the AI kill switch and for agent actions (`allow / deny / require_human` through the same decision contract).
+
+- Design source of truth: [docs/architecture/decision-engine-design.md](docs/architecture/decision-engine-design.md) (ADR: [0003](docs/decisions/0003-decision-engine-pure-rust-per-tenant.md))
+- Build/run: `cd rules && cargo test --workspace`; local fleet via `rules-fleet` (see [rules/README.md](rules/README.md))
+- API integration: eligibility call sites route through the engine behind `LOANOS_RULES_ENGINE=off|shadow|active` (default `off`; run `shadow` to a clean divergence window before `active`)
+
 ## Current Executable Slice
 
 ```bash
