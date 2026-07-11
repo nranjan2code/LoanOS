@@ -526,6 +526,26 @@ async function route(req, res, dataDir, platformAdminKey) {
     return;
   }
 
+  // --- Public website pages and original media ---
+  const publicWebPages = new Set([
+    "for-msmes",
+    "financial-institutions",
+    "partners",
+    "platform",
+    "loan-types",
+    "trust",
+    "resources"
+  ]);
+  if (method === "GET" && path.startsWith("/assets/")) {
+    return serveStaticFile(res, appsRoot, "web", path, "/", req);
+  }
+  if (method === "GET") {
+    const publicPageMatch = path.match(/^\/([^/]+)(?:\/|\/index\.html)?$/);
+    if (publicPageMatch && publicWebPages.has(publicPageMatch[1])) {
+      return serveStaticFile(res, appsRoot, "web", `/${publicPageMatch[1]}/index.html`, "/");
+    }
+  }
+
   // --- Backward compatibility: /dashboard/ → /t/dev/staff/ ---
   if (method === "GET" && (path === "/dashboard" || path === "/dashboard/")) {
     res.writeHead(302, { Location: "/t/dev/staff/" });
@@ -6883,7 +6903,7 @@ async function readJson(req) {
 }
 
 // ─── Static File Serving Helper ──────────────────────────────────────────
-async function serveStaticFile(res, appsRoot, appDir, urlPath, urlPrefix) {
+async function serveStaticFile(res, appsRoot, appDir, urlPath, urlPrefix, req = null) {
   try {
     let fileSubpath = urlPath.slice(urlPrefix.length);
     if (fileSubpath === "" || fileSubpath === "index.html") {
@@ -6902,8 +6922,37 @@ async function serveStaticFile(res, appsRoot, appDir, urlPath, urlPrefix) {
     else if (fileSubpath.endsWith(".js")) contentType = "application/javascript; charset=utf-8";
     else if (fileSubpath.endsWith(".svg")) contentType = "image/svg+xml";
     else if (fileSubpath.endsWith(".png")) contentType = "image/png";
+    else if (fileSubpath.endsWith(".jpg") || fileSubpath.endsWith(".jpeg")) contentType = "image/jpeg";
+    else if (fileSubpath.endsWith(".webp")) contentType = "image/webp";
+    else if (fileSubpath.endsWith(".mp4")) contentType = "video/mp4";
+    else if (fileSubpath.endsWith(".vtt")) contentType = "text/vtt; charset=utf-8";
     else if (fileSubpath.endsWith(".ico")) contentType = "image/x-icon";
-    res.writeHead(200, { "Content-Type": contentType });
+    if (contentType === "video/mp4" && req?.headers?.range) {
+      const match = req.headers.range.match(/^bytes=(\d*)-(\d*)$/);
+      if (match) {
+        const start = match[1] ? Number(match[1]) : 0;
+        const end = match[2] ? Math.min(Number(match[2]), content.length - 1) : content.length - 1;
+        if (Number.isInteger(start) && Number.isInteger(end) && start >= 0 && start <= end && start < content.length) {
+          const chunk = content.subarray(start, end + 1);
+          res.writeHead(206, {
+            "Content-Type": contentType,
+            "Content-Length": chunk.length,
+            "Content-Range": `bytes ${start}-${end}/${content.length}`,
+            "Accept-Ranges": "bytes"
+          });
+          res.end(chunk);
+          return;
+        }
+      }
+      res.writeHead(416, { "Content-Range": `bytes */${content.length}` });
+      res.end();
+      return;
+    }
+    res.writeHead(200, {
+      "Content-Type": contentType,
+      "Content-Length": content.length,
+      ...(contentType === "video/mp4" ? { "Accept-Ranges": "bytes" } : {})
+    });
     res.end(content);
   } catch (err) {
     res.writeHead(404);
