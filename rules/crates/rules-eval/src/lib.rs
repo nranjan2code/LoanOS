@@ -29,8 +29,10 @@ pub const DEFAULT_FUEL: u64 = 100_000;
 pub struct DecideConfig {
     pub engine: EngineInfo,
     pub version_label: String,
-    /// Platform guardrail pack hash; a real pack arrives in PH-2. Until then
-    /// callers pass the placeholder used in their bundle metadata.
+    /// Signed tenant-pack bundle hash for lineage. None (tests, tools that
+    /// work on bare models) falls back to the model's content hash.
+    pub tenant_pack: Option<String>,
+    /// Signed platform guardrail pack hash for lineage.
     pub platform_pack: String,
     pub fuel: u64,
 }
@@ -78,7 +80,10 @@ pub fn decide(plan: &Plan, request: &DecisionRequest, config: &DecideConfig) -> 
         outputs,
         reasons,
         ruleset: RulesetInfo {
-            tenant_pack: plan.hash.clone(),
+            tenant_pack: config
+                .tenant_pack
+                .clone()
+                .unwrap_or_else(|| plan.hash.clone()),
             platform_pack: config.platform_pack.clone(),
             version_label: config.version_label.clone(),
             effective_from: request.effective_at,
@@ -301,8 +306,10 @@ pub fn decide_with_guardrails(
     request: &DecisionRequest,
     config: &DecideConfig,
 ) -> DecisionResponse {
+    // Lineage note: `config.platform_pack` (the signed pack's bundle hash)
+    // is what appears in the response; the guardrail MODEL hash is recorded
+    // in the audit trace, not the caller-visible ruleset info.
     let mut response = decide(tenant_plan, request, config);
-    response.ruleset.platform_pack = guardrail_plan.hash.clone();
 
     // Build the guardrail view: facts + tenant outputs.
     let guardrail_outcome = (|| -> Result<(Outcome, Vec<Reason>), DecisionError> {

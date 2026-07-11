@@ -62,6 +62,7 @@ fn run() -> i32 {
             build: env!("CARGO_PKG_VERSION").into(),
         },
         version_label: "shadow-diff".into(),
+        tenant_pack: None,
         platform_pack: "sha256:shadow-diff-no-guardrail".into(),
         fuel: DEFAULT_FUEL,
     };

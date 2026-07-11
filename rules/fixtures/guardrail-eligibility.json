@@ -1,0 +1,13 @@
+{
+  "key": "guardrail.eligibility",
+  "bindings": [
+    { "name": "foir", "path": "/tenant_outputs/foir", "type": "decimal", "required": false },
+    { "name": "estimated_emi", "path": "/tenant_outputs/estimated_emi", "type": "decimal", "required": false }
+  ],
+  "expressions": [],
+  "findings": [
+    { "id": "g_foir_platform_ceiling", "when": ["foir != null", "foir > 0.65"], "severity": "error", "code": "FOIR_PLATFORM_CEILING", "regulation": "RBI-DL-2025", "message": "FOIR exceeds the platform regulatory ceiling regardless of tenant policy.", "path": "tenant_outputs.foir", "audience": "tenant_ops" }
+  ],
+  "outcome": "severity_fold",
+  "outputs": {}
+}

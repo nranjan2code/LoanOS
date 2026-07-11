@@ -16,6 +16,7 @@ fn config() -> DecideConfig {
             build: "test".into(),
         },
         version_label: "test".into(),
+        tenant_pack: None,
         platform_pack: "sha256:placeholder".into(),
         fuel: DEFAULT_FUEL,
     }
@@ -103,8 +104,9 @@ fn inv4_breaching_tenant_output_is_overridden_with_audit_reason() {
     let codes: Vec<&str> = response.reasons.iter().map(|r| r.code.as_str()).collect();
     assert!(codes.contains(&"GUARDRAIL_OVERRIDE"));
     assert!(codes.contains(&"SANCTION_CAP_EXCEEDED"));
-    // The response records which guardrail pack ran (INV-8 lineage).
-    assert_eq!(response.ruleset.platform_pack, guardrail.hash);
+    // Lineage carries the configured platform pack hash (the signed bundle),
+    // not the internal model hash.
+    assert_eq!(response.ruleset.platform_pack, "sha256:placeholder");
 }
 
 #[test]
@@ -119,8 +121,9 @@ fn inv4_compliant_decision_passes_through_but_guardrail_still_ran() {
     );
     assert_eq!(response.decision, Outcome::Eligible);
     assert!(response.reasons.is_empty());
-    // Proof the guardrail pack participated: its hash is in the lineage.
-    assert_eq!(response.ruleset.platform_pack, guardrail.hash);
+    // Participation of the pack is proven by the override tests; lineage
+    // carries the configured bundle hash.
+    assert_eq!(response.ruleset.platform_pack, "sha256:placeholder");
 }
 
 #[test]

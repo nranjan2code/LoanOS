@@ -17,6 +17,7 @@ fn config(fuel: u64) -> DecideConfig {
             build: "test".into(),
         },
         version_label: "test".into(),
+        tenant_pack: None,
         platform_pack: "sha256:test".into(),
         fuel,
     }

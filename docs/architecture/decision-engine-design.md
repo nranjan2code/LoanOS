@@ -368,12 +368,12 @@ Each phase has acceptance criteria; a phase is done when all its criteria have a
 - [x] Runtime overlay enforcement (INV-4): `decide_with_guardrails` in `rules-eval` — the guardrail pack always evaluates, sees tenant outputs under `/tenant_outputs/`, downgrades breaching outcomes with a `GUARDRAIL_OVERRIDE` audit reason, never upgrades, and an unevaluable guardrail fails the decision closed.
 - [x] Shadow mode (`shadow()` — candidate decides nothing) + `rules-diff` CLI operational: verified 0 divergences on identical models (exit 0) and detected 3 divergences on a threshold-mutated eligibility model (exit 1) over the 542-case corpus.
 
-### PH-3 — Per-tenant runtime
-- [ ] `rules-service` instance: boot-time tenant binding, mTLS identity, mismatch rejection + alarm (INV-2).
-- [ ] Fleet controller: provision on tenant onboarding, bundle push, health, decommission.
-- [ ] Kill-switch feed + TTL cache + fail-closed degradation (INV-5 kill-switch tests green).
-- [ ] Gateway routing from `apps/api` to tenant instances; `apps/api` consumes the engine for eligibility behind a feature flag; JS path retired only after shadow sign-off.
-- [ ] Trace emission to per-tenant encrypted audit stream; `rules-replay` canary scheduled (INV-8).
+### PH-3 — Per-tenant runtime — core complete 2026-07-10; two items open
+- [x] `rules-service` instance: boot-time tenant binding with foreign-bundle refusal, tenant-mismatch rejection + alarm (INV-2), INV-3 verification as the only load path (bad signature = refusal to boot), guardrail pairing by naming convention (`lending.X` -> `guardrail.X`). (Amendment: v1 transport is loopback HTTP; mTLS identities (SEC-3) land with deployment infrastructure, tenant binding is enforced at the application layer meanwhile.)
+- [x] Fleet controller (`rules-fleet`, minimal single-node v1): bundle signing CLI, instance spawn/stop from a fleet config, health checks, authenticated kill-switch broadcast with per-model states. Cloud fleet (pods, KMS custody, mTLS issuance) is deployment infrastructure.
+- [x] Kill-switch feed + TTL cache + fail-closed degradation, all tested: boot state is deliberately STALE (absence of information is not permission), stale/global/model-killed/unknown-model all degrade model-tagged requests to `refer` while deterministic requests continue; recovery restores evaluation; pushes require the control-plane token.
+- [ ] Gateway routing from `apps/api`: the client module `apps/api/src/rules-engine.js` (facts mapping, engine call with provenance tagging, shadow comparison, `LOANOS_RULES_ENGINE=off|shadow|active` flag) is delivered; wiring the three `evaluateEligibility` call sites in `server.js` is pending because that file carries unrelated in-flight changes. JS path retires only after a clean shadow window.
+- [x] Trace emission: every decision appends `{request(with stamped kill-switch), response}` to the tenant's append-only audit stream; `rules-replay` reproduces live-service audit records byte-identically (verified end-to-end: 2 replayed, 0 divergences). (Amendments: v1 sink is a per-tenant JSONL file pending the encrypted audit-service integration; canary *scheduling* is an ops task once a scheduler exists.)
 
 ### PH-4 — AI control plane
 - [ ] Fact provenance tagging enforced; `guardrail.model_consumption` live (DEC-4).

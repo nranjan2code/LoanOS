@@ -21,6 +21,7 @@ fn config() -> DecideConfig {
             build: "test".into(),
         },
         version_label: "ph1-port".into(),
+        tenant_pack: None,
         platform_pack: "sha256:ph1-no-guardrail-pack".into(),
         fuel: DEFAULT_FUEL,
     }
