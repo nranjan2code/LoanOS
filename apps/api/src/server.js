@@ -165,6 +165,7 @@ import {
   sealAuditChain,
   stampAuditEvents
 } from "../../../packages/core/src/index.js";
+import { assessEligibilityGated } from "./rules-engine.js";
 import {
   appendEvent,
   appendPlatformEvent,
@@ -3445,7 +3446,12 @@ async function route(req, res, dataDir, platformAdminKey) {
       ...application,
       bureauReport
     };
-    const eligibility = evaluateEligibility(appWithBureau);
+    const eligibility = await assessEligibilityGated({
+      evaluateJs: evaluateEligibility,
+      application: appWithBureau,
+      tenantId: tenant.tenantId,
+      stage: "eligibility"
+    });
     const stored = {
       ...appWithBureau,
       eligibility: eligibility.assessment
@@ -3483,7 +3489,12 @@ async function route(req, res, dataDir, platformAdminKey) {
     const evaluation = evaluateLoanApplication(updated, {
       modelRegistry: state.modelRegistry
     });
-    const eligibility = evaluateEligibility(updated);
+    const eligibility = await assessEligibilityGated({
+      evaluateJs: evaluateEligibility,
+      application: updated,
+      tenantId: tenant.tenantId,
+      stage: "kfs"
+    });
     const withCompliance = {
       ...updated,
       compliance: evaluation,
@@ -3528,9 +3539,11 @@ async function route(req, res, dataDir, platformAdminKey) {
         underwriterId: resolveSessionActorId(authContext, body.manualUnderwriting.underwriterId)
       };
     }
-    const eligibility = evaluateEligibility({
-      ...application,
-      aiDecision: body.aiDecision ?? application.aiDecision
+    const eligibility = await assessEligibilityGated({
+      evaluateJs: evaluateEligibility,
+      application: { ...application, aiDecision: body.aiDecision ?? application.aiDecision },
+      tenantId: tenant.tenantId,
+      stage: "decision"
     });
     const decisionApplication = {
       ...application,

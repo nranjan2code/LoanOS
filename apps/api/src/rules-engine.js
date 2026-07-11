@@ -122,6 +122,84 @@ export async function decideEligibilityWithEngine({
   return response.json();
 }
 
+// The gated eligibility assessment used by server.js call sites.
+//
+// Always runs the JS evaluator first (its assessment payload shape feeds the
+// downstream workflow), then per LOANOS_RULES_ENGINE:
+//   off    return the JS result untouched;
+//   shadow consult the engine, log divergences, attach an engineShadow
+//          record to the assessment; engine failure NEVER affects the caller;
+//   active the engine's decision overrides the JS decision (JS metrics are
+//          kept for the payload); engine failure fails CLOSED to "refer"
+//          (INV-5 — the engine being unreachable is not an approval).
+export async function assessEligibilityGated({ evaluateJs, application, tenantId, stage }) {
+  const jsResult = evaluateJs(application);
+  const mode = engineMode();
+  if (mode === "off") {
+    return jsResult;
+  }
+  const requestId = `req_${stage}_${globalThis.crypto.randomUUID()}`;
+  try {
+    const engineResponse = await decideEligibilityWithEngine({
+      tenantId,
+      requestId,
+      application,
+      caller: `workflow:${stage}`
+    });
+    if (mode === "shadow") {
+      const comparison = shadowCompareEligibility(jsResult.assessment, engineResponse);
+      if (comparison.diverged) {
+        console.warn(
+          `[rules-engine shadow] DIVERGENCE stage=${stage} request=${requestId} js=${comparison.jsDecision} engine=${comparison.engineDecision} trace=${comparison.traceRef}`
+        );
+      }
+      return {
+        ...jsResult,
+        assessment: {
+          ...jsResult.assessment,
+          engineShadow: {
+            decision: engineResponse.decision,
+            diverged: comparison.diverged,
+            ruleset: engineResponse.ruleset,
+            traceRef: engineResponse.trace_ref
+          }
+        }
+      };
+    }
+    // active
+    return {
+      ...jsResult,
+      assessment: {
+        ...jsResult.assessment,
+        decision: engineResponse.decision,
+        engine: {
+          decidedBy: "rules-engine",
+          reasons: engineResponse.reasons,
+          ruleset: engineResponse.ruleset,
+          traceRef: engineResponse.trace_ref,
+          instance: engineResponse.engine
+        }
+      }
+    };
+  } catch (err) {
+    if (mode === "active") {
+      console.error(
+        `[rules-engine] FAIL-CLOSED stage=${stage} request=${requestId}: ${err.message}`
+      );
+      return {
+        ...jsResult,
+        assessment: {
+          ...jsResult.assessment,
+          decision: "refer",
+          engine: { decidedBy: "rules-engine", error: "engine_unavailable_fail_closed" }
+        }
+      };
+    }
+    console.warn(`[rules-engine shadow] engine unreachable (caller unaffected): ${err.message}`);
+    return jsResult;
+  }
+}
+
 // Shadow-mode comparison record: log these and require a clean window before
 // flipping LOANOS_RULES_ENGINE to "active" (PH-3 acceptance: JS path is
 // retired only after shadow sign-off).
