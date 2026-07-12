@@ -34,7 +34,7 @@ Goal: no loan product exists without approved policy, fees, and compliance confi
 Tasks:
 
 - Product model: product code, borrower segment, loan type, min/max amount, min/max tenor. Done.
-- Pricing model: interest method, APR components, processing fees, verification charges, maintenance charges. Done: validateCharges and validateKfs validate that each charge belongs to ALLOWED_CHARGE_TYPES (representing upfront and recurring APR components: processing_fee, verification_charge, maintenance_charge, etc.) and enforces name, reason, and limit checks.
+- Pricing model: interest method, APR components, processing fees, verification charges, maintenance charges. Done: validateCharges and validateKfs validate that each charge belongs to ALLOWED_CHARGE_TYPES (representing upfront and recurring APR components: processing_fee, verification_charge, maintenance_charge, etc.) and enforces name, reason, and limit checks. GST (18%) disclosed on fees (REV-42): `packages/core/src/tax.js` decomposes each GST-inclusive charge into base + GST (exact paise; interest, stamp duty, insurance premium, and penal charges exempt), surfaced on the KFS (`taxDisclosure` + per-charge breakdown), the charge-assessment ledger event, and borrower statements.
 - Penal-charge policy model. Done.
 - Cooling-off policy. Done.
 - Prepayment/foreclosure policy. Done: product policy validates allowability, lock-in period, and blocks fees on floating-rate individual retail loans; quoteForeclosure and prepayLoanAccount enforce these checks at transaction level.

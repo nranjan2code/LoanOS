@@ -16,6 +16,7 @@ import {
   approveAccountAggregatorConsent,
   fetchAccountAggregatorData,
   revokeAccountAggregatorConsent,
+  assessChargeToLoanAccount,
   attachKfs,
   buildAuditEvidencePack,
   buildKeyFactStatement,
@@ -41,10 +42,13 @@ import {
   recordPostIncidentReview,
   ELIGIBILITY_DECISIONS,
   estimateEmi,
+  decomposeGstInclusive,
+  summarizeGst,
   evaluateEligibility,
   evaluateLoanApplication,
   evaluateModelUse,
   generateDlaCimsExport,
+  generateLoanStatement,
   generateRepaymentSchedule,
   registerModel,
   sealAuditChain,
@@ -342,6 +346,92 @@ test("repayment schedule is exact to the paise — principal reconstructs with n
   // The sum of scheduled principal equals the disbursed principal exactly.
   assert.equal(principalPaise, toPaise(principalAmount));
   assert.equal(result.schedule.at(-1).closingPrincipal, 0);
+});
+
+test("GST decomposes an inclusive fee into base + 18% tax, and exempts penal/statutory charges (REV-42)", () => {
+  // Taxable processing fee: ₹300 inclusive → ₹254.24 base + ₹45.76 GST.
+  const processing = decomposeGstInclusive(300, { type: "processing_fee" });
+  assert.equal(processing.gstApplicable, true);
+  assert.equal(processing.gstRateBps, 1800);
+  assert.equal(processing.baseAmount, 254.24);
+  assert.equal(processing.gstAmount, 45.76);
+  assert.equal(processing.totalAmount, 300);
+  // base + gst reconstructs the disclosed amount exactly.
+  assert.equal(Math.round(processing.baseAmount * 100) + Math.round(processing.gstAmount * 100), 30000);
+
+  // Penal charge (liquidated damages) is outside GST scope.
+  const penal = decomposeGstInclusive(500, { type: "penal_charge" });
+  assert.equal(penal.gstApplicable, false);
+  assert.equal(penal.gstAmount, 0);
+  assert.equal(penal.baseAmount, 500);
+
+  // Statutory levy is exempt; an explicit override wins over the type default.
+  assert.equal(decomposeGstInclusive(1000, { type: "stamp_duty" }).gstApplicable, false);
+  assert.equal(decomposeGstInclusive(300, { type: "processing_fee", gstApplicable: false }).gstAmount, 0);
+});
+
+test("KFS discloses GST per charge and totals net fees, GST, and all-in payable (REV-42)", () => {
+  const kfs = buildKeyFactStatement(
+    { applicationId: "app_gst", product: { productCode: "PL-1" } },
+    {
+      principalAmount: 100000,
+      charges: [
+        { name: "Processing fee", reason: "Origination", type: "processing_fee", amount: 2360 },
+        { name: "Stamp duty", reason: "Statutory", type: "stamp_duty", amount: 500 }
+      ],
+      penalCharges: [{ name: "Late fee", reason: "Default", type: "penal_charge", amount: 590 }]
+    }
+  );
+
+  const processing = kfs.charges.find((charge) => charge.name === "Processing fee");
+  assert.equal(processing.gstApplicable, true);
+  assert.equal(processing.gstAmount, 360); // 2360 inclusive → 2000 base + 360 GST
+  assert.equal(processing.baseAmount, 2000);
+  assert.equal(processing.totalAmount, 2360);
+
+  const stamp = kfs.charges.find((charge) => charge.name === "Stamp duty");
+  assert.equal(stamp.gstApplicable, false);
+  assert.equal(stamp.gstAmount, 0);
+
+  assert.equal(kfs.penalCharges[0].gstApplicable, false);
+
+  // Fee summary totals only the standard charges list.
+  assert.equal(kfs.taxDisclosure.gstRateBps, 1800);
+  assert.equal(kfs.taxDisclosure.charges.totalGst, 360);
+  assert.equal(kfs.taxDisclosure.charges.totalBaseFees, 2500); // 2000 + 500
+  assert.equal(kfs.taxDisclosure.charges.totalPayable, 2860); // 2360 + 500
+});
+
+test("charge assessment records the GST component and the statement discloses GST collected (REV-42)", () => {
+  const account = {
+    loanAccountId: "loan_gst",
+    borrowerId: "bor_gst",
+    status: "active",
+    currency: "INR",
+    disclosedChargeCatalog: [{ name: "Processing fee", type: "processing_fee", amount: 2360 }],
+    ledger: [{ type: "disbursement", eventDate: "2026-06-15T00:00:00.000Z", principalDebit: 100000 }],
+    schedule: []
+  };
+
+  const result = assessChargeToLoanAccount(
+    account,
+    { name: "Processing fee", reason: "Origination", type: "processing_fee", amount: 2360, assessedAt: "2026-07-05T00:00:00.000Z" },
+    new Date("2026-07-05T00:00:00.000Z")
+  );
+  assert.equal(result.summary.status, "ready");
+  const event = result.chargeEvent;
+  assert.equal(event.chargesDebit, 2360); // GST-inclusive money still flows through the ledger
+  assert.equal(event.baseAmount, 2000);
+  assert.equal(event.gstAmount, 360);
+  assert.equal(event.gstRateBps, 1800);
+
+  const statement = generateLoanStatement(result.loanAccount, {
+    periodStart: "2026-07-01T00:00:00.000Z",
+    periodEnd: "2026-07-31T23:59:59.000Z"
+  });
+  assert.equal(statement.totals.chargesAssessed, 2360);
+  assert.equal(statement.totals.gstCollected, 360);
+  assert.equal(statement.totals.chargesBaseFees, 2000);
 });
 
 test("delinquency computation buckets unpaid installments", async (t) => {

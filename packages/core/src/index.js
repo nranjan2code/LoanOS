@@ -7,6 +7,16 @@ export {
 } from "./compliance-controls.js";
 
 export {
+  GST_RATE_BPS,
+  GST_EXEMPT_CHARGE_TYPES,
+  isChargeGstApplicable,
+  gstRateBpsForCharge,
+  decomposeGstInclusive,
+  withGstDisclosure,
+  summarizeGst
+} from "./tax.js";
+
+export {
   AUDIT_ACTOR_TYPES,
   AUDIT_DATA_CLASSES,
   auditGenesisHash,

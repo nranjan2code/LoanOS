@@ -36,7 +36,7 @@ cite the ID in commits and PRs.
 | REV-33 | Microfinance (MFI): household income, 50% aggregate FOIR cap, JLG | D | P2 | DECIDE |
 | REV-40 | Multi-structure amortization: honor `repaymentFrequency`; bullet/moratorium/step-up | E | P2 | TODO |
 | REV-41 | Revolving / credit line / overdraft product type (MSME/BNPL) | E | P2 | TODO |
-| REV-42 | GST (18%) on charges/fees in KFS, charge assessment, statements | E | P1 | TODO |
+| REV-42 | GST (18%) on charges/fees in KFS, charge assessment, statements | E | P1 | DONE |
 | REV-43 | Credit-insurance product modeling and disclosure | E | P3 | DECIDE |
 | REV-50 | Legal-recovery workflow: SARFAESI notices, Sec-138, Lok Adalat/arbitration/DRT | F | P2 | TODO |
 | REV-51 | Field-collections / telecalling operational layer (dialer, feet-on-street, PTP) | F | P2 | DECIDE |
@@ -196,9 +196,23 @@ Only amortizing term loans exist (no revolving, credit line, overdraft, cash-cre
 non-amortizing product with drawdowns, minimum-due, and interest-on-utilization — core to MSME and BNPL.
 **Acceptance:** a credit-line account services drawdowns/repayments without a fixed EMI schedule.
 
-### REV-42 — GST on charges/fees · P1 · TODO
+### REV-42 — GST on charges/fees · P1 · DONE
 No GST anywhere. India charges 18% GST on processing/foreclosure/bounce fees, which must appear on the
 KFS, in charge assessment, and in statements; absence would fail a compliance walkthrough. **Acceptance:** every taxable charge computes and discloses GST; KFS APR treatment is correct.
+**Done this session.** New `packages/core/src/tax.js` centralises GST policy: `GST_RATE_BPS` (18%), a
+data-driven applicability rule (`isChargeGstApplicable` — a charge may override via `gstApplicable`/
+`gstRateBps`; defaults exempt `stamp_duty`, `insurance_premium`, `penal_charge`, `late_payment_penalty`
+per CBIC Circular 178/2022 and interest), and exact integer-paise decomposition
+(`decomposeGstInclusive`, `withGstDisclosure`, `summarizeGst`). Disclosed/assessed charge amounts are
+treated as GST-**inclusive** (so KFS caps are all-in and borrower-protective) and decomposed into base +
+GST for transparency, which keeps ledger cash flows unchanged. Wired into: `buildKeyFactStatement`
+(per-charge breakdown + a `taxDisclosure` fee summary + rendered-KFS charge lines and note),
+`assessChargeToLoanAccount` (charge event now carries `gstApplicable`/`gstRateBps`/`baseAmount`/
+`gstAmount`), and `generateLoanStatement` + the rendered statement (`gstCollected`/`chargesBaseFees`).
+Three tests cover decomposition/exemptions, KFS disclosure + totals, and the charge-event/statement path.
+**Note:** APR here is a passthrough field, not computed from fees, so there is no live APR calculation to
+fold GST-inclusive fees into; when an actuarial APR calculator is built it must consume the GST-inclusive
+fee (WS-E follow-up).
 
 ### REV-43 — Credit-insurance product modeling · P3 · DECIDE
 Bundled credit insurance is common and RBI-scrutinized (disclosure, optionality). Decide whether to model

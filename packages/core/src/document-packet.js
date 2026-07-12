@@ -136,7 +136,8 @@ export function renderLoanStatementDocument(account, input = {}, now = new Date(
   const totalsRows = [
     ["Principal due", money(statement.totals.principalDue, currency)],
     ["Interest due", money(statement.totals.interestDue, currency)],
-    ["Charges assessed", money(statement.totals.chargesAssessed, currency)],
+    ["Charges assessed (incl. GST)", money(statement.totals.chargesAssessed, currency)],
+    ["— of which GST", money(statement.totals.gstCollected ?? 0, currency)],
     ["Charges waived", money(statement.totals.chargesWaived, currency)],
     ["Payments received", money(statement.totals.payments, currency)]
   ];
@@ -289,10 +290,24 @@ function buildKfsDocument(application, generatedAt) {
     ["Grievance officer", `${kfs.grievanceOfficer?.name ?? ""} <${kfs.grievanceOfficer?.email ?? ""}>`]
   ];
   const charges = [...(kfs.charges ?? []), ...(kfs.penalCharges ?? []), ...(kfs.contingentCharges ?? [])];
+  const chargeLine = (charge) => {
+    const inclusive = money(charge.amount, kfs.currency);
+    const taxNote =
+      charge.gstApplicable && Number.isFinite(charge.gstAmount)
+        ? ` (incl. GST ${money(charge.gstAmount, kfs.currency)}; base ${money(charge.baseAmount, kfs.currency)})`
+        : Number.isFinite(charge.amount)
+          ? " (GST not applicable)"
+          : "";
+    return [charge.name, `${inclusive}${taxNote} - ${charge.reason}`];
+  };
+  const gstNote = kfs.taxDisclosure?.note
+    ? paragraph(kfs.taxDisclosure.note)
+    : "";
   const body = [
     tableHtml(rows),
     heading("Charges and Penal Charges"),
-    charges.length ? tableHtml(charges.map((charge) => [charge.name, `${money(charge.amount, kfs.currency)} - ${charge.reason}`])) : paragraph("No charges disclosed.")
+    charges.length ? tableHtml(charges.map(chargeLine)) : paragraph("No charges disclosed."),
+    gstNote
   ].join("\n");
 
   return document("key_fact_statement", "Key Facts Statement", body, generatedAt, ["RBI-KFS-2024", "RBI-DL-2025"]);

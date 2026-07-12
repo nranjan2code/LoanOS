@@ -1,5 +1,6 @@
 import { createFinding, summarizeFindings } from "./compliance-controls.js";
 import { evaluateModelUse } from "./model-governance.js";
+import { GST_RATE_BPS, summarizeGst, withGstDisclosure } from "./tax.js";
 
 export const ALLOWED_RE_TYPES = new Set([
   "commercial_bank",
@@ -87,6 +88,13 @@ export function buildKeyFactStatement(application, terms, now = new Date()) {
     : product.contingentCharges ?? [];
   const penalCharges = Array.isArray(terms?.penalCharges) ? terms.penalCharges : product.penalCharges ?? [];
 
+  // Disclose GST on each fee (REV-42). Disclosed charge amounts are GST-inclusive;
+  // each charge carries its base/GST breakdown, and a fee summary totals them so
+  // the borrower sees net fees, GST, and the all-in payable on the KFS.
+  const chargesWithGst = charges.map(withGstDisclosure);
+  const contingentChargesWithGst = contingentCharges.map(withGstDisclosure);
+  const penalChargesWithGst = penalCharges.map(withGstDisclosure);
+
   return {
     kfsId: createLoanId("kfs"),
     generatedAt: now.toISOString(),
@@ -103,9 +111,15 @@ export function buildKeyFactStatement(application, terms, now = new Date()) {
     aprBps: terms?.aprBps ?? product.aprBps ?? terms?.annualInterestRateBps ?? product.annualInterestRateBps ?? null,
     repaymentFrequency: terms?.repaymentFrequency ?? product.repaymentFrequency ?? "monthly",
     coolingOffDays: terms?.coolingOffDays ?? product.coolingOffDays ?? 1,
-    charges,
-    contingentCharges,
-    penalCharges,
+    charges: chargesWithGst,
+    contingentCharges: contingentChargesWithGst,
+    penalCharges: penalChargesWithGst,
+    taxDisclosure: {
+      gstRateBps: GST_RATE_BPS,
+      note: "Disclosed charges are inclusive of GST at 18% where applicable; interest, stamp duty, insurance premium, and penal charges are not subject to GST.",
+      charges: summarizeGst(chargesWithGst),
+      contingentCharges: summarizeGst(contingentChargesWithGst)
+    },
     recoveryMechanism: terms?.recoveryMechanism ?? application.repayment?.recoveryMechanism ?? product.recoveryMechanism ?? null,
     grievanceOfficer: terms?.grievanceOfficer ?? application.tenant?.grievanceOfficer ?? null,
     privacyPolicyUrl: terms?.privacyPolicyUrl ?? application.tenant?.privacyPolicyUrl ?? null,

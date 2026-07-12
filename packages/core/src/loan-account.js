@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { createFinding, summarizeFindings } from "./compliance-controls.js";
 import { createLoanId } from "./loan-policy.js";
+import { decomposeGstInclusive } from "./tax.js";
 
 const ACTIVE_STATUS = "active";
 const CLOSED_STATUS = "closed";
@@ -1824,6 +1825,14 @@ export function assessChargeToLoanAccount(account, input, now = new Date()) {
   }
 
   const assessedAt = input.assessedAt ? new Date(input.assessedAt) : now;
+  const chargeType = input.type ?? disclosedCharge.type ?? "charge";
+  // The assessed amount is GST-inclusive; decompose it for disclosure (REV-42).
+  // gstApplicable/gstRateBps may be carried on the input or the disclosed charge.
+  const gst = decomposeGstInclusive(input.amount, {
+    type: chargeType,
+    gstApplicable: input.gstApplicable ?? disclosedCharge.gstApplicable,
+    gstRateBps: input.gstRateBps ?? disclosedCharge.gstRateBps
+  });
   const chargeEvent = {
     eventId: createLoanId("ledger"),
     type: "charge_assessed",
@@ -1836,9 +1845,13 @@ export function assessChargeToLoanAccount(account, input, now = new Date()) {
     chargesCredit: 0,
     chargesWaiverCredit: 0,
     chargeName: input.name,
-    chargeType: input.type ?? disclosedCharge.type ?? "charge",
+    chargeType,
     reason: input.reason,
     disclosedChargeRef: disclosedCharge.name,
+    gstApplicable: gst.gstApplicable,
+    gstRateBps: gst.gstRateBps,
+    baseAmount: gst.baseAmount,
+    gstAmount: gst.gstAmount,
     actor: input.actor ?? "system"
   };
   const updated = {
@@ -2021,6 +2034,17 @@ export function generateLoanStatement(account, input = {}, now = new Date()) {
       principalDue: sumMoney(scheduledDues, (installment) => installment.principalDue),
       interestDue: sumMoney(scheduledDues, (installment) => installment.interestDue),
       chargesAssessed: sumMoney(transactions, (event) => event.chargesDebit),
+      // GST component within the charges assessed this period, disclosed
+      // separately for borrower transparency (REV-42). chargesAssessed is
+      // GST-inclusive; chargesBaseFees is the net-of-tax fee.
+      gstCollected: sumMoney(
+        transactions.filter((event) => event.type === "charge_assessed"),
+        (event) => event.gstAmount
+      ),
+      chargesBaseFees: sumMoney(
+        transactions.filter((event) => event.type === "charge_assessed"),
+        (event) => event.baseAmount ?? event.chargesDebit
+      ),
       chargesWaived: sumMoney(transactions, (event) => event.chargesWaiverCredit),
       payments: sumMoney(
         transactions.filter((event) => event.type === "payment"),
