@@ -141,9 +141,15 @@ export function evaluateEligibility(application, options = {}) {
 
   const estimatedEmi = estimateEmi(requestedAmount, annualInterestRateBps, requestedTenorMonths);
 
+  // Affordability must reflect real debt, not only what the borrower declares.
+  // Derive monthly obligations from the bureau trade lines and use the more
+  // conservative of the declared and bureau-derived figures (REV-32).
+  const bureauDerivedObligations = deriveBureauObligations(application);
+  const obligationsUsed = Math.max(existingMonthlyObligations, bureauDerivedObligations);
+
   let foir = null;
   if (Number.isFinite(monthlyIncome) && monthlyIncome > 0 && Number.isFinite(estimatedEmi)) {
-    foir = roundRatio((existingMonthlyObligations + estimatedEmi) / monthlyIncome);
+    foir = roundRatio((obligationsUsed + estimatedEmi) / monthlyIncome);
     if (foir > maxFoir) {
       findings.push(
         createFinding(
@@ -187,6 +193,8 @@ export function evaluateEligibility(application, options = {}) {
       annualInterestRateBps: Number.isFinite(annualInterestRateBps) ? annualInterestRateBps : null,
       monthlyIncome: Number.isFinite(monthlyIncome) ? monthlyIncome : null,
       existingMonthlyObligations,
+      bureauDerivedObligations,
+      obligationsUsed,
       estimatedEmi: Number.isFinite(estimatedEmi) ? estimatedEmi : null,
       foir,
       maxFoir,
@@ -206,6 +214,49 @@ export function evaluateEligibility(application, options = {}) {
 
 function decisionSeverity(decision) {
   return decision === "reject" ? "error" : "warning";
+}
+
+// The bureau reports in play: the `bureauReports[]` array if present, otherwise
+// the legacy single `bureauReport`, otherwise none.
+function resolveBureauReports(application) {
+  if (Array.isArray(application.bureauReports) && application.bureauReports.length > 0) {
+    return application.bureauReports;
+  }
+  return application.bureauReport ? [application.bureauReport] : [];
+}
+
+// Monthly debt obligations implied by a single bureau report: a directly
+// reported `monthlyObligations` total wins, else the sum of trade-line EMIs.
+function deriveMonthlyObligationsFromReport(report) {
+  if (Number.isFinite(report?.monthlyObligations)) {
+    return Math.max(0, report.monthlyObligations);
+  }
+  if (Array.isArray(report?.tradeLines)) {
+    return report.tradeLines.reduce((sum, line) => {
+      const emi = Number.isFinite(line?.emiAmount)
+        ? line.emiAmount
+        : Number.isFinite(line?.monthlyPayment)
+          ? line.monthlyPayment
+          : 0;
+      return sum + Math.max(0, emi);
+    }, 0);
+  }
+  return 0;
+}
+
+// Bureau-derived monthly obligations across all reports. We take the maximum
+// rather than the sum: the same live loan is often reported to several bureaus,
+// so summing would double-count; the max is the conservative single-source view
+// (REV-32).
+function deriveBureauObligations(application) {
+  let max = 0;
+  for (const report of resolveBureauReports(application)) {
+    const derived = deriveMonthlyObligationsFromReport(report);
+    if (derived > max) {
+      max = derived;
+    }
+  }
+  return max;
 }
 
 // Resolve the score band governing a report: a per-bureau override wins, then

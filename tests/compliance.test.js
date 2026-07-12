@@ -4834,6 +4834,42 @@ test("eligibility applies policy-configured attribute knockouts beyond the score
   assert(youngResult.findings.some(f => f.path === "bureauReport.oldestTradeLineMonths" && f.severity === "warning"));
 });
 
+test("FOIR uses the max of declared and bureau-derived obligations (REV-32)", () => {
+  // Borrower under-declares obligations; the bureau shows more real debt, which
+  // must drive affordability. Income 75000, requested EMI ~ small.
+  const base = {
+    economicProfile: { monthlyIncome: 75000, existingMonthlyObligations: 2000 },
+    product: { requestedAmount: 100000, requestedTenorMonths: 24, annualInterestRateBps: 1800, maxAmount: 500000, minAmount: 10000, eligibility: { maxFoir: 0.5 } }
+  };
+
+  // Bureau reports a directly-derived monthly obligation far above the declared.
+  const declaredOnly = evaluateEligibility(eligibilityApplication({
+    ...base,
+    bureauReport: { score: 800, defaultAccounts: 0 }
+  }));
+  // With derived obligations pushing FOIR over the ceiling.
+  const withDerived = evaluateEligibility(eligibilityApplication({
+    ...base,
+    bureauReport: { score: 800, defaultAccounts: 0, monthlyObligations: 40000 }
+  }));
+
+  assert(declaredOnly.assessment.metrics.foir < withDerived.assessment.metrics.foir);
+  assert.equal(withDerived.assessment.metrics.bureauDerivedObligations, 40000);
+  assert.equal(withDerived.assessment.metrics.obligationsUsed, 40000); // max(2000, 40000)
+  // 40000 + EMI over 75000 income exceeds the 0.5 FOIR ceiling → ineligible.
+  assert.equal(withDerived.assessment.decision, ELIGIBILITY_DECISIONS.INELIGIBLE);
+  assert(withDerived.findings.some(f => f.message.includes("Fixed obligation to income ratio") && f.severity === "error"));
+
+  // Trade-line EMIs sum when no direct total is reported; declared wins when higher.
+  const fromTradeLines = evaluateEligibility(eligibilityApplication({
+    ...base,
+    economicProfile: { monthlyIncome: 75000, existingMonthlyObligations: 30000 },
+    bureauReport: { score: 800, defaultAccounts: 0, tradeLines: [{ emiAmount: 5000 }, { emiAmount: 4000 }] }
+  }));
+  assert.equal(fromTradeLines.assessment.metrics.bureauDerivedObligations, 9000);
+  assert.equal(fromTradeLines.assessment.metrics.obligationsUsed, 30000); // declared 30000 > derived 9000
+});
+
 test("API assesses eligibility and blocks approval of an ineligible borrower", async (t) => {
   const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
   t.after(async () => {

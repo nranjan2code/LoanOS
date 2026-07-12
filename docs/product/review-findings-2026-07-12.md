@@ -32,7 +32,7 @@ cite the ID in commits and PRs.
 | REV-21 | NPA upgrade rule: standard only after all arrears cleared (RBI IRAC) | C | P1 | DONE |
 | REV-30 | Multi-bureau underwriting depth (bands + attributes, not one threshold) | D | P1 | DONE |
 | REV-31 | Account Aggregator → income/obligations/FOIR analytics layer | D | P1 | TODO |
-| REV-32 | Bureau-derived obligations into FOIR (not only self-declared) | D | P2 | TODO |
+| REV-32 | Bureau-derived obligations into FOIR (not only self-declared) | D | P2 | DONE |
 | REV-33 | Microfinance (MFI): household income, 50% aggregate FOIR cap, JLG | D | P2 | DECIDE |
 | REV-40 | Multi-structure amortization: honor `repaymentFrequency`; bullet/moratorium/step-up | E | P2 | TODO |
 | REV-41 | Revolving / credit line / overdraft product type (MSME/BNPL) | E | P2 | TODO |
@@ -187,9 +187,16 @@ turns AA data into verified income, obligations, and FOIR inputs to `eligibility
 highest-leverage LOS gap and hard for incumbents to match on compliance grounds. **Acceptance:** an AA
 fetch produces derived income/obligation facts consumed by eligibility with provenance tags.
 
-### REV-32 — Bureau-derived obligations into FOIR · P2 · TODO
+### REV-32 — Bureau-derived obligations into FOIR · P2 · DONE
 FOIR uses self-declared `existingMonthlyObligations`. Derive obligations from the bureau trade lines and
 feed them into affordability. Pairs with REV-30/REV-31. **Acceptance:** FOIR uses the max of declared and bureau-derived obligations.
+**Done this session.** `eligibility.js` derives monthly obligations from each bureau report — a directly
+reported `monthlyObligations` total, else the sum of trade-line EMIs (`tradeLines[].emiAmount`/
+`monthlyPayment`) — taking the **max across bureaus** (not the sum, since a live loan is often reported to
+several bureaus). FOIR is then computed on `max(declared, bureau-derived)`, and the assessment metrics
+expose `bureauDerivedObligations` and `obligationsUsed` alongside the declared figure. Defaults are inert
+when reports carry no obligation data, so the differential corpus stays byte-identical and the Rust test
+passes. One test covers the derived-over-declared, trade-line-sum, and declared-wins cases.
 
 ### REV-33 — Microfinance (MFI) decision and model · P2 · DECIDE
 No `household income`, `JLG`, or MFI concept exists. RBI Microfinance Directions 2022 impose household
