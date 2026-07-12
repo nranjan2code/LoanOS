@@ -1,5 +1,29 @@
 # Product Roadmap
 
+## Review-Driven Remediation (2026-07-12)
+
+A deep product/design/applicability review (LOS · LWS · LMS · compliance/AI plane · decision engine),
+plus a code-level trace of the decision engine, produced a consolidated set of discoveries and
+recommendations. The **authoritative, trackable list is
+[`review-findings-2026-07-12.md`](review-findings-2026-07-12.md)** (stable `REV-n` IDs, priority, status,
+evidence, acceptance). This section is a rollup only — update status in the tracker, not here.
+
+| WS | Theme | Priority | Lead items |
+| --- | --- | --- | --- |
+| A | Documentation alignment | P0 | REV-01/02 done; REV-03 (single source of truth for engine status) |
+| B | Decision engine: real, proven, multi-tenant | P1 | REV-10 gateway tests, REV-11 CI service lane, REV-12 per-tenant routing, REV-13 reason lineage, REV-14 wire-vs-pause **decision** |
+| C | Live-path correctness | P1 | REV-20 exact money math, REV-21 NPA upgrade rule |
+| D | Credit depth | P1 | REV-30 multi-bureau, REV-31 AA→income/FOIR, REV-32 bureau obligations, REV-33 MFI **decision** |
+| E | Product breadth & India tax | P1–P2 | REV-42 GST, REV-40 multi-structure amortization, REV-41 revolving/credit-line, REV-43 insurance |
+| F | LWS recovery depth | P2 | REV-50 SARFAESI/Sec-138 legal recovery, REV-51 field-collections |
+| G | Regulatory format fidelity & live integrations | P2 | REV-60 CIC URCF, REV-61 CKYC, REV-62 FIU FINnet, REV-63 CERSAI, REV-64 live providers |
+| H | Architecture & scale | P2 | REV-70 split `server.js`, REV-71 storage scale, REV-72 co-lending ledger economics |
+| I | Go-to-market / positioning | P3 | REV-80 positioning, REV-81 beachhead, REV-82 depth-over-breadth (**decisions**) |
+
+Sequencing guidance: **do WS-A + the P1s in WS-B/C first** (trust and correctness on the path that
+actually runs), then WS-D (credit depth) and REV-42 (GST) to make a single real loan real, then breadth
+(WS-E/F/G) and architecture (WS-H). WS-I decisions gate how wide vs. deep the build goes.
+
 ## Cross-Cutting Workstream: SaaS Tenancy and Vendor Posture
 
 Status: S1–S6 first slice complete for every task (tenant partitioning, tenant-scoped service auth, tenant/platform human sessions, tenant user admin, access reviews, service-key rotation, isolation suite, hash-chained audit spine + evidence export, tenant portability export + evidenced offboarding, disclosed sub-processor register, 6-hour incident-notification workflow, audited platform-staff break-glass access, uniform audit provenance stamping).

@@ -308,20 +308,89 @@ export function computeDelinquency(account, asOf = new Date()) {
 
 export function classifyLoanAsset(account, asOf = new Date()) {
   const delinquency = computeDelinquency(account, asOf);
-  const assetClass = assetClassFromDpd(delinquency.daysPastDue);
+  const dpdAssetClass = assetClassFromDpd(delinquency.daysPastDue);
+  const irac = applyIracUpgradeGuard(account, asOf, dpdAssetClass, delinquency);
 
   return {
     asOf: asOf.toISOString(),
-    assetClass,
+    assetClass: irac.assetClass,
+    dpdAssetClass,
     daysPastDue: delinquency.daysPastDue,
     delinquencyBucket: delinquency.bucket,
-    isNpa: assetClass === "npa",
+    isNpa: irac.assetClass === "npa",
+    // RBI IRAC (Nov 2021): once NPA, upgrade to standard only after all
+    // principal and interest arrears are cleared — not merely when DPD < 90.
+    npaHeldForArrears: irac.held,
     restructured: Boolean(account.restructured),
     writtenOff: Boolean(account.writtenOff),
-    basis: "days_past_due",
+    basis: irac.held ? "irac_arrears_upgrade_guard" : "days_past_due",
     npaThresholdDays: 90,
     delinquency
   };
+}
+
+// Reconstruct the IRAC-compliant asset class purely from the schedule and
+// ledger. An account that has ever been NPA cannot upgrade below NPA until its
+// principal and interest arrears are fully cleared; a partial catch-up that
+// only drops DPD below 90 keeps the account NPA (RBI IRAC clarification, Nov
+// 2021). We replay the DPD-based class at every due/payment checkpoint up to
+// asOf and thread that guard through the trajectory.
+function applyIracUpgradeGuard(account, asOf, dpdAssetClassAtAsOf, delinquencyAtAsOf) {
+  if (dpdAssetClassAtAsOf === "npa") {
+    return { assetClass: "npa", held: false };
+  }
+
+  const asOfTime = asOf.getTime();
+  const checkpointTimes = new Set();
+  for (const installment of account.schedule ?? []) {
+    const dueTime = new Date(`${installment.dueDate}T00:00:00.000Z`).getTime();
+    // The due date itself, and the exact moment it would tip into NPA (91 DPD)
+    // if still the earliest unpaid installment. Without the latter, an NPA
+    // crossing that occurs between two ledger events would be missed.
+    const npaCrossingTime = dueTime + 91 * 86400000;
+    if (dueTime <= asOfTime) {
+      checkpointTimes.add(dueTime);
+    }
+    if (npaCrossingTime <= asOfTime) {
+      checkpointTimes.add(npaCrossingTime);
+    }
+  }
+  for (const event of account.ledger ?? []) {
+    if (event.type !== "payment" && event.type !== "cash_recovery_payment") {
+      continue;
+    }
+    const time = new Date(event.eventDate).getTime();
+    if (time <= asOfTime) {
+      checkpointTimes.add(time);
+    }
+  }
+  const ordered = [...checkpointTimes].sort((a, b) => a - b);
+
+  let everNpa = false;
+  for (const time of ordered) {
+    if (time >= asOfTime) {
+      break;
+    }
+    const priorDelinquency = computeDelinquency(account, new Date(time));
+    if (assetClassFromDpd(priorDelinquency.daysPastDue) === "npa") {
+      everNpa = true;
+    } else if (everNpa && arrearsCleared(priorDelinquency)) {
+      // Arrears fully cured before asOf: the NPA episode is closed and a fresh
+      // one would require crossing 90 DPD again.
+      everNpa = false;
+    }
+  }
+
+  if (everNpa && !arrearsCleared(delinquencyAtAsOf)) {
+    return { assetClass: "npa", held: true };
+  }
+  return { assetClass: dpdAssetClassAtAsOf, held: false };
+}
+
+// RBI IRAC upgrade test: entire arrears of principal AND interest paid. Charges
+// alone do not hold an NPA classification.
+function arrearsCleared(delinquency) {
+  return roundMoney(delinquency.principalOverdue + delinquency.interestOutstanding) <= 0;
 }
 
 export function generateCicSnapshot(account, asOf = new Date()) {

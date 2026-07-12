@@ -348,6 +348,8 @@ Dependency rule: `rules-core`, `rules-expr`, `rules-model`, `rules-eval` must no
 
 ## 15. Delivery Phases
 
+**This checklist is the single source of truth for engine phase and status (REV-03).** Other documents (`current-implementation.md`, `build-backlog.md` Epic 4) must link here rather than restate phase/status — restating is what produced the REV-01 self-contradiction. Update status here first, then anywhere that links back.
+
 Each phase has acceptance criteria; a phase is done when all its criteria have automated verification or a recorded waiver. Implementers (human or agent) work strictly within the open phase.
 
 ### PH-0 — Foundations (docs + scaffold) — complete 2026-07-10

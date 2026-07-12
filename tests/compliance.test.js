@@ -364,6 +364,57 @@ test("asset classification promotes overdue accounts through SMA to NPA", async 
   assert.equal(classifyLoanAsset(account, new Date(`${addDays(firstDueDate, 91)}T00:00:00.000Z`)).assetClass, "npa");
 });
 
+function buildScheduledAccount(payments = []) {
+  const dueDates = ["2026-01-01", "2026-02-01", "2026-03-01", "2026-04-01", "2026-05-01", "2026-06-01"];
+  return {
+    loanAccountId: "loan_irac_test",
+    status: "active",
+    schedule: dueDates.map((dueDate, index) => ({
+      index: index + 1,
+      dueDate,
+      principalDue: 1000,
+      interestDue: 100,
+      totalDue: 1100
+    })),
+    ledger: [
+      { type: "disbursement", eventDate: "2025-12-15T00:00:00.000Z", principalDebit: 6000 },
+      ...payments
+    ]
+  };
+}
+
+test("NPA account is held below standard until all arrears clear (RBI IRAC upgrade guard)", () => {
+  // Account tips into NPA (installment #1 unpaid past 90 DPD), then a partial
+  // catch-up clears only installment #1 — dropping DPD below 90 while arrears
+  // on later installments remain. Per RBI IRAC (Nov 2021) it must stay NPA.
+  const account = buildScheduledAccount([
+    { type: "payment", eventDate: "2026-04-10T00:00:00.000Z", principalCredit: 1000, interestCredit: 100 }
+  ]);
+  const asOf = new Date("2026-04-15T00:00:00.000Z");
+
+  const classification = classifyLoanAsset(account, asOf);
+  assert.equal(classification.dpdAssetClass, "sma_2", "DPD alone would upgrade to SMA-2");
+  assert.equal(classification.assetClass, "npa", "IRAC guard holds the NPA classification");
+  assert.equal(classification.isNpa, true);
+  assert.equal(classification.npaHeldForArrears, true);
+  assert.equal(classification.basis, "irac_arrears_upgrade_guard");
+});
+
+test("NPA account upgrades to standard once every principal and interest arrear is cleared", () => {
+  // Same NPA episode, but the borrower clears ALL overdue installments — the
+  // account is entitled to upgrade to standard.
+  const account = buildScheduledAccount([
+    { type: "payment", eventDate: "2026-04-10T00:00:00.000Z", principalCredit: 4000, interestCredit: 400 }
+  ]);
+  const asOf = new Date("2026-04-15T00:00:00.000Z");
+
+  const classification = classifyLoanAsset(account, asOf);
+  assert.equal(classification.assetClass, "standard");
+  assert.equal(classification.isNpa, false);
+  assert.equal(classification.npaHeldForArrears, false);
+  assert.equal(classification.basis, "days_past_due");
+});
+
 test("AI model kill switch blocks credit-impacting model use", () => {
   const baseRegistry = createModelRegistryState();
   const registered = registerModel(baseRegistry, {
