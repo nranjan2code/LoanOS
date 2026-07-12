@@ -4764,6 +4764,76 @@ test("eligibility engine refers borrower with thin file", () => {
   assert(result.findings.some(f => f.path === "bureauReport" && f.severity === "warning"));
 });
 
+test("eligibility uses per-product bureau score bands from policy (REV-30)", () => {
+  // Product raises the bar: reject below 700, refer 700–749.
+  const app = eligibilityApplication({
+    bureauReport: { score: 720, defaultAccounts: 0 },
+    product: {
+      eligibility: { bureauPolicy: { bands: { default: { rejectBelow: 700, referBelow: 750 } } } }
+    }
+  });
+  const result = evaluateEligibility(app);
+  // 720 would straight-through approve under the default 700 bar, but is a refer here.
+  assert.equal(result.assessment.decision, ELIGIBILITY_DECISIONS.REFER);
+  assert(result.findings.some(f => f.path === "bureauReport.score" && f.severity === "warning"));
+
+  const belowBar = evaluateEligibility(eligibilityApplication({
+    bureauReport: { score: 680, defaultAccounts: 0 },
+    product: { eligibility: { bureauPolicy: { bands: { default: { rejectBelow: 700, referBelow: 750 } } } } }
+  }));
+  assert.equal(belowBar.assessment.decision, ELIGIBILITY_DECISIONS.INELIGIBLE);
+});
+
+test("eligibility evaluates multiple bureaus with per-bureau bands; the most conservative outcome wins (REV-30)", () => {
+  const app = eligibilityApplication({
+    bureauReport: null,
+    bureauReports: [
+      { bureau: "cibil", score: 780, defaultAccounts: 0 },
+      { bureau: "experian", score: 610, defaultAccounts: 0 }
+    ],
+    product: {
+      eligibility: {
+        bureauPolicy: {
+          bands: {
+            cibil: { rejectBelow: 650, referBelow: 720 },
+            experian: { rejectBelow: 650, referBelow: 720 }
+          }
+        }
+      }
+    }
+  });
+  const result = evaluateEligibility(app);
+  // CIBIL 780 is clean, but Experian 610 is below its reject bar → ineligible.
+  assert.equal(result.assessment.decision, ELIGIBILITY_DECISIONS.INELIGIBLE);
+  assert(result.findings.some(f => f.path === "bureauReports.1.score" && f.severity === "error"));
+});
+
+test("eligibility applies policy-configured attribute knockouts beyond the score (REV-30)", () => {
+  const writeOffApp = eligibilityApplication({
+    bureauReport: { score: 800, defaultAccounts: 0, writeOffs: 1 },
+    product: { eligibility: { bureauPolicy: { knockouts: { writeOffs: { max: 0 } } } } }
+  });
+  const writeOffResult = evaluateEligibility(writeOffApp);
+  assert.equal(writeOffResult.assessment.decision, ELIGIBILITY_DECISIONS.INELIGIBLE);
+  assert(writeOffResult.findings.some(f => f.path === "bureauReport.writeOffs" && f.severity === "error"));
+
+  // Enquiry-velocity knockout.
+  const enquiryApp = eligibilityApplication({
+    bureauReport: { score: 800, defaultAccounts: 0, enquiriesLast90Days: 15 },
+    product: { eligibility: { bureauPolicy: { knockouts: { enquiriesLast90Days: { max: 10 } } } } }
+  });
+  assert.equal(evaluateEligibility(enquiryApp).assessment.decision, ELIGIBILITY_DECISIONS.INELIGIBLE);
+
+  // Trade-line seasoning refers (does not reject) a too-young file.
+  const youngFileApp = eligibilityApplication({
+    bureauReport: { score: 800, defaultAccounts: 0, oldestTradeLineMonths: 3 },
+    product: { eligibility: { bureauPolicy: { knockouts: { minTradeLineVintageMonths: { min: 6 } } } } }
+  });
+  const youngResult = evaluateEligibility(youngFileApp);
+  assert.equal(youngResult.assessment.decision, ELIGIBILITY_DECISIONS.REFER);
+  assert(youngResult.findings.some(f => f.path === "bureauReport.oldestTradeLineMonths" && f.severity === "warning"));
+});
+
 test("API assesses eligibility and blocks approval of an ineligible borrower", async (t) => {
   const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
   t.after(async () => {

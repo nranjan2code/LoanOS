@@ -30,7 +30,7 @@ cite the ID in commits and PRs.
 | REV-14 | Decision: wire engine to shadow now vs. pause PH-6+ engine work | B | P1 | DECIDE |
 | REV-20 | Exact money math on the live JS path (EMI/interest/foreclosure) | C | P1 | IN PROGRESS |
 | REV-21 | NPA upgrade rule: standard only after all arrears cleared (RBI IRAC) | C | P1 | DONE |
-| REV-30 | Multi-bureau underwriting depth (bands + attributes, not one threshold) | D | P1 | TODO |
+| REV-30 | Multi-bureau underwriting depth (bands + attributes, not one threshold) | D | P1 | DONE |
 | REV-31 | Account Aggregator → income/obligations/FOIR analytics layer | D | P1 | TODO |
 | REV-32 | Bureau-derived obligations into FOIR (not only self-declared) | D | P2 | TODO |
 | REV-33 | Microfinance (MFI): household income, 50% aggregate FOIR cap, JLG | D | P2 | DECIDE |
@@ -160,11 +160,26 @@ hold it). The result exposes `dpdAssetClass` (raw), `npaHeldForArrears`, and `ba
 
 ## WS-D — Credit depth
 
-### REV-30 — Multi-bureau underwriting depth · P1 · TODO
+### REV-30 — Multi-bureau underwriting depth · P1 · DONE
 `eligibility.js` hardcodes a single score model (`<600` reject, `<700` refer, `defaultAccounts>0`
 reject). Real India underwriting spans four bureaus on different scales (CIBIL 300–900, CRIF, Experian,
 Equifax) and reads attributes: DPD history, enquiry velocity, write-offs/settlements, trade-line
 vintage. Make bands and attribute rules policy-data (decision model), not hardcoded. **Acceptance:** score bands and knockout attributes are per-product policy, per bureau.
+**Done this session.** `eligibility.js` now reads bureau underwriting from
+`product.eligibility.bureauPolicy`: per-bureau score `bands` (`rejectBelow`/`referBelow`, keyed by bureau
+name with a `default`), count/value `knockouts` (`defaultAccounts`, `writeOffs`, `settlements`, `maxDpd`,
+`enquiriesLast90Days` — each rejects above a configured max), a `minTradeLineVintageMonths` seasoning
+refer, and `thinFileDecision`/`noBureauDecision`. It evaluates either the legacy single `bureauReport` or
+an array of `bureauReports[]`, each optionally naming its `bureau`; because all findings summarise
+together, the most conservative outcome across bureaus wins (any error ⇒ ineligible, any warning ⇒
+refer). **Defaults reproduce the prior behaviour exactly**, so the 542-case differential corpus is
+byte-identical after regeneration and the Rust `differential_eligibility` test still passes with zero
+divergence. Four tests cover custom bands, per-bureau multi-report conservatism, attribute knockouts, and
+trade-line seasoning.
+**Follow-up:** the richer bands/attributes are not yet ported into the Rust decision-model fixture
+(`rules/fixtures/lending-eligibility.json`), which still encodes the default `600`/`700` literals — fine
+while the engine is off by default, but the port is needed before a tenant runs a *custom* bureau policy
+through the engine in `active` mode. Pairs with REV-32 (feed bureau-derived obligations into FOIR).
 
 ### REV-31 — Account Aggregator → income/obligations/FOIR analytics · P1 · TODO
 `account-aggregator.js` is consent-correct but stops at a hashed evidence record; there is no layer that

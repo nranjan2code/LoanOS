@@ -8,6 +8,26 @@ const DEFAULT_MAX_FOIR = 0.5;
 // routed to manual underwriting instead of straight-through approval.
 const REFER_FOIR_FRACTION = 0.8;
 
+// Default credit-bureau score bands when a product policy does not set its own.
+// CIBIL-style (300–900): reject below 600, refer 600–699, approve from 700.
+const DEFAULT_BUREAU_BANDS = { rejectBelow: 600, referBelow: 700 };
+// Default knockout attributes: any active default account rejects. Other
+// attributes (write-offs, settlements, severe DPD, enquiry velocity, trade-line
+// vintage) only bite when a product policy configures a threshold for them.
+const DEFAULT_BUREAU_KNOCKOUTS = { defaultAccounts: { max: 0 } };
+// How a thin/absent bureau file is treated by default: manual underwriting.
+const DEFAULT_THIN_FILE_DECISION = "refer";
+
+// Knockout attributes evaluated as "reject when the reported count/value exceeds
+// the configured maximum". Each maps a bureau-report field to a KFS finding path.
+const MAX_KNOCKOUT_ATTRIBUTES = [
+  { key: "defaultAccounts", label: "active default accounts", path: "defaultAccounts" },
+  { key: "writeOffs", label: "written-off accounts", path: "writeOffs" },
+  { key: "settlements", label: "settled accounts", path: "settlements" },
+  { key: "maxDpd", label: "days past due", path: "maxDpd" },
+  { key: "enquiriesLast90Days", label: "credit enquiries in 90 days", path: "enquiriesLast90Days" }
+];
+
 export const ELIGIBILITY_DECISIONS = {
   ELIGIBLE: "eligible",
   REFER: "refer",
@@ -117,58 +137,7 @@ export function evaluateEligibility(application, options = {}) {
   }
 
   // Credit Bureau (CIBIL equivalent) scoring.
-  const bureauReport = application.bureauReport;
-  if (bureauReport) {
-    if (Number.isFinite(bureauReport.defaultAccounts) && bureauReport.defaultAccounts > 0) {
-      findings.push(
-        createFinding(
-          "error",
-          "RBI-DL-2025",
-          `Borrower has active default accounts (${bureauReport.defaultAccounts}) on credit bureau.`,
-          "bureauReport.defaultAccounts"
-        )
-      );
-    }
-    if (Number.isFinite(bureauReport.score)) {
-      if (bureauReport.score < 600) {
-        findings.push(
-          createFinding(
-            "error",
-            "RBI-DL-2025",
-            `Borrower credit score (${bureauReport.score}) is below the minimum limit of 600.`,
-            "bureauReport.score"
-          )
-        );
-      } else if (bureauReport.score < 700) {
-        findings.push(
-          createFinding(
-            "warning",
-            "RBI-DL-2025",
-            `Borrower credit score (${bureauReport.score}) is within review band and requires manual underwriting.`,
-            "bureauReport.score"
-          )
-        );
-      }
-    } else {
-      findings.push(
-        createFinding(
-          "warning",
-          "RBI-DL-2025",
-          "Borrower credit report has no score (thin file); routing to manual underwriting.",
-          "bureauReport.score"
-        )
-      );
-    }
-  } else {
-    findings.push(
-      createFinding(
-        "warning",
-        "RBI-DL-2025",
-        "Borrower has no credit bureau history; routing to manual underwriting.",
-        "bureauReport"
-      )
-    );
-  }
+  evaluateBureauReports(application, eligibilityPolicy, findings);
 
   const estimatedEmi = estimateEmi(requestedAmount, annualInterestRateBps, requestedTenorMonths);
 
@@ -233,4 +202,134 @@ export function evaluateEligibility(application, options = {}) {
     findings,
     summary
   };
+}
+
+function decisionSeverity(decision) {
+  return decision === "reject" ? "error" : "warning";
+}
+
+// Resolve the score band governing a report: a per-bureau override wins, then
+// the policy's `default`, then the built-in CIBIL-style default. Bureaus run on
+// different scales (CIBIL 300–900, CRIF/Experian/Equifax variants), so bands are
+// keyed by bureau name.
+function resolveBureauBands(bureauPolicy, bureauName) {
+  const bands = bureauPolicy?.bands ?? {};
+  const key = bureauName ? String(bureauName).toLowerCase() : null;
+  const resolved = (key && (bands[bureauName] ?? bands[key])) ?? bands.default ?? DEFAULT_BUREAU_BANDS;
+  return {
+    rejectBelow: Number.isFinite(resolved.rejectBelow) ? resolved.rejectBelow : DEFAULT_BUREAU_BANDS.rejectBelow,
+    referBelow: Number.isFinite(resolved.referBelow) ? resolved.referBelow : DEFAULT_BUREAU_BANDS.referBelow
+  };
+}
+
+// Policy-data credit-bureau underwriting (REV-30). Reads score bands and
+// knockout attributes from the product's eligibility policy
+// (`eligibility.bureauPolicy`) rather than a single hardcoded threshold, and
+// evaluates one or many bureau reports (`bureauReports[]`, or the legacy single
+// `bureauReport`). Each report may name its `bureau`; attributes beyond the
+// score — write-offs, settlements, severe DPD, enquiry velocity, trade-line
+// vintage — knock out or refer only when the policy configures a threshold. The
+// most conservative outcome across bureaus wins because every finding is
+// summarised together (any error ⇒ ineligible, any warning ⇒ refer).
+function evaluateBureauReports(application, eligibilityPolicy, findings) {
+  const bureauPolicy = eligibilityPolicy?.bureauPolicy ?? {};
+  const knockouts = bureauPolicy.knockouts ?? DEFAULT_BUREAU_KNOCKOUTS;
+  const thinFileDecision = bureauPolicy.thinFileDecision ?? DEFAULT_THIN_FILE_DECISION;
+  const noBureauDecision = bureauPolicy.noBureauDecision ?? thinFileDecision;
+
+  const fromArray = Array.isArray(application.bureauReports) && application.bureauReports.length > 0;
+  const reports = fromArray
+    ? application.bureauReports
+    : application.bureauReport
+      ? [application.bureauReport]
+      : [];
+
+  if (reports.length === 0) {
+    if (noBureauDecision !== "approve") {
+      findings.push(
+        createFinding(
+          decisionSeverity(noBureauDecision),
+          "RBI-DL-2025",
+          "Borrower has no credit bureau history; routing to manual underwriting.",
+          "bureauReport"
+        )
+      );
+    }
+    return;
+  }
+
+  reports.forEach((report, index) => {
+    const base = fromArray ? `bureauReports.${index}` : "bureauReport";
+    const label = report.bureau ? `${report.bureau} ` : "";
+
+    // Count/value knockouts: reject when the reported figure exceeds the cap.
+    for (const attr of MAX_KNOCKOUT_ATTRIBUTES) {
+      const rule = knockouts[attr.key];
+      if (!rule || !Number.isFinite(rule.max)) {
+        continue;
+      }
+      const value = report[attr.key];
+      if (Number.isFinite(value) && value > rule.max) {
+        findings.push(
+          createFinding(
+            "error",
+            "RBI-DL-2025",
+            `Borrower has ${value} ${attr.label} on ${label}credit bureau (limit ${rule.max}).`,
+            `${base}.${attr.path}`
+          )
+        );
+      }
+    }
+
+    // Trade-line seasoning: too-young a file routes to manual underwriting.
+    const vintageRule = knockouts.minTradeLineVintageMonths;
+    if (
+      vintageRule &&
+      Number.isFinite(vintageRule.min) &&
+      Number.isFinite(report.oldestTradeLineMonths) &&
+      report.oldestTradeLineMonths < vintageRule.min
+    ) {
+      findings.push(
+        createFinding(
+          "warning",
+          "RBI-DL-2025",
+          `Borrower's oldest ${label}trade line (${report.oldestTradeLineMonths} months) is below the seasoning minimum of ${vintageRule.min}; routing to manual underwriting.`,
+          `${base}.oldestTradeLineMonths`
+        )
+      );
+    }
+
+    // Score bands (per bureau scale).
+    if (Number.isFinite(report.score)) {
+      const bands = resolveBureauBands(bureauPolicy, report.bureau);
+      if (report.score < bands.rejectBelow) {
+        findings.push(
+          createFinding(
+            "error",
+            "RBI-DL-2025",
+            `Borrower ${label}credit score (${report.score}) is below the minimum limit of ${bands.rejectBelow}.`,
+            `${base}.score`
+          )
+        );
+      } else if (report.score < bands.referBelow) {
+        findings.push(
+          createFinding(
+            "warning",
+            "RBI-DL-2025",
+            `Borrower ${label}credit score (${report.score}) is within review band and requires manual underwriting.`,
+            `${base}.score`
+          )
+        );
+      }
+    } else if (thinFileDecision !== "approve") {
+      findings.push(
+        createFinding(
+          decisionSeverity(thinFileDecision),
+          "RBI-DL-2025",
+          `Borrower ${label}credit report has no score (thin file); routing to manual underwriting.`,
+          `${base}.score`
+        )
+      );
+    }
+  });
 }
