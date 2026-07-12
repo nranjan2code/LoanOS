@@ -314,6 +314,36 @@ test("repayment schedule amortizes principal over tenor", () => {
   assert(result.schedule[0].principalDue > 0);
 });
 
+test("repayment schedule is exact to the paise — principal reconstructs with no drift (REV-20)", () => {
+  // An awkward principal, odd rate, and long tenor that would accumulate
+  // floating-point drift under float principal carry. Integer-paise arithmetic
+  // must keep the schedule exact regardless of the Number.EPSILON heuristic.
+  const principalAmount = 733333.37;
+  const result = generateRepaymentSchedule({
+    principalAmount,
+    annualInterestRateBps: 1337,
+    tenorMonths: 84,
+    startDate: "2026-07-08T00:00:00.000Z"
+  });
+
+  assert.equal(result.summary.status, "ready");
+  assert.equal(result.schedule.length, 84);
+
+  const toPaise = (rupees) => Math.round(rupees * 100);
+  let principalPaise = 0;
+  for (const installment of result.schedule) {
+    // Each installment's total is exactly principal + interest, to the paise.
+    assert.equal(toPaise(installment.totalDue), toPaise(installment.principalDue) + toPaise(installment.interestDue));
+    // Opening minus principal equals closing, exactly.
+    assert.equal(toPaise(installment.closingPrincipal), toPaise(installment.openingPrincipal) - toPaise(installment.principalDue));
+    principalPaise += toPaise(installment.principalDue);
+  }
+
+  // The sum of scheduled principal equals the disbursed principal exactly.
+  assert.equal(principalPaise, toPaise(principalAmount));
+  assert.equal(result.schedule.at(-1).closingPrincipal, 0);
+});
+
 test("delinquency computation buckets unpaid installments", async (t) => {
   const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-"));
   t.after(async () => {

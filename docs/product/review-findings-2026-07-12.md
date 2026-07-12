@@ -28,7 +28,7 @@ cite the ID in commits and PRs.
 | REV-12 | Per-tenant engine routing in the JS gateway (retire the single hardcoded URL) | B | P1 | TODO |
 | REV-13 | `active`-mode reason-lineage fidelity (carry engine reasons/summary, not just decision) | B | P1 | TODO |
 | REV-14 | Decision: wire engine to shadow now vs. pause PH-6+ engine work | B | P1 | DECIDE |
-| REV-20 | Exact money math on the live JS path (EMI/interest/foreclosure) | C | P1 | TODO |
+| REV-20 | Exact money math on the live JS path (EMI/interest/foreclosure) | C | P1 | IN PROGRESS |
 | REV-21 | NPA upgrade rule: standard only after all arrears cleared (RBI IRAC) | C | P1 | DONE |
 | REV-30 | Multi-bureau underwriting depth (bands + attributes, not one threshold) | D | P1 | TODO |
 | REV-31 | Account Aggregator → income/obligations/FOIR analytics layer | D | P1 | TODO |
@@ -122,11 +122,26 @@ lending breadth + live integrations. **Owner decision required before further en
 
 ## WS-C — Live-path correctness
 
-### REV-20 — Exact money math on the live JS path · P1 · TODO
+### REV-20 — Exact money math on the live JS path · P1 · IN PROGRESS
 `eligibility.js` (EMI/FOIR) and `loan-account.js` (interest/foreclosure) use float + `Number.EPSILON`
 rounding (`roundMoney`). Ledger *summation* already uses exact integer paise (`sumMoney`), but EMI,
 per-installment interest, and foreclosure math do not. Either move these to integer-paise arithmetic or
 route the decision through the decimal engine (WS-B). **Acceptance:** amortization and payoff are exact at scale, independent of epsilon heuristics.
+
+**LMS ledger path done this session.** `loan-account.js` now carries outstanding principal as exact
+integer paise through `generateRepaymentSchedule` and `reamortizeInstallments`, computes per-installment
+interest via `interestForPeriodPaise` and the EMI via `computeEmiPaise` (compounding factor in float,
+rounded once to whole paise — no float rupee carried between installments), and derives the foreclosure
+payoff and bps ceiling with exact paise arithmetic (`sumMoney`/`toPaise`). This covers schedule
+generation, part-prepayment re-amortization, and the floating-rate reset rebuild (which reuses
+`generateRepaymentSchedule`). A REV-20 test asserts the schedule reconstructs the disbursed principal to
+the paise with zero drift over an awkward 84-month case; all 150 Node tests stay green (outputs are
+identical to the prior epsilon path, now guaranteed exact rather than heuristic).
+
+**Deferred (still TODO):** the affordability-path EMI in `eligibility.js` (`estimateEmi`) — it is an
+estimate that is never ledgered, and it is entangled with the Rust engine's differential corpus
+(`rules/tools/gen-eligibility-corpus.mjs`), so it is best cut over together with the decimal decision
+engine (WS-B) rather than dual-maintained. Track flip to DONE when that path is converted.
 
 ### REV-21 — NPA upgrade rule (RBI IRAC) · P1 · DONE
 Asset classification maps DPD → standard/SMA/NPA with a 90-day threshold, but the upgrade path needs the

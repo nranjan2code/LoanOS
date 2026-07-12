@@ -113,7 +113,7 @@ Tasks:
 - Loan account model. Done.
 - Immutable ledger events. First slices done.
 - Repayment schedule generator. Done.
-- EMI/amortization calculator. Done.
+- EMI/amortization calculator. Done; exact integer-paise money math (REV-20, LMS path): schedule generation, part-prepayment re-amortization, and the floating-rate reset rebuild carry principal as integer paise and round EMI/interest deterministically to whole paise (no `Number.EPSILON` heuristic), so amortization and foreclosure payoff are exact at scale. Affordability-path EMI in `eligibility.js` deferred to the decimal-engine cutover.
 - Interest accrual. First slice done: scheduled interest is recognized as immutable `interest_accrual` ledger events per installment, idempotent, reconstructable from the ledger, and reconciled against the schedule.
 - Payment allocation. First slice done.
 - Charges, waivers, reversals. First slice done.

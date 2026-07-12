@@ -32,28 +32,32 @@ export function generateRepaymentSchedule(input) {
   }
 
   const monthlyRate = annualInterestRateBps / 10000 / 12;
-  const emi = computeEmi(principalAmount, monthlyRate, tenorMonths);
+  const emiPaise = computeEmiPaise(toPaise(principalAmount), monthlyRate, tenorMonths);
   const schedule = [];
-  let openingPrincipal = principalAmount;
+  // Carry the outstanding principal as exact integer paise so it never
+  // accumulates floating-point drift across a long schedule (REV-20).
+  let openingPaise = toPaise(principalAmount);
 
   for (let index = 1; index <= tenorMonths; index += 1) {
-    const interestDue = roundMoney(openingPrincipal * monthlyRate);
-    const principalDue =
-      index === tenorMonths ? openingPrincipal : roundMoney(Math.min(openingPrincipal, Math.max(0, emi - interestDue)));
-    const closingPrincipal = roundMoney(Math.max(0, openingPrincipal - principalDue));
+    const interestPaise = interestForPeriodPaise(openingPaise, monthlyRate);
+    const principalPaise =
+      index === tenorMonths
+        ? openingPaise
+        : Math.min(openingPaise, Math.max(0, emiPaise - interestPaise));
+    const closingPaise = Math.max(0, openingPaise - principalPaise);
 
     schedule.push({
       installmentNumber: index,
       dueDate: addMonthsUtc(startDate, index).toISOString().slice(0, 10),
-      openingPrincipal,
-      principalDue,
-      interestDue,
-      totalDue: roundMoney(principalDue + interestDue),
-      closingPrincipal,
+      openingPrincipal: fromPaise(openingPaise),
+      principalDue: fromPaise(principalPaise),
+      interestDue: fromPaise(interestPaise),
+      totalDue: fromPaise(principalPaise + interestPaise),
+      closingPrincipal: fromPaise(closingPaise),
       status: "scheduled"
     });
 
-    openingPrincipal = closingPrincipal;
+    openingPaise = closingPaise;
   }
 
   return {
@@ -818,7 +822,7 @@ export function quoteForeclosure(account, input = {}, now = new Date()) {
       findings.push(createFinding("error", "RBI-FPC-PENAL", "Foreclosure charges are prohibited on floating-rate individual retail loans.", "foreclosureCharge"));
     }
   } else if (foreclPolicy.chargeBps > 0 && foreclosureCharge > 0) {
-    const ceiling = roundMoney((balance.principalOutstanding * foreclPolicy.chargeBps) / 10000);
+    const ceiling = fromPaise(Math.round((toPaise(balance.principalOutstanding) * foreclPolicy.chargeBps) / 10000));
     if (foreclosureCharge > ceiling) {
       findings.push(createFinding(
         "error",
@@ -842,8 +846,15 @@ export function quoteForeclosure(account, input = {}, now = new Date()) {
       chargesOutstanding: balance.chargesOutstanding,
       foreclosureCharge,
       disclosedChargeRef,
-      payoffAmount: roundMoney(
-        balance.principalOutstanding + balance.interestOutstanding + balance.chargesOutstanding + foreclosureCharge
+      // Exact integer-paise summation of already-rounded components (REV-20).
+      payoffAmount: sumMoney(
+        [
+          balance.principalOutstanding,
+          balance.interestOutstanding,
+          balance.chargesOutstanding,
+          foreclosureCharge
+        ],
+        (value) => value
       )
     },
     findings,
@@ -2019,12 +2030,32 @@ export function generateLoanStatement(account, input = {}, now = new Date()) {
   };
 }
 
-function computeEmi(principalAmount, monthlyRate, tenorMonths) {
+// Equated monthly installment in exact integer paise. The reducing-balance
+// compounding factor (1+r)^n is irrational, so it is computed in float, but the
+// EMI is rounded once to whole paise — no float rupee amount is carried between
+// installments, which is where drift accumulates (REV-20).
+function computeEmiPaise(principalPaise, monthlyRate, tenorMonths) {
   if (monthlyRate === 0) {
-    return roundMoney(principalAmount / tenorMonths);
+    return Math.round(principalPaise / tenorMonths);
   }
   const factor = (1 + monthlyRate) ** tenorMonths;
-  return roundMoney((principalAmount * monthlyRate * factor) / (factor - 1));
+  return Math.round((principalPaise * monthlyRate * factor) / (factor - 1));
+}
+
+// Reducing-balance interest for one period in exact integer paise:
+// interest = openingPaise * monthlyRate, rounded to whole paise. Deterministic
+// and independent of the Number.EPSILON rounding heuristic (REV-20).
+function interestForPeriodPaise(openingPaise, monthlyRate) {
+  if (!monthlyRate) {
+    return 0;
+  }
+  return Math.round(openingPaise * monthlyRate);
+}
+
+// Rupee-denominated EMI kept for callers that work in rupees; delegates to the
+// exact paise computation.
+function computeEmi(principalAmount, monthlyRate, tenorMonths) {
+  return fromPaise(computeEmiPaise(toPaise(principalAmount), monthlyRate, tenorMonths));
 }
 
 function dueTime(dueDate) {
@@ -2036,17 +2067,21 @@ function dueTime(dueDate) {
 // reduce_tenure mode the EMI is fixed and the loan amortizes over however many
 // installments that takes.
 function reamortizeInstallments(remainingPrincipal, monthlyRate, mode, futureDueDates, originalEmi, startNumber) {
-  const emi = mode === "reduce_emi" ? computeEmi(remainingPrincipal, monthlyRate, futureDueDates.length) : originalEmi;
+  const emiPaise =
+    mode === "reduce_emi"
+      ? computeEmiPaise(toPaise(remainingPrincipal), monthlyRate, futureDueDates.length)
+      : toPaise(originalEmi);
   const maxTerm = mode === "reduce_emi" ? futureDueDates.length : futureDueDates.length + 600;
   const installments = [];
-  let openingPrincipal = roundMoney(remainingPrincipal);
+  // Exact integer-paise principal carry (REV-20).
+  let openingPaise = toPaise(remainingPrincipal);
 
-  for (let index = 0; index < maxTerm && openingPrincipal > 0.005; index += 1) {
-    const interestDue = roundMoney(openingPrincipal * monthlyRate);
-    const scheduledPrincipal = roundMoney(Math.max(0, emi - interestDue));
-    const isFinal = mode === "reduce_emi" ? index === futureDueDates.length - 1 : scheduledPrincipal >= openingPrincipal;
-    const principalDue = isFinal ? openingPrincipal : roundMoney(Math.min(openingPrincipal, scheduledPrincipal));
-    const closingPrincipal = roundMoney(Math.max(0, openingPrincipal - principalDue));
+  for (let index = 0; index < maxTerm && openingPaise > 0; index += 1) {
+    const interestPaise = interestForPeriodPaise(openingPaise, monthlyRate);
+    const scheduledPrincipal = Math.max(0, emiPaise - interestPaise);
+    const isFinal = mode === "reduce_emi" ? index === futureDueDates.length - 1 : scheduledPrincipal >= openingPaise;
+    const principalPaise = isFinal ? openingPaise : Math.min(openingPaise, scheduledPrincipal);
+    const closingPaise = Math.max(0, openingPaise - principalPaise);
     const dueDate =
       futureDueDates[index] ??
       addMonthsUtc(new Date(`${futureDueDates[futureDueDates.length - 1]}T00:00:00.000Z`), index - futureDueDates.length + 1)
@@ -2056,14 +2091,14 @@ function reamortizeInstallments(remainingPrincipal, monthlyRate, mode, futureDue
     installments.push({
       installmentNumber: startNumber + index,
       dueDate,
-      openingPrincipal,
-      principalDue,
-      interestDue,
-      totalDue: roundMoney(principalDue + interestDue),
-      closingPrincipal,
+      openingPrincipal: fromPaise(openingPaise),
+      principalDue: fromPaise(principalPaise),
+      interestDue: fromPaise(interestPaise),
+      totalDue: fromPaise(principalPaise + interestPaise),
+      closingPrincipal: fromPaise(closingPaise),
       status: "scheduled"
     });
-    openingPrincipal = closingPrincipal;
+    openingPaise = closingPaise;
   }
 
   return installments;
