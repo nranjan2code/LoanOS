@@ -80,10 +80,23 @@ export function evaluateEligibility(application, options = {}) {
     ? product.annualInterestRateBps
     : product.aprBps;
 
-  const monthlyIncome = profile.monthlyIncome;
+  // Account Aggregator analytics (REV-31): AA-verified income supersedes the
+  // self-declared figure for affordability, and AA-derived obligations feed the
+  // obligations picture alongside declared and bureau-derived. All optional —
+  // absent AA data leaves behaviour unchanged.
+  const aaAnalytics = application.aaAnalytics ?? null;
+  const declaredMonthlyIncome = profile.monthlyIncome;
+  const aaVerifiedMonthlyIncome =
+    aaAnalytics && Number.isFinite(aaAnalytics.monthlyIncome) && aaAnalytics.monthlyIncome > 0
+      ? aaAnalytics.monthlyIncome
+      : null;
+  const monthlyIncome = Number.isFinite(aaVerifiedMonthlyIncome) ? aaVerifiedMonthlyIncome : declaredMonthlyIncome;
+  const incomeSource = Number.isFinite(aaVerifiedMonthlyIncome) ? "account_aggregator_verified" : "declared";
   const existingMonthlyObligations = Number.isFinite(profile.existingMonthlyObligations)
     ? profile.existingMonthlyObligations
     : 0;
+  const aaDerivedObligations =
+    aaAnalytics && Number.isFinite(aaAnalytics.monthlyObligations) ? Math.max(0, aaAnalytics.monthlyObligations) : 0;
 
   const minAgeYears = Number.isFinite(eligibilityPolicy.minAgeYears) ? eligibilityPolicy.minAgeYears : 18;
   const maxAgeYears = Number.isFinite(eligibilityPolicy.maxAgeYears) ? eligibilityPolicy.maxAgeYears : null;
@@ -145,7 +158,7 @@ export function evaluateEligibility(application, options = {}) {
   // Derive monthly obligations from the bureau trade lines and use the more
   // conservative of the declared and bureau-derived figures (REV-32).
   const bureauDerivedObligations = deriveBureauObligations(application);
-  const obligationsUsed = Math.max(existingMonthlyObligations, bureauDerivedObligations);
+  const obligationsUsed = Math.max(existingMonthlyObligations, bureauDerivedObligations, aaDerivedObligations);
 
   let foir = null;
   if (Number.isFinite(monthlyIncome) && monthlyIncome > 0 && Number.isFinite(estimatedEmi)) {
@@ -192,9 +205,14 @@ export function evaluateEligibility(application, options = {}) {
       requestedTenorMonths: Number.isFinite(requestedTenorMonths) ? requestedTenorMonths : null,
       annualInterestRateBps: Number.isFinite(annualInterestRateBps) ? annualInterestRateBps : null,
       monthlyIncome: Number.isFinite(monthlyIncome) ? monthlyIncome : null,
+      incomeSource,
+      declaredMonthlyIncome: Number.isFinite(declaredMonthlyIncome) ? declaredMonthlyIncome : null,
+      aaVerifiedMonthlyIncome,
       existingMonthlyObligations,
       bureauDerivedObligations,
+      aaDerivedObligations,
       obligationsUsed,
+      incomeProvenance: aaAnalytics?.provenance ?? null,
       estimatedEmi: Number.isFinite(estimatedEmi) ? estimatedEmi : null,
       foir,
       maxFoir,

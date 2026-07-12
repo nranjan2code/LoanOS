@@ -254,3 +254,86 @@ export function fetchAccountAggregatorData(consent, input = {}, now = new Date()
   const next = { ...consent, fetches, updatedAt: asOf.toISOString() };
   return { consent: next, fetch, findings, summary };
 }
+
+// Transaction categories that count as income (credits) and as debt obligations
+// (debits) when deriving underwriting facts from AA data.
+export const AA_INCOME_CATEGORIES = new Set([
+  "salary",
+  "income",
+  "business_income",
+  "pension",
+  "interest_income"
+]);
+
+export const AA_OBLIGATION_CATEGORIES = new Set([
+  "loan_emi",
+  "emi",
+  "loan_repayment",
+  "credit_card_payment",
+  "insurance_premium"
+]);
+
+// Turn consented AA financial-information data into verified income and
+// obligation facts for underwriting (REV-31). Operates on the transient FIP
+// payload — the raw data is never persisted here — and stamps every derived
+// fact with its provenance (source, consent/fetch/hash lineage, method, and the
+// observation window) so the decision path can carry it as evidence. Income is
+// the monthly average of categorised income credits; obligations the monthly
+// average of categorised obligation debits, over the observation window.
+export function deriveAaAnalytics(financialData = {}, context = {}, now = new Date()) {
+  const findings = [];
+  const accounts = Array.isArray(financialData.accounts) ? financialData.accounts : [];
+  const observationMonths =
+    Number.isFinite(financialData.observationMonths) && financialData.observationMonths > 0
+      ? financialData.observationMonths
+      : null;
+
+  if (accounts.length === 0) {
+    findings.push(createFinding("error", "RBI-DL-2025", "AA analytics require at least one account.", "accounts"));
+  }
+  if (!observationMonths) {
+    findings.push(
+      createFinding("error", "RBI-DL-2025", "AA analytics require a positive observationMonths window.", "observationMonths")
+    );
+  }
+  const preSummary = summarizeFindings(findings);
+  if (preSummary.status === "blocked") {
+    return { analytics: null, findings, summary: preSummary };
+  }
+
+  let incomeCredits = 0;
+  let obligationDebits = 0;
+  let transactionsScanned = 0;
+  for (const account of accounts) {
+    for (const txn of account.transactions ?? []) {
+      transactionsScanned += 1;
+      const amount = Number.isFinite(txn.amount) ? Math.abs(txn.amount) : 0;
+      const category = txn.category ?? null;
+      const direction = txn.direction ?? (Number(txn.amount) >= 0 ? "credit" : "debit");
+      if (direction === "credit" && AA_INCOME_CATEGORIES.has(category)) {
+        incomeCredits += amount;
+      } else if (direction === "debit" && AA_OBLIGATION_CATEGORIES.has(category)) {
+        obligationDebits += amount;
+      }
+    }
+  }
+
+  const round = (value) => Math.round(value * 100) / 100;
+  const analytics = {
+    monthlyIncome: round(incomeCredits / observationMonths),
+    monthlyObligations: round(obligationDebits / observationMonths),
+    observationMonths,
+    provenance: {
+      source: "account_aggregator",
+      consentId: context.consentId ?? null,
+      fetchId: context.fetchId ?? null,
+      dataHash: context.dataHash ?? null,
+      method: "average_of_categorised_transactions",
+      observationMonths,
+      transactionsScanned,
+      derivedAt: now.toISOString()
+    }
+  };
+
+  return { analytics, findings, summary: preSummary };
+}

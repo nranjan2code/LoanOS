@@ -31,7 +31,7 @@ cite the ID in commits and PRs.
 | REV-20 | Exact money math on the live JS path (EMI/interest/foreclosure) | C | P1 | IN PROGRESS |
 | REV-21 | NPA upgrade rule: standard only after all arrears cleared (RBI IRAC) | C | P1 | DONE |
 | REV-30 | Multi-bureau underwriting depth (bands + attributes, not one threshold) | D | P1 | DONE |
-| REV-31 | Account Aggregator → income/obligations/FOIR analytics layer | D | P1 | TODO |
+| REV-31 | Account Aggregator → income/obligations/FOIR analytics layer | D | P1 | DONE |
 | REV-32 | Bureau-derived obligations into FOIR (not only self-declared) | D | P2 | DONE |
 | REV-33 | Microfinance (MFI): household income, 50% aggregate FOIR cap, JLG | D | P2 | DECIDE |
 | REV-40 | Multi-structure amortization: honor `repaymentFrequency`; bullet/moratorium/step-up | E | P2 | TODO |
@@ -181,11 +181,27 @@ trade-line seasoning.
 while the engine is off by default, but the port is needed before a tenant runs a *custom* bureau policy
 through the engine in `active` mode. Pairs with REV-32 (feed bureau-derived obligations into FOIR).
 
-### REV-31 — Account Aggregator → income/obligations/FOIR analytics · P1 · TODO
+### REV-31 — Account Aggregator → income/obligations/FOIR analytics · P1 · DONE
 `account-aggregator.js` is consent-correct but stops at a hashed evidence record; there is no layer that
 turns AA data into verified income, obligations, and FOIR inputs to `eligibility.js`. This is the
 highest-leverage LOS gap and hard for incumbents to match on compliance grounds. **Acceptance:** an AA
 fetch produces derived income/obligation facts consumed by eligibility with provenance tags.
+**Done this session (first slice).** New `deriveAaAnalytics(financialData, context)`
+(`account-aggregator.js`) turns a transient AA financial-information payload into monthly income (average
+of categorised income credits) and monthly obligations (average of categorised obligation debits) over an
+observation window — operating on the raw data without persisting it, and stamping a provenance envelope
+(`source: account_aggregator`, consent/fetch/`dataHash` lineage, method, window, transactions scanned).
+`eligibility.js` consumes `application.aaAnalytics`: AA-verified income supersedes the self-declared
+figure for affordability, AA-derived obligations join the `max(declared, bureau, AA)` obligations picture
+(REV-32), and the assessment metrics carry `incomeSource`, `declaredMonthlyIncome`,
+`aaVerifiedMonthlyIncome`, `aaDerivedObligations`, and the `incomeProvenance` envelope. Gated on presence,
+so the differential corpus stays byte-identical and the Rust test passes. Two tests cover the derivation
+(income/obligation math + provenance + blocked-without-window) and eligibility consumption (verified
+income overriding an inflated declaration, obligations overriding an under-declaration, provenance on the
+assessment).
+**Follow-up:** transaction categorisation is caller-supplied here; a real categoriser/normaliser over FIP
+schemas (salary-identification heuristics, income stability/variance, bounce detection) is the deeper
+build. Income-stability and cash-flow signals are not yet modelled.
 
 ### REV-32 — Bureau-derived obligations into FOIR · P2 · DONE
 FOIR uses self-declared `existingMonthlyObligations`. Derive obligations from the bureau trade lines and

@@ -14,6 +14,7 @@ import {
   recordCoLendingLoanAllocation,
   createAccountAggregatorConsent,
   approveAccountAggregatorConsent,
+  deriveAaAnalytics,
   fetchAccountAggregatorData,
   revokeAccountAggregatorConsent,
   assessChargeToLoanAccount,
@@ -4868,6 +4869,86 @@ test("FOIR uses the max of declared and bureau-derived obligations (REV-32)", ()
   }));
   assert.equal(fromTradeLines.assessment.metrics.bureauDerivedObligations, 9000);
   assert.equal(fromTradeLines.assessment.metrics.obligationsUsed, 30000); // declared 30000 > derived 9000
+});
+
+test("Account Aggregator data derives income and obligations with provenance (REV-31)", () => {
+  const result = deriveAaAnalytics(
+    {
+      observationMonths: 3,
+      accounts: [
+        {
+          type: "deposit",
+          transactions: [
+            { date: "2026-05-01", amount: 90000, direction: "credit", category: "salary" },
+            { date: "2026-06-01", amount: 90000, direction: "credit", category: "salary" },
+            { date: "2026-07-01", amount: 90000, direction: "credit", category: "salary" },
+            { date: "2026-05-05", amount: 12000, direction: "debit", category: "loan_emi" },
+            { date: "2026-06-05", amount: 12000, direction: "debit", category: "loan_emi" },
+            { date: "2026-07-05", amount: 12000, direction: "debit", category: "loan_emi" },
+            { date: "2026-07-06", amount: 3000, direction: "debit", category: "groceries" } // ignored
+          ]
+        }
+      ]
+    },
+    { consentId: "aacon_1", fetchId: "aafetch_1", dataHash: "abc123" },
+    new Date("2026-07-10T00:00:00.000Z")
+  );
+
+  assert.equal(result.summary.status, "ready");
+  assert.equal(result.analytics.monthlyIncome, 90000); // 270000 / 3
+  assert.equal(result.analytics.monthlyObligations, 12000); // 36000 / 3
+  assert.equal(result.analytics.provenance.source, "account_aggregator");
+  assert.equal(result.analytics.provenance.consentId, "aacon_1");
+  assert.equal(result.analytics.provenance.dataHash, "abc123");
+  assert.equal(result.analytics.provenance.transactionsScanned, 7);
+
+  // Blocks without an observation window.
+  const bad = deriveAaAnalytics({ accounts: [{ transactions: [] }] });
+  assert.equal(bad.summary.status, "blocked");
+});
+
+test("eligibility consumes AA-verified income and obligations with provenance (REV-31)", () => {
+  const analytics = deriveAaAnalytics(
+    {
+      observationMonths: 2,
+      accounts: [
+        {
+          transactions: [
+            { amount: 30000, direction: "credit", category: "salary" },
+            { amount: 30000, direction: "credit", category: "salary" },
+            { amount: 15000, direction: "debit", category: "loan_emi" },
+            { amount: 15000, direction: "debit", category: "loan_emi" }
+          ]
+        }
+      ]
+    },
+    { consentId: "aacon_2", fetchId: "aafetch_2", dataHash: "hash2" }
+  ).analytics;
+  assert.equal(analytics.monthlyIncome, 30000);
+  assert.equal(analytics.monthlyObligations, 15000);
+
+  const app = eligibilityApplication({
+    // Borrower over-declares income and under-declares obligations.
+    economicProfile: { monthlyIncome: 120000, existingMonthlyObligations: 1000 },
+    bureauReport: { score: 800, defaultAccounts: 0 },
+    aaAnalytics: analytics,
+    product: { requestedAmount: 100000, requestedTenorMonths: 24, annualInterestRateBps: 1800, minAmount: 10000, maxAmount: 500000, eligibility: { maxFoir: 0.5 } }
+  });
+  const result = evaluateEligibility(app);
+  const metrics = result.assessment.metrics;
+
+  // AA-verified income supersedes the inflated declared figure.
+  assert.equal(metrics.incomeSource, "account_aggregator_verified");
+  assert.equal(metrics.monthlyIncome, 30000);
+  assert.equal(metrics.declaredMonthlyIncome, 120000);
+  // AA obligations (15000) beat the under-declared 1000.
+  assert.equal(metrics.aaDerivedObligations, 15000);
+  assert.equal(metrics.obligationsUsed, 15000);
+  // Provenance is carried on the assessment.
+  assert.equal(metrics.incomeProvenance.source, "account_aggregator");
+  assert.equal(metrics.incomeProvenance.consentId, "aacon_2");
+  // On verified numbers the loan is unaffordable (15000 + EMI over 30000 > 0.5).
+  assert.equal(result.assessment.decision, ELIGIBILITY_DECISIONS.INELIGIBLE);
 });
 
 test("API assesses eligibility and blocks approval of an ineligible borrower", async (t) => {
