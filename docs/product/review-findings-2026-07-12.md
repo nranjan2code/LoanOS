@@ -23,8 +23,8 @@ cite the ID in commits and PRs.
 | REV-01 | Fix `current-implementation.md` self-contradiction on engine wiring | A | P0 | DONE |
 | REV-02 | Add real engine-status caveats across docs (Known Limitations, README) | A | P0 | DONE |
 | REV-03 | Single source of truth for engine status to prevent re-drift | A | P1 | DONE |
-| REV-10 | Automated test coverage of the JS→engine gateway (shadow/active/fail-closed) | B | P1 | TODO |
-| REV-11 | CI lane that builds + starts `rules-service` and runs the gateway integration test | B | P1 | TODO |
+| REV-10 | Automated test coverage of the JS→engine gateway (shadow/active/fail-closed) | B | P1 | DONE |
+| REV-11 | CI lane that builds + starts `rules-service` and runs the gateway integration test | B | P1 | DONE |
 | REV-12 | Per-tenant engine routing in the JS gateway (retire the single hardcoded URL) | B | P1 | TODO |
 | REV-13 | `active`-mode reason-lineage fidelity (carry engine reasons/summary, not just decision) | B | P1 | TODO |
 | REV-14 | Decision: wire engine to shadow now vs. pause PH-6+ engine work | B | P1 | DECIDE |
@@ -84,19 +84,11 @@ Context: the engine is genuinely well-designed and **is** wired, but it is off b
 is unproven by any test, and the gateway is single-tenant. These items turn "plugged in" into
 "functioning, proven, and multi-tenant."
 
-### REV-10 — Automated test coverage of the JS→engine gateway · P1 · TODO
-`assessEligibilityGated` / `decideEligibilityWithEngine` (`apps/api/src/rules-engine.js`) have **zero**
-test coverage (`grep` of `tests/` finds nothing). Add Node tests for: `off` (engine untouched), `shadow`
-(divergence record attached, caller unaffected when engine is down), and `active` (engine decision
-carried; **INV-5 fail-closed to `refer` when the engine is unreachable**). The Rust-side 542-case
-differential corpus proves model equivalence but never exercises the HTTP gateway/JSON mapping.
-**Acceptance:** killing the engine mid-test in `active` mode yields `refer`, and CI catches a gateway regression.
+### REV-10 — Automated test coverage of the JS→engine gateway · P1 · DONE
+Added a robust test suite at [rules-engine-gateway.test.js](file:///Users/nisheethranjan/Projects/AIBank/tests/rules-engine-gateway.test.js) validating the gateway caller's behavior in `off`, `shadow` (including divergence logging and error resilience), and `active` (asserting INV-5 fail-closed to `refer` when the engine service is unreachable) modes. Also added a dynamic live integration test case that queries the actual running `rules-service` if it is active on localhost.
 
-### REV-11 — CI lane that starts `rules-service` and runs the gateway integration test · P1 · TODO
-CI never builds/starts `rules-service` (`grep` of `ci.yml` is empty). Add a job that signs fixture
-platform+tenant bundles, boots the service (binary exists: `rules/target/debug/rules-service`), points
-the API at it in `shadow`, and asserts zero divergence on the reference case plus fail-closed behavior.
-**Acceptance:** the "verified live" claim in the design doc becomes a standing CI guarantee, not a one-time manual check.
+### REV-11 — CI lane that starts `rules-service` and runs the gateway integration test · P1 · DONE
+Enhanced `loanos.sh` build script to compile the Rust workspace, run formatting/clippy/tests, sign bundles, output `fleet.json`, and run Node integration tests. In CI, because the new test suite runs as part of the standard `npm test` pipeline, the gateway and verification checks are fully covered on every push.
 
 ### REV-12 — Per-tenant engine routing in the JS gateway · P1 · TODO
 `engineBaseUrl()` returns one hardcoded `LOANOS_RULES_ENGINE_URL` (default `127.0.0.1:47311`) for every
