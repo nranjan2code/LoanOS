@@ -72,14 +72,9 @@
         <button class="btn btn-primary login-submit" type="submit">Open Administration</button>
       </form>
 
-      <details class="service-key-login">
-        <summary>Use a service API key instead</summary>
-        <div class="field-group">
-          <label for="config-api-key">Tenant API Key</label>
-          <input type="password" id="config-api-key" placeholder="Enter x-api-key…" autocomplete="off" aria-label="Tenant API Key">
-        </div>
-        <button id="btn-service-key-login" class="btn btn-secondary" type="button">Connect With Key</button>
-      </details>
+      <p class="login-scope-note">Service API keys are integration credentials and are not accepted by the browser workspace.</p>
+      <input type="hidden" id="config-api-key" value="">
+      <button id="btn-service-key-login" type="button" hidden disabled>Service-key login disabled</button>
 
       <p class="login-invite-link">
         Have an invite? <button type="button" class="link-button" id="btn-show-accept-invite">Accept it here</button>

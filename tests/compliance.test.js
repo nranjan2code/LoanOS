@@ -18,6 +18,7 @@ import {
   fetchAccountAggregatorData,
   revokeAccountAggregatorConsent,
   assessChargeToLoanAccount,
+  acceptKfs,
   attachKfs,
   buildAuditEvidencePack,
   buildKeyFactStatement,
@@ -248,12 +249,12 @@ test("KFS acceptance and delivery evidence gates sanction readiness", () => {
     coolingOffDays: 1,
     recoveryMechanism: "NACH debit to RE account"
   });
-  const withoutAcceptance = attachKfs(app, kfs);
-  const withAcceptance = attachKfs(app, kfs, {
-    acceptedAt: "2026-07-08T07:00:00.000Z",
-    deliveryChannel: "email",
-    deliveryRef: "email_msg_123"
-  });
+  const withoutAcceptance = attachKfs(app, { ...kfs, deliveryRef: "email_msg_123" });
+  const withAcceptance = acceptKfs(withoutAcceptance, {
+    acceptedBy: "bor_001",
+    acceptanceChannel: "borrower_portal",
+    acceptanceEvidenceRef: "session:test:proposal"
+  }).application;
 
   assert.equal(validateKfsBeforeDecision(withoutAcceptance).summary.status, "blocked");
   assert.equal(validateKfsBeforeDecision(withAcceptance).summary.status, "ready");
@@ -270,11 +271,11 @@ test("bank account verification evidence gates disbursement readiness", () => {
     recoveryMechanism: "NACH debit to RE account"
   });
   const approved = {
-    ...attachKfs(app, kfs, {
-      acceptedAt: "2026-07-08T07:00:00.000Z",
-      deliveryChannel: "email",
-      deliveryRef: "email_msg_123"
-    }),
+    ...acceptKfs(attachKfs(app, { ...kfs, deliveryRef: "email_msg_123" }), {
+      acceptedBy: "bor_001",
+      acceptanceChannel: "borrower_portal",
+      acceptanceEvidenceRef: "session:test:proposal"
+    }).application,
     status: "approved"
   };
 
@@ -1250,9 +1251,8 @@ test("product policy rejects invalid interest method and APR inconsistency", () 
   const explicitReducing = upsert({ interestCalcMethod: "reducing_balance" });
   assert.equal(explicitReducing.summary.status, "ready");
 
-  // APR below the computed floor: charge with chargeFrequency:"once" and amount:12000 on a
-  // ₹1,00,000 reference principal = 1200 bps annual floor. annualInterestRateBps=1800 + 1200 = 3000.
-  // aprBps=2100 < 3000 → blocked.
+  // Fixed charges cannot be converted to a product-level APR using an invented
+  // reference principal. The application KFS computes the authoritative IRR.
   const aprBelowFloor = upsert({
     charges: [
       {
@@ -1266,8 +1266,7 @@ test("product policy rejects invalid interest method and APR inconsistency", () 
     annualInterestRateBps: 1800,
     aprBps: 2100
   });
-  assert.equal(aprBelowFloor.summary.status, "blocked");
-  assert(aprBelowFloor.findings.some((f) => f.path === "aprBps" && f.controlId === "RBI-KFS-2024"));
+  assert.equal(aprBelowFloor.summary.status, "ready");
 
   // APR meets the floor: same charge but aprBps raised to cover it.
   const aprMeetsFloor = upsert({
@@ -1823,7 +1822,14 @@ test("legal-entity borrower resolution requires a verified beneficial owner abov
     merge(validBorrowerProfile(), {
       borrowerId: "bor_company_001",
       borrowerType: "company",
-      legalName: "Example Textiles Pvt Ltd"
+      legalName: "Example Textiles Pvt Ltd",
+      beneficialOwnershipDeclaration: {
+        complete: true,
+        noNaturalOwnerIdentified: false,
+        verifiedAt: "2026-06-01T00:00:00.000Z",
+        verifiedBy: "compliance-analyst-1",
+        evidenceRef: "bo_declaration_001"
+      }
     })
   );
   assert.equal(borrowerResult.summary.status, "ready");
@@ -2353,7 +2359,14 @@ test("API blocks a legal-entity borrower's application until a qualifying benefi
         residencyCountry: "IN",
         primaryAddressCountry: "IN",
         contact: { email: "finance@exampletextiles.in" },
-        economicProfile: { monthlyIncome: 900000 }
+        economicProfile: { monthlyIncome: 900000 },
+        beneficialOwnershipDeclaration: {
+          complete: true,
+          noNaturalOwnerIdentified: false,
+          verifiedAt: "2026-06-01T00:00:00.000Z",
+          verifiedBy: "compliance-analyst-1",
+          evidenceRef: "bo_declaration_001"
+        }
       })
     ).status,
     201
@@ -5867,10 +5880,10 @@ test("incident reporting clock breaches after the 6-hour CERT-In/RBI window", ()
   );
   assert.equal(created.summary.status, "ready");
   const incident = created.incident;
-  // Reportable to both authorities by default, each on a 6-hour clock.
+  // Data breaches also trigger DPDP Board and affected-person notices.
   assert.deepEqual(
     incident.reporting.map((clock) => clock.authority).sort(),
-    ["cert_in", "rbi"]
+    ["affected_data_principals", "cert_in", "dpdp_board_detailed", "dpdp_board_initial", "rbi"]
   );
 
   // Within the window, unreported, the clock is on track.
@@ -6168,6 +6181,11 @@ test("API gates third-party data sharing on consent and logs statutory disclosur
       purpose: "third_party_sharing",
       status: "granted",
       noticeVersion: "dpdp-notice-v1",
+      purposeDescription: "Share the listed data with the named LSP for loan servicing.",
+      dataCategories: ["contact", "loan_account"],
+      recipients: ["PartnerCo LSP"],
+      retentionPeriod: "For the servicing engagement and statutory retention period.",
+      withdrawalMechanism: "Borrower portal privacy controls.",
       acceptedAt: "2026-07-08T06:30:00.000Z"
     })).status,
     201
@@ -6538,7 +6556,7 @@ test("API stamps every sealed audit event with tenant provenance", async (t) => 
       (event) => event.actorType && event.dataClass && Object.hasOwn(event, "actor")
     )
   );
-  assert.ok(events.events.every((event) => event.actorType === "tenant"));
+  assert.ok(events.events.every((event) => ["tenant", "borrower"].includes(event.actorType)));
   // A borrower event is personal data; a disbursement is financial.
   const borrowerEvent = events.events.find((event) => event.type === "borrower_profile.upserted");
   assert.equal(borrowerEvent.dataClass, "personal_data");
@@ -6822,6 +6840,13 @@ function validApplication() {
     kyc: {
       status: "verified",
       riskCategory: "low",
+      screenedAt: "2026-07-08T06:44:00.000Z",
+      screening: {
+        status: "clear",
+        screenedAt: "2026-07-08T06:44:00.000Z",
+        evidenceRef: "aml_screening_001",
+        sources: ["unsc", "uapa", "pep"]
+      },
       aadhaar: {
         biometricStored: false,
         otpStored: false,
@@ -7177,6 +7202,10 @@ function validConsentRecord() {
     purpose: "data_processing",
     status: "granted",
     noticeVersion: "dpdp-notice-v1",
+    purposeDescription: "Process identity, financial and contact data to originate and service this loan.",
+    dataCategories: ["identity", "contact", "financial", "kyc"],
+    retentionPeriod: "For the loan relationship and applicable statutory retention periods.",
+    withdrawalMechanism: "Borrower portal privacy controls or grievance officer request.",
     acceptedAt: "2026-07-08T06:30:00.000Z",
     channel: "web",
     evidenceRef: "consent_click_001"
@@ -7193,6 +7222,12 @@ function validKycRecord() {
     verifiedAt: "2026-07-08T06:45:00.000Z",
     expiresAt: "2027-07-08T06:45:00.000Z",
     ckycRef: "ckyc_001",
+    screening: {
+      status: "clear",
+      screenedAt: "2026-07-08T06:44:00.000Z",
+      evidenceRef: "aml_screening_001",
+      sources: ["unsc", "uapa", "pep"]
+    },
     aadhaar: {
       biometricStored: false,
       otpStored: false,
@@ -7468,6 +7503,13 @@ function close(server) {
 }
 
 async function postJson(url, payload, apiKey) {
+  // KFS is a two-step borrower ceremony in the greenfield API. Keep the
+  // numerous end-to-end workflow scenarios concise while exercising both
+  // issuance and authenticated acceptance.
+  if (/\/loans\/applications\/[^/]+\/kfs$/.test(url) && payload?.acceptance) {
+    const applicationId = decodeURIComponent(url.split("/").at(-2));
+    return issueAndAcceptKfs(url.slice(0, url.indexOf("/loans/applications/")), applicationId);
+  }
   const response = await apiFetch(
     url,
     {
@@ -7484,6 +7526,45 @@ async function postJson(url, payload, apiKey) {
     status: response.status,
     body
   };
+}
+
+async function issueAndAcceptKfs(base, applicationId, borrower = null) {
+  const issued = await postJson(`${base}/loans/applications/${applicationId}/kfs`, {});
+  assert.equal(issued.status, 201, JSON.stringify(issued.body));
+  assert.equal(issued.body.status, "kfs_issued");
+  borrower ??= issued.body.borrower;
+
+  const challenge = await postJson(`${base}/auth/borrower-challenge`, {
+    tenantId: TENANT_A.tenantId,
+    borrowerId: borrower.borrowerId,
+    email: borrower.contact.email
+  }, null);
+  assert.equal(challenge.status, 202);
+  assert.ok(challenge.body.debugCode);
+
+  const loginResponse = await rawFetch(`${base}/auth/borrower-connect`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      tenantId: TENANT_A.tenantId,
+      borrowerId: borrower.borrowerId,
+      email: borrower.contact.email,
+      code: challenge.body.debugCode
+    })
+  });
+  assert.equal(loginResponse.status, 200);
+  const acceptedResponse = await rawFetch(`${base}/loans/applications/${applicationId}/kfs/accept`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      cookie: sessionCookieHeader(loginResponse)
+    },
+    body: "{}"
+  });
+  const accepted = await acceptedResponse.json();
+  assert.equal(acceptedResponse.status, 200);
+  assert.equal(accepted.status, "ready_for_decision");
+  return { status: 201, body: accepted };
 }
 
 function sessionCookieHeader(response) {
@@ -7509,7 +7590,7 @@ async function createRegistryBackedApplication(base, overrides = {}) {
     disbursement: validApplication().disbursement,
     repayment: validApplication().repayment
   });
-  assert.equal(response.status, 201);
+  assert.equal(response.status, 201, JSON.stringify(response.body));
   assert.equal(response.body.status, "ready_for_kfs");
   return response.body;
 }
@@ -7878,17 +7959,13 @@ test("KFS grounding validation checks prevent undisclosed or exceeding charges",
   
   // Compliant KFS
   const validKfs = {
-    currency: "INR",
-    aprBps: 2100,
-    principalAmount: 125000,
-    tenorMonths: 12,
-    coolingOffDays: 1,
-    grievanceOfficer: { name: "Grievance Officer", email: "grievance@bank.com" },
-    recoveryMechanism: "NACH debit to RE account",
-    charges: [{ name: "Processing fee", reason: "One-time processing charge disclosed upfront", amount: 1000, type: "fixed" }],
-    penalCharges: [{ name: "Late payment charge", reason: "Repayment default", amount: 500, type: "penal_charge", capitalizes: false }],
-    prepaymentPolicy: { allowed: true, chargeBps: 0, lockInMonths: 0 },
-    foreclosurePolicy: { allowed: true, chargeBps: 0, lockInMonths: 0 },
+    ...buildKeyFactStatement(merge(validApplication(), { product: { ...product, requestedAmount: 125000, requestedTenorMonths: 12 } }), {
+      principalAmount: 125000,
+      tenorMonths: 12,
+      annualInterestRateBps: product.annualInterestRateBps,
+      charges: product.charges,
+      penalCharges: product.penalCharges
+    }),
     acceptedAt: "2026-07-08T07:00:00.000Z",
     deliveryRef: "delivery_ref_1"
   };
@@ -8145,7 +8222,8 @@ test("CKYC Search, Download, and Upload flow", async (t) => {
     status: "verified",
     riskCategory: "medium",
     verifiedAt: new Date().toISOString(),
-    method: "manual"
+    method: "manual",
+    screening: validKycRecord().screening
   };
   const seedKyc = await postJson(`${base}/borrowers/bor_002/kyc-records`, kycInput);
   assert.equal(seedKyc.status, 201);
@@ -8190,6 +8268,7 @@ test("V-CIP Evidence Vault and validation checks", async (t) => {
 
   // 1. Submit valid V-CIP evidence
   const validVcip = {
+    screening: validKycRecord().screening,
     vCip: {
       storageCountry: "IN",
       videoRecordingHash: "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f61234",
@@ -8850,7 +8929,14 @@ test("API supports complete erasure fulfillment and automated data-retention cle
     primaryAddressCountry: "IN",
     primaryAddress: "Mumbai, India",
     contact: { email: "corp@retention.in", mobile: "9876543210" },
-    economicProfile: { monthlyIncome: 500000 }
+    economicProfile: { monthlyIncome: 500000 },
+    beneficialOwnershipDeclaration: {
+      complete: true,
+      noNaturalOwnerIdentified: false,
+      verifiedAt: "2026-07-08T00:00:00.000Z",
+      verifiedBy: "kyc-officer-1",
+      evidenceRef: "bo_decl_ret_001"
+    }
   });
   assert.equal(borRes.status, 201);
 
@@ -8874,6 +8960,7 @@ test("API supports complete erasure fulfillment and automated data-retention cle
     verifiedAt: "2026-07-08T00:00:00.000Z",
     expiresAt: "2027-07-08T00:00:00.000Z",
     ckycRef: "ckyc_ret_001",
+    screening: validKycRecord().screening,
     aadhaar: { biometricStored: false, otpStored: false, pidStored: false },
     vCip: {
       used: true,
@@ -8948,7 +9035,8 @@ test("API supports complete erasure fulfillment and automated data-retention cle
     riskCategory: "low",
     verifiedAt: "2026-07-08T00:00:00.000Z",
     expiresAt: "2027-07-08T00:00:00.000Z",
-    ckycRef: "ckyc_clean_001"
+    ckycRef: "ckyc_clean_001",
+    screening: validKycRecord().screening
   });
   assert.equal(kycARes.status, 201);
 
@@ -9181,7 +9269,8 @@ test("API locks AI model-use evidence on decision and isolates from subsequent u
     riskCategory: "low",
     verifiedAt: "2026-07-08T00:00:00.000Z",
     expiresAt: "2027-07-08T00:00:00.000Z",
-    ckycRef: "ckyc_model_001"
+    ckycRef: "ckyc_model_001",
+    screening: validKycRecord().screening
   });
 
   await postJson(`${base}/borrowers/bor_model_test/consents`, {

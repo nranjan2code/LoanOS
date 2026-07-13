@@ -230,6 +230,7 @@ export function normalizeSessions(sessions = {}) {
       roles: normalizeStringList(session.roles),
       status: session.status ?? "active",
       restricted: session.restricted ?? null,
+      challengePurpose: session.challengePurpose ?? null,
       createdAt: session.createdAt ?? null,
       expiresAt: session.expiresAt ?? null,
       lastSeenAt: session.lastSeenAt ?? null,
@@ -367,7 +368,7 @@ export function resolveSessionRecord(state, token, now = new Date()) {
     }
     return { session, tenant };
   }
-  if (session.principalType === "borrower") {
+  if (session.principalType === "borrower" || session.principalType === "borrower_challenge") {
     const tenant = state.controlPlane.tenants?.[session.tenantId];
     if (!tenant || tenant.status !== "active") {
       return null;
@@ -400,6 +401,14 @@ export function resolveSession(state, token, now = new Date()) {
   const record = resolveSessionRecord(state, token, now);
   if (!record) return null;
   if (record.session.principalType === "platform_user") {
+    return record;
+  }
+  if (record.session.principalType === "borrower") {
+    const borrower = state?.tenants?.[record.session.tenantId]?.borrowerProfiles?.[record.session.userId];
+    if (!borrower || borrower.status !== "active") return null;
+    return { session: record.session, tenant: record.tenant, user: borrower };
+  }
+  if (record.session.principalType === "borrower_challenge") {
     return record;
   }
   const user = resolveSessionUser(state?.tenants?.[record.session.tenantId], record.session);

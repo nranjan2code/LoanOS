@@ -28,6 +28,7 @@ const RESERVED_FIELDS = new Set([
 export const AUDIT_ACTOR_TYPES = {
   TENANT: "tenant",
   TENANT_USER: "tenant_user",
+  BORROWER: "borrower",
   PLATFORM_STAFF: "platform_staff",
   SYSTEM: "system"
 };

@@ -9,7 +9,7 @@ Date of research baseline: 2026-07-08.
 | ID | Control family | Why it matters | Implementation anchor |
 | --- | --- | --- | --- |
 | RBI-DL-2025 | Digital lending conduct | Governs digital lending by banks, co-operative banks, NBFCs including HFCs, and All-India Financial Institutions. | `packages/core/src/compliance-controls.js`, loan application preflight, KFS issuance, fund-flow gates |
-| RBI-KFS-2024 | Key Facts Statement | Requires standardized disclosure of APR, fees, charges, recovery, cooling-off, grievance, and other key terms before execution. | `buildKeyFactStatement`, `validateKfsBeforeDecision` |
+| RBI-KFS-2024 | Key Facts Statement | Requires standardized disclosure of cash-flow APR, amortisation, fees, charges, recovery, cooling-off, grievance and other key terms before execution. | Server-grounded `buildKeyFactStatement`, proposal delivery, authenticated `acceptKfs`, `validateKfsBeforeDecision` |
 | RBI-KYC-2016 | KYC, AML, CFT, V-CIP, recordkeeping | Requires customer acceptance, risk management, CDD, FIU-IND reporting support, record management, and India-hosted V-CIP data. | KYC state machine, CKYC/CERSAI integration, V-CIP evidence vault |
 | RBI-FPC-PENAL | Fair lending and penal charges | Penal charges must be reasonable, non-discriminatory, not capitalized, and disclosed upfront in KFS/MITC/loan agreement. | KFS fee registry, penal-charge policy engine |
 | RBI-FUND-FLOW | Direct fund flow | LSP/DLA cannot control disbursement/repayment flows except limited allowed cases. | Disbursement and collection account validator |
@@ -26,7 +26,7 @@ Date of research baseline: 2026-07-08.
 | RBI-MRM-DRAFT-2026 | Model risk management and AI kill switch | Draft guidance indicates broad model inventory, validation, human oversight, customer-facing AI safeguards, and kill-switch/override controls. | AI model registry, kill switch, model use guard |
 | FREE-AI-2025 | Responsible and ethical AI | RBI committee report recommends trust, people-first AI, fairness, accountability, explainability, resilience, red-teaming, incident reporting. | AI governance policy, model tests, incident process |
 | DPDP-2023 | Digital personal data protection | Digital personal data processing needs lawful purpose, notice/consent where applicable, principal rights, breach response, fiduciary duties. | Consent ledger, data minimization, retention/deletion workflow |
-| DPDP-RULES-2025 | DPDP implementation rules | Operationalizes notice, consent manager, breach notice, Data Protection Board, phased commencement. | Consent UX/API, breach workflow, DPBI reporting evidence |
+| DPDP-RULES-2025 | DPDP implementation rules | Operationalizes granular notice/consent and breach notice to affected principals and the Data Protection Board. | Consent ledger; immediate and 72-hour breach reporting clocks |
 | UIDAI-AADHAAR | Aadhaar/e-KYC constraints | Aadhaar biometrics/OTP/PID must not be stored on permanent storage; authentication must follow UIDAI controls. | Aadhaar connector boundaries, no biometric persistence test |
 | CERSAI-CKYC | CKYC and security interest registries | CKYC supports reusable KYC records; CERSAI security interest registry matters for secured lending. | CKYC fetch/upload, SI registration/satisfaction workflows |
 | RBI-PAY-DATA | Payment-system data storage | Payment system data must be stored only in India for payment system providers. | Payment vendor eligibility, payment log residency |
@@ -67,4 +67,3 @@ Date of research baseline: 2026-07-08.
 10. LWS must preserve approvals, exceptions, committee decisions, audit evidence, and customer notices.
 11. LoanOS as a SaaS vendor is itself inside the regulatory perimeter: RE customers can only buy the platform if it satisfies their IT-outsourcing obligations (due diligence, audit rights, incident notification, BCP/DR, exit plan), and LoanOS carries direct CERT-In and DPDP-processor duties. See the SaaS tenancy and operating model document.
 12. Tenant isolation is a compliance control, not only an engineering concern: a cross-tenant data leak between two REs is a reportable event for both customers.
-

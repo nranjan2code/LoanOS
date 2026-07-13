@@ -3,10 +3,9 @@ import { createLoanId } from "./loan-policy.js";
 
 // A security/data incident inside a tenant's perimeter carries statutory
 // reporting duties the RE (and LoanOS as its IT service provider) must meet on a
-// hard clock: the CERT-In 2022 directions require reporting within 6 hours of
-// noticing, and RBI's cyber-incident expectations run to the same 6-hour window.
-// This module tracks each incident and an independent reporting clock per
-// authority so a breach of either duty is detectable at read time.
+// hard clock. CERT-In/RBI reporting is tracked alongside the DPDP Rules 2025
+// data-breach duties: affected-principal and initial Board notice without
+// delay, followed by the detailed Board submission within 72 hours.
 
 export const INCIDENT_STATUSES = {
   OPEN: "open",
@@ -26,10 +25,14 @@ export const INCIDENT_CATEGORIES = [
 
 export const INCIDENT_SEVERITIES = ["low", "medium", "high", "critical"];
 
-// Both authorities operate on a 6-hour-from-detection window.
+// Each statutory recipient has its own clock. A zero-hour target represents
+// the Rules' "without delay" duty and becomes overdue immediately until logged.
 export const INCIDENT_REPORTING_TARGETS = {
   cert_in: { authority: "cert_in", policyId: "certin.2022.6_hour.v1", targetHours: 6 },
-  rbi: { authority: "rbi", policyId: "rbi.cyber_incident.6_hour.v1", targetHours: 6 }
+  rbi: { authority: "rbi", policyId: "rbi.cyber_incident.6_hour.v1", targetHours: 6 },
+  affected_data_principals: { authority: "affected_data_principals", policyId: "dpdp.rules.2025.rule7.without_delay", targetHours: 0 },
+  dpdp_board_initial: { authority: "dpdp_board_initial", policyId: "dpdp.rules.2025.rule7.initial_without_delay", targetHours: 0 },
+  dpdp_board_detailed: { authority: "dpdp_board_detailed", policyId: "dpdp.rules.2025.rule7.72_hour", targetHours: 72 }
 };
 
 const REPORTABLE_AUTHORITIES = new Set(Object.keys(INCIDENT_REPORTING_TARGETS));
@@ -162,12 +165,13 @@ export function computeIncidentReportingClock(incident, authority, asOf = new Da
 
 function normalizeIncident(input, existing = {}, now = new Date()) {
   const detectedAt = normalizeDate(input.detectedAt) ?? normalizeDate(existing.detectedAt) ?? now;
-  const reportableTo = normalizeReportableTo(input.reportableTo ?? existing.reportableTo);
+  const category = input.category ?? existing.category ?? null;
+  const reportableTo = normalizeReportableTo(input.reportableTo ?? existing.reportableTo, category);
   return {
     ...existing,
     incidentId: input.incidentId ?? existing.incidentId ?? createLoanId("inc"),
     status: input.status ?? existing.status ?? INCIDENT_STATUSES.OPEN,
-    category: input.category ?? existing.category ?? null,
+    category,
     severity: input.severity ?? existing.severity ?? null,
     summary: input.summary ?? existing.summary ?? null,
     description: input.description ?? existing.description ?? null,
@@ -185,9 +189,11 @@ function normalizeIncident(input, existing = {}, now = new Date()) {
 
 // Default to both statutory authorities unless the caller narrows the set; an
 // incident that reaches this workflow is presumed reportable.
-function normalizeReportableTo(value) {
+function normalizeReportableTo(value, category) {
   if (!Array.isArray(value) || value.length === 0) {
-    return [...REPORTABLE_AUTHORITIES];
+    return category === "data_breach"
+      ? ["cert_in", "rbi", "affected_data_principals", "dpdp_board_initial", "dpdp_board_detailed"]
+      : ["cert_in", "rbi"];
   }
   return value.filter((authority) => REPORTABLE_AUTHORITIES.has(authority));
 }

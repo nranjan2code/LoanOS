@@ -573,30 +573,6 @@ export function generateDlaCimsExport(digitalLendingApps = {}, regulatedEntities
   };
 }
 
-// Compute the annualised mandatory charge cost in basis points from a charges array.
-// Only charges with an explicit chargeFrequency of "once", "monthly", or "annual"
-// and a positive numeric amount are included — ad-hoc or contingent charges are excluded.
-// The result is added to annualInterestRateBps to derive the minimum permissible aprBps.
-function computeAnnualisedChargeBps(charges, principalHint = 100000) {
-  if (!Array.isArray(charges) || principalHint <= 0) return 0;
-  let annualSum = 0;
-  for (const c of charges) {
-    const amount = Number.isFinite(c.amount) ? c.amount : 0;
-    if (amount <= 0) continue;
-    const freq = c.chargeFrequency;
-    if (freq === "once") {
-      annualSum += amount; // paid once over life; conservative: treat as annual cost in year 1
-    } else if (freq === "monthly") {
-      annualSum += amount * 12;
-    } else if (freq === "annual") {
-      annualSum += amount;
-    }
-    // charges without a chargeFrequency are not included in the floor calculation
-  }
-  // Convert absolute INR annual sum to annualised bps relative to a reference principal
-  return Math.round((annualSum / principalHint) * 10000);
-}
-
 export function validateProductPolicy(product, regulatedEntities = {}) {
   const findings = [];
 
@@ -661,22 +637,9 @@ export function validateProductPolicy(product, regulatedEntities = {}) {
     }
   }
 
-  // APR mathematical floor: aprBps must cover annualInterestRateBps plus the annualised sum of
-  // all mandatory upfront charges that carry a known chargeFrequency.
-  if (Number.isFinite(product?.aprBps) && Number.isFinite(product?.annualInterestRateBps)) {
-    const annualisedChargeBps = computeAnnualisedChargeBps(product?.charges ?? []);
-    const aprFloor = product.annualInterestRateBps + annualisedChargeBps;
-    if (product.aprBps < aprFloor) {
-      findings.push(
-        createFinding(
-          "error",
-          "RBI-KFS-2024",
-          `Product aprBps (${product.aprBps}) is below the computed floor of annualInterestRateBps + annualised mandatory charges (${aprFloor}). APR must reflect the full cost of credit.`,
-          "aprBps"
-        )
-      );
-    }
-  }
+  // Product APR is indicative because a fixed fee has no meaningful bps
+  // conversion without the actual principal and cash-flow dates. The issued
+  // KFS computes authoritative APR from the application-specific cash flows.
 
   // Mandatory pricing policy reference.
   if (!product?.policyRefs?.pricingPolicyRef) {

@@ -279,6 +279,8 @@ function buildKfsDocument(application, generatedAt) {
     ["Lender", kfs.lenderName],
     ["Borrower ID", kfs.borrowerId],
     ["Application ID", kfs.applicationId],
+    ["Proposal number", kfs.proposalNumber],
+    ["Proposal valid until", kfs.validUntil],
     ["Product", kfs.productCode],
     ["Principal", money(kfs.principalAmount, kfs.currency)],
     ["Tenor", `${kfs.tenorMonths} months`],
@@ -305,6 +307,22 @@ function buildKfsDocument(application, generatedAt) {
     : "";
   const body = [
     tableHtml(rows),
+    heading("APR computation sheet"),
+    tableHtml([
+      ["Method", kfs.aprComputation?.method],
+      ["Amount disbursed", money(kfs.aprComputation?.amountDisbursed, kfs.currency)],
+      ["Mandatory upfront charges", money(kfs.aprComputation?.mandatoryUpfrontCharges, kfs.currency)],
+      ["Number of instalments", kfs.aprComputation?.installmentCount],
+      ["Total repayment amount", money(kfs.aprComputation?.totalRepaymentAmount, kfs.currency)]
+    ]),
+    heading("Amortisation schedule"),
+    tableHtml([
+      ["Instalment", "Due date / Opening / Principal / Interest / Total / Closing"],
+      ...(kfs.amortizationSchedule ?? []).map((row) => [
+        row.installmentNumber,
+        `${row.dueDate} / ${money(row.openingPrincipal, kfs.currency)} / ${money(row.principalDue, kfs.currency)} / ${money(row.interestDue, kfs.currency)} / ${money(row.totalDue, kfs.currency)} / ${money(row.closingPrincipal, kfs.currency)}`
+      ])
+    ]),
     heading("Charges and Penal Charges"),
     charges.length ? tableHtml(charges.map(chargeLine)) : paragraph("No charges disclosed."),
     gstNote

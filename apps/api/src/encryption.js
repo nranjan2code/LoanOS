@@ -15,9 +15,9 @@ import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from "node:cr
 // renders its data unrecoverable even if the root key survives. The root key
 // itself is never written to disk.
 //
-// Encryption is OPT-IN: with no LOANOS_MASTER_KEY configured the store writes
-// plaintext exactly as before (dev/test default). When a key IS configured,
-// tenant partitions are transparently encrypted on save and decrypted on load.
+// File storage may remain plaintext only in development and test. Production
+// file storage fails at startup without a master key; production deployments
+// should use Postgres with independently evidenced database encryption.
 
 const ALG = "aes-256-gcm";
 const ENVELOPE_VERSION = "v1";
@@ -32,7 +32,12 @@ const HKDF_SALT = Buffer.from("loanos-hkdf-salt-v1");
 // Parse LOANOS_MASTER_KEY as 32 raw bytes from hex (64 chars) or base64.
 export function getMasterKey(env = process.env) {
   const raw = env.LOANOS_MASTER_KEY;
-  if (!raw) return null;
+  if (!raw) {
+    if (env.NODE_ENV === "production" && (env.LOANOS_STORAGE_DRIVER ?? "file") === "file") {
+      throw new Error("LOANOS_MASTER_KEY is required for production file storage.");
+    }
+    return null;
+  }
   let key;
   if (/^[0-9a-fA-F]{64}$/.test(raw)) {
     key = Buffer.from(raw, "hex");

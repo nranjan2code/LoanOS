@@ -5,7 +5,7 @@ const ACTIVE_STATUS = "active";
 const GRANTED_STATUS = "granted";
 const VERIFIED_KYC_STATUS = "verified";
 const CONSENT_PURPOSES = new Set(["data_processing", "third_party_sharing", "credit_bureau", "ckyc", "communications"]);
-const BORROWER_TYPES = new Set(["individual", "sole_proprietor", "company", "partnership", "llp", "trust"]);
+const BORROWER_TYPES = new Set(["individual", "sole_proprietor", "company", "partnership", "llp", "trust", "unincorporated_association"]);
 
 // The RBI KYC Master Direction requires periodic updation of KYC on a
 // risk-based cycle. Once a verified record passes its review-due date it is no
@@ -115,6 +115,15 @@ export function normalizeBorrowerProfile(input, now = new Date(), options = {}) 
       employerName: input.economicProfile?.employerName ?? null,
       incomeEvidenceRef: input.economicProfile?.incomeEvidenceRef ?? null
     },
+    beneficialOwnershipDeclaration: input.beneficialOwnershipDeclaration
+      ? {
+          complete: input.beneficialOwnershipDeclaration.complete === true,
+          noNaturalOwnerIdentified: input.beneficialOwnershipDeclaration.noNaturalOwnerIdentified === true,
+          verifiedAt: input.beneficialOwnershipDeclaration.verifiedAt ?? null,
+          verifiedBy: input.beneficialOwnershipDeclaration.verifiedBy ?? null,
+          evidenceRef: input.beneficialOwnershipDeclaration.evidenceRef ?? null
+        }
+      : null,
     isSynthetic: input.isSynthetic === true || (options.isSandbox && input.isSynthetic !== false),
     createdAt: input.createdAt ?? now.toISOString(),
     updatedAt: now.toISOString()
@@ -155,6 +164,21 @@ export function validateConsentRecord(record) {
   if (!record?.noticeVersion) {
     findings.push(createFinding("error", "DPDP-RULES-2025", "noticeVersion is required.", "noticeVersion"));
   }
+  if (!record?.purposeDescription) {
+    findings.push(createFinding("error", "DPDP-RULES-2025", "Consent must state the specific processing purpose in plain language.", "purposeDescription"));
+  }
+  if (!Array.isArray(record?.dataCategories) || record.dataCategories.length === 0) {
+    findings.push(createFinding("error", "DPDP-RULES-2025", "Consent must identify each category of personal data requested.", "dataCategories"));
+  }
+  if (!record?.retentionPeriod) {
+    findings.push(createFinding("error", "DPDP-RULES-2025", "Consent must disclose the applicable retention period or criterion.", "retentionPeriod"));
+  }
+  if (!record?.withdrawalMechanism) {
+    findings.push(createFinding("error", "DPDP-RULES-2025", "Consent must provide a withdrawal mechanism comparable to the grant flow.", "withdrawalMechanism"));
+  }
+  if (record?.purpose === "third_party_sharing" && (!Array.isArray(record.recipients) || record.recipients.length === 0)) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Third-party sharing consent must identify the recipients or recipient classes.", "recipients"));
+  }
   if (!["granted", "revoked", "pending_verification"].includes(record?.status)) {
     findings.push(createFinding("error", "DPDP-2023", "Consent status must be granted, revoked, or pending_verification.", "status"));
   }
@@ -178,6 +202,11 @@ export function normalizeConsentRecord(input, now = new Date()) {
     purpose: input.purpose ?? "data_processing",
     status: input.status ?? GRANTED_STATUS,
     noticeVersion: input.noticeVersion,
+    purposeDescription: input.purposeDescription ?? null,
+    dataCategories: Array.isArray(input.dataCategories) ? [...new Set(input.dataCategories)] : [],
+    recipients: Array.isArray(input.recipients) ? [...new Set(input.recipients)] : [],
+    retentionPeriod: input.retentionPeriod ?? null,
+    withdrawalMechanism: input.withdrawalMechanism ?? null,
     lawfulBasis: input.lawfulBasis ?? "consent",
     acceptedAt: input.acceptedAt ?? input.dataProcessingAcceptedAt ?? null,
     revokedAt: input.revokedAt ?? null,
@@ -232,6 +261,25 @@ export function validateKycRecord(record, now = new Date()) {
   }
   if (record?.status === VERIFIED_KYC_STATUS && !record?.verifiedAt) {
     findings.push(createFinding("error", "RBI-KYC-2016", "Verified KYC requires verifiedAt.", "verifiedAt"));
+  }
+  if (record?.status === VERIFIED_KYC_STATUS) {
+    const screening = record.screening;
+    const requiredSources = ["unsc", "uapa", "pep"];
+    if (screening?.status !== "clear" || !screening.screenedAt || !screening.evidenceRef) {
+      findings.push(
+        createFinding(
+          "error",
+          "RBI-KYC-2016",
+          "Verified KYC requires clear sanctions/PEP screening with timestamp and evidence.",
+          "screening"
+        )
+      );
+    }
+    for (const source of requiredSources) {
+      if (!screening?.sources?.includes(source)) {
+        findings.push(createFinding("error", "RBI-KYC-2016", `Verified KYC screening must include ${source.toUpperCase()}.`, "screening.sources"));
+      }
+    }
   }
   if (record?.expiresAt && new Date(record.expiresAt).getTime() <= now.getTime()) {
     findings.push(createFinding("warning", "RBI-KYC-2016", "KYC record is expired.", "expiresAt"));
@@ -291,6 +339,15 @@ export function normalizeKycRecord(input, now = new Date()) {
     expiresAt: input.expiresAt ?? null,
     nextReviewDueAt: input.nextReviewDueAt ?? null,
     ckycRef: input.ckycRef ?? null,
+    screening: input.screening
+      ? {
+          status: input.screening.status ?? null,
+          screenedAt: input.screening.screenedAt ?? null,
+          sources: Array.isArray(input.screening.sources) ? [...new Set(input.screening.sources)] : [],
+          evidenceRef: input.screening.evidenceRef ?? null,
+          reviewedBy: input.screening.reviewedBy ?? null
+        }
+      : null,
     vCip: {
       used: Boolean(input.vCip?.used),
       storageCountry: input.vCip?.storageCountry ?? null,
@@ -350,18 +407,29 @@ export function upsertKycRecord(registry, input, borrowerProfiles = {}, now = ne
 // PMLA Rules (Rule 9(1A)/9(3)) require a regulated entity to identify the
 // natural person(s) who ultimately own or control a legal-entity customer
 // before an account-based relationship is established: a controlling
-// ownership interest (25% for a company, 15% for a partnership/LLP/trust or
-// unincorporated association), or — where no natural person meets that
-// threshold — the senior managing official exercising control. Individuals
+// ownership interest (more than 10% for a company/partnership/LLP, more than
+// 15% for an unincorporated association; trust beneficiaries at 10% or more),
+// or — where no natural person meets the applicable threshold — the senior
+// managing official exercising control. Trusts separately require their
+// author, trustee(s), qualifying beneficiaries, and ultimate controllers.
+// Individuals
 // and sole proprietors are the customer themselves, so no separate
 // beneficial-owner declaration applies to them.
-export const BENEFICIAL_OWNER_TYPES = new Set(["ownership", "control", "senior_managing_official"]);
-export const BENEFICIAL_OWNER_ENTITY_TYPES = new Set(["company", "partnership", "llp", "trust"]);
+export const BENEFICIAL_OWNER_TYPES = new Set([
+  "ownership",
+  "control",
+  "senior_managing_official",
+  "trust_author",
+  "trustee",
+  "beneficiary"
+]);
+export const BENEFICIAL_OWNER_ENTITY_TYPES = new Set(["company", "partnership", "llp", "trust", "unincorporated_association"]);
 export const BENEFICIAL_OWNERSHIP_THRESHOLD_PERCENT = {
-  company: 25,
-  partnership: 15,
-  llp: 15,
-  trust: 15
+  company: 10,
+  partnership: 10,
+  llp: 10,
+  trust: 10,
+  unincorporated_association: 15
 };
 
 export function validateBeneficialOwner(record, borrowerProfiles = {}) {
@@ -387,8 +455,8 @@ export function validateBeneficialOwner(record, borrowerProfiles = {}) {
     findings.push(createFinding("error", "RBI-KYC-2016", "Beneficial owner identificationRef (e.g. PAN) is required.", "identificationRef"));
   }
   if (!record?.type || !BENEFICIAL_OWNER_TYPES.has(record.type)) {
-    findings.push(createFinding("error", "RBI-KYC-2016", "Beneficial owner type must be ownership, control, or senior_managing_official.", "type"));
-  } else if (record.type === "ownership") {
+    findings.push(createFinding("error", "RBI-KYC-2016", "Beneficial owner type is invalid.", "type"));
+  } else if (record.type === "ownership" || record.type === "beneficiary") {
     if (!Number.isFinite(record?.ownershipPercentage) || record.ownershipPercentage <= 0 || record.ownershipPercentage > 100) {
       findings.push(createFinding("error", "RBI-KYC-2016", "Ownership-type beneficial owner requires ownershipPercentage in (0, 100].", "ownershipPercentage"));
     }
@@ -460,11 +528,14 @@ function qualifiesAsBeneficialOwner(record, borrowerType) {
   if (record?.verification?.status !== VERIFIED_KYC_STATUS) {
     return false;
   }
-  if (record.type === "ownership") {
-    const threshold = BENEFICIAL_OWNERSHIP_THRESHOLD_PERCENT[borrowerType] ?? 25;
-    return Number.isFinite(record.ownershipPercentage) && record.ownershipPercentage >= threshold;
+  if (record.type === "ownership" || record.type === "beneficiary") {
+    const threshold = BENEFICIAL_OWNERSHIP_THRESHOLD_PERCENT[borrowerType] ?? 10;
+    const inclusive = borrowerType === "trust";
+    return Number.isFinite(record.ownershipPercentage) && (inclusive
+      ? record.ownershipPercentage >= threshold
+      : record.ownershipPercentage > threshold);
   }
-  return record.type === "control" || record.type === "senior_managing_official";
+  return ["control", "senior_managing_official", "trust_author", "trustee"].includes(record.type);
 }
 
 export function resolveBorrowerApplicationReferences(application, registries = {}, now = new Date()) {
@@ -494,12 +565,42 @@ export function resolveBorrowerApplicationReferences(application, registries = {
 
   if (BENEFICIAL_OWNER_ENTITY_TYPES.has(borrower.borrowerType)) {
     const beneficialOwners = listBorrowerBeneficialOwners(registries.beneficialOwners ?? {}, borrower.borrowerId);
-    if (!beneficialOwners.some((record) => qualifiesAsBeneficialOwner(record, borrower.borrowerType))) {
+    const declaration = borrower.beneficialOwnershipDeclaration;
+    if (!declaration?.complete || !declaration.verifiedAt || !declaration.verifiedBy || !declaration.evidenceRef) {
       findings.push(
         createFinding(
           "error",
           "RBI-KYC-2016",
-          "A legal-entity borrower requires at least one verified beneficial owner meeting the PMLA controlling-interest threshold.",
+          "A verified complete beneficial-ownership declaration and evidence are required for a legal-entity borrower.",
+          "borrowerId"
+        )
+      );
+    }
+    const qualifyingOwners = beneficialOwners.filter(
+      (record) =>
+        qualifiesAsBeneficialOwner(record, borrower.borrowerType) &&
+        (record.type !== "senior_managing_official" || declaration?.noNaturalOwnerIdentified === true)
+    );
+    if (borrower.borrowerType === "trust") {
+      const hasAuthor = qualifyingOwners.some((record) => record.type === "trust_author");
+      const hasTrustee = qualifyingOwners.some((record) => record.type === "trustee");
+      const hasControllerOrBeneficiary = qualifyingOwners.some((record) => ["beneficiary", "control"].includes(record.type));
+      if (!hasAuthor || !hasTrustee || !hasControllerOrBeneficiary) {
+        findings.push(
+          createFinding(
+            "error",
+            "RBI-KYC-2016",
+            "A trust borrower requires verified author, trustee, and qualifying beneficiary or ultimate-controller records.",
+            "borrowerId"
+          )
+        );
+      }
+    } else if (qualifyingOwners.length === 0) {
+      findings.push(
+        createFinding(
+          "error",
+          "RBI-KYC-2016",
+          "A legal-entity borrower requires verified beneficial owners meeting the current PMLA controlling-interest rule.",
           "borrowerId"
         )
       );
@@ -544,7 +645,8 @@ export function resolveBorrowerApplicationReferences(application, registries = {
       legalName: borrower.legalName,
       dateOfBirth: borrower.dateOfBirth,
       residencyCountry: borrower.residencyCountry,
-      primaryAddressCountry: borrower.primaryAddressCountry
+      primaryAddressCountry: borrower.primaryAddressCountry,
+      contact: borrower.contact
     },
     economicProfile: {
       ...(borrower.economicProfile ?? {}),
@@ -568,6 +670,7 @@ export function resolveBorrowerApplicationReferences(application, registries = {
           verifiedAt: kycRecord.verifiedAt,
           expiresAt: kycRecord.expiresAt,
           nextReviewDueAt: kycStatus.nextReviewDueAt,
+          screening: kycRecord.screening,
           aadhaar: kycRecord.aadhaar,
           vCip: kycRecord.vCip
         }
@@ -802,4 +905,3 @@ export function uploadCkycRecord(ckycRegistry, borrower, kycRecord, now = new Da
     summary: summarizeFindings(findings)
   };
 }
-

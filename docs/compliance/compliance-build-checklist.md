@@ -55,7 +55,7 @@ Legend:
 | Grievance officer | KFS requires name and email. | Done |
 | Undisclosed fees cannot be charged later | Ground KFS charges in Product Policy and block ad-hoc, foreclosure, and prepayment ledger charges exceeding KFS/policy limits. | Done |
 | Digitally signed/rendered KFS | HTML/text document packet renderer with checksum and delivery evidence; eSign creates a signed packet and document-vault receipt with manifest checksum. PDF generation and external envelope storage remain planned. | Partial |
-| KFS workflow state | KFS route separates issued KFS from decision-ready KFS based on acceptance and delivery evidence. | Done |
+| KFS workflow state | Server derives terms from the approved product/application, computes cash-flow APR and amortisation, delivers a time-bound proposal, then requires a separate authenticated borrower acceptance bound to session and proposal. | Done |
 
 ## Fair Lending and Penal Charges
 
@@ -79,7 +79,7 @@ Legend:
 | CKYC search/upload | CKYC registry connector with search, download, and upload flows. | Done |
 | V-CIP evidence | V-CIP evidence vault validates video hash, liveness, face match score (>=0.8), India GPS coordinates, official actor role (kyc_officer/credit_officer), and digital signature. | Done |
 | FIU-IND reporting support | `fiu-str.js` implements STR/CTR/CCR lifecycle (draft → reviewed → filed → acknowledged): STRs require designated Principal Officer review before filing, CTRs enforce the ₹10 lakh threshold, tipping-off exposure to the subject is guarded, and filing runs through `ExternalServiceManager` (mock/real `fiuProvider`). External FIU-IND submission format is mocked. | Partial |
-| Beneficial-owner checks for legal entities | A legal-entity (company/partnership/llp/trust) borrower's preflight is blocked without at least one verified beneficial owner meeting the PMLA controlling-interest threshold (25% company, 15% partnership/llp/trust) or declared as control/senior-managing-official. | Done |
+| Beneficial-owner checks for legal entities | Verified declaration evidence is mandatory. Ownership thresholds are >10% for companies/partnerships/LLPs, >15% for unincorporated associations, and ≥10% for trusts; trust authors, trustees and beneficiaries/controllers are verified, with senior-management fallback only after declaring no natural owner. | Done |
 
 ## Aadhaar and UIDAI Constraints
 
@@ -93,12 +93,14 @@ Legend:
 
 | Requirement | Platform behavior | Status |
 | --- | --- | --- |
+| Granular notice and consent | Purpose description, data categories, retention criterion and equivalent withdrawal mechanism are mandatory; third-party sharing also names recipients/classes. | Done |
+| Personal-data breach notice | Tracks notice without delay to affected principals and the Board, plus the detailed Board submission within 72 hours, alongside CERT-In/RBI clocks. | Done |
 | Notice and consent evidence | Consent timestamp and notice version required. | Done |
 | Consent revocation | Consent ledger with revocation workflow (revoked consent blocks borrower resolution). | Done |
 | Third-party disclosure record-of-processing | `data-sharing.js` logs every disclosure; consent-basis sharing requires an active `third_party_sharing` consent, legal-obligation-basis sharing requires a cited legal reference. | Done |
 | Data principal rights (erasure) | Right-to-erasure workflow (`data-retention.js`) gated on statutory retention (active loan or 5-year RBI/PMLA window); fulfilment/cleanup redacts the borrower profile, KYC records, and beneficial owners in place. | Done |
 | Data principal rights (access/correction) | `data-principal-rights.js` implements access requests (assemble a portable data pack: profile, consent ledger, KYC summary, loan accounts, disclosures) and correction requests (apply/reject a field change, applied corrections propagate to the borrower profile), both under a 30-day DPDP SLA clock with overdue detection and LWS task derivation. | Done |
-| Breach workflow | Incident tracking (`incident-notification.js`) with an independent 6-hour CERT-In/RBI reporting clock and overdue detection; DPBI-specific reporting evidence planned. | Partial |
+| Breach workflow | Incident tracking with independent CERT-In/RBI six-hour clocks, immediate affected-principal and Board notices, a detailed Board notice within 72 hours, and overdue detection. | Done |
 | Retention and deletion | Statutory-retention-gated erasure workflow implemented for borrower profiles, KYC records, and beneficial owners; automated retention cleanup job redacts expired inactive borrowers. | Done |
 
 ## IT Governance, Cybersecurity, and Data Residency

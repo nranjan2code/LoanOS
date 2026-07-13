@@ -8,6 +8,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 import {
   accrueInterest,
+  acceptKfs,
   attachKfs,
   applyDecisionApproval,
   applyKfsWorkflow,
@@ -127,6 +128,7 @@ import {
   validateDocumentPacketBeforeDisbursement,
   validateGrievanceOfficerAccess,
   validateHumanReviewAccess,
+  validateKfs,
   validateKfsBeforeDecision,
   validateManualUnderwritingAccess,
   validateRecoveryAssignmentAccess,
@@ -338,10 +340,12 @@ async function resolveLockKey(req, dataDir) {
 }
 
 export function createLoanOsServer({ dataDir, bootstrapTenants = [], platformAdminKey } = {}) {
+  validateProductionConfiguration();
   const adminKey = platformAdminKey ?? process.env.LOANOS_PLATFORM_ADMIN_KEY ?? null;
   let bootstrapPromise = null;
   return createServer(async (req, res) => {
     const requestId = `req_${randomBytes(8).toString("hex")}`;
+    applySecurityHeaders(res);
     try {
       if (!bootstrapPromise) {
         // Cache the in-flight promise so concurrent early requests share one
@@ -383,6 +387,39 @@ export function createLoanOsServer({ dataDir, bootstrapTenants = [], platformAdm
       });
     }
   });
+}
+
+function validateProductionConfiguration(env = process.env) {
+  if (env.NODE_ENV !== "production") return;
+  if (env.LOANOS_STORAGE_DRIVER !== "postgres") {
+    throw new Error("Production requires LOANOS_STORAGE_DRIVER=postgres.");
+  }
+  if (env.LOANOS_DATABASE_ENCRYPTION_AT_REST !== "true") {
+    throw new Error("Production requires evidenced database encryption at rest (LOANOS_DATABASE_ENCRYPTION_AT_REST=true).");
+  }
+  if (env.LOANOS_RULES_ENGINE !== "active") {
+    throw new Error("Production requires LOANOS_RULES_ENGINE=active so eligibility cannot bypass the policy engine.");
+  }
+  if (!env.LOANOS_RULES_ENGINE_URLS) {
+    throw new Error("Production requires per-tenant LOANOS_RULES_ENGINE_URLS routing.");
+  }
+  if (env.LOANOS_EMAIL_PROVIDER !== "real") {
+    throw new Error("Production requires a real email provider for borrower authentication and KFS delivery.");
+  }
+}
+
+function applySecurityHeaders(res) {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "no-referrer");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()");
+  res.setHeader(
+    "Content-Security-Policy",
+    "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'; form-action 'self'; img-src 'self' data:; media-src 'self'; connect-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'"
+  );
+  if (process.env.NODE_ENV === "production") {
+    res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  }
 }
 
 // Request bodies are untrusted input from a single client, but the whole
@@ -772,6 +809,21 @@ async function route(req, res, dataDir, platformAdminKey) {
     tenantData = await loadTenantDataOnly(dataDir, tenant.tenantId);
   }
 
+  if (authContext?.principalType === "borrower") {
+    const authorization = authorizeBorrowerRoute(method, path, authContext.userId, tenantData);
+    if (!authorization.allowed) {
+      sendJson(res, authorization.statusCode, {
+        error: {
+          code: authorization.statusCode === 404 ? "not_found" : "borrower_forbidden",
+          message: authorization.statusCode === 404
+            ? "The requested borrower resource was not found."
+            : "This operation is not available to borrower sessions."
+        }
+      });
+      return;
+    }
+  }
+
   // The store hands each handler ONLY this tenant's partition. There is no code
   // path from a handler back to another tenant's data. On every save the tenant's
   // audit events are sealed into an append-only hash chain, so the persisted
@@ -785,6 +837,8 @@ async function route(req, res, dataDir, platformAdminKey) {
     ? { actor: `platform:${breakGlass.staffId}`, actorType: AUDIT_ACTOR_TYPES.PLATFORM_STAFF }
     : authContext?.principalType === "tenant_user"
       ? { actor: authContext.userId, actorType: AUDIT_ACTOR_TYPES.TENANT_USER }
+      : authContext?.principalType === "borrower"
+        ? { actor: authContext.userId, actorType: AUDIT_ACTOR_TYPES.BORROWER }
       : { actor: tenant.tenantId, actorType: AUDIT_ACTOR_TYPES.TENANT };
   const store = {
     load: async () => currentTenantData,
@@ -1388,6 +1442,7 @@ async function route(req, res, dataDir, platformAdminKey) {
     const asOf = url.searchParams.get("asOf") ? new Date(url.searchParams.get("asOf")) : new Date();
     const complaints = Object.values(state.complaints)
       .map((complaint) => enrichComplaint(complaint, asOf))
+      .filter((complaint) => authContext?.principalType !== "borrower" || complaint.borrowerId === authContext.userId)
       .filter((complaint) => complaintMatchesFilters(complaint, url));
     sendJson(res, 200, {
       asOf: asOf.toISOString(),
@@ -1398,7 +1453,10 @@ async function route(req, res, dataDir, platformAdminKey) {
   }
 
   if (method === "POST" && path === "/complaints") {
-    const body = await readJson(req);
+    const submittedBody = await readJson(req);
+    const body = authContext?.principalType === "borrower"
+      ? { ...submittedBody, borrowerId: authContext.userId, receivedFrom: "borrower_portal" }
+      : submittedBody;
     const state = await store.load();
     const result = createComplaint(state.complaints, body, state);
     const nextState =
@@ -1435,7 +1493,10 @@ async function route(req, res, dataDir, platformAdminKey) {
 
   const complaintActionMatch = path.match(/^\/complaints\/([^/]+)\/(assignments|reviews|resolution|rbi-cms-escalation)$/);
   if (method === "POST" && complaintActionMatch) {
-    const body = await readJson(req);
+    const submittedBody = await readJson(req);
+    const body = authContext?.principalType === "borrower"
+      ? { ...submittedBody, borrowerId: authContext.userId, requestedBy: authContext.userId }
+      : submittedBody;
     const state = await store.load();
     const complaintId = decodeURIComponent(complaintActionMatch[1]);
     const action = complaintActionMatch[2];
@@ -1708,7 +1769,10 @@ async function route(req, res, dataDir, platformAdminKey) {
   }
 
   if (method === "POST" && path === "/erasure-requests") {
-    const body = await readJson(req);
+    const submittedBody = await readJson(req);
+    const body = authContext?.principalType === "borrower"
+      ? { ...submittedBody, borrowerId: authContext.userId, requestedBy: authContext.userId }
+      : submittedBody;
     const state = await store.load();
     const result = createErasureRequest(state.erasureRequests, body, state);
     if (result.summary.status === "blocked") {
@@ -3067,7 +3131,8 @@ async function route(req, res, dataDir, platformAdminKey) {
           method: "ckyc",
           riskCategory: "low",
           verifiedAt: new Date().toISOString(),
-          ckycRef: record.ckycNumber
+          ckycRef: record.ckycNumber,
+          screening: body.screening
         },
         syncProfileResult.registry
       );
@@ -3213,6 +3278,7 @@ async function route(req, res, dataDir, platformAdminKey) {
         status: "verified",
         method: "vcip",
         verifiedAt: new Date().toISOString(),
+        screening: body.screening,
         vCip: {
           used: true,
           storageCountry: body.vCip?.storageCountry,
@@ -3333,7 +3399,9 @@ async function route(req, res, dataDir, platformAdminKey) {
   if (method === "GET" && path === "/loans/applications") {
     const state = await store.load();
     sendJson(res, 200, {
-      applications: Object.values(state.loanApplications || {})
+      applications: Object.values(state.loanApplications || {}).filter(
+        (application) => authContext?.principalType !== "borrower" || borrowerIdForApplication(application) === authContext.userId
+      )
     });
     return;
   }
@@ -3478,14 +3546,61 @@ async function route(req, res, dataDir, platformAdminKey) {
   const kfsMatch = path.match(/^\/loans\/applications\/([^/]+)\/kfs$/);
   if (method === "POST" && kfsMatch) {
     const body = await readJson(req);
+    const forbiddenTermFields = ["terms", "principalAmount", "tenorMonths", "annualInterestRateBps", "aprBps", "charges", "acceptance"];
+    if (forbiddenTermFields.some((field) => body[field] !== undefined)) {
+      sendJson(res, 422, {
+        error: {
+          code: "kfs_terms_server_managed",
+          message: "KFS pricing, loan terms, delivery, and acceptance are server-managed and cannot be supplied by the client."
+        }
+      });
+      return;
+    }
     const state = await store.load();
     const application = state.loanApplications[kfsMatch[1]];
     if (!application) {
       sendJson(res, 404, { error: { code: "not_found", message: "Loan application not found." } });
       return;
     }
-    const kfs = buildKeyFactStatement(application, body.terms ?? body);
-    const updated = attachKfs(application, kfs, body.acceptance ?? {});
+    const kfs = buildKeyFactStatement(application, {
+      principalAmount: application.product?.requestedAmount,
+      tenorMonths: application.product?.requestedTenorMonths ?? application.product?.defaultTenorMonths,
+      annualInterestRateBps: application.product?.annualInterestRateBps,
+      charges: application.product?.charges,
+      contingentCharges: application.product?.contingentCharges,
+      penalCharges: application.product?.penalCharges,
+      repaymentFrequency: application.product?.repaymentFrequency,
+      coolingOffDays: application.product?.coolingOffDays,
+      recoveryMechanism: application.product?.recoveryMechanism,
+      grievanceOfficer: application.tenant?.grievanceOfficer,
+      privacyPolicyUrl: application.tenant?.privacyPolicyUrl
+    });
+    const kfsValidation = validateKfs(kfs);
+    if (kfsValidation.summary.status === "blocked") {
+      sendJson(res, 422, { error: { code: "kfs_generation_blocked", message: "KFS generation failed validation." }, findings: kfsValidation.findings });
+      return;
+    }
+    const recipient = application.borrower?.contact?.email ?? application.borrower?.email;
+    const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox });
+    if (process.env.NODE_ENV === "production" && manager.config.emailProvider !== "real") {
+      sendJson(res, 503, { error: { code: "kfs_delivery_provider_unavailable", message: "A production email provider is required before KFS issuance." } });
+      return;
+    }
+    let delivery;
+    try {
+      delivery = await manager.sendEmail(
+        recipient,
+        `Key Fact Statement ${kfs.proposalNumber}`,
+        `Your Key Fact Statement proposal ${kfs.proposalNumber} is available until ${kfs.validUntil}. Sign in to review and accept it.`
+      );
+    } catch (error) {
+      sendJson(res, 503, { error: { code: "kfs_delivery_failed", message: "The KFS could not be delivered to the verified borrower email." } });
+      return;
+    }
+    const updated = {
+      ...attachKfs(application, kfs),
+      kfs: { ...kfs, deliveryChannel: delivery.channel, deliveryRef: delivery.ref, acceptedAt: null, acceptedBy: null }
+    };
     const evaluation = evaluateLoanApplication(updated, {
       modelRegistry: state.modelRegistry
     });
@@ -3516,7 +3631,44 @@ async function route(req, res, dataDir, platformAdminKey) {
       }
     );
     await store.save(nextState);
-    sendJson(res, evaluation.summary.status === "blocked" ? 422 : 201, stored);
+    sendJson(res, 201, stored);
+    return;
+  }
+
+  const kfsAcceptMatch = path.match(/^\/loans\/applications\/([^/]+)\/kfs\/accept$/);
+  if (method === "POST" && kfsAcceptMatch) {
+    if (authContext?.principalType !== "borrower") {
+      sendJson(res, 403, { error: { code: "borrower_acceptance_required", message: "Only the authenticated borrower may accept a KFS." } });
+      return;
+    }
+    const state = await store.load();
+    const application = state.loanApplications[decodeURIComponent(kfsAcceptMatch[1])];
+    if (!application || borrowerIdForApplication(application) !== authContext.userId) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Loan application not found." } });
+      return;
+    }
+    const result = acceptKfs(application, {
+      acceptedBy: authContext.userId,
+      acceptanceChannel: "borrower_portal",
+      acceptanceEvidenceRef: `session:${authContext.sessionId}:proposal:${application.kfs?.proposalNumber}`
+    });
+    if (result.summary.status === "blocked") {
+      sendJson(res, 422, { error: { code: "kfs_acceptance_blocked", message: "KFS acceptance is blocked." }, findings: result.findings });
+      return;
+    }
+    const evaluation = evaluateLoanApplication(result.application, { modelRegistry: state.modelRegistry });
+    const eligibility = await assessEligibilityGated({
+      evaluateJs: evaluateEligibility,
+      application: result.application,
+      tenantId: tenant.tenantId,
+      stage: "kfs_acceptance"
+    });
+    const stored = applyKfsWorkflow({ ...result.application, compliance: evaluation, eligibility: eligibility.assessment }, evaluation);
+    await store.save(appendEvent(
+      { ...state, loanApplications: { ...state.loanApplications, [stored.applicationId]: stored } },
+      { type: "loan.kfs.accepted", applicationId: stored.applicationId, kfsId: stored.kfs.kfsId, proposalNumber: stored.kfs.proposalNumber }
+    ));
+    sendJson(res, 200, stored);
     return;
   }
 
@@ -3882,7 +4034,11 @@ async function route(req, res, dataDir, platformAdminKey) {
       return;
     }
 
-    const { aadhaarNumber, otp, signerName } = body;
+    const authenticatedBorrowerName = authContext?.principalType === "borrower"
+      ? application.borrower?.fullName ?? application.borrower?.legalName ?? application.borrower?.name
+      : null;
+    const { aadhaarNumber, otp } = body;
+    const signerName = authenticatedBorrowerName ?? body.signerName;
     if (!aadhaarNumber || !otp || !signerName) {
       sendJson(res, 400, { error: { code: "bad_request", message: "aadhaarNumber, otp, and signerName are required." } });
       return;
@@ -3979,7 +4135,9 @@ async function route(req, res, dataDir, platformAdminKey) {
   if (method === "GET" && path === "/loan-accounts") {
     const state = await store.load();
     sendJson(res, 200, {
-      loanAccounts: Object.values(state.loanAccounts)
+      loanAccounts: Object.values(state.loanAccounts).filter(
+        (account) => authContext?.principalType !== "borrower" || account.borrowerId === authContext.userId
+      )
     });
     return;
   }
@@ -5026,9 +5184,12 @@ async function route(req, res, dataDir, platformAdminKey) {
   }
 
   if (method === "POST" && accessListMatch) {
-    const body = await readJson(req);
+    const submittedBody = await readJson(req);
     const state = await store.load();
     const borrowerId = decodeURIComponent(accessListMatch[1]);
+    const body = authContext?.principalType === "borrower"
+      ? { ...submittedBody, requestedBy: authContext.userId, requestChannel: "borrower_portal" }
+      : submittedBody;
     const result = createAccessRequest(state.accessRequests, { ...body, borrowerId }, state);
     if (result.summary.status === "blocked") {
       sendJson(res, 422, {
@@ -5053,7 +5214,10 @@ async function route(req, res, dataDir, platformAdminKey) {
 
   const accessFulfillMatch = path.match(/^\/borrowers\/([^/]+)\/access-requests\/([^/]+)\/fulfillment$/);
   if (method === "POST" && accessFulfillMatch) {
-    const body = await readJson(req);
+    const submittedBody = await readJson(req);
+    const body = authContext?.principalType === "borrower"
+      ? { ...submittedBody, actor: authContext.userId }
+      : submittedBody;
     const state = await store.load();
     const reqId = decodeURIComponent(accessFulfillMatch[2]);
     const request = state.accessRequests[reqId];
@@ -5097,9 +5261,17 @@ async function route(req, res, dataDir, platformAdminKey) {
   }
 
   if (method === "POST" && correctionListMatch) {
-    const body = await readJson(req);
+    const submittedBody = await readJson(req);
     const state = await store.load();
     const borrowerId = decodeURIComponent(correctionListMatch[1]);
+    const body = authContext?.principalType === "borrower"
+      ? {
+          ...submittedBody,
+          fieldPath: submittedBody.fieldPath ?? submittedBody.field,
+          requestedBy: authContext.userId,
+          requestChannel: "borrower_portal"
+        }
+      : submittedBody;
     const result = createCorrectionRequest(state.correctionRequests, { ...body, borrowerId }, state);
     if (result.summary.status === "blocked") {
       sendJson(res, 422, {
@@ -5414,6 +5586,56 @@ function resolveSessionActorId(authContext, providedActorId) {
     return authContext.userId ?? null;
   }
   return providedActorId ?? null;
+}
+
+function borrowerIdForApplication(application) {
+  return application?.borrowerId ?? application?.borrower?.borrowerId ?? null;
+}
+
+function authorizeBorrowerRoute(method, path, borrowerId, tenantData) {
+  const allow = () => ({ allowed: true, statusCode: 200 });
+  const deny = (statusCode = 403) => ({ allowed: false, statusCode });
+
+  if (method === "GET" && ["/loans/applications", "/loan-accounts", "/complaints"].includes(path)) {
+    return allow();
+  }
+  if (method === "POST" && ["/complaints", "/erasure-requests"].includes(path)) {
+    return allow();
+  }
+
+  const borrowerRightsMatch = path.match(/^\/borrowers\/([^/]+)\/(access-requests|correction-requests)(?:\/([^/]+)\/(fulfillment))?$/);
+  if (borrowerRightsMatch) {
+    if (decodeURIComponent(borrowerRightsMatch[1]) !== borrowerId) return deny(404);
+    if (!borrowerRightsMatch[3] && (method === "GET" || method === "POST")) return allow();
+    if (borrowerRightsMatch[2] === "access-requests" && borrowerRightsMatch[4] === "fulfillment" && method === "POST") {
+      const request = tenantData?.accessRequests?.[decodeURIComponent(borrowerRightsMatch[3])];
+      return request?.borrowerId === borrowerId ? allow() : deny(404);
+    }
+    return deny();
+  }
+
+  const applicationMatch = path.match(/^\/loans\/applications\/([^/]+)(.*)$/);
+  if (applicationMatch) {
+    const application = tenantData?.loanApplications?.[decodeURIComponent(applicationMatch[1])];
+    if (!application || borrowerIdForApplication(application) !== borrowerId) return deny(404);
+    const suffix = applicationMatch[2];
+    if (method === "GET" && (suffix === "" || suffix === "/document-packet")) return allow();
+    if (method === "POST" && ["/kfs/accept", "/document-packet/esign"].includes(suffix)) return allow();
+    return deny();
+  }
+
+  const accountMatch = path.match(/^\/loan-accounts\/([^/]+)(.*)$/);
+  if (accountMatch) {
+    const account = tenantData?.loanAccounts?.[decodeURIComponent(accountMatch[1])];
+    if (!account || account.borrowerId !== borrowerId) return deny(404);
+    const suffix = accountMatch[2];
+    if (method === "GET" && ["", "/schedule", "/statement", "/statement/document", "/closure-certificate"].includes(suffix)) {
+      return allow();
+    }
+    return deny();
+  }
+
+  return deny();
 }
 
 function requiredModuleForPath(path) {
@@ -5809,23 +6031,107 @@ async function routeAuth(req, res, { dataDir, method, path }) {
     return;
   }
 
-  if (method === "POST" && path === "/auth/borrower-connect") {
+  if (method === "POST" && path === "/auth/borrower-challenge") {
     const body = await readJson(req);
     const tenantId = body.tenantId;
     const borrowerId = body.borrowerId;
-    const email = body.email;
+    const email = String(body.email ?? "").trim().toLowerCase();
 
     const state = await loadWholeState(dataDir);
     const tenant = state.controlPlane.tenants?.[tenantId];
     const tenantData = state.tenants?.[tenantId];
     if (!tenant || tenant.status !== "active" || !tenantData) {
-      sendJson(res, 401, { error: { code: "invalid_credentials", message: "Invalid tenant ID." } });
+      sendJson(res, 401, { error: { code: "invalid_credentials", message: "We could not verify those customer details." } });
       return;
     }
 
     const borrower = tenantData.borrowerProfiles?.[borrowerId];
-    if (!borrower || borrower.email.toLowerCase() !== email.toLowerCase()) {
-      sendJson(res, 401, { error: { code: "invalid_credentials", message: "We could not match those customer details." } });
+    const borrowerEmail = String(borrower?.contact?.email ?? borrower?.email ?? "").trim().toLowerCase();
+    if (!borrower || borrower.status !== "active" || !borrowerEmail || borrowerEmail !== email) {
+      sendJson(res, 401, { error: { code: "invalid_credentials", message: "We could not verify those customer details." } });
+      return;
+    }
+
+    const now = new Date();
+    const recentChallenges = Object.values(state.controlPlane.sessions ?? {}).filter(
+      (candidate) =>
+        candidate.principalType === "borrower_challenge" &&
+        candidate.tenantId === tenantId &&
+        candidate.userId === borrowerId &&
+        new Date(candidate.createdAt).getTime() > now.getTime() - 15 * 60 * 1000
+    );
+    if (recentChallenges.length >= 5) {
+      sendJson(res, 429, { error: { code: "challenge_rate_limited", message: "Too many access-code requests. Try again later." } });
+      return;
+    }
+
+    const { token: challengeCode, session: baseChallenge } = createSessionRecord({
+      principalType: "borrower_challenge",
+      tenantId,
+      userId: borrower.borrowerId,
+      email: borrowerEmail,
+      displayName: borrower.fullName ?? borrower.legalName ?? borrower.name ?? borrower.borrowerId,
+      roles: [],
+      ttlMs: 10 * 60 * 1000
+    }, now);
+    const challenge = { ...baseChallenge, challengePurpose: "borrower_login" };
+    const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox });
+    if (process.env.NODE_ENV === "production" && manager.config.emailProvider !== "real") {
+      sendJson(res, 503, {
+        error: { code: "borrower_auth_provider_unavailable", message: "Borrower login is unavailable until a production email provider is configured." }
+      });
+      return;
+    }
+    try {
+      await manager.sendEmail(
+        borrowerEmail,
+        "Your LoanOS one-time access code",
+        `Use this one-time access code within 10 minutes: ${challengeCode}`
+      );
+    } catch (error) {
+      sendJson(res, 503, { error: { code: "challenge_delivery_failed", message: "The one-time access code could not be delivered." } });
+      return;
+    }
+    await saveWholeState({
+      ...state,
+      controlPlane: {
+        ...state.controlPlane,
+        sessions: { ...state.controlPlane.sessions, [challenge.sessionId]: challenge }
+      }
+    }, dataDir);
+    sendJson(res, 202, {
+      challengeId: challenge.sessionId,
+      expiresAt: challenge.expiresAt,
+      deliveryChannel: "email",
+      ...(process.env.NODE_ENV !== "production" || tenant.isSandbox || process.env.LOANOS_EXPOSE_AUTH_CODES === "true"
+        ? { debugCode: challengeCode }
+        : {})
+    });
+    return;
+  }
+
+  if (method === "POST" && path === "/auth/borrower-connect") {
+    const body = await readJson(req);
+    const tenantId = body.tenantId;
+    const borrowerId = body.borrowerId;
+    const email = String(body.email ?? "").trim().toLowerCase();
+    const state = await loadWholeState(dataDir);
+    const challengeRecord = resolveSessionRecord(state, body.code);
+    if (
+      !challengeRecord ||
+      challengeRecord.session.principalType !== "borrower_challenge" ||
+      challengeRecord.session.challengePurpose !== "borrower_login" ||
+      challengeRecord.session.tenantId !== tenantId ||
+      challengeRecord.session.userId !== borrowerId ||
+      challengeRecord.session.email !== email
+    ) {
+      sendJson(res, 401, { error: { code: "invalid_access_code", message: "The one-time access code is invalid or expired." } });
+      return;
+    }
+    const tenant = state.controlPlane.tenants?.[tenantId];
+    const borrower = state.tenants?.[tenantId]?.borrowerProfiles?.[borrowerId];
+    if (!tenant || tenant.status !== "active" || !borrower || borrower.status !== "active") {
+      sendJson(res, 401, { error: { code: "invalid_access_code", message: "The one-time access code is invalid or expired." } });
       return;
     }
 
@@ -5834,17 +6140,18 @@ async function routeAuth(req, res, { dataDir, method, path }) {
       principalType: "borrower",
       tenantId,
       userId: borrower.borrowerId,
-      email: borrower.email,
-      displayName: borrower.name,
+      email,
+      displayName: borrower.fullName ?? borrower.legalName ?? borrower.name ?? borrower.borrowerId,
       roles: []
     }, now);
 
+    const revokedChallenges = revokeSession(state.controlPlane.sessions, challengeRecord.session.sessionId, now);
     const nextState = {
       ...state,
       controlPlane: {
         ...state.controlPlane,
         sessions: {
-          ...state.controlPlane.sessions,
+          ...revokedChallenges,
           [session.sessionId]: session
         }
       }
@@ -5895,6 +6202,15 @@ async function routeAuth(req, res, { dataDir, method, path }) {
         }
       }, dataDir);
       sendJson(res, 200, { ok: true });
+      return;
+    }
+    if (resolved.session.principalType === "borrower") {
+      sendJson(res, 200, {
+        scope: "borrower",
+        tenant: publicTenant(resolved.tenant),
+        borrower: resolved.user,
+        session: publicSession(resolved.session)
+      });
       return;
     }
     const storedUser = state.controlPlane.platformUsers[resolved.user.userId];

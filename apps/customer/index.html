@@ -441,6 +441,12 @@
           <input type="email" id="borrower-email" value="rajesh@example.com" required>
         </div>
 
+        <div class="form-group">
+          <label for="borrower-code">One-time access code</label>
+          <input type="password" id="borrower-code" autocomplete="one-time-code" placeholder="Request a code, then paste it here">
+          <small id="borrower-code-help">The code is sent to the verified email registered with your lender.</small>
+        </div>
+
         <button type="submit" class="btn btn-primary" style="width: 100%;">Continue securely</button>
       </form>
     </div>
@@ -667,6 +673,19 @@
       </ul>
     </div>
 
+    <div class="form-group">
+      <label for="esign-name">Signer name</label>
+      <input id="esign-name" type="text" autocomplete="name">
+    </div>
+    <div class="form-group">
+      <label for="esign-aadhaar">Aadhaar number</label>
+      <input id="esign-aadhaar" type="password" inputmode="numeric" autocomplete="off" maxlength="12">
+    </div>
+    <div class="form-group">
+      <label for="esign-otp">eSign OTP</label>
+      <input id="esign-otp" type="password" inputmode="numeric" autocomplete="one-time-code">
+    </div>
+
     <div class="dialog-footer" style="display: flex; justify-content: flex-end; gap: var(--space-2);">
       <button class="btn btn-secondary btn-sm" id="btn-signing-close">Cancel</button>
       <button class="btn btn-primary btn-sm" id="btn-signing-execute">eSign & Submit Packet</button>
@@ -781,7 +800,9 @@
       toast.className = `alert-banner ${type}`;
       toast.style.margin = '0 0 var(--space-2) 0';
       toast.style.boxShadow = 'var(--shadow-sm)';
-      toast.innerHTML = `<strong>${type.toUpperCase()}:</strong> ${message}`;
+      const prefix = document.createElement('strong');
+      prefix.textContent = `${type.toUpperCase()}:`;
+      toast.append(prefix, document.createTextNode(` ${String(message ?? '')}`));
       dom.toastContainer.appendChild(toast);
       setTimeout(() => {
         toast.remove();
@@ -796,11 +817,28 @@
       const email = document.getElementById('borrower-email').value.trim();
 
       try {
-        // Authenticate context setup via /auth/borrower-connect which establishes the session cookie
+        const codeInput = document.getElementById('borrower-code');
+        const code = codeInput.value.trim();
+        if (!code) {
+          const challengeRes = await fetch('/auth/borrower-challenge', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tenantId, borrowerId, email })
+          });
+          const challenge = await challengeRes.json().catch(() => ({}));
+          if (!challengeRes.ok) throw new Error(challenge.error?.message || 'The access code could not be sent.');
+          if (challenge.debugCode) codeInput.value = challenge.debugCode;
+          document.getElementById('borrower-code-help').textContent =
+            `Code sent. It expires at ${new Date(challenge.expiresAt).toLocaleTimeString('en-IN')}.`;
+          showToast('One-time access code sent to your verified email.', 'success');
+          codeInput.focus();
+          return;
+        }
+
         const connectRes = await fetch('/auth/borrower-connect', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tenantId, borrowerId, email })
+          body: JSON.stringify({ tenantId, borrowerId, email, code })
         });
         if (!connectRes.ok) {
           const errData = await connectRes.json().catch(() => ({}));
@@ -809,7 +847,7 @@
         const connectData = await connectRes.json();
         const me = connectData.borrower;
         
-        authContext = { tenantId, borrowerId, email, name: me.name };
+        authContext = { tenantId, borrowerId, email, name: me.fullName || me.legalName || me.name || borrowerId };
         dom.welcomeName.textContent = `Welcome, ${authContext.name || 'customer'}`;
         
         // Show Workspace
@@ -830,8 +868,10 @@
       }
     });
 
-    function disconnect() {
+    async function disconnect() {
+      await fetch('/auth/logout', { method: 'POST' }).catch(() => {});
       authContext = { tenantId: '', borrowerId: '', email: '' };
+      document.getElementById('borrower-code').value = '';
       dom.authPanel.style.display = 'block';
       dom.mainPortal.style.display = 'none';
       dom.headerStatus.innerHTML = `
@@ -922,7 +962,7 @@
         const data = await res.json();
         
         // Filter by borrowerId
-        const list = (data.accounts || []).filter(loan => loan.borrowerId === authContext.borrowerId);
+        const list = data.loanAccounts || [];
         
         dom.loanCount.textContent = list.length;
         if (list.length === 0) {
@@ -935,18 +975,18 @@
             <div class="item-row" style="flex-direction: column; align-items: stretch; gap: var(--space-3)">
               <div style="display: flex; justify-content: space-between; align-items: center;">
                 <div class="item-details">
-                  <span class="item-title">Loan account ${escapeHtml(loan.accountId)}</span>
+              <span class="item-title">Loan account ${escapeHtml(loan.loanAccountId)}</span>
                   <span class="item-meta">Lender: ${escapeHtml(loan.regulatedEntityId)}</span>
                   <span class="item-meta">Outstanding: ₹${Number(loan.summary?.outstandingPrincipal || 0).toLocaleString('en-IN')}</span>
                 </div>
                 <div style="display: flex; gap: var(--space-2);">
-                  <button class="btn btn-secondary btn-sm" onclick="viewRepaymentSchedule('${loan.accountId}')">Schedule</button>
-                  <a href="/loan-accounts/${loan.accountId}/statement/document" target="_blank" class="btn btn-secondary btn-sm">Sealed Statement</a>
+                  <button class="btn btn-secondary btn-sm" onclick="viewRepaymentSchedule('${loan.loanAccountId}')">Schedule</button>
+                  <a href="/loan-accounts/${loan.loanAccountId}/statement/document" target="_blank" class="btn btn-secondary btn-sm">Sealed Statement</a>
                 </div>
               </div>
               
               <!-- Repayment schedule table dynamically hidden/shown -->
-              <div id="schedule-${loan.accountId}" style="display: none; border-top: 1px solid var(--border-default); padding-top: var(--space-2);">
+              <div id="schedule-${loan.loanAccountId}" style="display: none; border-top: 1px solid var(--border-default); padding-top: var(--space-2);">
                 <h5 style="margin-bottom: var(--space-2);">Upcoming Installments</h5>
                 <table class="kfs-table" style="margin: 0; font-size: var(--text-xs);">
                   <thead>
@@ -958,7 +998,7 @@
                       <th>Status</th>
                     </tr>
                   </thead>
-                  <tbody id="schedule-body-${loan.accountId}"></tbody>
+                  <tbody id="schedule-body-${loan.loanAccountId}"></tbody>
                 </table>
               </div>
             </div>
@@ -984,13 +1024,13 @@
         const res = await fetch(`/loan-accounts/${accountId}/schedule`);
         const data = await res.json();
         
-        body.innerHTML = (data.installments || []).map(inst => `
+        body.innerHTML = (data.schedule || []).map(inst => `
           <tr>
             <td>${new Date(inst.dueDate).toLocaleDateString()}</td>
-            <td>₹${inst.emi.toLocaleString()}</td>
-            <td>₹${inst.principal.toLocaleString()}</td>
-            <td>₹${inst.interest.toLocaleString()}</td>
-            <td><span class="status-tag ${inst.status}">${inst.status}</span></td>
+            <td>₹${Number(inst.totalDue).toLocaleString('en-IN')}</td>
+            <td>₹${Number(inst.principalDue).toLocaleString('en-IN')}</td>
+            <td>₹${Number(inst.interestDue).toLocaleString('en-IN')}</td>
+            <td><span class="status-tag">scheduled</span></td>
           </tr>
         `).join('');
         
@@ -1009,7 +1049,7 @@
         const data = await res.json();
         
         // Filter by borrowerId
-        const list = (data.complaints || []).filter(c => c.borrowerId === authContext.borrowerId);
+        const list = data.complaints || [];
         
         dom.helpCount.textContent = list.filter(item => !['resolved', 'closed'].includes(item.status)).length;
         if (list.length === 0) {
@@ -1043,13 +1083,13 @@
         const res = await fetch(`/loans/applications/${applicationId}`);
         const data = await res.json();
         
-        document.getElementById('kfs-principal').textContent = `₹${data.amount.toLocaleString()}`;
+        document.getElementById('kfs-principal').textContent = `₹${Number(data.kfs.principalAmount).toLocaleString('en-IN')}`;
         document.getElementById('kfs-apr').textContent = `${(data.kfs.aprBps / 100).toFixed(2)}%`;
-        document.getElementById('kfs-tenor').textContent = `${data.tenorMonths} months`;
-        document.getElementById('kfs-total-repay').textContent = `₹${data.kfs.principal.toLocaleString()}`;
-        document.getElementById('kfs-fees').textContent = `₹${((data.kfs.processingFee || 0) + (data.kfs.verificationCharge || 0)).toLocaleString()}`;
-        document.getElementById('kfs-cooling').textContent = `${data.coolingOffDays || 3} days`;
-        document.getElementById('kfs-recovery').textContent = data.recoveryMechanism || 'Authorized Agent Only';
+        document.getElementById('kfs-tenor').textContent = `${data.kfs.tenorMonths} months`;
+        document.getElementById('kfs-total-repay').textContent = `₹${Number(data.kfs.aprComputation.totalRepaymentAmount).toLocaleString('en-IN')}`;
+        document.getElementById('kfs-fees').textContent = `₹${Number(data.kfs.aprComputation.mandatoryUpfrontCharges).toLocaleString('en-IN')}`;
+        document.getElementById('kfs-cooling').textContent = `${data.kfs.coolingOffDays} days`;
+        document.getElementById('kfs-recovery').textContent = data.kfs.recoveryMechanism;
 
         dom.dialogKfs.showModal();
       } catch (err) {
@@ -1061,14 +1101,10 @@
 
     dom.btnKfsAccept.addEventListener('click', async () => {
       try {
-        const res = await fetch(`/loans/applications/${activeApplicationId}/kfs`, {
+        const res = await fetch(`/loans/applications/${activeApplicationId}/kfs/accept`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            actor: authContext.borrowerId,
-            channel: 'web_portal',
-            reference: 'accept_direct_web'
-          })
+          body: JSON.stringify({ acknowledged: true })
         });
 
         if (!res.ok) {
@@ -1094,28 +1130,19 @@
 
     dom.btnSigningExecute.addEventListener('click', async () => {
       try {
-        // eSign Packet execution
-        const buildRes = await fetch(`/loans/applications/${activeApplicationId}/document-packet`, {
+        const signingRes = await fetch(`/loans/applications/${activeApplicationId}/document-packet/esign`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            actor: authContext.borrowerId
+            signerName: document.getElementById('esign-name').value.trim(),
+            aadhaarNumber: document.getElementById('esign-aadhaar').value.trim(),
+            otp: document.getElementById('esign-otp').value.trim()
           })
         });
-
-        if (!buildRes.ok) throw new Error('Failed to generate document packet.');
-
-        // Record delivery
-        const deliveryRes = await fetch(`/loans/applications/${activeApplicationId}/document-packet/delivery`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            channel: 'email',
-            reference: `esign-packet-${activeApplicationId}`
-          })
-        });
-
-        if (!deliveryRes.ok) throw new Error('Failed to deliver/execute document packet.');
+        if (!signingRes.ok) {
+          const error = await signingRes.json().catch(() => ({}));
+          throw new Error(error.error?.message || 'eSign could not be completed.');
+        }
 
         showToast('Loan agreement signed successfully.', 'success');
         dom.dialogSigning.close();
@@ -1147,7 +1174,7 @@
           throw new Error(data.error?.message || 'Failed to submit complaint.');
         }
 
-        showToast('Grievance filed successfully. Checked by Ombudsman.', 'success');
+        showToast('Grievance filed successfully. You can track its status here.', 'success');
         document.getElementById('complaint-summary').value = '';
         await loadComplaints();
       } catch (err) {
@@ -1169,7 +1196,7 @@
         if (!reqRes.ok) throw new Error(reqData.error?.message || 'Access request failed.');
 
         // Fulfill access request to fetch portable pack
-        const fulfillRes = await fetch(`/borrowers/${authContext.borrowerId}/access-requests/${reqData.accessRequest.requestId}/fulfillment`, {
+        const fulfillRes = await fetch(`/borrowers/${authContext.borrowerId}/access-requests/${reqData.accessRequest.accessRequestId}/fulfillment`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ actor: authContext.borrowerId })
@@ -1178,7 +1205,7 @@
         const pack = await fulfillRes.json();
         if (!fulfillRes.ok) throw new Error('Failed to assemble data pack.');
 
-        dom.dataPackJson.textContent = JSON.stringify(pack.dataPack, null, 2);
+        dom.dataPackJson.textContent = JSON.stringify(pack.accessRequest?.dataPack, null, 2);
         dom.dialogDataPack.showModal();
         showToast('DPDP Data Pack assembled.', 'success');
       } catch (err) {

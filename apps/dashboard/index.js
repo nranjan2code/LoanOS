@@ -197,7 +197,7 @@ const dom = {
 
 // ─── Init ───────────────────────────────────────────────────────────────────
 async function initConfig() {
-  apiState.apiKey = localStorage.getItem('loanos_api_key') || '';
+  apiState.apiKey = '';
   apiState.currentActorId = localStorage.getItem('loanos_actor_id') || '';
   
   // Default simulation date to now
@@ -445,26 +445,9 @@ async function bareFetch(path, options = {}) {
 
 // ─── API Key Changed ────────────────────────────────────────────────────────
 async function onApiKeyChange() {
-  apiState.apiKey = dom.apiKeyInput.value.trim();
-  localStorage.setItem('loanos_api_key', apiState.apiKey);
-  apiState.authScope = apiState.apiKey ? 'tenant_service' : '';
-  apiState.currentUser = null;
-  updateAdminButtonVisibility();
-
-  if (!apiState.apiKey) {
-    dom.actorSelect.disabled = false;
-    dom.actorSelect.innerHTML = '<option value="">— Sign In First —</option>';
-    updateConnectionStatus(false);
-    return;
-  }
-  
-  try {
-    showApp();
-    await loadTenantWorkspace('Tenant service key');
-  } catch (err) {
-    updateConnectionStatus(false);
-    showToast(`Failed to connect: ${err.message}`, 'error');
-  }
+  apiState.apiKey = '';
+  dom.apiKeyInput.value = '';
+  showToast('Service API keys cannot be used in the browser. Sign in with your staff account.', 'warning');
 }
 
 async function loadTenantWorkspace(label) {
@@ -1743,7 +1726,6 @@ async function logout() {
   apiState.actors = [];
   apiState.tasks = [];
   apiState.connected = false;
-  localStorage.removeItem('loanos_api_key');
   dom.apiKeyInput.value = '';
   dom.actorSelect.disabled = false;
   dom.actorSelect.title = '';

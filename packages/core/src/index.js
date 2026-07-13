@@ -67,6 +67,7 @@ export {
 
 export {
   ALLOWED_RE_TYPES,
+  acceptKfs,
   attachKfs,
   buildKeyFactStatement,
   calculateAgeYears,

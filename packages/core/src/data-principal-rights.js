@@ -3,8 +3,9 @@ import { createLoanId } from "./loan-policy.js";
 
 // DPDP Act 2023 gives data principals (borrowers) the right to access their
 // personal data held by the fiduciary and the right to correct inaccurate data.
-// This module implements both workflows with a 30-day SLA as required by the
-// DPDP Act and Rules.
+// This module implements both workflows with a conservative 30-day internal
+// service target. The final DPDP Rules do not prescribe this 30-day period;
+// tenants may configure a stricter policy without presenting it as statute.
 
 export const ACCESS_REQUEST_STATUSES = {
   REQUESTED: "requested",

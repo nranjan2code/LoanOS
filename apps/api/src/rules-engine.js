@@ -19,8 +19,20 @@ export function engineMode() {
   return ["off", "shadow", "active"].includes(mode) ? mode : "off";
 }
 
-function engineBaseUrl() {
-  return process.env.LOANOS_RULES_ENGINE_URL ?? "http://127.0.0.1:47311";
+function engineBaseUrl(tenantId) {
+  if (process.env.LOANOS_RULES_ENGINE_URLS) {
+    let urls;
+    try {
+      urls = JSON.parse(process.env.LOANOS_RULES_ENGINE_URLS);
+    } catch {
+      throw new Error("LOANOS_RULES_ENGINE_URLS must be valid JSON");
+    }
+    if (typeof urls?.[tenantId] !== "string" || !urls[tenantId]) {
+      throw new Error(`rules-engine: no isolated instance configured for tenant ${tenantId}`);
+    }
+    return urls[tenantId].replace(/\/$/, "");
+  }
+  return (process.env.LOANOS_RULES_ENGINE_URL ?? "http://127.0.0.1:47311").replace(/\/$/, "");
 }
 
 const money = (value) => (Number.isFinite(value) ? value.toFixed(2) : undefined);
@@ -111,7 +123,7 @@ export async function decideEligibilityWithEngine({
       }
     }
   };
-  const response = await fetch(`${engineBaseUrl()}/v1/decide`, {
+  const response = await fetch(`${engineBaseUrl(tenantId)}/v1/decide`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(request)
