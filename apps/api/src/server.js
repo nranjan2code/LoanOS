@@ -1,6 +1,7 @@
 import { createServer } from "node:http";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { routeIntegrationControls } from "./routes/integration-controls.js";
+import { routeCersaiSearch } from "./routes/cersai-search.js";
 import { readFile } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -1075,6 +1076,7 @@ async function route(req, res, dataDir, platformAdminKey) {
   }
 
   if (await routeIntegrationControls({ method, path, req, res, tenant, store, readJson, sendJson, appendEvent, acknowledgeCersaiSubmission, acknowledgeFiuReport })) return;
+  if (await routeCersaiSearch({ method, path, url, res, store, sendJson })) return;
 
   if (method === "POST" && path === "/integrations/communications") {
     const body = await readJson(req);
@@ -6372,14 +6374,6 @@ async function route(req, res, dataDir, platformAdminKey) {
     );
     await store.save(nextState);
     sendJson(res, 200, { securityInterest: stored, event: result.event });
-    return;
-  }
-
-  if (method === "GET" && path === "/cersai/search") {
-    const state = await store.load();
-    const assetDescription = url.searchParams.get("asset") ?? "";
-    const search = searchCersaiCharges(assetDescription, state);
-    sendJson(res, 200, { assetDescription, ...search });
     return;
   }
 
