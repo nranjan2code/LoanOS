@@ -66,6 +66,16 @@ export class ExternalServiceManager {
       paymentRailApiKey: config.paymentRailApiKey ?? (typeof process !== "undefined" ? process.env.LOANOS_PAYMENT_RAIL_API_KEY : "") ?? "",
       paymentRailDataResidencyCountry: config.paymentRailDataResidencyCountry ?? (typeof process !== "undefined" ? process.env.LOANOS_PAYMENT_RAIL_DATA_RESIDENCY_COUNTRY : "IN") ?? "IN",
 
+      escrowProvider: config.escrowProvider ?? (typeof process !== "undefined" ? process.env.LOANOS_ESCROW_PROVIDER : "mock") ?? "mock",
+      escrowApiUrl: config.escrowApiUrl ?? (typeof process !== "undefined" ? process.env.LOANOS_ESCROW_API_URL : "") ?? "",
+      escrowApiKey: config.escrowApiKey ?? (typeof process !== "undefined" ? process.env.LOANOS_ESCROW_API_KEY : "") ?? "",
+      escrowDataResidencyCountry: config.escrowDataResidencyCountry ?? (typeof process !== "undefined" ? process.env.LOANOS_ESCROW_DATA_RESIDENCY_COUNTRY : "IN") ?? "IN",
+
+      coreBankingProvider: config.coreBankingProvider ?? (typeof process !== "undefined" ? process.env.LOANOS_CORE_BANKING_PROVIDER : "mock") ?? "mock",
+      coreBankingApiUrl: config.coreBankingApiUrl ?? (typeof process !== "undefined" ? process.env.LOANOS_CORE_BANKING_API_URL : "") ?? "",
+      coreBankingApiKey: config.coreBankingApiKey ?? (typeof process !== "undefined" ? process.env.LOANOS_CORE_BANKING_API_KEY : "") ?? "",
+      coreBankingDataResidencyCountry: config.coreBankingDataResidencyCountry ?? (typeof process !== "undefined" ? process.env.LOANOS_CORE_BANKING_DATA_RESIDENCY_COUNTRY : "IN") ?? "IN",
+
       esignProvider: config.esignProvider ?? (typeof process !== "undefined" ? process.env.LOANOS_ESIGN_PROVIDER : "mock") ?? "mock",
       esignApiUrl: config.esignApiUrl ?? (typeof process !== "undefined" ? process.env.LOANOS_ESIGN_API_URL : "") ?? "",
       esignApiKey: config.esignApiKey ?? (typeof process !== "undefined" ? process.env.LOANOS_ESIGN_API_KEY : "") ?? "",
@@ -90,6 +100,8 @@ export class ExternalServiceManager {
       this.config.vcipProvider = "mock";
       this.config.bankAccountProvider = "mock";
       this.config.paymentRailProvider = "mock";
+      this.config.escrowProvider = "mock";
+      this.config.coreBankingProvider = "mock";
       this.config.esignProvider = "mock";
       this.config.cersaiProvider = "mock";
       this.config.fiuProvider = "mock";
@@ -624,6 +636,34 @@ export class ExternalServiceManager {
         filedAt: new Date().toISOString()
       };
     }
+  }
+
+  async submitEscrowInstruction(instruction = {}) {
+    ensureIndiaDataResidency("Co-lending escrow", this.config.escrowDataResidencyCountry);
+    if (!instruction.instructionId || !instruction.escrowAccountRef || !instruction.checksumSha256 || !Number.isFinite(instruction.amount) || instruction.amount < 0) throw new Error("Escrow instruction requires identifiers, checksum, and a non-negative amount.");
+    if (this.config.escrowProvider === "real") {
+      if (!this.config.escrowApiUrl || !this.config.escrowApiKey) throw new Error("Real escrow provider configured but API URL or API key is missing.");
+      const res = await fetch(`${this.config.escrowApiUrl}/instructions`, { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${this.config.escrowApiKey}` }, body: JSON.stringify(instruction) });
+      if (!res.ok) throw new Error(`Real escrow provider returned status ${res.status}`);
+      const result = await res.json();
+      if (!result?.providerReference || result?.checksumSha256 !== instruction.checksumSha256 || result?.status !== "accepted") throw new Error("Escrow provider acknowledgement did not exactly match the submitted instruction.");
+      return result;
+    }
+    return { status: "accepted", provider: "mock", providerReference: `ESCROW-MOCK-${instruction.instructionId}`, checksumSha256: instruction.checksumSha256, acceptedAt: new Date().toISOString(), dataResidencyCountry: this.config.escrowDataResidencyCountry };
+  }
+
+  async postCoreBankingBatch(batch = {}) {
+    ensureIndiaDataResidency("Core banking", this.config.coreBankingDataResidencyCountry);
+    if (!batch.batchId || !batch.checksumSha256 || !Number.isInteger(batch.lineCount) || batch.lineCount <= 0 || !Array.isArray(batch.lines) || batch.lines.length !== batch.lineCount) throw new Error("Core-banking batch requires an exact checksum-bound line payload.");
+    if (this.config.coreBankingProvider === "real") {
+      if (!this.config.coreBankingApiUrl || !this.config.coreBankingApiKey) throw new Error("Real core-banking provider configured but API URL or API key is missing.");
+      const res = await fetch(`${this.config.coreBankingApiUrl}/journal-batches`, { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${this.config.coreBankingApiKey}` }, body: JSON.stringify(batch) });
+      if (!res.ok) throw new Error(`Real core-banking provider returned status ${res.status}`);
+      const result = await res.json();
+      if (!result?.providerReference || result?.checksumSha256 !== batch.checksumSha256 || result?.lineCount !== batch.lineCount || result?.status !== "accepted") throw new Error("Core-banking acknowledgement did not exactly match the submitted batch.");
+      return result;
+    }
+    return { status: "accepted", provider: "mock", providerReference: `CBS-MOCK-${batch.batchId}`, checksumSha256: batch.checksumSha256, lineCount: batch.lineCount, acceptedAt: new Date().toISOString(), dataResidencyCountry: this.config.coreBankingDataResidencyCountry };
   }
 }
 

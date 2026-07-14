@@ -129,8 +129,11 @@ import {
   upsertCoLendingArrangement,
   recordCoLendingLoanAllocation,
   computeCoLendingExposure,
+  acknowledgeCoLendingTaxExchange,
+  buildCoLendingProvisionReport,
   buildCoLendingTransferPricingReport,
   createCoLendingSettlementStatement,
+  createCoLendingTaxExchange,
   recordCoLendingSettlementPayment,
   createAccountAggregatorConsent,
   approveAccountAggregatorConsent,
@@ -2447,6 +2450,12 @@ async function route(req, res, dataDir, platformAdminKey) {
     try { sendJson(res, 200, buildCoLendingTransferPricingReport(state, arrangement, from, to)); } catch (err) { sendJson(res, 422, { error: { code: "co_lending_transfer_pricing_blocked", message: err.message } }); } return;
   }
 
+  const coLendingProvisionMatch = path.match(/^\/co-lending-arrangements\/([^/]+)\/provision-report$/);
+  if (method === "GET" && coLendingProvisionMatch) {
+    const state = await store.load(); const arrangementId = decodeURIComponent(coLendingProvisionMatch[1]);
+    try { sendJson(res, 200, buildCoLendingProvisionReport(state, arrangementId, url.searchParams.get("asOf"))); } catch (err) { sendJson(res, 404, { error: { code: "not_found", message: err.message } }); } return;
+  }
+
   const coLendingStatementsMatch = path.match(/^\/co-lending-arrangements\/([^/]+)\/settlement-statements$/);
   if (method === "GET" && coLendingStatementsMatch) {
     const state = await store.load(); const arrangementId = decodeURIComponent(coLendingStatementsMatch[1]); const statements = Object.values(state.coLendingSettlementStatements ?? {}).filter((record) => record.coLendingArrangementId === arrangementId).sort((left, right) => right.to.localeCompare(left.to)); sendJson(res, 200, { count: statements.length, statements }); return;
@@ -2460,11 +2469,46 @@ async function route(req, res, dataDir, platformAdminKey) {
     await store.save(appendEvent({ ...state, coLendingSettlementStatements: { ...(state.coLendingSettlementStatements ?? {}), [result.statement.statementId]: result.statement } }, { type: "co_lending.settlement_statement.approved", statementId: result.statement.statementId, coLendingArrangementId: arrangementId, from: result.statement.from, to: result.statement.to, netPayable: result.statement.totals.netPayable, approvedBy: result.statement.approvedBy })); sendJson(res, 201, { statement: result.statement, idempotent: false }); return;
   }
 
+  const coLendingTaxExchangeMatch = path.match(/^\/co-lending-settlement-statements\/([^/]+)\/tax-exchanges$/);
+  if (method === "GET" && coLendingTaxExchangeMatch) {
+    const state = await store.load(); const statementId = decodeURIComponent(coLendingTaxExchangeMatch[1]); const exchanges = Object.values(state.coLendingTaxExchanges ?? {}).filter((record) => record.statementId === statementId); sendJson(res, 200, { count: exchanges.length, taxExchanges: exchanges }); return;
+  }
+  if (method === "POST" && coLendingTaxExchangeMatch) {
+    const body = await readJson(req); const state = await store.load(); const statementId = decodeURIComponent(coLendingTaxExchangeMatch[1]); const statement = state.coLendingSettlementStatements?.[statementId];
+    if (!statement) { sendJson(res, 404, { error: { code: "not_found", message: "Co-lending settlement statement not found." } }); return; }
+    const existing = state.coLendingTaxExchanges?.[body.taxExchangeId]; if (existing) { sendJson(res, 200, { taxExchange: existing, idempotent: true }); return; }
+    if (Object.values(state.coLendingTaxExchanges ?? {}).some((record) => record.statementId === statementId && record.regulatedEntityId === body.regulatedEntityId)) { sendJson(res, 409, { error: { code: "co_lending_tax_exchange_conflict", message: "A tax exchange already exists for this statement partner leg." } }); return; }
+    const result = createCoLendingTaxExchange(statement, body); if (result.summary.status === "blocked") { sendJson(res, 422, { error: { code: "co_lending_tax_exchange_blocked", message: "Partner tax exchange is blocked." }, findings: result.findings }); return; }
+    await store.save(appendEvent({ ...state, coLendingTaxExchanges: { ...(state.coLendingTaxExchanges ?? {}), [result.taxExchange.taxExchangeId]: result.taxExchange } }, { type: "co_lending.tax_exchange.approved", taxExchangeId: result.taxExchange.taxExchangeId, statementId, regulatedEntityId: result.taxExchange.regulatedEntityId, checksumSha256: result.taxExchange.checksumSha256 })); sendJson(res, 201, { taxExchange: result.taxExchange, idempotent: false }); return;
+  }
+
+  const coLendingTaxAckMatch = path.match(/^\/co-lending-tax-exchanges\/([^/]+)\/acknowledgement$/);
+  if (method === "POST" && coLendingTaxAckMatch) {
+    const body = await readJson(req); const state = await store.load(); const taxExchangeId = decodeURIComponent(coLendingTaxAckMatch[1]); const taxExchange = state.coLendingTaxExchanges?.[taxExchangeId];
+    if (!taxExchange) { sendJson(res, 404, { error: { code: "not_found", message: "Co-lending tax exchange not found." } }); return; }
+    if (taxExchange.acknowledgement) { sendJson(res, 200, { taxExchange, idempotent: true }); return; }
+    const result = acknowledgeCoLendingTaxExchange(taxExchange, body); if (result.blocked) { sendJson(res, 422, { error: { code: "co_lending_tax_acknowledgement_blocked", message: "Status, acknowledgementRef, and recordedBy are required." } }); return; }
+    let financeExceptions = state.financeExceptions ?? {}; let exception = null; if (!result.accepted) { exception = createFinanceExceptionRecord({ sourceType: "co_lending_tax_exchange", sourceId: taxExchangeId, businessDate: state.coLendingSettlementStatements?.[taxExchange.statementId]?.to, exceptionCode: "co_lending_tax_mismatch", description: "Partner GST/TDS acknowledgement does not exactly match the approved tax exchange.", checksumMismatch: body.checksumSha256 !== taxExchange.checksumSha256, amountDifference: Math.round(((Number(body.gstAmount ?? 0) + Number(body.tdsAmount ?? 0)) - (taxExchange.gstAmount + taxExchange.tdsAmount)) * 100) / 100 }); financeExceptions = { ...financeExceptions, [exception.exceptionId]: exception }; }
+    await store.save(appendEvent({ ...state, coLendingTaxExchanges: { ...state.coLendingTaxExchanges, [taxExchangeId]: result.taxExchange }, financeExceptions }, { type: `co_lending.tax_exchange_${result.accepted ? "accepted" : "rejected"}`, taxExchangeId, acknowledgementRef: body.acknowledgementRef, exceptionId: exception?.exceptionId ?? null })); sendJson(res, result.accepted ? 200 : 202, { taxExchange: result.taxExchange, exception }); return;
+  }
+
+  const coLendingEscrowMatch = path.match(/^\/co-lending-settlement-statements\/([^/]+)\/escrow-instructions$/);
+  if (method === "POST" && coLendingEscrowMatch) {
+    const body = await readJson(req); const state = await store.load(); const statementId = decodeURIComponent(coLendingEscrowMatch[1]); const statement = state.coLendingSettlementStatements?.[statementId]; const leg = statement?.partnerLegs?.find((record) => record.regulatedEntityId === body.regulatedEntityId && record.role === "partner");
+    if (!body.instructionId || !statement || !leg || leg.settlementStatus !== "pending" || !body.initiatedBy || !body.approvedBy || body.initiatedBy === body.approvedBy || !body.approvalRef) { sendJson(res, 422, { error: { code: "co_lending_escrow_instruction_blocked", message: "Pending partner leg, instructionId, and independent approval are required." } }); return; }
+    const existing = state.coLendingEscrowInstructions?.[body.instructionId]; if (existing) { sendJson(res, 200, { instruction: existing, idempotent: true }); return; }
+    const immutable = { instructionId: body.instructionId, statementId, coLendingArrangementId: statement.coLendingArrangementId, escrowAccountRef: statement.escrowAccountRef, regulatedEntityId: leg.regulatedEntityId, amount: leg.netPayable, currency: "INR", beneficiaryAccountRef: body.beneficiaryAccountRef, initiatedBy: body.initiatedBy, approvedBy: body.approvedBy, approvalRef: body.approvalRef }; if (!immutable.beneficiaryAccountRef) { sendJson(res, 422, { error: { code: "co_lending_escrow_instruction_blocked", message: "beneficiaryAccountRef is required." } }); return; }
+    const checksumSha256 = createHash("sha256").update(JSON.stringify(immutable)).digest("hex"); const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox });
+    try { const providerAcknowledgement = await manager.submitEscrowInstruction({ ...immutable, checksumSha256 }); const instruction = { ...immutable, checksumSha256, status: "accepted", providerAcknowledgement, submittedAt: new Date().toISOString() }; await store.save(appendEvent({ ...state, coLendingEscrowInstructions: { ...(state.coLendingEscrowInstructions ?? {}), [instruction.instructionId]: instruction } }, { type: "co_lending.escrow_instruction.accepted", instructionId: instruction.instructionId, statementId, regulatedEntityId: instruction.regulatedEntityId, providerReference: providerAcknowledgement.providerReference })); sendJson(res, 201, { instruction, idempotent: false }); } catch (err) { sendJson(res, 502, { error: { code: "co_lending_escrow_provider_failed", message: err.message } }); } return;
+  }
+
   const coLendingPaymentMatch = path.match(/^\/co-lending-settlement-statements\/([^/]+)\/payments$/);
   if (method === "POST" && coLendingPaymentMatch) {
     const body = await readJson(req); const state = await store.load(); const statementId = decodeURIComponent(coLendingPaymentMatch[1]); const statement = state.coLendingSettlementStatements?.[statementId];
     if (!statement) { sendJson(res, 404, { error: { code: "not_found", message: "Co-lending settlement statement not found." } }); return; }
     const existing = state.coLendingSettlementPayments?.[body.paymentId]; if (existing) { sendJson(res, 200, { payment: existing, statement, idempotent: true }); return; }
+    const partnerLeg = statement.partnerLegs.find((record) => record.regulatedEntityId === body.regulatedEntityId); const escrowInstruction = state.coLendingEscrowInstructions?.[body.escrowInstructionId]; if (!escrowInstruction || escrowInstruction.status !== "accepted" || escrowInstruction.statementId !== statementId || escrowInstruction.regulatedEntityId !== body.regulatedEntityId || Math.round(escrowInstruction.amount * 100) !== Math.round(Number(partnerLeg?.netPayable) * 100)) { sendJson(res, 422, { error: { code: "co_lending_payment_escrow_blocked", message: "An accepted checksum-bound escrow instruction matching the approved settlement is required." } }); return; }
+    if ((partnerLeg?.servicingGst ?? 0) > 0 || (partnerLeg?.servicingTds ?? 0) > 0) { const acceptedTax = Object.values(state.coLendingTaxExchanges ?? {}).some((record) => record.statementId === statementId && record.regulatedEntityId === body.regulatedEntityId && record.status === "accepted"); if (!acceptedTax) { sendJson(res, 422, { error: { code: "co_lending_payment_tax_blocked", message: "Accepted partner GST/TDS exchange is required before settlement." } }); return; } }
     if (isAccountingDateClosed(state, body.paidAt ?? new Date().toISOString())) { sendJson(res, 422, { error: { code: "co_lending_payment_closed_period", message: "Partner settlement cannot post into a closed accounting period." } }); return; }
     const result = recordCoLendingSettlementPayment(statement, body); if (result.summary.status === "blocked") { sendJson(res, 422, { error: { code: "co_lending_payment_blocked", message: "Partner settlement payment is blocked." }, findings: result.findings }); return; }
     let financeExceptions = state.financeExceptions ?? {}; let exception = null;
@@ -2894,6 +2938,17 @@ async function route(req, res, dataDir, platformAdminKey) {
     if (existing) { sendJson(res, 200, { delivery: existing, idempotent: true }); return; }
     const delivery = buildGlDeliveryRecord(body, postingRun); await store.save(appendEvent({ ...state, glDeliveries: { ...(state.glDeliveries ?? {}), [delivery.deliveryId]: delivery } }, { type: "accounting.gl.delivery_created", deliveryId: delivery.deliveryId, postingRunId: delivery.postingRunId, targetSystem: delivery.targetSystem, checksumSha256: delivery.checksumSha256, lineCount: delivery.lineCount }));
     sendJson(res, 201, { delivery, idempotent: false }); return;
+  }
+
+  if (method === "GET" && path === "/accounting/core-banking-deliveries") {
+    const state = await store.load(); sendJson(res, 200, { count: Object.keys(state.coreBankingDeliveries ?? {}).length, deliveries: Object.values(state.coreBankingDeliveries ?? {}) }); return;
+  }
+  if (method === "POST" && path === "/accounting/core-banking-deliveries") {
+    const body = await readJson(req); const state = await store.load(); const postingRun = state.accountingPostingRuns?.[body.postingRunId];
+    if (!body.batchId || !postingRun || !body.initiatedBy || !body.approvedBy || body.initiatedBy === body.approvedBy || !body.approvalRef) { sendJson(res, 422, { error: { code: "core_banking_delivery_blocked", message: "batchId, posted run, and independent approval are required." } }); return; }
+    const existing = state.coreBankingDeliveries?.[body.batchId]; if (existing) { sendJson(res, 200, { delivery: existing, idempotent: true }); return; }
+    const glExport = buildGlExportPackage([postingRun]); const batch = { batchId: body.batchId, postingRunId: postingRun.postingRunId, businessDate: postingRun.throughDate, checksumSha256: glExport.checksum, lineCount: glExport.lineCount, debitTotal: glExport.debitTotal, creditTotal: glExport.creditTotal, lines: glExport.lines, initiatedBy: body.initiatedBy, approvedBy: body.approvedBy, approvalRef: body.approvalRef }; const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox });
+    try { const providerAcknowledgement = await manager.postCoreBankingBatch(batch); const delivery = { ...batch, lines: undefined, status: "accepted", providerAcknowledgement, deliveredAt: new Date().toISOString() }; await store.save(appendEvent({ ...state, coreBankingDeliveries: { ...(state.coreBankingDeliveries ?? {}), [delivery.batchId]: delivery } }, { type: "accounting.core_banking_delivery.accepted", batchId: delivery.batchId, postingRunId: delivery.postingRunId, checksumSha256: delivery.checksumSha256, providerReference: providerAcknowledgement.providerReference })); sendJson(res, 201, { delivery, idempotent: false }); } catch (err) { sendJson(res, 502, { error: { code: "core_banking_provider_failed", message: err.message } }); } return;
   }
 
   const glDeliveryAckMatch = path.match(/^\/accounting\/gl-deliveries\/([^/]+)\/acknowledgement$/);
@@ -8286,13 +8341,15 @@ function buildFinanceCloseBlockers(state, businessDate) {
   const unreconciledPostingRuns = postingRuns.filter((run) => !Object.values(state.glReconciliations ?? {}).some((record) => record.postingRunId === run.postingRunId && record.outcome === "matched"));
   const openFinanceExceptions = Object.values(state.financeExceptions ?? {}).filter((record) => record.status === "open" && (!record.businessDate || record.businessDate <= businessDate));
   const unsettledCoLendingStatements = Object.values(state.coLendingSettlementStatements ?? {}).filter((record) => record.to <= businessDate && !["settled"].includes(record.status));
+  const unacknowledgedCoLendingTaxExchanges = Object.values(state.coLendingTaxExchanges ?? {}).filter((record) => state.coLendingSettlementStatements?.[record.statementId]?.to <= businessDate && record.status !== "accepted");
+  const unprovisionedCoLendingAccounts = Object.values(state.loanAccounts ?? {}).filter((account) => account.coLendingAllocation && new Date(account.disbursedAt).getTime() <= cutoff && !Object.values(state.eclProvisions ?? {}).some((record) => record.loanAccountId === account.loanAccountId && record.asOf.slice(0, 10) <= businessDate));
   const coLendingArrangementIds = new Set(Object.values(state.loanAccounts ?? {}).filter((account) => account.coLendingAllocation && new Date(account.disbursedAt).getTime() <= cutoff).map((account) => account.coLendingAllocation.coLendingArrangementId));
   const unreconciledCoLendingArrangements = [...coLendingArrangementIds].filter((arrangementId) => { const current = buildCoLendingIntercompanyReport(state, arrangementId, businessDate); return !Object.values(state.coLendingIntercompanyReconciliations ?? {}).some((record) => record.coLendingArrangementId === arrangementId && record.status === "matched" && record.asOf >= businessDate && record.journalCount === current.journalCount && Math.round(record.dueToAmount * 100) === Math.round(current.dueToAmount * 100) && Math.round(record.dueFromAmount * 100) === Math.round(current.dueFromAmount * 100)); });
-  return { unpostedJournals, paymentExceptions, bankExceptions, openSuspenseReceipts, unacknowledgedTaxFilings, undeliveredPostingRuns, unreconciledPostingRuns, openFinanceExceptions, unsettledCoLendingStatements, unreconciledCoLendingArrangements };
+  return { unpostedJournals, paymentExceptions, bankExceptions, openSuspenseReceipts, unacknowledgedTaxFilings, undeliveredPostingRuns, unreconciledPostingRuns, openFinanceExceptions, unsettledCoLendingStatements, unacknowledgedCoLendingTaxExchanges, unprovisionedCoLendingAccounts, unreconciledCoLendingArrangements };
 }
 
 function financeBlockerCounts(blockers) {
-  return { unpostedJournalCount: blockers.unpostedJournals.length, paymentExceptionCount: blockers.paymentExceptions.length, bankExceptionCount: blockers.bankExceptions.length, openSuspenseReceiptCount: blockers.openSuspenseReceipts.length, unacknowledgedTaxFilingCount: blockers.unacknowledgedTaxFilings.length, undeliveredPostingRunCount: blockers.undeliveredPostingRuns.length, unreconciledPostingRunCount: blockers.unreconciledPostingRuns.length, openFinanceExceptionCount: blockers.openFinanceExceptions.length, unsettledCoLendingStatementCount: blockers.unsettledCoLendingStatements.length, unreconciledCoLendingArrangementCount: blockers.unreconciledCoLendingArrangements.length };
+  return { unpostedJournalCount: blockers.unpostedJournals.length, paymentExceptionCount: blockers.paymentExceptions.length, bankExceptionCount: blockers.bankExceptions.length, openSuspenseReceiptCount: blockers.openSuspenseReceipts.length, unacknowledgedTaxFilingCount: blockers.unacknowledgedTaxFilings.length, undeliveredPostingRunCount: blockers.undeliveredPostingRuns.length, unreconciledPostingRunCount: blockers.unreconciledPostingRuns.length, openFinanceExceptionCount: blockers.openFinanceExceptions.length, unsettledCoLendingStatementCount: blockers.unsettledCoLendingStatements.length, unacknowledgedCoLendingTaxExchangeCount: blockers.unacknowledgedCoLendingTaxExchanges.length, unprovisionedCoLendingAccountCount: blockers.unprovisionedCoLendingAccounts.length, unreconciledCoLendingArrangementCount: blockers.unreconciledCoLendingArrangements.length };
 }
 
 function hasFinanceCloseBlockers(blockers) {

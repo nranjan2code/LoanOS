@@ -69,7 +69,7 @@ LoanOS currently has a strong compliance-first domain foundation and a credible 
 
 The principal gaps before bank production are live integrations, downstream GL certification, regulatory submission formats, product-specific lending depth, full collections/legal recovery, enterprise IAM and key management, observability/DR/BCP, and bank-assurance evidence. Payment operations now have a controlled internal first slice, but live rail/file transport and operating-scale automation remain open. Public product positioning must remain narrower than this catalogue until each advertised journey reaches an agreed maturity level.
 
-The detailed register contains **453 individually identified capabilities**. At this snapshot, 78 are classified `Implemented`, 163 `Partial`, 184 `Missing`, and 28 are mock, partner, external, or composite-status obligations. These counts measure scope coverage, not delivery percentage: a single missing ledger, reconciliation, security, or recovery control can block production even if many smaller capabilities exist.
+The detailed register contains **453 individually identified capabilities**. At this snapshot, 79 are classified `Implemented`, 162 `Partial`, 184 `Missing`, and 28 are mock, partner, external, or composite-status obligations. These counts measure scope coverage, not delivery percentage: a single missing ledger, reconciliation, security, or recovery control can block production even if many smaller capabilities exist.
 
 ## Capability Index
 
@@ -98,7 +98,7 @@ The detailed register contains **453 individually identified capabilities**. At 
 | Workflow and operations | Role-aware queues, approvals and SLAs | Partial |
 | Grievance and conduct | End-to-end complaint resolution and escalation | Partial |
 | Regulatory reporting | Source-to-submission regulatory reporting | Partial/Mock |
-| Finance, tax and treasury | GL, tax, ECL, ALM and profitability | Partial; accounting/tax control plane established, treasury/profitability missing |
+| Finance, tax and treasury | GL, tax, ECL, ALM and profitability | Partial; governed accounting, tax, treasury, profitability, and co-lender attribution slices exist |
 | Portfolio and enterprise risk | Concentration, vintage, EWS and risk appetite | Mostly missing |
 | AI and model governance | Inventoried, validated and interruptible model use | Partial, strong first slice |
 | Audit and compliance assurance | Reproducible evidence and obligation oversight | Partial |
@@ -496,7 +496,7 @@ The detailed register contains **453 individually identified capabilities**. At 
 | PAR-005 | Co-lending agreement, roles, shares, retention, rate, and escrow | Product | Implemented |
 | PAR-006 | Loan-level allocation and share reconciliation | Product | Implemented |
 | PAR-007 | Partner funding, disbursement, and settlement confirmation | Product | Partial |
-| PAR-008 | Partner principal, interest, fee, tax, and provision ledger legs | Product | Partial |
+| PAR-008 | Partner principal, interest, fee, tax, and provision ledger legs | Product | Implemented |
 | PAR-009 | Collection and recovery allocation by partner share | Product | Partial |
 | PAR-010 | Partner reconciliation, break management, and statements | Product | Partial |
 | PAR-011 | Servicing transfer, portfolio sale, assignment, and participation | Product | Missing |

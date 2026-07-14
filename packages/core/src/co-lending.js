@@ -49,6 +49,8 @@ function normalizePartner(partner = {}) {
     feeSharePercent: partner.feeSharePercent ?? sharePercent,
     transferPriceBps: partner.transferPriceBps ?? 0,
     servicingFeeBps: partner.servicingFeeBps ?? 0,
+    servicingGstRateBps: partner.servicingGstRateBps ?? 0,
+    servicingTdsRateBps: partner.servicingTdsRateBps ?? 0,
     grievanceContact: partner.grievanceContact ?? null
   };
 }
@@ -131,6 +133,9 @@ export function validateCoLendingArrangement(arrangement, context = {}) {
     if (!Number.isFinite(feeShare) || feeShare < 0 || feeShare > 100) findings.push(createFinding("error", "RBI-DL-2025", `Partner ${index + 1} feeSharePercent must be between 0 and 100.`, `partners.${index}.feeSharePercent`)); else feeShareSum += feeShare;
     if (!Number.isInteger(partner.transferPriceBps) || partner.transferPriceBps < 0 || partner.transferPriceBps > 10000) findings.push(createFinding("error", "RBI-DL-2025", `Partner ${index + 1} transferPriceBps must be an integer from 0 to 10000.`, `partners.${index}.transferPriceBps`));
     if (!Number.isInteger(partner.servicingFeeBps) || partner.servicingFeeBps < 0 || partner.servicingFeeBps > 10000) findings.push(createFinding("error", "RBI-DL-2025", `Partner ${index + 1} servicingFeeBps must be an integer from 0 to 10000.`, `partners.${index}.servicingFeeBps`));
+    if (![0, 1800].includes(partner.servicingGstRateBps)) findings.push(createFinding("error", "GST-ACT-2017", `Partner ${index + 1} servicingGstRateBps must be 0 or 1800.`, `partners.${index}.servicingGstRateBps`));
+    if (!Number.isInteger(partner.servicingTdsRateBps) || partner.servicingTdsRateBps < 0 || partner.servicingTdsRateBps > 10000) findings.push(createFinding("error", "INCOME-TAX-ACT", `Partner ${index + 1} servicingTdsRateBps must be an integer from 0 to 10000.`, `partners.${index}.servicingTdsRateBps`));
+    if (Number.isInteger(partner.servicingFeeBps) && Number.isInteger(partner.servicingGstRateBps) && Number.isInteger(partner.servicingTdsRateBps) && partner.servicingFeeBps * (10000 + partner.servicingGstRateBps - partner.servicingTdsRateBps) > 100000000) findings.push(createFinding("error", "RBI-DL-2025", `Partner ${index + 1} servicing fee plus net tax cannot exceed its gross collection entitlement.`, `partners.${index}.servicingFeeBps`));
   }
 
   if (partners.length >= 2 && Math.abs(shareSum - 100) > SHARE_TOLERANCE_PERCENT) {

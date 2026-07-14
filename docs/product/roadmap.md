@@ -17,7 +17,7 @@ evidence, acceptance). This section is a rollup only — update status in the tr
 | E | Product breadth & India tax | P1–P2 | REV-42 GST, REV-40 multi-structure amortization, REV-41 revolving/credit-line, REV-43 insurance |
 | F | LWS recovery depth | P2 | REV-50 SARFAESI/Sec-138 legal recovery, REV-51 field-collections |
 | G | Regulatory format fidelity & live integrations | P2 | REV-60 CIC URCF, REV-61 CKYC, REV-62 FIU FINnet, REV-63 CERSAI, REV-64 live providers |
-| H | Architecture & scale | P2 | REV-70 split `server.js`, REV-71 storage scale; REV-72 co-lending ledger economics done |
+| H | Architecture & scale | P2 | REV-70 split `server.js`, REV-71 storage scale; REV-72 co-lending accounting, ECL, tax, escrow and CBS boundary done |
 | I | Go-to-market / positioning | P3 | REV-80 positioning, REV-81 beachhead, REV-82 depth-over-breadth (**decisions**) |
 
 Sequencing guidance: **do WS-A + the P1s in WS-B/C first** (trust and correctness on the path that

@@ -1,5 +1,5 @@
 import { classifyLoanAsset, summarizeLoanAccount } from "./loan-account.js";
-import { buildCoLendingSettlementJournals } from "./co-lending-finance.js";
+import { buildCoLendingProvisionJournals, buildCoLendingSettlementJournals } from "./co-lending-finance.js";
 
 const money = (value) => Math.round(Number(value ?? 0) * 100) / 100;
 const paise = (value) => Math.round(Number(value ?? 0) * 100);
@@ -16,7 +16,7 @@ export function calculateEclAssessment(account, parameterSet, asOf = new Date())
 }
 
 export function buildFinanceJournalEntries(state) {
-  const provisionJournals = Object.values(state.eclProvisions ?? {}).map((record) => movementJournal(record, "ecl_expense", "ecl_loss_allowance"));
+  const provisionJournals = Object.values(state.eclProvisions ?? {}).filter((record) => !state.loanAccounts?.[record.loanAccountId]?.coLendingAllocation).map((record) => movementJournal(record, "ecl_expense", "ecl_loss_allowance"));
   const iracJournals = Object.values(state.iracIncomeAdjustments ?? {}).map((record) => movementJournal(record, "interest_income", "interest_receivable"));
   const tdsJournals = Object.values(state.taxWithholdings ?? {}).map((record) => ({ journalId: `jrnl_${record.withholdingId}`, eventId: record.withholdingId, eventType: "tds_withholding", eventDate: record.paymentDate, currency: "INR", lines: [{ account: record.expenseAccount, side: "debit", amount: record.grossAmount }, { account: "bank_clearing", side: "credit", amount: record.netAmount }, { account: "tds_payable", side: "credit", amount: record.tdsAmount }], debitTotal: record.grossAmount, creditTotal: money(record.netAmount + record.tdsAmount) }));
   const creditNoteJournals = Object.values(state.gstCreditNotes ?? {}).map((record) => { const accounts = record.accountingAccounts ?? {}; return { journalId: `jrnl_${record.creditNoteId}`, loanAccountId: record.loanAccountId, eventId: record.creditNoteId, eventType: "gst_credit_note", eventDate: record.issuedAt, currency: "INR", lines: [{ account: accounts.chargesIncome ?? "charges_income", side: "debit", amount: record.taxableValue }, { account: accounts.outputGstPayable ?? "output_gst_payable", side: "debit", amount: record.gstAmount }, { account: accounts.chargesReceivable ?? "charges_receivable", side: "credit", amount: record.grossAmount }], debitTotal: record.grossAmount, creditTotal: record.grossAmount }; });
@@ -26,7 +26,7 @@ export function buildFinanceJournalEntries(state) {
     const writeOff = record.writeOff ? [{ journalId: `jrnl_${record.writeOff.writeOffId}`, eventId: record.writeOff.writeOffId, eventType: "payment_suspense_written_off", eventDate: record.writeOff.eventDate, currency: "INR", lines: [{ account: "payment_suspense_liability", side: "debit", amount: record.writeOff.amount }, { account: "payment_suspense_writeoff_income", side: "credit", amount: record.writeOff.amount }], debitTotal: record.writeOff.amount, creditTotal: record.writeOff.amount }] : [];
     return [receipt, ...resolutions, ...writeOff];
   });
-  return [...provisionJournals, ...iracJournals, ...tdsJournals, ...creditNoteJournals, ...suspenseJournals, ...buildCoLendingSettlementJournals(state)];
+  return [...provisionJournals, ...buildCoLendingProvisionJournals(state), ...iracJournals, ...tdsJournals, ...creditNoteJournals, ...suspenseJournals, ...buildCoLendingSettlementJournals(state)];
 }
 
 function movementJournal(record, debitAccount, creditAccount) {

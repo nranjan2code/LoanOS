@@ -188,6 +188,26 @@ test("ExternalServiceManager payment rail dispatch enforces India data residency
   );
 });
 
+test("ExternalServiceManager escrow and core-banking mocks preserve exact delivery evidence", async () => {
+  const manager = new ExternalServiceManager();
+  const escrow = await manager.submitEscrowInstruction({ instructionId: "escrow_001", escrowAccountRef: "ESCROW-001", amount: 123.45, checksumSha256: "abc123" });
+  assert.strictEqual(escrow.status, "accepted");
+  assert.strictEqual(escrow.checksumSha256, "abc123");
+  assert.strictEqual(escrow.dataResidencyCountry, "IN");
+
+  const batch = await manager.postCoreBankingBatch({ batchId: "cbs_001", checksumSha256: "def456", lineCount: 1, lines: [{ account: "bank", debit: 123.45, credit: 0 }] });
+  assert.strictEqual(batch.status, "accepted");
+  assert.strictEqual(batch.checksumSha256, "def456");
+  assert.strictEqual(batch.lineCount, 1);
+  assert.strictEqual(batch.dataResidencyCountry, "IN");
+});
+
+test("ExternalServiceManager finance transports fail closed on missing credentials and non-India residency", async () => {
+  await assert.rejects(() => new ExternalServiceManager({ escrowProvider: "real" }).submitEscrowInstruction({ instructionId: "escrow_001", escrowAccountRef: "ESCROW-001", amount: 1, checksumSha256: "abc" }), /Real escrow provider configured but API URL or API key is missing/);
+  await assert.rejects(() => new ExternalServiceManager({ coreBankingProvider: "real" }).postCoreBankingBatch({ batchId: "cbs_001", checksumSha256: "def", lineCount: 1, lines: [{}] }), /Real core-banking provider configured but API URL or API key is missing/);
+  await assert.rejects(() => new ExternalServiceManager({ escrowDataResidencyCountry: "SG" }).submitEscrowInstruction({ instructionId: "escrow_001", escrowAccountRef: "ESCROW-001", amount: 1, checksumSha256: "abc" }), /Co-lending escrow provider data residency country must be IN/);
+});
+
 test("ExternalServiceManager Credit Bureau enforces India data residency", async () => {
   const manager = new ExternalServiceManager({ bureauDataResidencyCountry: "US" });
   await assert.rejects(

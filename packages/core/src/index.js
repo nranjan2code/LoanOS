@@ -226,9 +226,13 @@ export {
 } from "./co-lending.js";
 
 export {
+  acknowledgeCoLendingTaxExchange,
+  buildCoLendingProvisionJournals,
+  buildCoLendingProvisionReport,
   buildCoLendingSettlementJournals,
   buildCoLendingTransferPricingReport,
   createCoLendingSettlementStatement,
+  createCoLendingTaxExchange,
   recordCoLendingSettlementPayment
 } from "./co-lending-finance.js";
 
