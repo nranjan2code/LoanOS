@@ -70,7 +70,7 @@ node docs/gtm/automation/gtm-backlog-sync.mjs
 | C-37 | eSign success creates a tenant-scoped document-vault receipt with checksums and retention policy | Partial | roadmap.md Phase 4; certified eSign envelope onboarding roadmap |
 | C-38 | NACH/UPI payment rail initiation stores masked/hash-only evidence with India residency | Partial | roadmap.md Phase 4; live settlement/reconciliation roadmap |
 | C-39 | CIC reporting crosses a checksum/idempotency-bound provider adapter and reconciles signed callbacks | Partial | roadmap.md Phase 4; proprietary CIC certification remains external |
-| C-40 | Enterprise IAM/SSO, admin maker-checker, deeper key management | Roadmap | what-we-are-building.md next build Epic 11 S5/S6 |
+| C-40 | Enterprise IAM/SSO, admin maker-checker, deeper key management | Partial | architecture/enterprise-security-and-scale.md; live IdP/KMS remains deployment-specific |
 | C-41 | SOC 2 / ISO 27001 certification | Roadmap | roadmap.md S6 certification roadmap |
 | C-42 | Sandbox environments enforce synthetic-only borrowers with mock integration overrides | Built | roadmap.md S5 sandbox environments |
 | C-43 | Revolving credit / overdraft accounts with daily utilised-balance interest | Built | roadmap.md Phase 2 revolving/OD slice |
@@ -79,6 +79,12 @@ node docs/gtm/automation/gtm-backlog-sync.mjs
 | C-46 | External audit-anchor evidence must match the verified tenant chain head and event count | Partial | architecture/data-governance.md; production TSA/WORM service remains deployment-specific |
 | C-47 | Evidence custody enforces India storage, retention, legal holds, and proof-bearing deletion | Built | architecture/data-governance.md; /governance/evidence APIs |
 | C-48 | Critical data-quality failures block maker-checker certification | Partial | architecture/data-governance.md; enterprise catalogue/stewardship remains deployment depth |
+| C-49 | Tenant federation requires MFA, domain/group policy and independently tested metadata before activation | Partial | architecture/enterprise-security-and-scale.md; live token validation remains deployment-specific |
+| C-50 | Idempotent SCIM deactivation immediately removes a federated user's effective access | Partial | architecture/enterprise-security-and-scale.md; live SCIM connector remains deployment-specific |
+| C-51 | Database and backup readiness resolve India-region, HSM-backed, purpose-attested managed keys | Partial | architecture/enterprise-security-and-scale.md; direct KMS/HSM operation remains deployment-specific |
+| C-52 | PostgreSQL HA and PITR readiness requires multi-AZ synchronous topology, WAL, immutable custody, RPO/RTO and restore evidence | Partial | architecture/enterprise-security-and-scale.md; managed database operation remains deployment-specific |
+| C-53 | Published APIs, events and webhooks are checksum, schema, tenancy, ordering, idempotency, retry and dead-letter governed | Partial | architecture/enterprise-security-and-scale.md; dispatch/queue runtime remains deployment-specific |
+| C-54 | Production automation readiness fails closed without supply-chain, migration, rollback, drift, HA/PITR and capacity dependencies | Partial | architecture/enterprise-security-and-scale.md; cloud rollout execution remains deployment-specific |
 
 ## Change process
 

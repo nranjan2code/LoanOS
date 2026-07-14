@@ -4,7 +4,7 @@ Status date: 2026-07-14
 
 ## Control objective
 
-LoanOS must recover tenant and control-plane state without accepting a corrupt, unauthenticated, cross-region, or operationally unapproved recovery point. The current implementation is an application-level recovery control and evidence slice. It does not claim database HA, PITR, multi-AZ/region failover, or a complete business-continuity programme.
+LoanOS must recover tenant and control-plane state without accepting a corrupt, unauthenticated, cross-region, or operationally unapproved recovery point. The current implementation includes application-level recovery plus governed declarations for India multi-AZ synchronous PostgreSQL, continuous-WAL PITR, immutable backup custody, purpose-attested keys, capacity and deployment dependencies. It does not claim to operate the database, replication, archive storage, failover controller, or a complete business-continuity programme.
 
 ## Recovery package
 

@@ -141,8 +141,11 @@ The local provider supports an active version plus decrypt-only previous
 versions. `POST /platform/encryption/rekey` loads all tenants using the
 available source versions, writes them under only the active version, and
 records source/target ids, tenant count, actor, reason, and change ticket in
-the hash-chained platform audit spine. Production KMS/HSM custody, rotation
-ceremonies, and destruction evidence remain open. With no key ring in local
+the hash-chained platform audit spine. Bundle E can attest India-region,
+non-exportable HSM keys by purpose and requires purpose-correct database and
+backup attestations for HA/PITR readiness. Direct KMS grants and key-state
+validation, rotation/destruction execution, and managed volume/WAL/backup
+encryption remain open. With no key ring in local
 development, the driver retains plaintext JSONB behavior for inspectability.
 
 ## What has and has not been verified

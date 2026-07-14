@@ -185,7 +185,7 @@ Recently completed: SaaS tenancy groundwork, tenant onboarding, human login/admi
 
 Immediate next build:
 
-1. Production hardening for tenant lifecycle: enterprise IAM/SSO, MFA, admin maker-checker, deeper key management, and expanded onboarding approvals around the existing wizard/offboarding/export foundation (Epic 11, stage S5/S6).
+1. Production hardening for tenant lifecycle: the federation/SCIM policy and managed-key control planes are executable; next is live IdP token/signature/discovery integration, authenticated SCIM connectivity, direct KMS/HSM grants/key state, and expanded onboarding assurance (Epic 11, stage S5/S6).
 2. Product policy versioning with effective dates and explicit prepayment/foreclosure policy rules.
 3. CKYC adapter boundary and fuller V-CIP evidence vault.
 4. Data-retention, deletion-request, and third-party sharing consent workflows.

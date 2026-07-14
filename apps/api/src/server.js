@@ -2,6 +2,7 @@ import { createServer } from "node:http";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { routeIntegrationControls } from "./routes/integration-controls.js";
 import { routeDataGovernanceControls } from "./routes/data-governance-controls.js";
+import { routeEnterprisePlatformControls, routeEnterpriseTenantControls } from "./routes/enterprise-controls.js";
 import { routeCersaiSearch } from "./routes/cersai-search.js";
 import { createObservabilityRegistry } from "./observability.js";
 import { readFile } from "node:fs/promises";
@@ -361,6 +362,7 @@ import {
   revokeSession,
   sessionEffectiveStatus,
   upsertPlatformUser,
+  upsertFederatedTenantUser,
   upsertTenantUser,
   verifyTotpCode
 } from "./identity.js";
@@ -1082,6 +1084,7 @@ async function route(req, res, dataDir, platformAdminKey, observability) {
   }
 
   if (await routeDataGovernanceControls({ method, path, req, res, tenant, store, readJson, sendJson, appendEvent })) return;
+  if (await routeEnterpriseTenantControls({ method, path, req, res, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor, upsertFederatedTenantUser })) return;
 
   // Standing sub-processor disclosure: every authenticated tenant RE can read
   // the platform-wide register of LoanOS sub-processors that apply to it.
@@ -8501,6 +8504,8 @@ async function routePlatform(req, res, { dataDir, platformAdminKey, method, path
     return;
   }
   const authContext = platformAuth.authContext;
+
+  if (await routeEnterprisePlatformControls({ method, path, req, res, dataDir, authContext, readJson, sendJson, hasPlatformRole, authActor, loadWholeState, saveWholeState, appendPlatformEvent })) return;
 
   if (method === "GET" && path === "/platform/control-assurance") {
     if (!hasPlatformRole(authContext, ["platform_admin", "security_admin", "auditor"])) { sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } }); return; }

@@ -67,9 +67,9 @@ Composite labels such as `Partial/Mock` identify a mixed capability: some intern
 
 LoanOS currently has a strong compliance-first domain foundation and executable slices for amortising, bullet, moratorium, step-up, and revolving facilities. Its best-developed capabilities are tenant isolation, KFS and fund-flow gates, policy/evidence lineage, maker-checker, audit integrity, borrower privacy rights, model governance, deterministic decision-engine infrastructure, and finance controls.
 
-The principal gaps before bank production are live integrations, downstream GL certification, regulatory submission formats, product-specific lending depth, repossession/auction and legal-expense depth, enterprise IAM and key management, durable India-hosted observability/SIEM operations, production HA/PITR and multi-region infrastructure, and independent bank-assurance evidence. Bounded observability, encrypted recovery, governed release, configuration drift/parity, concurrent HTTP resilience probes, support/problem evidence, vendor SLA/concentration controls, artifact-bound scan/SBOM/vulnerability release gates, SOC alert/investigation/evidence controls, and compliance test/certification/audit/committee records now provide local operational evidence; institutional control methodology and independent effectiveness testing, evidence/workpaper systems, confidential auditor/regulator workspaces, independently operated security scanners and pen tests, SIEM/log/WORM custody, authenticated collectors, NTP/SOAR/forensics and SOC effectiveness, managed backup/PITR, deployment-controller integration, ITSM/paging/status communication, tested 24x7 staffing, production-scale soak/chaos testing, contract enforcement, full fourth-party/portfolio/regional concentration, real failover/failback, and exercised business continuity remain open. Collections and legal recovery have a controlled first slice, but dialer integration, route/capacity optimization, track-specific pleadings, court integration, possession, auction, and recovery accounting remain open. Public product positioning must remain narrower than this catalogue until each advertised journey reaches an agreed maturity level.
+The principal gaps before bank production are live integrations, downstream GL certification, regulatory submission formats, product-specific lending depth, repossession/auction and legal-expense depth, live IdP/KMS/SIEM/database/deployment infrastructure, and independent bank-assurance evidence. The product now governs federation/SCIM state, purpose-attested keys, security-log custody, PostgreSQL HA/PITR/capacity dependencies, API/event/webhook contracts and deployment readiness alongside bounded observability, encrypted recovery, governed release, security assurance, SOC investigation and compliance evidence. Actual token/signature validation, KMS grants, SIEM/WORM/NTP/collectors, managed replication/WAL/PITR, queue/dispatch/replay workers, cloud rollout controllers, institutional control methodology, pen tests, ITSM/paging, 24x7 staffing, production-scale soak/chaos, contract enforcement, real failover/failback and exercised continuity remain open. Collections/legal recovery also retains partner depth for dialers, route/capacity optimization, court integration, possession, auction and recovery accounting. Public positioning must remain narrower than this catalogue until each advertised journey reaches agreed maturity.
 
-The detailed register contains **453 individually identified capabilities**. At this snapshot, 87 are classified `Implemented`, 198 `Partial`, 141 `Missing`, and 27 are mock, partner, external, or composite-status obligations. These counts measure scope coverage, not delivery percentage: a single missing ledger, reconciliation, security, or recovery control can block production even if many smaller capabilities exist.
+The detailed register contains **453 individually identified capabilities**. At this snapshot, 87 are classified `Implemented`, 219 `Partial`, 120 `Missing`, and 27 are mock, partner, external, or composite-status obligations. These counts measure scope coverage, not delivery percentage: a single missing ledger, reconciliation, security, or recovery control can block production even if many smaller capabilities exist.
 
 ## Capability Index
 
@@ -632,8 +632,8 @@ The detailed register contains **453 individually identified capabilities**. At 
 | ID | Capability | Applicability | Status |
 | --- | --- | --- | --- |
 | SEC-001 | Local human authentication and secure password hashing | Core | Implemented |
-| SEC-002 | Enterprise OIDC/SAML federation and tenant IdP policy | Core | Missing |
-| SEC-003 | SCIM provisioning/deprovisioning and group mapping | Core | Missing |
+| SEC-002 | Enterprise OIDC/SAML federation and tenant IdP policy | Core | Partial |
+| SEC-003 | SCIM provisioning/deprovisioning and group mapping | Core | Partial |
 | SEC-004 | Enforced MFA, step-up authentication, and recovery | Core | Partial |
 | SEC-005 | Fine-grained RBAC/ABAC and separation-of-duty policy | Core | Partial |
 | SEC-006 | Privileged access management and just-in-time elevation | Core | Partial |
@@ -655,11 +655,11 @@ The detailed register contains **453 individually identified capabilities**. At 
 | --- | --- | --- | --- |
 | INT-001 | Versioned REST API and consistent error contract | Core | Partial |
 | INT-002 | Tenant authentication, scopes, idempotency, and rate limits | Core | Partial |
-| INT-003 | Webhooks/events with signing, retries, ordering, and replay | Core | Missing |
+| INT-003 | Webhooks/events with signing, retries, ordering, and replay | Core | Partial |
 | INT-004 | Provider adapter boundary and India-residency guard | Core | Implemented |
 | INT-005 | Provider health, timeout, retry, circuit breaker, and fail-closed policy | Core | Partial |
 | INT-006 | Callback correlation, acknowledgement, and reconciliation | Core | Partial |
-| INT-007 | API catalogue, OpenAPI, examples, SDK, and sandbox | Core | Missing |
+| INT-007 | API catalogue, OpenAPI, examples, SDK, and sandbox | Core | Partial |
 | INT-008 | Core banking, GL, CRM, DMS, data warehouse, and identity connectors | Institution | Missing |
 | INT-009 | Bureau, AA, CKYC, V-CIP, eSign, bank verify, payment, comms, CERSAI, and FIU providers | Product | Partial/Mock |
 | INT-010 | Event schema registry, lineage, backward compatibility, and deprecation | Core | Partial |

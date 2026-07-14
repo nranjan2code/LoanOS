@@ -1,22 +1,22 @@
 {
-  "generated": "2026-07-14T16:31:39.134Z",
+  "generated": "2026-07-14T16:49:16.251Z",
   "git": {
     "branch": "main",
-    "count": 151,
+    "count": 153,
     "commits": []
   },
   "overall": {
     "counts": {
       "Implemented": 87,
-      "Partial": 215,
+      "Partial": 219,
       "Partial/Mock": 11,
       "Mock": 7,
-      "Missing": 124,
+      "Missing": 120,
       "Partner": 3,
       "External": 6
     },
     "total": 453,
-    "pct": 40
+    "pct": 41
   },
   "planes": [
     {
@@ -321,21 +321,21 @@
         {
           "n": 29,
           "name": "Identity, Security, and Cyber Controls",
-          "pct": 43,
+          "pct": 48,
           "total": 17
         }
       ],
       "counts": {
         "Implemented": 2,
-        "Partial": 11,
+        "Partial": 13,
         "Partial/Mock": 0,
         "Mock": 0,
-        "Missing": 2,
+        "Missing": 0,
         "Partner": 0,
         "External": 2
       },
       "total": 17,
-      "pct": 43
+      "pct": 48
     },
     {
       "name": "Data & Integration",
@@ -343,21 +343,21 @@
         {
           "n": 30,
           "name": "Integrations, APIs, Events, and Data Platform",
-          "pct": 27,
+          "pct": 33,
           "total": 14
         }
       ],
       "counts": {
         "Implemented": 1,
-        "Partial": 6,
+        "Partial": 8,
         "Partial/Mock": 1,
         "Mock": 0,
-        "Missing": 6,
+        "Missing": 4,
         "Partner": 0,
         "External": 0
       },
       "total": 14,
-      "pct": 27
+      "pct": 33
     },
     {
       "name": "Reliability & Ops",
@@ -5955,8 +5955,8 @@
           "id": "SEC-002",
           "name": "Enterprise OIDC/SAML federation and tenant IdP policy",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -5968,8 +5968,8 @@
           "id": "SEC-003",
           "name": "SCIM provisioning/deprovisioning and group mapping",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -6162,15 +6162,15 @@
       ],
       "counts": {
         "Implemented": 2,
-        "Partial": 11,
+        "Partial": 13,
         "Partial/Mock": 0,
         "Mock": 0,
-        "Missing": 2,
+        "Missing": 0,
         "Partner": 0,
         "External": 2
       },
       "total": 17,
-      "pct": 43
+      "pct": 48
     },
     {
       "n": 30,
@@ -6207,8 +6207,8 @@
           "id": "INT-003",
           "name": "Webhooks/events with signing, retries, ordering, and replay",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -6259,8 +6259,8 @@
           "id": "INT-007",
           "name": "API catalogue, OpenAPI, examples, SDK, and sandbox",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -6362,15 +6362,15 @@
       ],
       "counts": {
         "Implemented": 1,
-        "Partial": 6,
+        "Partial": 8,
         "Partial/Mock": 1,
         "Mock": 0,
-        "Missing": 6,
+        "Missing": 4,
         "Partner": 0,
         "External": 0
       },
       "total": 14,
-      "pct": 27
+      "pct": 33
     },
     {
       "n": 31,
@@ -7059,9 +7059,9 @@
     }
   ],
   "tests": {
-    "pass": 259,
+    "pass": 265,
     "fail": 0,
-    "total": 264,
+    "total": 270,
     "ran": true
   }
 }

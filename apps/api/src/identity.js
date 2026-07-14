@@ -262,6 +262,19 @@ export function upsertTenantUser(users = {}, input, now = new Date()) {
   };
 }
 
+export function upsertFederatedTenantUser(users = {}, input, now = new Date()) {
+  const existingRecord = input?.userId ? users[input.userId] : findUserByEmail(users, input?.email);
+  if (existingRecord && existingRecord.authenticationSource !== "federated") {
+    return { users, user: publicTenantUser(existingRecord), findings: [{ code: "federated_identity_conflict", message: "SCIM cannot take over a locally managed identity." }] };
+  }
+  const existing = existingRecord ?? {};
+  const user = normalizeTenantUser({ ...input, passwordHash: null, mfaRequired: true }, existing, now);
+  const findings = validateTenantUser(user, { isCreate: !existingRecord, passwordProvided: false, rawPassword: null, allowNoPassword: true });
+  if (!input.federationPolicyId || !input.federationExternalId || input.authenticationSource !== "federated") findings.push({ code: "federated_identity_invalid", message: "Federation policy, external identity, and federated authentication source are required." });
+  if (findings.length > 0) return { users, user: publicTenantUser(user), findings };
+  return { users: { ...users, [user.userId]: user }, user: publicTenantUser(user), findings: [] };
+}
+
 export function upsertPlatformUser(users = {}, input, now = new Date()) {
   const existingRecord = input?.userId ? users[input.userId] : findUserByEmail(users, input?.email);
   const existing = existingRecord ?? {};
@@ -719,6 +732,9 @@ function normalizeTenantUser(input = {}, existing = {}, now = new Date()) {
     queues: normalizeStringList(input.queues ?? existing.queues),
     canAssignQueues: normalizeStringList(input.canAssignQueues ?? existing.canAssignQueues),
     country: input.country ?? existing.country ?? "IN",
+    authenticationSource: input.authenticationSource ?? existing.authenticationSource ?? "local",
+    federationPolicyId: input.federationPolicyId ?? existing.federationPolicyId ?? null,
+    federationExternalId: input.federationExternalId ?? existing.federationExternalId ?? null,
     passwordHash: input.password ? hashPassword(input.password) : input.passwordHash ?? existing.passwordHash ?? null,
     // An admin who directly sets/resets a password knows that credential, so
     // the account must rotate it at next login; self-service password

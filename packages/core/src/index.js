@@ -222,6 +222,26 @@ export {
   registerDataLineage
 } from "./data-governance.js";
 export {
+  applyScimIdentityEvent,
+  assessFederationPolicy,
+  certifyFederationPolicy,
+  createFederationPolicy
+} from "./enterprise-identity.js";
+export {
+  assessPlatformCapacity,
+  createWebhookSubscription,
+  projectEnterprisePlatform,
+  queueWebhookDelivery,
+  recordWebhookOutcome,
+  registerApiContract,
+  registerDatabaseTopology,
+  registerDeploymentAutomationPolicy,
+  registerEventSchema,
+  registerManagedKeyAttestation,
+  registerPitrPolicy,
+  registerSecurityLogCustody
+} from "./enterprise-platform.js";
+export {
   PROVIDER_INTEGRATIONS,
   assessProviderCertification,
   certifyProvider,

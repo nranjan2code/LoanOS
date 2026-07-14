@@ -29,6 +29,8 @@ the [build backlog's Large Delivery Bundle Sequence](build-backlog.md#large-deli
 
 Bundle D status: audit/data-governance product controls are complete for verified external-anchor evidence, critical business-event completeness, evidence custody/legal holds/deletion proof, field lineage, and declarative DQ certification. Production TSA/WORM infrastructure and institution-wide stewardship remain external/deployment work.
 
+Bundle E status: enterprise-security/scale product controls are complete for certified federation and SCIM identity state, purpose-attested managed keys, security-log custody, PostgreSQL HA/PITR/capacity dependencies, OpenAPI/event/webhook governance, and deployment-automation readiness. Live IdP, KMS/HSM, SIEM/WORM/NTP, managed database/queue, and cloud rollout controllers remain external deployment work.
+
 ## Cross-Cutting Workstream: SaaS Tenancy and Vendor Posture
 
 Status: S1–S9 first slice complete for every task (tenant partitioning, tenant-scoped service auth, tenant/platform human sessions, tenant user admin, access reviews, service-key rotation, isolation suite, hash-chained audit spine + evidence export, tenant portability export + evidenced offboarding, disclosed sub-processor register, 6-hour incident-notification workflow, audited platform-staff break-glass access, uniform audit provenance stamping, artifact-bound security assurance, governed SOC investigation records, and compliance-control assurance/audit evidence).
