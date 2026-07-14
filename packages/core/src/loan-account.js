@@ -121,6 +121,7 @@ export function createLoanAccountFromApplication(application, disbursement, now 
     productId: application.productId ?? application.product?.productId ?? null,
     productCode: application.product?.productCode ?? null,
     accountingProfile: application.product?.accountingProfile ?? null,
+    paymentAllocationWaterfall: application.product?.paymentAllocationWaterfall ?? ["interest", "charges", "principal"],
     status: ACTIVE_STATUS,
     currency: application.kfs?.currency ?? application.product?.currency ?? "INR",
     principalAmount: roundMoney(principalAmount),
@@ -594,12 +595,15 @@ export function postPaymentToLoanAccount(account, input, now = new Date()) {
   const receivedAt = input.receivedAt ? new Date(input.receivedAt) : now;
   const balance = summarizeLoanAccount(account, receivedAt);
   let remaining = roundMoney(input.amount);
-  const interestCredit = roundMoney(Math.min(remaining, balance.interestOutstanding));
-  remaining = roundMoney(remaining - interestCredit);
-  const chargesCredit = roundMoney(Math.min(remaining, balance.chargesOutstanding));
-  remaining = roundMoney(remaining - chargesCredit);
-  const principalCredit = roundMoney(Math.min(remaining, balance.principalOutstanding));
-  remaining = roundMoney(remaining - principalCredit);
+  const allocated = { interest: 0, charges: 0, principal: 0 };
+  const outstanding = { interest: balance.interestOutstanding, charges: balance.chargesOutstanding, principal: balance.principalOutstanding };
+  for (const component of account.paymentAllocationWaterfall ?? ["interest", "charges", "principal"]) {
+    allocated[component] = roundMoney(Math.min(remaining, outstanding[component]));
+    remaining = roundMoney(remaining - allocated[component]);
+  }
+  const interestCredit = allocated.interest;
+  const chargesCredit = allocated.charges;
+  const principalCredit = allocated.principal;
   const unappliedAmount = roundMoney(Math.max(0, remaining));
 
   const paymentEvent = {
@@ -616,6 +620,7 @@ export function postPaymentToLoanAccount(account, input, now = new Date()) {
     unappliedAmount,
     paymentRef: input.paymentRef,
     channel: input.channel ?? null,
+    allocationWaterfall: [...(account.paymentAllocationWaterfall ?? ["interest", "charges", "principal"])],
     actor: input.actor ?? "system"
   };
   const updatedLedger = [...(account.ledger ?? []), paymentEvent];

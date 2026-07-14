@@ -22,7 +22,7 @@ The current implementation is intentionally small:
 - Internal staff workspace in `apps/dashboard/`.
 - Borrower customer portal in `apps/customer/`: a responsive, white-labelled journey home with prioritised next actions, visual application milestones, repayment schedules, a document centre, guided media, grievance tracking, and DPDP access/correction/erasure controls.
 - Shared design system tokens in `apps/shared/`.
-- Automated tests in `tests/`: 172 file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
+- Automated tests in `tests/`: 175 file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
 
 Run it:
 
@@ -53,6 +53,7 @@ npm run dev:api
 | `packages/core/src/application-workflow.js` | LOS application state machine, KFS workflow, human review, decision proposal, manual underwriting override gate for referred applications, coded decline-reason taxonomy, maker-checker approval, disbursement transition. |
 | `packages/core/src/loan-account.js` | LMS loan account creation, amortization schedule, ledger balance reconstruction, interest accrual, payment posting, part-prepayment re-amortization, foreclosure quote and payoff, closure No-Objection Certificate, statements, charges, waivers, reversals, delinquency, collections reminders (RBI FPC contact-hours gate), recovery controls, hardship restructure, floating-rate interest rate resets, settlement/write-off, asset classification, and CIC snapshots. |
 | `packages/core/src/finance-accounting.js` | Governed ECL assessment and allowance movements, finance-only journal projection, IRAC income-reversal journals, TDS journals/return extracts, and GST invoice/credit-note return aggregation. |
+| `packages/core/src/payment-operations.js` | Suspense-receipt creation, partial loan allocation, and independently approved residual write-off; all amounts remain exact to paise and resolutions post through the canonical loan-payment function. |
 | `packages/core/src/finance-management.js` | EIR fee-amortisation journals, funding-cost attribution, ALM maturity buckets, profitability, economic-capital, and RAROC reporting. |
 | `packages/core/src/loan-policy.js` | India-only loan validation, KFS validation (including prepayment/foreclosure checks), sanction readiness, disbursement checks. |
 | `packages/core/src/model-governance.js` | AI/model inventory (including generative model class), model status, governed lifecycle transitions with a validation gate (fairness/explainability/monitoring for high-risk, adversarial/hallucination testing for generative), drift monitoring with auto kill-switch, global/model kill switch, kill-switch incident and post-incident review workflow, runtime model-use evaluation. |
@@ -133,11 +134,19 @@ npm run dev:api
 | `POST /integrations/payment-rails/nach-presentments` | Creates a single NACH debit presentment against a registered mandate; initiation itself cannot credit a loan account. |
 | `POST /integrations/payment-rails/upi-collects` | Creates a UPI collect request through `ExternalServiceManager`, stores masked/hash-only VPA evidence with provider/status data, and seals the initiation into the tenant audit chain. |
 | `POST /integrations/payment-rails/settlements` | Reconciles one idempotent UPI provider callback. Only an exact match to an initiated collect and active loan account posts a repayment; failed, returned, mismatched, and unknown callbacks remain exception records. |
+| `GET/POST /integrations/payment-rails/settlement-files` | Lists or ingests an idempotent checksum-sealed provider file, independently acknowledging every matched, duplicate, exception, or rejected row while using the canonical settlement reconciler. |
+| `POST /integrations/payment-rails/nach-due-presentments` | Creates a tenant due-collection batch from ledger-derived overdue amounts, active registered mandates, mandate caps, and same-due duplicate prevention. |
 | `GET /payment-reconciliations` | Lists provider settlement reconciliation records, including matched postings and unresolved exceptions. |
 | `POST /payment-reconciliations/:id/resolution` | Resolves an unresolved provider-settlement exception with named resolver, approval evidence, and reason. |
 | `POST /bank-statements/entries` | Matches an idempotent bank-statement credit to an already-posted provider settlement; unmatched or mismatched credits remain finance exceptions and cannot create a borrower payment. |
 | `GET /bank-reconciliations` | Lists matched and exception bank-statement reconciliation records. |
 | `POST /bank-reconciliations/:id/resolution` | Resolves an unresolved bank-statement exception with named resolver, approval evidence, and reason. |
+| `GET/POST /payment-suspense/receipts` | Lists or records unidentified, advance, excess, provider-mismatch, and bank-unmatched receipts in the suspense liability. |
+| `POST /payment-suspense/receipts/:id/resolution` | Partially or fully allocates suspense to an active loan through the canonical payment ledger under independent maker-checker approval. |
+| `POST /payment-suspense/receipts/:id/write-off` | Writes off only the remaining open suspense under independent approval and creates a balanced finance journal. |
+| `GET /finance/reconciliation-breaks` | Unifies open provider, bank, and suspense breaks with ageing, ownership, due-date status, and resolution/write-off links. |
+| `POST /finance/reconciliation-breaks/:id/assignment` | Assigns an open break to a named operator with an accountable owner and due date. |
+| `POST /finance/reconciliation-breaks/:id/write-off` | Writes off provider or bank exceptions only under maker-checker control; suspense uses its dedicated write-off route. |
 | `GET /accounting/journals` | Projects immutable loan-ledger events into balanced, read-only double-entry journals using the accounting profile frozen on each loan at disbursement; optionally filters by `loanAccountId`. |
 | `GET /accounting/trial-balance` | Returns a tenant-scoped derived trial balance from journal projections, optionally for one loan account. |
 | `GET /accounting/posting-runs` | Lists immutable, approval-evidenced tenant GL posting-run snapshots. |
@@ -162,13 +171,14 @@ npm run dev:api
 | `POST /accounting/irac-recovery-recognitions` | Links cash-basis recovery recognition to an earlier reversal and an actual interest-bearing payment. |
 | `POST /accounting/posting-runs` | Posts all unposted balanced journals through a date into an immutable tenant batch; run ID retries are idempotent. |
 | `GET /accounting/reconciliation-certifications` | Lists dated finance reconciliation certifications for the tenant. |
-| `POST /accounting/reconciliation-certifications` | Certifies a business date only after all journals are posted and provider/bank exceptions are clear, retaining named approval evidence. |
+| `POST /accounting/reconciliation-certifications` | Certifies a business date only after all journals are posted, provider/bank exceptions and suspense are clear, and tax filings are acknowledged, retaining named approval evidence. |
 | `POST /accounting/business-dates/:date/close` | Closes a reconciliation-certified business date, blocking later posting through that date. |
 | `POST /accounting/business-dates/:date/reopen` | Reopens a closed date only with independent actor, approval evidence, and reason. |
 | `POST /loan-accounts/:id/refunds` | Issues an approved, idempotent refund only against the unapplied portion of an existing payment; principal and interest corrections remain ledger reversals. |
 | `POST /loan-accounts/:id/disbursement-return` | Cancels a failed outward disbursement before any repayment or servicing activity, reversing the original principal debit with approval evidence. |
 | `GET /loan-accounts/:id/cooling-off-quote` | Quotes principal plus proportionate interest within the KFS cooling-off period; execution/payout remains the next workflow step. |
 | `POST /loan-accounts/:id/cooling-off-cancellation` | Cancels an account within the quoted KFS cooling-off window after exact borrower repayment, preserving the principal and proportionate-interest evidence. |
+| `POST /loan-accounts/:id/payment-corrections` | Posts an idempotent, value-dated payment through the canonical payment authority with receipt date, backdated flag, reason, and independent approval; future and closed-period value dates fail closed. |
 | `POST /integrations/bank-account-verification` | Verifies a borrower/end-beneficiary bank account through `ExternalServiceManager`, returning sanitized evidence (`verificationRef`, IFSC, last four digits, status/name match) and sealing the attempt into the tenant audit chain. |
 | `POST /integrations/credit-bureau` | Queries Credit Bureau (CIBIL equivalent) score for a given PAN; enforces data residency and returns the bureau report. |
 | `POST /integrations/vcip/video-analysis` | Invokes V-CIP video analysis / facial match; enforces data residency and returns V-CIP verification outcome. |

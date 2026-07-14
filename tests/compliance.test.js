@@ -66,6 +66,7 @@ import {
   upsertConsentRecord,
   upsertKycRecord,
   selectProductPolicyVersion,
+  postPaymentToLoanAccount,
   summarizeLoanAccount,
   upsertProductPolicy,
   upsertRecoveryAgent,
@@ -348,6 +349,19 @@ test("repayment schedule is exact to the paise — principal reconstructs with n
   // The sum of scheduled principal equals the disbursed principal exactly.
   assert.equal(principalPaise, toPaise(principalAmount));
   assert.equal(result.schedule.at(-1).closingPrincipal, 0);
+});
+
+test("product payment allocation waterfall is frozen and applied in configured order", () => {
+  const account = {
+    loanAccountId: "loan_waterfall_001", status: "active", paymentAllocationWaterfall: ["charges", "principal", "interest"], schedule: [],
+    ledger: [
+      { eventId: "disb_1", type: "disbursement", eventDate: "2026-01-01T00:00:00.000Z", principalDebit: 1000, principalCredit: 0, interestCredit: 0, chargesDebit: 0, chargesCredit: 0, chargesWaiverCredit: 0, unappliedAmount: 0 },
+      { eventId: "int_1", type: "interest_accrual", eventDate: "2026-02-01T00:00:00.000Z", principalDebit: 0, principalCredit: 0, interestDebit: 100, interestCredit: 0, chargesDebit: 0, chargesCredit: 0, chargesWaiverCredit: 0, unappliedAmount: 0 },
+      { eventId: "fee_1", type: "charge_assessment", eventDate: "2026-02-01T00:00:00.000Z", principalDebit: 0, principalCredit: 0, interestCredit: 0, chargesDebit: 50, chargesCredit: 0, chargesWaiverCredit: 0, unappliedAmount: 0 }
+    ]
+  };
+  const result = postPaymentToLoanAccount(account, { amount: 200, receivedAt: "2026-02-02T00:00:00.000Z", paymentRef: "WF-001" });
+  assert.equal(result.summary.status, "ready"); assert.equal(result.paymentEvent.chargesCredit, 50); assert.equal(result.paymentEvent.principalCredit, 150); assert.equal(result.paymentEvent.interestCredit, 0); assert.deepEqual(result.paymentEvent.allocationWaterfall, ["charges", "principal", "interest"]);
 });
 
 test("GST decomposes an inclusive fee into base + 18% tax, and exempts penal/statutory charges (REV-42)", () => {
@@ -7012,6 +7026,8 @@ test("payment rail settlement reconciles once before posting a UPI repayment", a
   assert.equal(unmatched.status, 202);
   assert.equal(unmatched.body.reconciliation.outcome, "exception");
   assert.equal(unmatched.body.reconciliation.exceptionCode, "unmatched_payment_rail");
+  const writtenOffBreak = await postJson(`${base}/finance/reconciliation-breaks/${encodeURIComponent(`payment:${unmatched.body.reconciliation.reconciliationId}`)}/write-off`, { writeOffId: "payment_break_wo_001", proposedBy: "recon_analyst", approvedBy: "finance_controller", approvalRef: "FIN-APR-BREAK-001", reason: "Provider confirmed irrecoverable orphan event" });
+  assert.equal(writtenOffBreak.status, 200); assert.equal(writtenOffBreak.body.break.status, "written_off");
 });
 
 test("NACH presentment settles through the same reconciliation gate", async (t) => {
@@ -7040,6 +7056,57 @@ test("NACH presentment settles through the same reconciliation gate", async (t) 
   });
   assert.equal(settled.status, 200);
   assert.equal(settled.body.paymentEvent.channel, "nach");
+});
+
+test("payment operations control suspense, break ownership, value-date corrections, and write-off", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-payment-operations-"));
+  t.after(async () => { await rm(dataDir, { recursive: true, force: true }); });
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] }); await listen(server);
+  t.after(async () => { await close(server); });
+  const base = `http://127.0.0.1:${server.address().port}`; const application = await approveAndDisburseApplication(base);
+  const account = await (await apiFetch(`${base}/loan-accounts/${application.loanAccountId}`)).json(); const valueDate = account.schedule[0].dueDate;
+
+  const received = await postJson(`${base}/payment-suspense/receipts`, { suspenseId: "suspense_ops_001", transactionRef: "BANK-UNIDENTIFIED-001", amount: 1000, reasonCode: "unidentified", valueDate, createdBy: "finance_ops" });
+  assert.equal(received.status, 201); assert.equal(received.body.receipt.status, "open");
+  const blockedCertification = await postJson(`${base}/accounting/reconciliation-certifications`, { businessDate: valueDate, certifiedBy: "finance_controller", approvalRef: "FIN-CERT-BLOCKED" });
+  assert.equal(blockedCertification.status, 422); assert.equal(blockedCertification.body.blockers.openSuspenseReceiptCount, 1);
+  const queue = await (await apiFetch(`${base}/finance/reconciliation-breaks`)).json();
+  assert.equal(queue.count, 1); assert.equal(queue.breaks[0].breakId, "suspense:suspense_ops_001");
+  const assigned = await postJson(`${base}/finance/reconciliation-breaks/${encodeURIComponent("suspense:suspense_ops_001")}/assignment`, { assignedTo: "ops_analyst", assignedBy: "ops_manager", dueAt: "2099-01-01T00:00:00.000Z" });
+  assert.equal(assigned.status, 200); assert.equal(assigned.body.break.assignment.assignedTo, "ops_analyst");
+  const resolved = await postJson(`${base}/payment-suspense/receipts/suspense_ops_001/resolution`, { resolutionId: "suspense_res_001", loanAccountId: application.loanAccountId, amount: 600, valueDate, proposedBy: "ops_analyst", approvedBy: "ops_manager", approvalRef: "OPS-APR-001", reason: "Borrower account identified" });
+  assert.equal(resolved.status, 200); assert.equal(resolved.body.receipt.status, "partially_resolved"); assert.equal(resolved.body.receipt.remainingAmount, 400);
+  const writtenOff = await postJson(`${base}/payment-suspense/receipts/suspense_ops_001/write-off`, { writeOffId: "suspense_wo_001", proposedBy: "ops_analyst", approvedBy: "finance_controller", approvalRef: "FIN-APR-001", reason: "Irrecoverable residual", eventDate: `${valueDate}T12:00:00.000Z` });
+  assert.equal(writtenOff.status, 200); assert.equal(writtenOff.body.receipt.status, "written_off");
+  const journals = await (await apiFetch(`${base}/accounting/journals`)).json(); const suspenseJournals = journals.journals.filter((journal) => String(journal.eventType).startsWith("payment_suspense_"));
+  assert.equal(suspenseJournals.length, 3); assert(suspenseJournals.every((journal) => journal.debitTotal === journal.creditTotal));
+
+  const corrected = await postJson(`${base}/loan-accounts/${application.loanAccountId}/payment-corrections`, { correctionId: "corr_001", paymentRef: "BANK-CORRECTION-001", amount: 100, valueDate, receivedAt: `${valueDate}T12:00:00.000Z`, reasonCode: "bank_value_date_correction", proposedBy: "ops_analyst", approvedBy: "ops_manager", approvalRef: "OPS-APR-002" });
+  assert.equal(corrected.status, 200); assert.equal(corrected.body.paymentEvent.valueDate, valueDate); assert.equal(corrected.body.paymentEvent.approvedBy, "ops_manager");
+  const correctionRetry = await postJson(`${base}/loan-accounts/${application.loanAccountId}/payment-corrections`, { correctionId: "corr_001", paymentRef: "BANK-CORRECTION-001", amount: 100, valueDate, receivedAt: `${valueDate}T12:00:00.000Z`, reasonCode: "bank_value_date_correction", proposedBy: "ops_analyst", approvedBy: "ops_manager", approvalRef: "OPS-APR-002" });
+  assert.equal(correctionRetry.status, 200); assert.equal(correctionRetry.body.idempotent, true);
+  const finalQueue = await (await apiFetch(`${base}/finance/reconciliation-breaks`)).json(); assert.equal(finalQueue.count, 0);
+});
+
+test("settlement files acknowledge mixed rows and NACH due batches prevent duplicate presentment", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-payment-batches-"));
+  t.after(async () => { await rm(dataDir, { recursive: true, force: true }); });
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] }); await listen(server);
+  t.after(async () => { await close(server); });
+  const base = `http://127.0.0.1:${server.address().port}`; const application = await approveAndDisburseApplication(base);
+  const account = await (await apiFetch(`${base}/loan-accounts/${application.loanAccountId}`)).json(); const amount = account.schedule[0].totalDue;
+  const collect = await postJson(`${base}/integrations/payment-rails/upi-collects`, { borrowerId: "bor_001", loanAccountId: application.loanAccountId, vpa: "asha@upi", amount });
+  const records = [{ providerRef: collect.body.paymentRail.providerRef, providerEventRef: "file_event_001", status: "settled", amount, bankReference: "BANK-FILE-001", settledAt: `${account.schedule[0].dueDate}T00:00:00.000Z` }, { providerEventRef: "file_event_invalid", status: "unknown", amount: 10 }];
+  const file = await postJson(`${base}/integrations/payment-rails/settlement-files`, { fileId: "settlement_file_001", provider: "mock", records });
+  assert.equal(file.status, 202); assert.equal(file.body.settlementFile.status, "processed_with_exceptions"); assert.equal(file.body.settlementFile.matchedPostedCount, 1); assert.equal(file.body.settlementFile.exceptionCount, 1); assert.equal(file.body.settlementFile.acknowledgement.status, "accepted_with_exceptions");
+  const retry = await postJson(`${base}/integrations/payment-rails/settlement-files`, { fileId: "settlement_file_001", provider: "mock", records }); assert.equal(retry.status, 200); assert.equal(retry.body.idempotent, true);
+  const conflict = await postJson(`${base}/integrations/payment-rails/settlement-files`, { fileId: "settlement_file_001", provider: "mock", records: [{}] }); assert.equal(conflict.status, 409);
+
+  const mandate = await postJson(`${base}/integrations/payment-rails/nach-mandates`, { borrowerId: "bor_001", loanAccountId: application.loanAccountId, accountNumber: "123456789012", ifsc: "HDFC0000001", maxAmount: amount, frequency: "monthly", consentRef: "consent_nach_batch", bankAccountVerificationRef: "BANK-VERIFY-MOCK-002" });
+  assert.equal(mandate.status, 201);
+  const asOf = `${account.schedule[1].dueDate}T12:00:00.000Z`; const batch = await postJson(`${base}/integrations/payment-rails/nach-due-presentments`, { batchId: "nach_batch_001", asOf, loanAccountIds: [application.loanAccountId] });
+  assert.equal(batch.status, 201); assert.equal(batch.body.createdCount, 1); assert.equal(batch.body.paymentRails[0].dueDate, account.schedule[1].dueDate);
+  const repeated = await postJson(`${base}/integrations/payment-rails/nach-due-presentments`, { batchId: "nach_batch_002", asOf, loanAccountIds: [application.loanAccountId] }); assert.equal(repeated.body.createdCount, 0); assert.equal(repeated.body.skipped[0].reason, "already_presented");
 });
 
 function eligibilityApplication(overrides = {}) {

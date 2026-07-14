@@ -191,6 +191,7 @@ export {
 } from "./loan-account.js";
 
 export { reconcileBankStatementEntry, reconcilePaymentRailSettlement } from "./payment-reconciliation.js";
+export { createSuspenseReceipt, resolveSuspenseReceipt, writeOffSuspenseReceipt } from "./payment-operations.js";
 export { buildLoanJournalEntries } from "./accounting.js";
 export { buildFinanceJournalEntries, buildGstReturnData, buildTdsReturnData, calculateEclAssessment } from "./finance-accounting.js";
 export { buildAlmReport, buildManagementFinanceJournals, buildProfitabilityReport } from "./finance-management.js";

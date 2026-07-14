@@ -37,6 +37,7 @@ const RECOVERY_LSP_SERVICES = new Set(["recovery", "collections"]);
 const ALLOWED_LSP_REVIEW_OUTCOMES = new Set(["satisfactory", "deviation_found", "remediation_required"]);
 const ALLOWED_DLA_OWNER_TYPES = new Set(["self_owned", "lsp_owned"]);
 const ALLOWED_DLA_STATUSES = new Set(["draft", "active", "ceased"]);
+const PAYMENT_ALLOCATION_COMPONENTS = ["interest", "charges", "principal"];
 const DLA_CIMS_COLUMNS = [
   { key: "serialNumber", label: "Sl. No." },
   { key: "dlaName", label: "Name of the DLA" },
@@ -742,6 +743,10 @@ export function validateProductPolicy(product, regulatedEntities = {}) {
       findings.push(createFinding("error", "RBI-IT-GRC", `Accounting profile account '${key}' is required.`, `accountingProfile.accounts.${key}`));
     }
   }
+  const waterfall = product?.paymentAllocationWaterfall;
+  if (!Array.isArray(waterfall) || waterfall.length !== PAYMENT_ALLOCATION_COMPONENTS.length || new Set(waterfall).size !== PAYMENT_ALLOCATION_COMPONENTS.length || waterfall.some((component) => !PAYMENT_ALLOCATION_COMPONENTS.includes(component))) {
+    findings.push(createFinding("error", "RBI-IT-GRC", "Payment allocation waterfall must contain interest, charges, and principal exactly once.", "paymentAllocationWaterfall"));
+  }
 
   return {
     findings,
@@ -827,6 +832,9 @@ export function normalizeProductPolicy(input, now = new Date()) {
       profileId: input.accountingProfile?.profileId ?? `${input.productCode ?? "product"}_v${Number.isFinite(input.version) ? input.version : 1}`,
       accounts: { ...DEFAULT_ACCOUNTING_PROFILE, ...(input.accountingProfile?.accounts ?? {}) }
     },
+    paymentAllocationWaterfall: Array.isArray(input.paymentAllocationWaterfall)
+      ? [...input.paymentAllocationWaterfall]
+      : [...PAYMENT_ALLOCATION_COMPONENTS],
     createdAt: input.createdAt ?? now.toISOString(),
     updatedAt: now.toISOString()
   };

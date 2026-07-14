@@ -67,9 +67,9 @@ Composite labels such as `Partial/Mock` identify a mixed capability: some intern
 
 LoanOS currently has a strong compliance-first domain foundation and a credible executable slice for a monthly amortising term loan. Its best-developed capabilities are tenant isolation, KFS and fund-flow gates, policy/evidence lineage, maker-checker, audit integrity, borrower privacy rights, model governance, and deterministic decision-engine infrastructure.
 
-The principal gaps before bank production are live integrations, accounting/GL, payment reconciliation, regulatory submission formats, product-specific lending depth, full collections/legal recovery, enterprise IAM and key management, observability/DR/BCP, and bank-assurance evidence. Public product positioning must remain narrower than this catalogue until each advertised journey reaches an agreed maturity level.
+The principal gaps before bank production are live integrations, downstream GL certification, regulatory submission formats, product-specific lending depth, full collections/legal recovery, enterprise IAM and key management, observability/DR/BCP, and bank-assurance evidence. Payment operations now have a controlled internal first slice, but live rail/file transport and operating-scale automation remain open. Public product positioning must remain narrower than this catalogue until each advertised journey reaches an agreed maturity level.
 
-The detailed register contains **436 individually identified capabilities**. At this snapshot, 76 are classified `Implemented`, 143 `Partial`, 189 `Missing`, and 28 are mock, partner, external, or composite-status obligations. These counts measure scope coverage, not delivery percentage: a single missing ledger, reconciliation, security, or recovery control can block production even if many smaller capabilities exist.
+The detailed register contains **453 individually identified capabilities**. At this snapshot, 78 are classified `Implemented`, 158 `Partial`, 189 `Missing`, and 28 are mock, partner, external, or composite-status obligations. These counts measure scope coverage, not delivery percentage: a single missing ledger, reconciliation, security, or recovery control can block production even if many smaller capabilities exist.
 
 ## Capability Index
 
@@ -88,8 +88,8 @@ The detailed register contains **436 individually identified capabilities**. At 
 | Collateral and security | Asset, valuation, legal, perfection and release controls | Partial/Mock |
 | Offer, KFS and contracting | Transparent offer through enforceable execution | Partial |
 | Disbursement | Controlled direct and reconciled fund release | Partial/Mock |
-| Loan accounting and LMS | Reconstructable account plus finance-grade books | Partial; balanced subledger first slice, GL/close missing |
-| Payments and reconciliation | Complete collection-to-ledger control | Mock/Partial |
+| Loan accounting and LMS | Reconstructable account plus finance-grade books | Partial; balanced subledger, controlled close, suspense and value-date slices |
+| Payments and reconciliation | Complete collection-to-ledger control | Partial/Mock; controlled operations core with mock provider boundary |
 | Servicing | Customer and operations servicing over the full loan life | Partial |
 | Delinquency and collections | Strategy, contact, field and agency operations | Partial |
 | Legal recovery and repossession | Evidence-led statutory recovery | Missing |
@@ -359,14 +359,14 @@ The detailed register contains **436 individually identified capabilities**. At 
 | ACC-001 | Loan account creation from approved disbursement | Core | Implemented |
 | ACC-002 | Immutable operational ledger and balance reconstruction | Core | Implemented |
 | ACC-003 | Idempotent financial-event ingestion | Core | Partial |
-| ACC-004 | Configurable payment-allocation waterfall | Core | Missing |
+| ACC-004 | Configurable payment-allocation waterfall | Core | Partial |
 | ACC-005 | Double-entry subledger and balanced journals | Core | Partial |
 | ACC-006 | Chart-of-accounts mapping and GL export/interface | Core | Partial |
 | ACC-007 | EOD/BOD, business date, period close, and rerun control | Core | Partial |
 | ACC-008 | Accrued, overdue, suspended, and memorandum interest | Core | Partial |
 | ACC-009 | NPA income reversal and recovery recognition | Institution | Partial |
-| ACC-010 | Suspense, unapplied, excess, and unidentified receipts | Core | Missing |
-| ACC-011 | Value date, backdating, correction, and controlled reprocessing | Core | Missing |
+| ACC-010 | Suspense, unapplied, excess, and unidentified receipts | Core | Partial |
+| ACC-011 | Value date, backdating, correction, and controlled reprocessing | Core | Partial |
 | ACC-012 | Charges, waivers, reversals, GST, and audit | Core | Partial |
 | ACC-013 | Accounting reconciliation by event, day, provider, and GL | Core | Partial |
 | ACC-014 | Trial balance, journal report, and finance sign-off | Core | Partial |
@@ -398,18 +398,18 @@ The detailed register contains **436 individually identified capabilities**. At 
 | --- | --- | --- | --- |
 | PAY-001 | NACH mandate setup, amendment, suspension, and cancellation | Core | Partial/Mock |
 | PAY-002 | UPI AutoPay/collect, eNACH, standing instruction, and bank transfer | Channel | Mock/Partner |
-| PAY-003 | Mandate presentation and due collection | Core | Missing |
-| PAY-004 | Settlement file/API ingestion and provider acknowledgement | Core | Missing |
+| PAY-003 | Mandate presentation and due collection | Core | Partial |
+| PAY-004 | Settlement file/API ingestion and provider acknowledgement | Core | Partial |
 | PAY-005 | Bounce/return reason, charge, retry, and borrower notice | Core | Partial/Mock |
 | PAY-006 | Bank statement and virtual-account reconciliation | Core | Partial |
-| PAY-007 | Partial, advance, excess, and unidentified payment handling | Core | Missing |
+| PAY-007 | Partial, advance, excess, and unidentified payment handling | Core | Partial |
 | PAY-008 | Refund, failed disbursement return, and cooling-off refund | Core | Partial |
 | PAY-009 | Cash, cheque, DD, branch, and field receipt controls | Channel | Partial |
 | PAY-010 | Same-day cash recovery posting | Channel | Implemented |
 | PAY-011 | Duplicate-payment protection and idempotency | Core | Implemented |
 | PAY-012 | Payment allocation, reversal, chargeback, and dispute | Core | Partial |
 | PAY-013 | Daily provider-to-bank-to-ledger reconciliation | Core | Partial |
-| PAY-014 | Reconciliation break queue, ageing, approval, and write-off | Core | Missing |
+| PAY-014 | Reconciliation break queue, ageing, approval, and write-off | Core | Partial |
 | PAY-015 | Payment data residency, masking, and tokenisation | Core | Partial |
 
 ### 17. Customer and Account Servicing
