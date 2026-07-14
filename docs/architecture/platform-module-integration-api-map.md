@@ -56,7 +56,7 @@ Every `BOTH` integration requires idempotent commands, status/read, authenticate
 | INT-LOS-06 | Credit underwriting | CIBIL/Experian/Equifax/CRIF enquiry, score/report, no-hit, dispute | OUT/BOTH; purpose, enquiry ref, XML/PDF/hash | Bound/Mock; generic score | Risk, pricing |
 | INT-LOS-07 | Open finance | AA consent/discovery/link/FI request/encrypted fetch/revoke; FIP failure | BOTH; signed consent, session, crypto validation | Bound/Mock; ref/count/hash | Risk, fraud, LMS |
 | INT-LOS-08 | Statement assessment | Upload/parse, tamper, categorisation, income/obligation metrics | BOTH; model/rule version and correction | Missing | Risk |
-| INT-LOS-09 | AML/fraud preflight | Sanctions/PEP/adverse media/negative list; device/SIM/IP/contact/account risk | BOTH; list/model version, reason, feedback | Internal injected records | AML, TM |
+| INT-LOS-09 | AML/fraud preflight | Sanctions/PEP/adverse media/negative list; device/SIM/IP/contact/account risk | BOTH; list/model version, reason, feedback | Certified adapter ports, adverse packs and reconciliation API complete; vendor feeds/payloads missing | AML, TM |
 | INT-LOS-10 | Document extraction | OCR, authenticity/tamper, face-to-ID and manual-review outcome | BOTH; field confidence/reason/correction | Missing | Channels |
 | INT-LOS-11 | Contract execution | eSign envelope/auth, eStamp, states, signed PDF, certificate/OCSP, cancel | BOTH; audit trail and checksum | Bound/Mock; no certificate lifecycle | LMS vault |
 | INT-LOS-12 | Bank verification | Penny-less/drop validation, name score, account status and reversal | BOTH; verification ref/status | Bound/Mock; synchronous fixed records | Disbursement |
@@ -87,7 +87,7 @@ The deterministic rules engine never calls an external system during evaluation.
 | INT-LWS-02 | Authentication/provisioning | OIDC/JWKS or SAML; SCIM user/group provision/deprovision | BOTH; signed identity/idempotent events | Governance only; local sessions | Platform |
 | INT-LWS-03 | Task/escalation | Email/SMS/WhatsApp/voice/pager and delivery callbacks | BOTH; task ref/status | Communication mocks | All modules |
 | INT-LWS-04 | Evidence/committees | DMS upload/version/download, hold, signed minutes and manifest | BOTH; checksum/retention | Governance only | Audit/compliance |
-| INT-LWS-05 | External work orders | Valuer/advocate/agency/custodian/insurer order/status/report | BOTH; certification/SLA events | Missing | LOS, recovery |
+| INT-LWS-05 | External work orders | Valuer/advocate/agency/custodian/insurer order/status/report | BOTH; certification/SLA events | Certified adapter ports, request/event lifecycle and reconciliation API complete; vendor mappings missing | LOS, recovery |
 | INT-LWS-06 | Complaints/Ombudsman | Complaint intake/export, RBI CMS reference/status/closure evidence | BOTH/file/portal; correlation/ack | Internal only | Compliance |
 | INT-LWS-07 | Court/regulator tasks | Filing accepted/rejected, hearing/order, response and due date | IN/BOTH; signed/portal evidence | Missing | Recovery, compliance |
 | INT-LWS-08 | Workflow workers | Timer, queue/event bus, retry/DLQ, replay and webhook delivery | BOTH; offset/checkpoint/idempotency | Persistent callback delivery queue, lease/retry/DLQ/four-eyes replay API complete; scheduled background/broker workers pending | Whole platform |
@@ -113,9 +113,9 @@ The deterministic rules engine never calls an external system during evaluation.
 
 | ID | Needed at | External operations | Direction / response | Current state | Also used by |
 | --- | --- | --- | --- | --- | --- |
-| INT-COL-01 | Tele-collections | Dialer campaign/list, click-to-call/IVR, disposition, recording, DNC | BOTH; attempt/recording completeness | Internal workflow; adapter missing | LWS |
+| INT-COL-01 | Tele-collections | Dialer campaign/list, click-to-call/IVR, disposition, recording, DNC | BOTH; attempt/recording completeness | Dialer/IVR adapter port and adverse contract complete; live vendor mapping missing | LWS |
 | INT-COL-02 | Digital collection | UPI/link/NACH retry, status, settlement, return, reversal and receipt | BOTH | Payment boundary partial | LMS, finance |
-| INT-COL-03 | Field assignment | Agency/agent cert, route, visit, geo/photo/receipt/offline sync | BOTH; device binding/media manifest | Internal evidence; adapter missing | LWS, MDM |
+| INT-COL-03 | Field assignment | Agency/agent cert, route, visit, geo/photo/receipt/offline sync | BOTH; device binding/media manifest | Field adapter port and adverse request/event contract complete; live platform mapping missing | LWS, MDM |
 | INT-COL-04 | Agency oversight | Roster/capacity, conduct, SLA, invoice and outcome feed | BOTH/file | Internal governance | Partner, finance |
 | INT-COL-05 | Legal cases | Advocate assign, filing/upload, eCourts/cause-list/hearing/order | BOTH/file/portal | Internal lifecycle; adapter missing | LWS |
 | INT-COL-06 | Security enforcement | CERSAI, notice delivery, possession, valuer/custodian/yard order | BOTH/file | CERSAI partial; rest missing | Collateral |
@@ -183,7 +183,7 @@ Regulatory integration must be in the regulated entity’s name where required. 
 | INT-PLT-03 | Security monitoring | SIEM ingest, alert/SOAR, DLP/scanner and threat intelligence | BOTH | Internal SOC; collectors missing | Compliance |
 | INT-PLT-04 | Evidence/time | WORM/object lock, hold/deletion, trusted NTP/TSA/anchor | BOTH | Attestations only | Audit |
 | INT-PLT-05 | Database | Managed PostgreSQL HA/replica/PITR/restore/failover/telemetry | BOTH | Live-capable pg; control API absent | Whole platform |
-| INT-PLT-06 | Events/jobs | Queue/topic, scheduler, offsets, retry/DLQ and replay | BOTH | Records only; workers absent | All modules |
+| INT-PLT-06 | Events/jobs | Queue/topic, scheduler, offsets, retry/DLQ and replay | BOTH | Persistent callback queue plus bounded HTTP dispatcher, circuit/health metrics complete; production scheduler/broker deployment pending | All modules |
 | INT-PLT-07 | API management | Gateway, mTLS/OAuth, WAF/rate-limit, schemas and usage | BOTH | App controls; gateway missing | All APIs |
 | INT-PLT-08 | Observability/support | Metrics/log/trace, synthetic, incident/on-call/ticket/SLA | BOTH | Internal ops; connectors missing | Vendors |
 | INT-PLT-09 | CDC/warehouse/lake | Log CDC, schema, checkpoint/backfill, sink, DQ, lineage, marts | BOTH | Governance only | Finance, risk, reporting |

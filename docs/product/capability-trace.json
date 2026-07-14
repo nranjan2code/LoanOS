@@ -2918,7 +2918,7 @@
     "lastReviewed": ""
   },
   "INT-009": {
-    "capability": "Bureau, AA, CKYC, V-CIP, eSign, bank verify, payment, comms, CERSAI, and FIU providers; deterministic simulator, durable callback and signed-file conformance baseline",
+    "capability": "External providers with deterministic simulation, executable callback delivery, signed-file transports and certified business-adapter port baseline",
     "category": "30. Integrations, APIs, Events, and Data Platform",
     "plane": "Data & Integration",
     "applicability": "Product",

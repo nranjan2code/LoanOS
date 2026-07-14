@@ -152,11 +152,14 @@ export class ExternalServiceManager {
 
   simulateMockProvider({ provider, operation, idempotencyKey, scenario, payload = {} } = {}) {
     if (!this.simulator) throw new Error("A tenant-local provider simulator is not configured.");
-    const providerPrefixes = { bureau: "bureau", vcip: "vcip", bank_account: "bankAccount", payment_rail: "paymentRail", esign: "esign", ckycrr: "ckycrr", account_aggregator: "accountAggregator", sms: "sms", email: "email", whatsapp: "whatsapp" };
+    const providerPrefixes = { bureau: "bureau", vcip: "vcip", bank_account: "bankAccount", payment_rail: "paymentRail", esign: "esign", ckycrr: "ckycrr", account_aggregator: "accountAggregator", sms: "sms", email: "email", whatsapp: "whatsapp", cersai: "cersai", fiu: "fiu", cic: "cic", escrow: "escrow", core_banking: "coreBanking" };
     const prefix = providerPrefixes[provider];
     if (!prefix) throw new Error(`Provider simulator does not support ${provider}.`);
     if (this.config[`${prefix}Provider`] === "real") throw new Error("Provider simulator cannot execute for a real provider configuration.");
-    return this.simulator.submit({ tenantId: this.simulatorTenantId, provider, operation, idempotencyKey, scenario, payload });
+    const result = this.simulator.submit({ tenantId: this.simulatorTenantId, provider, operation, idempotencyKey, scenario, payload });
+    const callbacks = typeof this.simulator.pendingCallbacks === "function" ? this.simulator.pendingCallbacks().filter((item) => item.payload?.requestId === result?.requestId) : [];
+    if (callbacks.some((item) => typeof this.simulator.verify === "function" && !this.simulator.verify(item))) throw new Error(`Simulated ${provider} callback integrity validation failed.`);
+    return result;
   }
 
   simulatedMock(provider, operation, idempotencyKey, payload = {}) {
@@ -521,6 +524,8 @@ export class ExternalServiceManager {
       return await res.json();
     }
 
+    const simulated = this.simulatedMock("payment_rail", "nach_mandate", mockIdempotencyKey("nach_mandate", payload), payload);
+    if (simulated) return { success: true, provider: "mock", channel: "nach", mandateRef: simulated.response?.mandateRef ?? simulated.providerReference, status: simulated.response?.status ?? "registered", dataResidencyCountry: this.config.paymentRailDataResidencyCountry, registeredAt: simulated.respondedAt };
     return {
       success: true,
       provider: "mock",
@@ -558,6 +563,8 @@ export class ExternalServiceManager {
       return await res.json();
     }
 
+    const simulated = this.simulatedMock("payment_rail", "upi_collect", mockIdempotencyKey("upi_collect", payload), payload);
+    if (simulated) return { success: true, provider: "mock", channel: "upi", collectRef: simulated.response?.collectRef ?? simulated.providerReference, status: simulated.response?.status ?? "pending", dataResidencyCountry: this.config.paymentRailDataResidencyCountry, createdAt: simulated.respondedAt };
     return {
       success: true,
       provider: "mock",
@@ -592,6 +599,9 @@ export class ExternalServiceManager {
       if (!res.ok) throw new Error(`Real payment rail provider returned status ${res.status}`);
       return await res.json();
     }
+    const presentmentPayload = { mandateRef, amount: input.amount, currency: input.currency ?? "INR", dueDate: input.dueDate ?? null };
+    const simulated = this.simulatedMock("payment_rail", "nach_presentment", mockIdempotencyKey("nach_presentment", presentmentPayload), presentmentPayload);
+    if (simulated) return { success: true, provider: "mock", channel: "nach", presentmentRef: simulated.response?.presentmentRef ?? simulated.providerReference, status: simulated.response?.status ?? "pending", dataResidencyCountry: this.config.paymentRailDataResidencyCountry, createdAt: simulated.respondedAt };
     return {
       success: true,
       provider: "mock",
@@ -665,6 +675,8 @@ export class ExternalServiceManager {
       return postProviderJson(`${this.config.cersaiApiUrl}/security-interests`, securityInterestData, this.config.cersaiApiKey, securityInterestData.checksumSha256, "CERSAI", this.config);
     } else {
       // Mock provider
+      const simulated = this.simulatedMock("cersai", "file", mockIdempotencyKey("cersai_file", securityInterestData.checksumSha256, securityInterestData.securityInterestId), securityInterestData);
+      if (simulated) return { success: true, provider: "mock", providerSubmissionRef: simulated.response?.providerSubmissionRef ?? simulated.providerReference, checksumSha256: securityInterestData.checksumSha256 ?? null, dataResidencyCountry: this.config.cersaiDataResidencyCountry, filedAt: simulated.respondedAt };
       return {
         success: true,
         provider: "mock",
@@ -697,6 +709,8 @@ export class ExternalServiceManager {
       return await res.json();
     } else {
       // Mock provider — returns no existing charges
+      const simulated = this.simulatedMock("cersai", "search", mockIdempotencyKey("cersai_search", assetDescription), { assetDescription });
+      if (simulated) return { success: true, provider: "mock", count: simulated.response?.count ?? simulated.response?.charges?.length ?? 0, charges: simulated.response?.charges ?? [], dataResidencyCountry: this.config.cersaiDataResidencyCountry, searchedAt: simulated.respondedAt };
       return {
         success: true,
         provider: "mock",
@@ -721,6 +735,8 @@ export class ExternalServiceManager {
       return postProviderJson(`${this.config.fiuApiUrl}/reports`, reportData, this.config.fiuApiKey, reportData.checksumSha256, "FIU-IND", this.config);
     } else {
       // Mock provider
+      const simulated = this.simulatedMock("fiu", "file", mockIdempotencyKey("fiu_file", reportData.checksumSha256, reportData.reportId), reportData);
+      if (simulated) return { success: true, provider: "mock", providerSubmissionRef: simulated.response?.providerSubmissionRef ?? simulated.providerReference, checksumSha256: reportData.checksumSha256 ?? null, dataResidencyCountry: this.config.fiuDataResidencyCountry, filedAt: simulated.respondedAt };
       return {
         success: true,
         provider: "mock",
@@ -740,6 +756,8 @@ export class ExternalServiceManager {
       this.assertCertified("cic");
       return postProviderJson(`${this.config.cicApiUrl}/batches`, batch, this.config.cicApiKey, batch.checksumSha256, "Credit information company", this.config);
     }
+    const simulated = this.simulatedMock("cic", "submit", mockIdempotencyKey("cic_submit", batch.batchId, batch.checksumSha256), batch);
+    if (simulated) return { success: true, provider: "mock", providerSubmissionRef: simulated.response?.providerSubmissionRef ?? simulated.providerReference, transportEvidenceRef: simulated.response?.transportEvidenceRef ?? simulated.providerReference, checksumSha256: batch.checksumSha256, submittedAt: simulated.respondedAt, dataResidencyCountry: "IN" };
     return { success: true, provider: "mock", providerSubmissionRef: `CIC-MOCK-${batch.batchId}`, transportEvidenceRef: `CIC-TRANSPORT-MOCK-${batch.checksumSha256}`, checksumSha256: batch.checksumSha256, submittedAt: new Date().toISOString(), dataResidencyCountry: "IN" };
   }
 
@@ -782,6 +800,8 @@ export class ExternalServiceManager {
       if (!result?.providerReference || result?.checksumSha256 !== instruction.checksumSha256 || result?.status !== "accepted") throw new Error("Escrow provider acknowledgement did not exactly match the submitted instruction.");
       return result;
     }
+    const simulated = this.simulatedMock("escrow", "submit", mockIdempotencyKey("escrow_submit", instruction.instructionId, instruction.checksumSha256), instruction);
+    if (simulated) return { status: simulated.response?.status ?? "accepted", provider: "mock", providerReference: simulated.response?.providerReference ?? simulated.providerReference, checksumSha256: instruction.checksumSha256, acceptedAt: simulated.respondedAt, dataResidencyCountry: this.config.escrowDataResidencyCountry };
     return { status: "accepted", provider: "mock", providerReference: `ESCROW-MOCK-${instruction.instructionId}`, checksumSha256: instruction.checksumSha256, acceptedAt: new Date().toISOString(), dataResidencyCountry: this.config.escrowDataResidencyCountry };
   }
 
@@ -797,6 +817,8 @@ export class ExternalServiceManager {
       if (!result?.providerReference || result?.checksumSha256 !== batch.checksumSha256 || result?.lineCount !== batch.lineCount || result?.status !== "accepted") throw new Error("Core-banking acknowledgement did not exactly match the submitted batch.");
       return result;
     }
+    const simulated = this.simulatedMock("core_banking", "post_batch", mockIdempotencyKey("core_banking", batch.batchId, batch.checksumSha256), batch);
+    if (simulated) return { status: simulated.response?.status ?? "accepted", provider: "mock", providerReference: simulated.response?.providerReference ?? simulated.providerReference, checksumSha256: batch.checksumSha256, lineCount: batch.lineCount, acceptedAt: simulated.respondedAt, dataResidencyCountry: this.config.coreBankingDataResidencyCountry };
     return { status: "accepted", provider: "mock", providerReference: `CBS-MOCK-${batch.batchId}`, checksumSha256: batch.checksumSha256, lineCount: batch.lineCount, acceptedAt: new Date().toISOString(), dataResidencyCountry: this.config.coreBankingDataResidencyCountry };
   }
 }

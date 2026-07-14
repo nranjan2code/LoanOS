@@ -1,8 +1,8 @@
 {
-  "generated": "2026-07-14T19:55:24.645Z",
+  "generated": "2026-07-14T20:03:30.896Z",
   "git": {
     "branch": "main",
-    "count": 173,
+    "count": 175,
     "commits": []
   },
   "overall": {
@@ -6646,7 +6646,7 @@
         },
         {
           "id": "INT-009",
-          "name": "Bureau, AA, CKYC, V-CIP, eSign, bank verify, payment, comms, CERSAI, and FIU providers; deterministic simulator, durable callback and signed-file conformance baseline",
+          "name": "External providers with deterministic simulation, executable callback delivery, signed-file transports and certified business-adapter port baseline",
           "applicability": "Product",
           "status": "Partial/Mock",
           "raw": "Partial/Mock",
@@ -7494,9 +7494,9 @@
     }
   ],
   "tests": {
-    "pass": 381,
+    "pass": 394,
     "fail": 0,
-    "total": 386,
+    "total": 399,
     "ran": true
   }
 }

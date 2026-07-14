@@ -636,6 +636,28 @@ export {
 } from "./signed-file-conformance.js";
 
 export {
+  createTransportRecord,
+  createTransportResubmission,
+  markTransportDispatched,
+  parseSignedFile,
+  recordTransportPoll,
+  serializeSignedFile
+} from "./signed-file-transport.js";
+
+export {
+  BUSINESS_ADAPTER_DEFINITIONS,
+  BUSINESS_ADAPTER_FAMILIES,
+  BUSINESS_ADAPTER_SCENARIO_CLASSES,
+  assessBusinessAdapterConformancePack,
+  assessBusinessAdapterSuite,
+  buildBusinessAdapterConformancePack,
+  createBusinessAdapterRequest,
+  projectBusinessAdapterReconciliation,
+  recordBusinessAdapterEvent,
+  registerBusinessAdapter
+} from "./business-adapter-conformance.js";
+
+export {
   ASSET_TYPES,
   CHARGE_TYPES,
   SECURITY_INTEREST_STATUSES,

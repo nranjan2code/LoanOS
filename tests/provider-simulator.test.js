@@ -37,3 +37,28 @@ test("ExternalServiceManager propagates simulated provider failures and preserve
   await assert.rejects(() => manager.queryCreditBureau("ABCDE1234F"), (error) => error.code === "provider_simulator_timeout");
   const defaultResult = await new ExternalServiceManager().queryCreditBureau("ABCDE1234F"); assert.equal(defaultResult.score, 750); assert.equal(defaultResult.provider, "mock");
 });
+
+test("ExternalServiceManager maps remaining payment, regulatory and finance simulators without journaling raw PII", async () => {
+  const names = ["mandate", "presentment", "upi", "cersai_file", "cersai_search", "fiu", "cic", "escrow", "cbs"];
+  const simulator = createProviderSimulator({ tenantId: "tenant-a", seed: "remaining", callbackSecret: "secret", startAt: "2026-07-15T10:00:00.000Z", scenarios: Object.fromEntries(names.map((name) => [name, { outcome: "success", response: name === "cersai_search" ? { charges: [{ chargeId: "charge-1" }] } : {} }])) });
+  const manager = new ExternalServiceManager({ simulator, simulatorTenantId: "tenant-a", simulatorScenarios: { "payment_rail.nach_mandate": "mandate", "payment_rail.nach_presentment": "presentment", "payment_rail.upi_collect": "upi", "cersai.file": "cersai_file", "cersai.search": "cersai_search", "fiu.file": "fiu", "cic.submit": "cic", "escrow.submit": "escrow", "core_banking.post_batch": "cbs" } });
+  assert.match((await manager.createNachMandate({ borrowerId: "borrower-secret", maxAmount: 1000, frequency: "monthly", accountNumberLast4: "9012" })).mandateRef, /^provider_ref_/);
+  assert.match((await manager.createNachPresentment({ mandateRef: "mandate-secret", amount: 100, currency: "INR" })).presentmentRef, /^provider_ref_/);
+  assert.match((await manager.createUpiCollect({ borrowerId: "borrower-secret", vpa: "private@upi", amount: 100 })).collectRef, /^provider_ref_/);
+  assert.match((await manager.fileCersaiSecurityInterest({ securityInterestId: "si-secret", checksumSha256: "a".repeat(64) })).providerSubmissionRef, /^provider_ref_/);
+  assert.equal((await manager.searchCersai("private vehicle registration")).count, 1);
+  assert.match((await manager.fileFiuReport({ reportId: "str-secret", checksumSha256: "b".repeat(64) })).providerSubmissionRef, /^provider_ref_/);
+  assert.match((await manager.submitCicReportingBatch({ batchId: "batch-secret", checksumSha256: "c".repeat(64), recordCount: 1 })).providerSubmissionRef, /^provider_ref_/);
+  assert.match((await manager.submitEscrowInstruction({ instructionId: "escrow-secret", escrowAccountRef: "account-secret", checksumSha256: "d".repeat(64), amount: 10 })).providerReference, /^provider_ref_/);
+  assert.match((await manager.postCoreBankingBatch({ batchId: "cbs-secret", checksumSha256: "e".repeat(64), lineCount: 1, lines: [{ account: "private" }] })).providerReference, /^provider_ref_/);
+  const journalText = JSON.stringify(simulator.requestJournal()); assert.equal(journalText.includes("borrower-secret"), false); assert.equal(journalText.includes("private@upi"), false); assert.equal(journalText.includes("account-secret"), false);
+});
+
+test("remaining simulator adapters fail closed on rejection and callback tampering", async () => {
+  const rejected = createProviderSimulator({ tenantId: "tenant-a", seed: "reject", callbackSecret: "secret", scenarios: { reject: { outcome: "failure", responseCode: "DECLINED" } } });
+  const rejectedManager = new ExternalServiceManager({ simulator: rejected, simulatorTenantId: "tenant-a", simulatorScenarios: { "payment_rail.upi_collect": "reject" } });
+  await assert.rejects(() => rejectedManager.createUpiCollect({ vpa: "test@upi", amount: 10 }), /rejected/);
+  const tampered = createProviderSimulator({ tenantId: "tenant-a", seed: "tamper-adapter", callbackSecret: "secret", scenarios: { tamper: { outcome: "success", tamper: true } } });
+  const tamperedManager = new ExternalServiceManager({ simulator: tampered, simulatorTenantId: "tenant-a", simulatorScenarios: { "cersai.file": "tamper" } });
+  await assert.rejects(() => tamperedManager.fileCersaiSecurityInterest({ securityInterestId: "si-1", checksumSha256: "a".repeat(64) }), /integrity validation failed/);
+});
