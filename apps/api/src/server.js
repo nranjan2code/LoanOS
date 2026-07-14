@@ -220,7 +220,13 @@ import {
   stampAuditEvents
 } from "../../../packages/core/src/index.js";
 import { assessEligibilityGated } from "./rules-engine.js";
-import { getActiveMasterKey, getMasterKeyRing } from "./encryption.js";
+import { getActiveMasterKey, getMasterKeyById, getMasterKeyRing } from "./encryption.js";
+import {
+  buildRecoveryExercise,
+  createRecoveryBackup,
+  evaluateRecoveryObjectives,
+  inspectRecoveryBackup
+} from "./recovery.js";
 import {
   appendEvent,
   appendPlatformEvent,
@@ -8356,6 +8362,138 @@ async function routePlatform(req, res, { dataDir, platformAdminKey, method, path
     return;
   }
 
+  if (method === "GET" && path === "/platform/recovery/history") {
+    if (!hasPlatformRole(authContext, ["platform_admin", "security_admin", "auditor"])) {
+      sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } });
+      return;
+    }
+    const state = await loadWholeState(dataDir);
+    const records = (state.controlPlane.platformEvents ?? [])
+      .filter((event) => event.type?.startsWith("platform.recovery."))
+      .map(({ hash, previousHash, ...event }) => event);
+    sendJson(res, 200, { count: records.length, records });
+    return;
+  }
+
+  if (method === "POST" && path === "/platform/recovery/backups") {
+    if (!hasPlatformRole(authContext, ["platform_admin", "security_admin"])) {
+      sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } });
+      return;
+    }
+    const body = await readJson(req);
+    const activeKey = getActiveMasterKey();
+    if (!activeKey) {
+      sendJson(res, 409, { error: { code: "backup_key_unavailable", message: "A master-key provider is required for encrypted recovery backups." } });
+      return;
+    }
+    try {
+      const state = await loadWholeState(dataDir);
+      const recoveryPackage = createRecoveryBackup(state, body, activeKey);
+      const manifest = recoveryPackage.manifest;
+      const nextState = appendPlatformEvent(state, {
+        type: "platform.recovery.backup_created",
+        backupId: manifest.backupId,
+        packageSha256: recoveryPackage.packageSha256,
+        contentSha256: manifest.contentSha256,
+        tenantCount: manifest.tenantCount,
+        sourceRegion: manifest.sourceRegion,
+        residencyCountry: manifest.residencyCountry,
+        storageLocationRef: manifest.storageLocationRef,
+        retentionUntil: manifest.retentionUntil,
+        keyId: manifest.keyId,
+        reason: body.reason
+      }, { actor: authActor(authContext) });
+      await saveWholeState(nextState, dataDir);
+      sendJson(res, 201, { recoveryPackage });
+    } catch (error) {
+      sendRecoveryError(res, error);
+    }
+    return;
+  }
+
+  if (method === "POST" && path === "/platform/recovery/backups/validate") {
+    if (!hasPlatformRole(authContext, ["platform_admin", "security_admin", "auditor"])) {
+      sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } });
+      return;
+    }
+    const body = await readJson(req);
+    try {
+      const key = getMasterKeyById(body.recoveryPackage?.manifest?.keyId);
+      if (!key) throw Object.assign(new Error("A master-key provider is required to validate recovery backups."), { code: "backup_key_unavailable" });
+      const { verification } = inspectRecoveryBackup(body.recoveryPackage, key);
+      sendJson(res, 200, { verification });
+    } catch (error) {
+      sendRecoveryError(res, error);
+    }
+    return;
+  }
+
+  if (method === "POST" && path === "/platform/recovery/drills") {
+    if (!hasPlatformRole(authContext, ["platform_admin", "security_admin"])) {
+      sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } });
+      return;
+    }
+    const body = await readJson(req);
+    if (body.approvedBy !== authActor(authContext)) {
+      sendJson(res, 403, { error: { code: "recovery_approver_mismatch", message: "approvedBy must be the authenticated platform actor." } });
+      return;
+    }
+    try {
+      const key = getMasterKeyById(body.recoveryPackage?.manifest?.keyId);
+      if (!key) throw Object.assign(new Error("A master-key provider is required to run recovery drills."), { code: "backup_key_unavailable" });
+      const { verification } = inspectRecoveryBackup(body.recoveryPackage, key);
+      const exercise = buildRecoveryExercise(body.recoveryPackage.manifest, verification, body);
+      const state = await loadWholeState(dataDir);
+      const nextState = appendPlatformEvent(state, { type: "platform.recovery.exercise_completed", ...exercise }, { actor: authActor(authContext) });
+      await saveWholeState(nextState, dataDir);
+      sendJson(res, 201, { exercise });
+    } catch (error) {
+      sendRecoveryError(res, error);
+    }
+    return;
+  }
+
+  if (method === "POST" && path === "/platform/recovery/restores") {
+    if (!hasPlatformRole(authContext, ["platform_admin", "security_admin"])) {
+      sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } });
+      return;
+    }
+    const body = await readJson(req);
+    if (!body.recoveryId || !body.changeTicket || !body.reason || String(body.reason).trim().length < 8 || !body.targetRegion || body.residencyCountry !== "IN" || !body.proposedBy || body.approvedBy !== authActor(authContext) || body.proposedBy === body.approvedBy) {
+      sendJson(res, 422, { error: { code: "recovery_restore_invalid", message: "recoveryId, India target, change ticket, specific reason, independent proposer, and authenticated approver are required." } });
+      return;
+    }
+    try {
+      if (body.expectedPackageSha256 !== body.recoveryPackage?.packageSha256) throw Object.assign(new Error("expectedPackageSha256 must match the submitted package."), { code: "backup_package_unexpected" });
+      const key = getMasterKeyById(body.recoveryPackage?.manifest?.keyId);
+      if (!key) throw Object.assign(new Error("A master-key provider is required to restore recovery backups."), { code: "backup_key_unavailable" });
+      const { verification, state: recoveredState } = inspectRecoveryBackup(body.recoveryPackage, key);
+      const recoveredAt = new Date();
+      const objectives = evaluateRecoveryObjectives(body.recoveryPackage.manifest, body, recoveredAt);
+      const recovery = {
+        recoveryId: String(body.recoveryId),
+        backupId: verification.backupId,
+        packageSha256: verification.packageSha256,
+        targetRegion: String(body.targetRegion),
+        residencyCountry: "IN",
+        changeTicket: String(body.changeTicket),
+        reason: String(body.reason),
+        proposedBy: String(body.proposedBy),
+        approvedBy: String(body.approvedBy),
+        executedBy: authActor(authContext),
+        objectives,
+        status: objectives.status === "objectives_met" ? "restored" : "restored_objectives_breached",
+        restoredAt: recoveredAt.toISOString()
+      };
+      const nextState = appendPlatformEvent(recoveredState, { type: "platform.recovery.restored", ...recovery }, { actor: authActor(authContext) }, recoveredAt);
+      await saveWholeState(nextState, dataDir);
+      sendJson(res, 200, { recovery, verification });
+    } catch (error) {
+      sendRecoveryError(res, error);
+    }
+    return;
+  }
+
   if (method === "POST" && path === "/platform/encryption/rekey") {
     if (!hasPlatformRole(authContext, ["platform_admin", "security_admin"])) {
       sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } });
@@ -8814,6 +8952,17 @@ function sendJson(res, statusCode, payload, headers = {}) {
     ...headers
   });
   res.end(body);
+}
+
+function sendRecoveryError(res, error) {
+  const code = error?.code ?? "recovery_operation_failed";
+  const conflictCodes = new Set(["backup_key_unavailable", "backup_key_mismatch", "backup_package_unexpected"]);
+  sendJson(res, conflictCodes.has(code) ? 409 : 422, {
+    error: {
+      code,
+      message: error?.message ?? "Recovery operation failed closed."
+    }
+  });
 }
 
 function metricsTokenValid(req, expectedToken) {

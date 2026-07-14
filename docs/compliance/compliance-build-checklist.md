@@ -111,7 +111,7 @@ Legend:
 | Payment data in India | Preflight requires IN payment data storage if specified; payment rail provider dispatch also enforces IN data residency. | Done |
 | Straight-through processing audit trail | Event model started; payment rail initiation evidence is sealed as financial audit events. Full STP settlement/reconciliation checks planned. | Partial |
 | Need-based access | Staff actor registry, roles, queue access, and regulated-action checks. External IAM and reviews planned. | Partial |
-| DC/DR and BCP | Production infrastructure design. | Planned |
+| DC/DR and BCP | Encrypted, authenticated recovery packages; fail-closed integrity validation; four-eyes restore; and RTO/RPO exercise evidence are executable. Production database HA/PITR, multi-AZ/region failover, immutable backup custody, business workarounds, and witnessed exercises remain infrastructure/operating controls. | Partial |
 
 ## Fraud Risk Management
 
@@ -205,12 +205,12 @@ LoanOS is delivered as SaaS, so the platform itself has compliance obligations a
 | Append-only hash-chained audit spine | Every save seals the tenant's events into a per-tenant SHA-256 hash chain (tenant-bound genesis, previous-hash linkage); `verifyAuditChain` detects any edit, drop, reorder, or genesis swap. | Done |
 | Evidence export pack | `GET /audit/export` produces an auditor-ready pack (genesis/head anchors, whole-chain integrity attestation, optionally filtered events); a broken chain returns 409 instead of a silently-tampered pack. `GET /audit/events` lists the chain with a validity verdict. | Done |
 | Platform-staff break-glass access with audit | Time-boxed, tenant-scoped credential; use seals a `platform.break_glass.access` event into the tenant's own audit chain; tenant-visible grants, revocation, and TTL expiry. | Done |
-| Per-tenant encryption keys and key destruction on exit | File and Postgres boundaries use a versioned root-key provider and tenant-bound HKDF/AES-256-GCM envelopes. Tenant/key ids are authenticated; previous versions are decrypt-only; unknown versions fail closed; a governed all-tenant rekey records change ticket, actor, source/target versions, and tenant count. Production KMS/HSM custody, managed backup encryption, rotation ceremony, and destruction evidence remain planned. | Partial |
+| Per-tenant encryption keys and key destruction on exit | File and Postgres boundaries use a versioned root-key provider and tenant-bound HKDF/AES-256-GCM envelopes. Tenant/key ids are authenticated; previous versions are decrypt-only; unknown versions fail closed; a governed all-tenant rekey records change ticket, actor, source/target versions, and tenant count. Recovery packages use a domain-separated AES-256-GCM key under the same versioned provider and bind India-resident retention/location metadata. Production KMS/HSM custody, managed immutable backup storage, rotation ceremony, and destruction evidence remain planned. | Partial |
 | RE due-diligence pack (ownership, security, subcontractors) | Standing vendor-assessment pack. | External |
 | RE audit and inspection rights support | Contract terms plus evidence-export tooling. | Planned |
 | Incident notification supporting RE 6-hour RBI window | `incident-notification.js` tracks an independent 6-hour reporting clock per authority (CERT-In and RBI); overdue duties surface as `overdue`/`reporting_overdue`. | Done |
 | CERT-In 6-hour reporting, 180-day India log retention, NTP sync | 6-hour incident-notification clock implemented; 180-day log retention and NTP sync are production infrastructure controls, still planned. | Partial |
-| BCP/DR with RTO/RPO commitments | Production infrastructure design. | Planned |
+| BCP/DR with RTO/RPO commitments | Platform recovery APIs govern encrypted backup, validation, four-eyes restore, and non-destructive exercises with measured objectives, findings, and remediation evidence. Contracted objectives, HA/PITR, real failover/failback, business continuity procedures, and witnessed production exercises remain required. | Partial |
 | Exit plan: portability export and evidenced deletion | `GET /platform/tenants/:id/export` (reproducible control record + data plane + audit evidence) and `POST /platform/tenants/:id/offboarding` (data-plane purge, api-key revocation, deletion attestation). | Done |
 | Sub-processor register and flow-down obligations | `POST/GET /platform/sub-processors` requires a DPA and data-residency country per sub-processor; `GET /sub-processors` discloses the register to every tenant. Contract flow-down terms remain external. | Partial |
 | ISO 27001 / SOC 2 Type II roadmap | Certification program. | External |
@@ -225,7 +225,7 @@ Before production, the platform needs:
 3. Authentication, authorization, maker-checker, and audit hardening.
 4. Secure secrets management. Partial: service secrets are one-time/hash-only with independent rotation and fail-closed compromise containment linked to incident reporting; production vault/KMS custody, workload identity, and automated leak detection remain required.
 5. India-hosted production database and object storage.
-6. Observability, SIEM, incident response, backup, DR, and BCP. Partial: authenticated tenant/platform operational-health APIs, local SLI/SLO and error-budget evaluation, provider/stuck-work alerts, and a protected Prometheus scrape exist; external telemetry retention, SIEM/paging, multi-replica aggregation, backup/restore evidence, DR, and BCP exercises remain required.
+6. Observability, SIEM, incident response, backup, DR, and BCP. Partial: authenticated operational-health APIs, local SLI/SLO and error-budget evaluation, provider/stuck-work alerts, protected Prometheus metrics, encrypted integrity-verified recovery packages, four-eyes restore, and RTO/RPO drill evidence exist. External telemetry retention, SIEM/paging, multi-replica aggregation, managed immutable backup/PITR, real failover/failback, and witnessed BCP exercises remain required.
 7. Vendor due diligence and contracts with audit rights and data residency obligations.
 8. Penetration testing and vulnerability management.
 9. Privacy impact assessment and DPDP operating model.

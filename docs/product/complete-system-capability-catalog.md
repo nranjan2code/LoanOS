@@ -67,9 +67,9 @@ Composite labels such as `Partial/Mock` identify a mixed capability: some intern
 
 LoanOS currently has a strong compliance-first domain foundation and executable slices for amortising, bullet, moratorium, step-up, and revolving facilities. Its best-developed capabilities are tenant isolation, KFS and fund-flow gates, policy/evidence lineage, maker-checker, audit integrity, borrower privacy rights, model governance, deterministic decision-engine infrastructure, and finance controls.
 
-The principal gaps before bank production are live integrations, downstream GL certification, regulatory submission formats, product-specific lending depth, repossession/auction and legal-expense depth, enterprise IAM and key management, external observability/SIEM operations, DR/BCP, and bank-assurance evidence. A bounded in-process observability slice now evaluates API SLI/SLOs and tenant provider/stuck-work health, but durable telemetry, distributed tracing, external alert delivery, on-call operations, and capacity testing remain open. Collections and legal recovery have a controlled first slice, but dialer integration, route/capacity optimization, track-specific pleadings, court integration, possession, auction, and recovery accounting remain open. Public product positioning must remain narrower than this catalogue until each advertised journey reaches an agreed maturity level.
+The principal gaps before bank production are live integrations, downstream GL certification, regulatory submission formats, product-specific lending depth, repossession/auction and legal-expense depth, enterprise IAM and key management, external observability/SIEM operations, production HA/PITR and multi-region infrastructure, and bank-assurance evidence. Bounded observability and encrypted recovery-package slices now evaluate SLOs, detect stuck work, verify audit integrity, govern restore, and retain RTO/RPO drill evidence; durable telemetry, managed backup storage, database-native PITR, real failover/failback, on-call operations, and exercised business continuity remain open. Collections and legal recovery have a controlled first slice, but dialer integration, route/capacity optimization, track-specific pleadings, court integration, possession, auction, and recovery accounting remain open. Public product positioning must remain narrower than this catalogue until each advertised journey reaches an agreed maturity level.
 
-The detailed register contains **452 individually identified capabilities**. At this snapshot, 87 are classified `Implemented`, 183 `Partial`, 155 `Missing`, and 27 are mock, partner, external, or composite-status obligations. These counts measure scope coverage, not delivery percentage: a single missing ledger, reconciliation, security, or recovery control can block production even if many smaller capabilities exist.
+The detailed register contains **452 individually identified capabilities**. At this snapshot, 87 are classified `Implemented`, 186 `Partial`, 153 `Missing`, and 26 are mock, partner, external, or composite-status obligations. These counts measure scope coverage, not delivery percentage: a single missing ledger, reconciliation, security, or recovery control can block production even if many smaller capabilities exist.
 
 ## Capability Index
 
@@ -674,9 +674,9 @@ The detailed register contains **452 individually identified capabilities**. At 
 | --- | --- | --- | --- |
 | OPS-001 | Production deployment topology and India hosting | Core | Partial |
 | OPS-002 | Horizontal scale, stateless API, background workers, and schedulers | Core | Partial |
-| OPS-003 | Database HA, backup, PITR, restore, and corruption drills | Core | Missing |
-| OPS-004 | Multi-AZ/region DR, RTO/RPO, failover, and failback | Core | Missing |
-| OPS-005 | BCP runbook and business/technology recovery exercises | Core | External |
+| OPS-003 | Database HA, backup, PITR, restore, and corruption drills | Core | Partial |
+| OPS-004 | Multi-AZ/region DR, RTO/RPO, failover, and failback | Core | Partial |
+| OPS-005 | BCP runbook and business/technology recovery exercises | Core | Partial |
 | OPS-006 | Metrics, logs, traces, dashboards, and alerting | Core | Partial |
 | OPS-007 | SLI/SLO, uptime, latency, error budget, and capacity | Core | Partial |
 | OPS-008 | Queue/batch/provider monitoring and stuck-work detection | Core | Partial |
