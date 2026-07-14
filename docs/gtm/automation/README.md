@@ -5,6 +5,22 @@ the repo root.
 
 ## Scripts
 
+### `apps/web/scripts/validate-public-site.mjs` — public-site integrity gate
+
+Checks public-page metadata, canonical and sitemap coverage, approved contact
+links, logo use, structured data, the 21 product journeys, product-specific
+five-stage journeys, and unique local product images.
+
+```bash
+npm run web:check
+```
+
+Run the combined pre-publish gate when content or claims change:
+
+```bash
+npm run web:content:check
+```
+
 ### `gtm-backlog-sync.mjs` — claims discipline gate
 Parses `strategy/claims-and-backlog-sync.md` and fails (exit 1) on a malformed
 claim row, an invalid `Status`, an empty `Evidence` cell, or a referenced source

@@ -9,7 +9,7 @@ not drift.
 ## Brand essence
 
 - **Name:** LoanOS India
-- **Domain / contact:** loanos.in · hello@loanos.in
+- **Domain / contact:** loanos.in · hello@aitailorworkshop.in
 - **Descriptor:** India-first lending lifecycle SaaS (LOS · LMS · Workflow ·
   Compliance control)
 - **Essence in one line:** *Accountable by construction.* Operational speed with
@@ -20,13 +20,16 @@ not drift.
 ## Logo & mark
 
 - **Wordmark:** "LoanOS" in the sans face, weight 700, letter-spacing −0.02em.
-- **Brand mark:** the letter **L** in a rounded tile with one squared corner
-  (`border-radius: 50% 50% 50% 12px`), rotated −8°, in DM Serif Display. Forest
-  background, lime letter.
+- **Brand mark:** [loanos-logo-mark.png](../../../apps/web/assets/loanos-logo-mark.png)
+  is the primary graphic mark. It depicts a continuous lending path with a lime
+  line and saffron completion point on a forest field.
 - **Sub-label:** small uppercase descriptor beneath the wordmark (letter-spacing
   0.1em), muted.
-- Do not restyle, recolour, or un-rotate the mark. Keep clear space ≥ the tile
-  height around it.
+- Do not redraw, recolour, crop, add effects to, or combine the mark with other
+  symbols. Keep clear space at least equal to the mark height around it.
+- This file is the approved web master. Before trademark filing, obtain a
+  professional distinctiveness and similarity search; the repository cannot
+  establish registrability or clearance.
 
 ## Colour system (canonical tokens)
 

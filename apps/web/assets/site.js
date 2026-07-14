@@ -30,7 +30,7 @@ const header = `
   <header class="site-header">
     <div class="wrap nav">
       <a class="brand" href="/" aria-label="LoanOS India home">
-        <span class="brand-mark"><span>L</span></span>
+        <span class="brand-mark" aria-hidden="true"><img src="/assets/loanos-logo-mark.png" alt=""></span>
         <span class="brand-copy">LoanOS <small>India lending operating system</small></span>
       </a>
       <nav class="nav-main" id="site-nav" aria-label="Main navigation">
@@ -47,10 +47,10 @@ const header = `
         <a data-route="/loan-types" href="/loan-types/">Capabilities</a>
         <a data-route="/trust" href="/trust/">Trust centre</a>
         <a data-route="/resources" href="/resources/">Resources</a>
-        <a class="mobile-nav-cta" href="mailto:hello@loanos.in?subject=LoanOS%20platform%20demo">Book a demo</a>
+        <a class="mobile-nav-cta" href="mailto:hello@aitailorworkshop.in?subject=LoanOS%20platform%20demo">Book a demo</a>
       </nav>
       <div class="nav-actions">
-        <a class="button ink" href="mailto:hello@loanos.in?subject=LoanOS%20platform%20demo">Book a demo</a>
+        <a class="button ink" href="mailto:hello@aitailorworkshop.in?subject=LoanOS%20platform%20demo">Book a demo</a>
         <button class="menu" id="menu" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="site-nav"><span class="menu-lines" aria-hidden="true"><i></i><i></i><i></i></span></button>
       </div>
     </div>
@@ -61,13 +61,13 @@ const footer = `
     <div class="wrap">
       <div class="footer-grid">
         <div class="footer-brand">
-          <a class="brand" href="/"><span class="brand-mark"><span>L</span></span><span class="brand-copy">LoanOS <small>India lending operating system</small></span></a>
+          <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"><img src="/assets/loanos-logo-mark.png" alt=""></span><span class="brand-copy">LoanOS <small>India lending operating system</small></span></a>
           <p class="footer-intro">India-first SaaS for loan origination, servicing, workflow orchestration and compliance control.</p>
         </div>
         <div class="footer-col"><h3>Solutions</h3><a href="/financial-institutions/">Financial institutions</a><a href="/partners/">Partners & fintechs</a><a href="/for-msmes/">Borrower experience</a></div>
         <div class="footer-col"><h3>Explore</h3><a href="/platform/">Platform</a><a href="/loan-types/">Loan types</a><a href="/trust/">Trust centre</a></div>
         <div class="footer-col"><h3>Learn</h3><a href="/resources/">Resource room</a><a href="/resources/#glossary">Plain-language glossary</a><a href="/resources/#faq">Common questions</a></div>
-        <div class="footer-col"><h3>Contact</h3><a href="mailto:hello@loanos.in?subject=LoanOS%20platform%20demo">Book a demo</a><a href="mailto:hello@loanos.in?subject=LoanOS%20trust%20review">Request a trust review</a><a href="mailto:hello@loanos.in?subject=LoanOS%20partnership">Discuss a partnership</a></div>
+        <div class="footer-col"><h3>Contact</h3><a href="mailto:hello@aitailorworkshop.in?subject=LoanOS%20platform%20demo">Book a demo</a><a href="mailto:hello@aitailorworkshop.in?subject=LoanOS%20trust%20review">Request a trust review</a><a href="mailto:hello@aitailorworkshop.in?subject=LoanOS%20partnership">Discuss a partnership</a></div>
       </div>
       <div class="footer-bottom"><span>© 2026 LoanOS India. All rights reserved.</span><span>India-only / INR-first / Human-governed AI</span></div>
     </div>

@@ -29,6 +29,10 @@ and is checked by [`automation/gtm-backlog-sync.mjs`](automation/gtm-backlog-syn
 | `automation/` | Runnable scripts: backlog-claim check, outreach list build, collateral generator | RevOps |
 | `brand/` | Brand guide (colours, type, logo, voice) — every asset must follow it | Product marketing / design |
 
+For public-site work, use [Public Site Content Operations](marketing/public-site-operations.md).
+It is the shared human and AI workflow for drafting, reviewing and approving
+website changes quickly without publishing automatically.
+
 ## Follow the brand
 
 All assets — human-made or AI-generated — follow

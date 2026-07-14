@@ -36,8 +36,8 @@ points to the doc that governs it.
 | --- | --- | --- | --- | --- | --- |
 | M0 | Plan campaign | Draft brief from template; pull proof points | Approve objective, budget, target list | ✅ approve | `marketing/campaign-briefs.md`, `marketing/marketing-plan.md` |
 | M1 | Message | Suggest pillar + persona angle | Choose angle | — | `marketing/messaging-house.md` |
-| M2 | Create | Draft content + working-notes with claim IDs | Edit + approve voice/claims | ✅ before publish | `ai-agents/agent-content-generation.md`, `brand/brand-guide.md` |
-| M3 | Publish | Assemble/schedule (draft state) | Click publish | ✅ publish | `marketing/content-calendar.md` |
+| M2 | Create | Draft content + working-notes with claim IDs | Edit + approve voice/claims | ✅ before publish | `ai-agents/agent-content-generation.md`, `ai-agents/agent-website-content.md`, `brand/brand-guide.md` |
+| M3 | Publish | Assemble/schedule (draft state) and run the site gate | Click publish | ✅ publish | `marketing/content-calendar.md`, `marketing/public-site-operations.md` |
 | M4 | Nurture | Draft newsletter/segments | Approve send | ✅ send | `marketing/content-calendar.md` |
 | S0 | Target & research | Build account brief, fit-screen, trigger hunt | Confirm targets | — | `ai-agents/agent-lead-research.md`, `automation/outreach-list-build.mjs` |
 | S1 | Engage | Personalise outreach (draft) | Send / call | ✅ send | `ai-agents/agent-outreach-personalization.md`, `sales/cold-call-scripts.md`, `sales/email-sequences.md` |
@@ -115,7 +115,8 @@ An asset (human- or AI-made) is "done" only when:
 2. It follows `brand/brand-guide.md` (voice + visual).
 3. It inherits the `marketing/messaging-house.md` pillar/persona structure.
 4. `node docs/gtm/automation/gtm-backlog-sync.mjs` passes.
-5. A human owner has approved (per the checkpoints above) if it's outbound/public.
+5. For public-site content, `npm run web:content:check` passes.
+6. A human owner has approved (per the checkpoints above) if it's outbound/public.
 
 ## Maintenance cadence (keeps everything in sync)
 

@@ -47,6 +47,7 @@ This folder is the working documentation set for the LoanOS India build. It expl
 | [Decision records](/Users/nisheethranjan/Projects/AIBank/docs/decisions/0001-india-only-compliance-first.md) | Architecture decisions and why they were made. ADR 0002 covers the multi-tenant SaaS delivery model. ADR 0003 covers the pure-Rust per-tenant decision engine. |
 | [GTM asset library](/Users/nisheethranjan/Projects/AIBank/docs/gtm/README.md) | Go-to-market library for Sales & Marketing (humans + AI agents): strategy, sales playbook/scripts, marketing, brand guide, AI-agent runbooks, and automation. Kept in sync with the product via a claims↔backlog matrix and a claims-discipline check script. |
 | [GTM operating model](/Users/nisheethranjan/Projects/AIBank/docs/gtm/operating-model.md) | The human ↔ AI-agent GTM process: end-to-end flow, agent orchestration, human-in-the-loop checkpoints, RACI, and maintenance cadence. |
+| [Public-site content operations](/Users/nisheethranjan/Projects/AIBank/docs/gtm/marketing/public-site-operations.md) | Fast, governed human and AI workflow for drafting, reviewing, validating and approving public-site updates. |
 
 ## Definition of Done for Documentation
 

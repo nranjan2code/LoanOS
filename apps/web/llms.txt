@@ -8,7 +8,7 @@
 - [Financial institutions](https://loanos.in/financial-institutions/): the operating model for banks, NBFCs, HFCs and other regulated lenders.
 - [Lending partners](https://loanos.in/partners/): scoped participation for LSPs, DLAs, fintechs, DSAs, co-lenders and service providers.
 - [Borrower experience](https://loanos.in/for-msmes/): the customer journey from application through servicing and closure.
-- [Loan journeys](https://loanos.in/loan-types/): configurable business, retail, secured, asset, trade and specialised lending patterns.
+- [Loan journeys](https://loanos.in/loan-types/): configurable business, retail, secured, asset, trade and specialised lending patterns, with individual journey pages for MSME working capital and term finance, asset and vehicle finance, trade and supply-chain patterns, home and personal lending, secured lending, inclusion and co-lending programmes.
 - [Trust centre](https://loanos.in/trust/): tenant isolation, evidence, India boundaries, customer protection and human-governed AI.
 - [Resources](https://loanos.in/resources/): buyer questions, FAQs and a plain-language lending glossary.
 
@@ -21,4 +21,4 @@
 
 ## Contact
 
-- Email: hello@loanos.in
+- Email: hello@aitailorworkshop.in
