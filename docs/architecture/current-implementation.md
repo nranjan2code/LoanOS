@@ -67,6 +67,7 @@ npm run dev:api
 | `packages/core/src/ai-interaction.js` | Customer-facing AI disclosure generation (blocked for back-office/inactive/kill-switched models) and human-handoff request/resolution workflow. |
 | `packages/core/src/incident-notification.js` | Tenant-scoped incident tracking with CERT-In/RBI six-hour clocks plus immediate and detailed DPDP Board and affected-data-principal notice duties. |
 | `packages/core/src/workflow-tasks.js` | LWS task derivation from LOS/LMS state (including pending DPDP access/correction requests) plus task assignment, start, release, and comment lifecycle. |
+| `packages/core/src/operations-monitoring.js` | Deterministic tenant operational-health projection combining provider readiness/circuit state, breached workflow SLAs, aged reconciliation/suspense/finance exceptions, pending provider callbacks, and API SLO breaches into severity-ranked open alerts and stuck-work queues. |
 | `packages/core/src/cersai.js` | CERSAI security-interest lifecycle with checksum-sealed canonical registration packets, India-resident provider submission evidence, payment/certificate-bound responses, rejection repair lineage, maker-checker modification, closure-gated satisfaction, prior-encumbrance search, and a `securedLoan` disbursement gate (SARFAESI Act). Certified gateway schema conformance remains an adapter/onboarding boundary. |
 | `packages/core/src/data-principal-rights.js` | DPDP data-principal access requests (portable data pack assembly) and correction requests (apply/reject with profile propagation), both under a 30-day SLA clock with overdue detection. |
 | `packages/core/src/fiu-str.js` | FIU-IND STR/CTR/CCR lifecycle with canonical FINnet XML (ARF/TRF/CRF) packets, Principal Officer review, ₹10 lakh CTR threshold, source-field validation, checksum-sealed filing, exact acknowledgement/reject handling, independent repair lineage, and a tipping-off guard (PMLA). Certified FIU XSD/rules validation remains the provider adapter boundary. |
@@ -87,22 +88,30 @@ npm run dev:api
 | `apps/api/src/storage.js` | Storage-driver façade: re-exports every pure, in-memory function from `file-store.js` unchanged, and selects the file- or Postgres-backed I/O functions (`loadState`/`saveState`/`withStateLock`/`ensureBootstrapTenants`/`peekControlPlaneState`/the four per-tenant accessors) based on `LOANOS_STORAGE_DRIVER`. `server.js` imports from here, not `file-store.js` directly. |
 | `db/schema.sql` | Postgres schema for the optional storage driver: `tenant_data` (one JSONB row per tenant, Row-Level Security), the control-plane tables (tenant registry, sessions, platform users, append-only audit events, sub-processors, break-glass grants), and the two-role model (`loanos_control_plane`, `BYPASSRLS`, what the app authenticates as; `loanos_app`, `NOBYPASSRLS`, reached only via `SET ROLE`, RLS-enforced for the per-tenant hot path). |
 | `apps/api/src/server.js` | HTTP API with tenant isolation, borrower one-time-code sessions and resource ownership authorization, security headers, server-grounded KFS issuance and separate borrower acceptance, centralized audit stamping, bounded request bodies, admin/platform routes, and LOS/LMS/LWS/compliance endpoints. Production startup requires Postgres, evidenced database encryption, active per-tenant rules routing, and a real email provider. |
+| `apps/api/src/observability.js` | Bounded process-local HTTP telemetry registry: normalized route/status aggregates, availability and latency SLIs, configurable SLO/error-budget state, in-flight/capacity signals, tenant-scoped snapshots, and Prometheus text output without tenant labels. |
 | `tests/compliance.test.js` | Regression tests for compliance, API, tenancy, audit, LOS/LMS/LWS, and integration-ledger gates. |
 | `tests/external-services.test.js` | Provider-boundary tests for `ExternalServiceManager` mock/real dispatch and residency guards. |
 | `tests/postgres-store.test.js` | Integration tests for the Postgres storage driver — RLS enforcement (direct and via the two-role model), advisory-lock serialization (same key) and non-serialization (different keys), and a full multi-tenant HTTP round-trip. Self-skips unless `DATABASE_URL_TEST` is set; not part of the default `npm test` gate but part of the `tests/*.test.js` glob it runs. |
+| `tests/observability.test.js` | Deterministic SLI/SLO, route-cardinality, tenant-label privacy, provider/stuck-work alert, metrics-token, role-gated tenant health, and cross-scope platform health tests. |
 
 ## Implemented API Endpoints
 
 | Endpoint | Purpose |
 | --- | --- |
-| `GET /health` | Service health. Open route, no tenant context. |
+| `GET /health` | Service and bounded runtime SLI health. Open route, no tenant context. |
+| `GET /metrics` | Prometheus-format process metrics; enabled only when `LOANOS_METRICS_TOKEN` is configured and protected by bearer or `x-metrics-token` authentication. Never emits tenant labels. |
 | `GET /compliance/controls` | Returns regulatory control catalog. Open route. |
 | `GET /reference/decline-reasons` | Returns the coded decline-reason taxonomy. Open route. |
 | `POST /auth/login` | Authenticates a tenant user or platform user, returning public principal data and setting an HTTP-only session cookie. |
 | `GET /auth/me` | Reads the current session principal. |
 | `POST /auth/logout` | Revokes the current session and clears the session cookie. |
 | `GET /platform/admin-summary` | Returns platform-level counts for tenants, sandboxes, sub-processors, break-glass grants, and platform users. |
+| `GET /platform/operations/health` | Platform/security/auditor view of aggregate runtime state and every tenant's provider, stuck-work, alert, and SLO health. |
+| `GET /platform/operations/metrics` | Platform/security/auditor view of the bounded process SLI/SLO and capacity snapshot. |
 | `GET /platform/users` | Lists platform users (no password hashes); requires platform admin/security/auditor role or platform admin key. |
+| `GET /operations/health` | Tenant-admin/security/auditor/operator health view combining tenant-scoped runtime SLOs, provider readiness, queue ageing, and open operational alerts. |
+| `GET /operations/alerts` | Tenant-scoped severity-ranked alert and stuck-work projection. |
+| `GET /operations/metrics` | Tenant-scoped runtime SLI/SLO, error-budget, capacity, and normalized route aggregates. |
 | `POST /platform/users` | Creates or updates a platform user with PBKDF2-hashed password and platform roles. |
 | `GET /platform/onboarding-options` | Lists supported tenant-onboarding modules, flows, launch modes, and isolation tiers. |
 | `GET /platform/encryption/rotations` | Lists credential-safe, audit-derived re-encryption records for security and audit review. |
@@ -489,6 +498,7 @@ npm run dev:api
 
 ## Known Limitations
 
+- Observability is deliberately an in-process first slice: each API replica retains at most 10,000 samples inside a rolling 15-minute window, so restarts erase history and multiple replicas do not aggregate. `GET /metrics` is scrape-ready, but production still needs an India-hosted metrics/log/trace backend, structured log shipping and redaction, distributed tracing, dashboards, alert routing/acknowledgement/suppression, SIEM correlation, and tested on-call runbooks. See [observability operations](observability-operations.md).
 - Persistence defaults to local JSON (tenant-partitioned); an optional Postgres/RLS driver exists (`LOANOS_STORAGE_DRIVER=postgres`, see the [Postgres migration doc](postgres-migration.md)) but sandbox management and the platform control plane (`routePlatform`/`routeAuth`) still use whole-state load/save even on that driver — genuinely cross-tenant by design and admin-frequency, not migrated to per-tenant fetching.
 - Per-tenant encryption at rest is implemented at both file and Postgres application-storage boundaries using `LOANOS_MASTER_KEYS` plus `LOANOS_ACTIVE_MASTER_KEY_ID` for the local provider: each tenant partition/row is sealed with a per-tenant AES-256-GCM key derived from the selected root via HKDF-SHA256. Tenant id and key id are authenticated associated data; unknown source versions fail closed. Previous versions are decrypt-only, every write uses the active version, and `POST /platform/encryption/rekey` performs an evidenced all-tenant rewrite. The control plane remains plaintext because it is cross-tenant by construction. Production KMS/HSM provider integration, managed database/backup encryption evidence, and destruction ceremonies remain follow-ons.
 - Tenant human login/session auth is implemented locally, but external IAM/SSO, enforced MFA, SCIM, and production-grade password policy are still integration work.

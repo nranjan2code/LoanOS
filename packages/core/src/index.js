@@ -360,6 +360,8 @@ export {
   startWorkflowTask
 } from "./workflow-tasks.js";
 
+export { buildTenantOperationalHealth } from "./operations-monitoring.js";
+
 export {
   validateMarketplaceNeutrality,
   rankMarketplaceOffers

@@ -2,6 +2,7 @@ import { createServer } from "node:http";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { routeIntegrationControls } from "./routes/integration-controls.js";
 import { routeCersaiSearch } from "./routes/cersai-search.js";
+import { createObservabilityRegistry } from "./observability.js";
 import { readFile } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -28,6 +29,7 @@ import {
   buildAlmReport,
   buildManagementFinanceJournals,
   buildProfitabilityReport,
+  buildTenantOperationalHealth,
   calculateEclAssessment,
   acknowledgeCicBatch,
   classifyLoanAsset,
@@ -400,10 +402,16 @@ async function resolveLockKey(req, dataDir) {
 export function createLoanOsServer({ dataDir, bootstrapTenants = [], platformAdminKey } = {}) {
   validateProductionConfiguration();
   const adminKey = platformAdminKey ?? process.env.LOANOS_PLATFORM_ADMIN_KEY ?? null;
+  const observability = createObservabilityRegistry({
+    windowMs: Number(process.env.LOANOS_SLI_WINDOW_MINUTES) * 60_000,
+    availabilityTargetPct: process.env.LOANOS_SLO_AVAILABILITY_PCT,
+    p95LatencyTargetMs: process.env.LOANOS_SLO_P95_LATENCY_MS
+  });
   let bootstrapPromise = null;
   return createServer(async (req, res) => {
     const requestId = `req_${randomBytes(8).toString("hex")}`;
     applySecurityHeaders(res);
+    observability.trackRequest(req, res);
     try {
       if (!bootstrapPromise) {
         // Cache the in-flight promise so concurrent early requests share one
@@ -428,7 +436,7 @@ export function createLoanOsServer({ dataDir, bootstrapTenants = [], platformAdm
       // driver can serialize per-tenant instead of platform-wide; the file
       // driver ignores it (see withStateLock in file-store.js).
       const lockKey = await resolveLockKey(req, dataDir);
-      await withStateLock(dataDir, lockKey, () => route(req, res, dataDir, adminKey));
+      await withStateLock(dataDir, lockKey, () => route(req, res, dataDir, adminKey, observability));
     } catch (error) {
       console.error(`[${requestId}]`, error);
       if (res.headersSent) {
@@ -548,7 +556,7 @@ function bufferRequestBody(req) {
   });
 }
 
-async function route(req, res, dataDir, platformAdminKey) {
+async function route(req, res, dataDir, platformAdminKey, observability) {
   const method = req.method ?? "GET";
   const url = new URL(req.url ?? "/", "http://localhost");
   // API versioning: routes are served both unprefixed and under an explicit
@@ -565,11 +573,38 @@ async function route(req, res, dataDir, platformAdminKey) {
 
   // --- Open routes: no tenant context required. ---
   if (method === "GET" && path === "/health") {
+    const runtime = observability.snapshot();
     sendJson(res, 200, {
       status: "ok",
       service: "loanos-india-api",
-      apiVersion: API_VERSION
+      apiVersion: API_VERSION,
+      runtime: {
+        status: runtime.status,
+        windowMinutes: runtime.windowMinutes,
+        availabilityPct: runtime.sli.availabilityPct,
+        p95LatencyMs: runtime.sli.p95LatencyMs
+      }
     });
+    return;
+  }
+
+  if (method === "GET" && path === "/metrics") {
+    const metricsToken = process.env.LOANOS_METRICS_TOKEN;
+    if (!metricsToken) {
+      sendJson(res, 404, { error: { code: "not_found", message: "Route not found." } });
+      return;
+    }
+    if (!metricsTokenValid(req, metricsToken)) {
+      sendJson(res, 401, { error: { code: "metrics_auth_required", message: "A valid metrics token is required." } });
+      return;
+    }
+    const body = observability.prometheus();
+    res.writeHead(200, {
+      "content-type": "text/plain; version=0.0.4; charset=utf-8",
+      "content-length": Buffer.byteLength(body),
+      "cache-control": "no-store"
+    });
+    res.end(body);
     return;
   }
 
@@ -717,7 +752,7 @@ async function route(req, res, dataDir, platformAdminKey) {
   // --- Platform control plane: administers tenants and the sub-processor
   // register, gated on the platform admin key (never a tenant api key). ---
   if (path === "/platform" || path.startsWith("/platform/")) {
-    await routePlatform(req, res, { dataDir, platformAdminKey, method, path, url });
+    await routePlatform(req, res, { dataDir, platformAdminKey, method, path, url, observability });
     return;
   }
 
@@ -846,6 +881,7 @@ async function route(req, res, dataDir, platformAdminKey) {
   if (authContext) {
     authContext.effectiveTenantId = tenant.tenantId;
   }
+  res._loanosTenantId = tenant.tenantId;
 
   // Module entitlements: modules default to enabled, so most tenants never hit
   // this gate. A platform admin can narrow a tenant's onboarding to a module
@@ -997,6 +1033,27 @@ async function route(req, res, dataDir, platformAdminKey) {
     sendJson(res, 200, {
       grants: listBreakGlassGrants(currentControlPlaneState, tenant.tenantId)
     });
+    return;
+  }
+
+  if (method === "GET" && ["/operations/health", "/operations/alerts", "/operations/metrics"].includes(path)) {
+    if (!hasTenantAdminRole(authContext, ["tenant_admin", "security_admin", "auditor", "operator"])) {
+      sendJson(res, 403, { error: { code: "operations_forbidden", message: "Tenant operations access is required." } });
+      return;
+    }
+    const runtime = observability.snapshot({ tenantId: tenant.tenantId });
+    if (path === "/operations/metrics") {
+      sendJson(res, 200, { tenantId: tenant.tenantId, runtime });
+      return;
+    }
+    const state = await store.load();
+    const providerReadiness = new ExternalServiceManager({ isSandbox: tenant.isSandbox }).integrationReadiness();
+    const health = buildTenantOperationalHealth(state, { providerReadiness, runtime });
+    if (path === "/operations/alerts") {
+      sendJson(res, 200, { tenantId: tenant.tenantId, generatedAt: health.generatedAt, status: health.status, alerts: health.alerts, work: health.work });
+      return;
+    }
+    sendJson(res, 200, { tenantId: tenant.tenantId, ...health });
     return;
   }
 
@@ -8106,7 +8163,7 @@ async function routeTenantAdmin(req, res, { dataDir, method, path, tenant, authC
   sendJson(res, 404, { error: { code: "not_found", message: "Admin route not found." } });
 }
 
-async function routePlatform(req, res, { dataDir, platformAdminKey, method, path }) {
+async function routePlatform(req, res, { dataDir, platformAdminKey, method, path, observability }) {
   const platformAuth = await platformAuthFromRequest(req, dataDir, platformAdminKey);
   if (!platformAuth.authContext && !platformAdminKey) {
     sendJson(res, 403, {
@@ -8130,6 +8187,39 @@ async function routePlatform(req, res, { dataDir, platformAdminKey, method, path
     return;
   }
   const authContext = platformAuth.authContext;
+
+  if (method === "GET" && ["/platform/operations/health", "/platform/operations/metrics"].includes(path)) {
+    if (!hasPlatformRole(authContext, ["platform_admin", "security_admin", "auditor"])) {
+      sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } });
+      return;
+    }
+    const runtime = observability.snapshot();
+    if (path === "/platform/operations/metrics") {
+      sendJson(res, 200, { scope: "platform", runtime });
+      return;
+    }
+    const state = await loadWholeState(dataDir);
+    const tenants = Object.values(state.controlPlane.tenants ?? {}).map((tenant) => {
+      const tenantRuntime = observability.snapshot({ tenantId: tenant.tenantId });
+      const providerReadiness = new ExternalServiceManager({ isSandbox: tenant.isSandbox }).integrationReadiness();
+      const health = buildTenantOperationalHealth(state.tenants?.[tenant.tenantId] ?? {}, { providerReadiness, runtime: tenantRuntime });
+      return { tenantId: tenant.tenantId, name: tenant.name, isSandbox: tenant.isSandbox, ...health };
+    });
+    sendJson(res, 200, {
+      scope: "platform",
+      generatedAt: new Date().toISOString(),
+      status: tenants.some((tenant) => tenant.status === "critical") || runtime.status === "breached" ? "critical" : tenants.some((tenant) => tenant.status === "degraded") || runtime.status === "degraded" ? "degraded" : "healthy",
+      runtime,
+      tenants: {
+        total: tenants.length,
+        healthy: tenants.filter((tenant) => tenant.status === "healthy").length,
+        degraded: tenants.filter((tenant) => tenant.status === "degraded").length,
+        critical: tenants.filter((tenant) => tenant.status === "critical").length,
+        items: tenants
+      }
+    });
+    return;
+  }
 
   if (method === "GET" && path === "/platform/admin-summary") {
     if (!hasPlatformRole(authContext, ["platform_admin", "tenant_provisioner", "security_admin", "auditor"])) {
@@ -8724,6 +8814,15 @@ function sendJson(res, statusCode, payload, headers = {}) {
     ...headers
   });
   res.end(body);
+}
+
+function metricsTokenValid(req, expectedToken) {
+  const header = req.headers["x-metrics-token"] ?? req.headers.authorization?.replace(/^Bearer\s+/i, "");
+  const suppliedToken = Array.isArray(header) ? header[0] : header;
+  if (!suppliedToken) return false;
+  const supplied = Buffer.from(String(suppliedToken));
+  const expected = Buffer.from(String(expectedToken));
+  return supplied.length === expected.length && timingSafeEqual(supplied, expected);
 }
 
 function isAccountingDateClosed(state, date) {

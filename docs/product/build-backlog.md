@@ -257,7 +257,7 @@ Tasks:
 - Encryption at rest and in transit. Application-envelope first slice done for both file and Postgres drivers: tenant-bound HKDF/AES-256-GCM encryption, ciphertext-only tenant JSON, authenticated key-version metadata, and fail-closed unavailable-key behavior. Production managed database/WAL/replica/backup evidence, field/object encryption, and transport-certificate operations remain planned.
 - Key management. Governed rotation slice done: a versioned provider exposes one active encrypt key plus decrypt-only prior versions; `POST /platform/encryption/rekey` validates source/target versions, requires reason/change ticket, rewrites all tenant data, and seals rotation evidence into the platform audit chain. Production KMS/HSM provider integration, dual-control ceremony, scheduled rotation, destruction/cryptographic-erasure attestation, and recovery drills remain planned.
 - Vulnerability scanning.
-- Observability and alerting.
+- Observability and alerting. First operational slice done: the API keeps a bounded, process-local request window with normalized low-cardinality routes, availability and latency SLIs, configurable SLOs, error-budget state, in-flight/capacity signals, and a token-protected Prometheus scrape. Tenant and platform health APIs combine those runtime signals with provider readiness, circuit state, overdue workflow SLAs, unresolved reconciliation/suspense/finance exceptions, and pending provider work. Durable metrics/log/trace storage, multi-replica aggregation, dashboards, SIEM export, external paging/notification, alert acknowledgement/suppression, and on-call ownership remain planned.
 - Backup and restore.
 - DR and BCP runbooks.
 - Data retention/deletion jobs.
