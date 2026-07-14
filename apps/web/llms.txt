@@ -1,0 +1,24 @@
+# LoanOS India
+
+> LoanOS India is an India-first, multi-tenant lending lifecycle SaaS platform for regulated financial institutions and their authorised partners. LoanOS is technology; it does not lend directly.
+
+## Core platform
+
+- [Platform overview](https://loanos.in/platform/): loan origination, loan management, human workflow, compliance controls and human-governed AI.
+- [Financial institutions](https://loanos.in/financial-institutions/): the operating model for banks, NBFCs, HFCs and other regulated lenders.
+- [Lending partners](https://loanos.in/partners/): scoped participation for LSPs, DLAs, fintechs, DSAs, co-lenders and service providers.
+- [Borrower experience](https://loanos.in/for-msmes/): the customer journey from application through servicing and closure.
+- [Loan journeys](https://loanos.in/loan-types/): configurable business, retail, secured, asset, trade and specialised lending patterns.
+- [Trust centre](https://loanos.in/trust/): tenant isolation, evidence, India boundaries, customer protection and human-governed AI.
+- [Resources](https://loanos.in/resources/): buyer questions, FAQs and a plain-language lending glossary.
+
+## Important boundaries
+
+- LoanOS is India-only and INR-first.
+- The regulated entity remains accountable for its products, policies, decisions, partners and customers.
+- Product and integration readiness depends on institutional configuration, deployment, review and live-provider validation.
+- LoanOS does not claim that use of the platform alone makes a lender compliant.
+
+## Contact
+
+- Email: hello@loanos.in

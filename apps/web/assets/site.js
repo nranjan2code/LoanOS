@@ -1,5 +1,29 @@
 const path = window.location.pathname.replace(/\/$/, '') || '/';
 
+const pageNames = {
+  '/platform': 'Platform',
+  '/financial-institutions': 'Financial institutions',
+  '/for-msmes': 'Borrower experience',
+  '/partners': 'Lending partners',
+  '/loan-types': 'Loan and product library',
+  '/trust': 'Trust centre',
+  '/resources': 'Resources'
+};
+
+if (pageNames[path]) {
+  const breadcrumbData = document.createElement('script');
+  breadcrumbData.type = 'application/ld+json';
+  breadcrumbData.textContent = JSON.stringify({
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'LoanOS India', item: 'https://loanos.in/' },
+      { '@type': 'ListItem', position: 2, name: pageNames[path], item: `https://loanos.in${path}/` }
+    ]
+  });
+  document.head.append(breadcrumbData);
+}
+
 const header = `
   <a class="skip-link" href="#main">Skip to content</a>
   <div class="announcement"><div class="wrap"><strong>Important:</strong> LoanOS powers regulated lenders and their partners. LoanOS does not lend directly.</div></div>
@@ -23,11 +47,11 @@ const header = `
         <a data-route="/loan-types" href="/loan-types/">Capabilities</a>
         <a data-route="/trust" href="/trust/">Trust centre</a>
         <a data-route="/resources" href="/resources/">Resources</a>
-        <a class="mobile-nav-cta" href="mailto:hello@loanos.in?subject=LoanOS%20platform%20demo">Book a demo <span class="arrow">→</span></a>
+        <a class="mobile-nav-cta" href="mailto:hello@loanos.in?subject=LoanOS%20platform%20demo">Book a demo</a>
       </nav>
       <div class="nav-actions">
-        <a class="button ink" href="mailto:hello@loanos.in?subject=LoanOS%20platform%20demo">Book a demo <span class="arrow">→</span></a>
-        <button class="menu" id="menu" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="site-nav">☰</button>
+        <a class="button ink" href="mailto:hello@loanos.in?subject=LoanOS%20platform%20demo">Book a demo</a>
+        <button class="menu" id="menu" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="site-nav"><span class="menu-lines" aria-hidden="true"><i></i><i></i><i></i></span></button>
       </div>
     </div>
   </header>`;
@@ -45,7 +69,7 @@ const footer = `
         <div class="footer-col"><h3>Learn</h3><a href="/resources/">Resource room</a><a href="/resources/#glossary">Plain-language glossary</a><a href="/resources/#faq">Common questions</a></div>
         <div class="footer-col"><h3>Contact</h3><a href="mailto:hello@loanos.in?subject=LoanOS%20platform%20demo">Book a demo</a><a href="mailto:hello@loanos.in?subject=LoanOS%20trust%20review">Request a trust review</a><a href="mailto:hello@loanos.in?subject=LoanOS%20partnership">Discuss a partnership</a></div>
       </div>
-      <div class="footer-bottom"><span>© 2026 LoanOS India. All rights reserved.</span><span>India-only • INR-first • Human-governed AI</span></div>
+      <div class="footer-bottom"><span>© 2026 LoanOS India. All rights reserved.</span><span>India-only / INR-first / Human-governed AI</span></div>
     </div>
   </footer>`;
 
@@ -61,14 +85,15 @@ const nav = document.getElementById('site-nav');
 menu?.addEventListener('click', () => {
   const open = nav.classList.toggle('open');
   document.body.classList.toggle('nav-open', open);
+  menu.classList.toggle('is-open', open);
   menu.setAttribute('aria-expanded', String(open));
-  menu.textContent = open ? '×' : '☰';
   menu.setAttribute('aria-label', open ? 'Close navigation' : 'Open navigation');
 });
 nav?.addEventListener('click', event => {
   if (!event.target.closest('a')) return;
   nav.classList.remove('open');
   document.body.classList.remove('nav-open');
+  menu?.classList.remove('is-open');
   menu?.setAttribute('aria-expanded', 'false');
 });
 

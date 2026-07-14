@@ -5,6 +5,23 @@ house, claims-discipline matrix, and brand guide. Scope: `apps/web/` (home,
 platform, financial-institutions, for-msmes, loan-types, partners, resources,
 trust) + `assets/site.css`.
 
+## Facelift and content sync — 2026-07-14
+
+- Re-audited all eight public routes against `docs/architecture/current-implementation.md`,
+  `docs/product/what-we-are-building.md`, and the current roadmap. Public copy remains
+  capability-led and accurate; implementation-status detail stays internal rather than
+  turning the marketing site into a backlog report.
+- Reduced the homepage from nine large content blocks to seven, combined the lifecycle
+  and value story, removed the redundant film block, and reduced global editorial spacing.
+- Added a people-led homepage hero and aligned all internal page heroes to the same compact,
+  image-led system using the existing approved photography and brand tokens.
+- Added page-specific canonical, robots, Open Graph and social metadata; Organization,
+  WebSite, SoftwareApplication, FAQ and breadcrumb structured data; plus `robots.txt`,
+  `sitemap.xml`, and a factual `llms.txt` discovery summary.
+- Retained the trust page's production-readiness caveat and avoided public `Built / Partial /
+  Roadmap` labels. Customer-facing language stays confident while claims remain bounded by
+  institutional configuration, deployment and live-integration readiness.
+
 ## Headline finding: the site is already largely in sync
 
 The live site was written with exactly the claims discipline this library
