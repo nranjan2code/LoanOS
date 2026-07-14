@@ -128,6 +128,15 @@ Legend:
 | Control-owner certification and sign-off | Completed-period certification binds control-specific tests, evidence and exception issues; effective certification cannot include a deficient test, future periods are rejected, and independent sign-off is mandatory. Institutional owner hierarchy, delegated authority, e-signature and recurring certification campaigns remain required. | Partial |
 | Audit, RBI inspection and board reporting | Internal/statutory/RBI/regulatory engagements track scope, requests, response evidence, management response and independent closure; linked issues must close. Committee packs derive test/issue/certification/engagement metrics and critical/high exceptions and checksum-seal the normalized source. Confidential audit spaces, regulator portals, rendered papers, minutes/actions, trends/KRIs and external audit operation remain required. | Partial |
 
+## Implementation and Migration Assurance
+
+| Requirement | Platform behavior | Status |
+| --- | --- | --- |
+| Approved configuration and data mapping | Configuration checksum, source inventory, record/checksum totals, required fields, versioned transformations, cleansing evidence and maker-checker approval are retained per tenant. Source discovery and cleansing execution remain institutional. | Partial |
+| Migration and opening-balance integrity | Mock/dress/final runs reconcile counts and exact-paise totals; account principal, interest, fee, ledger, installment and schedule evidence must match exactly. ETL and binary transfer remain external. | Partial |
+| Parallel run, UAT and trained users | At least five days of exact finance/regulatory/portfolio reconciliation, product/role/exception/control UAT coverage, severe-defect blocking and score/expiry-bound role certification are required. Bank execution remains external. | Partial |
+| Go-live, rollback and hypercare | Joined DR/security/provider/operations/finance/compliance evidence gates readiness; failed cutover requires rollback proof; hypercare exit requires seven days, no severe open issue and no SLA breach. Production commands and witnessed operation remain external. | Partial |
+
 ## Fraud Risk Management
 
 | Requirement | Platform behavior | Status |

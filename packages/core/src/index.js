@@ -254,6 +254,19 @@ export {
   registerScreeningList,
   stressPortfolio
 } from "./risk-aml-governance.js";
+
+export {
+  assessGoLiveReadiness,
+  assessParallelRun,
+  createImplementationProject,
+  createUatCampaign,
+  executeCutover,
+  recordMigrationRun,
+  recordTrainingCertification,
+  registerMigrationMapping,
+  reviewHypercare,
+  validateOpeningBalances
+} from "./implementation-governance.js";
 export {
   PROVIDER_INTEGRATIONS,
   assessProviderCertification,

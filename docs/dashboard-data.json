@@ -1,17 +1,17 @@
 {
-  "generated": "2026-07-14T17:07:15.330Z",
+  "generated": "2026-07-14T17:14:52.486Z",
   "git": {
     "branch": "main",
-    "count": 154,
+    "count": 155,
     "commits": []
   },
   "overall": {
     "counts": {
       "Implemented": 87,
-      "Partial": 239,
+      "Partial": 247,
       "Partial/Mock": 11,
       "Mock": 7,
-      "Missing": 100,
+      "Missing": 92,
       "Partner": 3,
       "External": 6
     },
@@ -393,21 +393,21 @@
         {
           "n": 33,
           "name": "Implementation, Migration, and Customer Adoption",
-          "pct": 8,
+          "pct": 40,
           "total": 13
         }
       ],
       "counts": {
         "Implemented": 2,
-        "Partial": 11,
+        "Partial": 19,
         "Partial/Mock": 0,
         "Mock": 0,
-        "Missing": 14,
+        "Missing": 6,
         "Partner": 0,
         "External": 3
       },
       "total": 30,
-      "pct": 24
+      "pct": 36
     }
   ],
   "categories": [
@@ -6859,8 +6859,8 @@
           "id": "IMP-003",
           "name": "Configuration workbook and approval",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -6872,8 +6872,8 @@
           "id": "IMP-004",
           "name": "Source-data inventory, mapping, cleansing, and reconciliation",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -6885,8 +6885,8 @@
           "id": "IMP-005",
           "name": "Customer, application, loan, ledger, document, and audit migration",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -6898,8 +6898,8 @@
           "id": "IMP-006",
           "name": "Opening-balance and historical-schedule validation",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -6911,8 +6911,8 @@
           "id": "IMP-007",
           "name": "Mock conversion, dress rehearsal, cutover, and rollback",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -6924,8 +6924,8 @@
           "id": "IMP-008",
           "name": "Parallel run and finance/regulatory reconciliation",
           "applicability": "Institution",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -6950,8 +6950,8 @@
           "id": "IMP-010",
           "name": "Training, role certification, SOPs, and operating manuals",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -6963,8 +6963,8 @@
           "id": "IMP-011",
           "name": "Go-live readiness, hypercare, issue triage, and exit criteria",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -7001,15 +7001,15 @@
       ],
       "counts": {
         "Implemented": 0,
-        "Partial": 2,
+        "Partial": 10,
         "Partial/Mock": 0,
         "Mock": 0,
-        "Missing": 8,
+        "Missing": 0,
         "Partner": 0,
         "External": 3
       },
       "total": 13,
-      "pct": 8
+      "pct": 40
     }
   ],
   "epics": [
@@ -7054,14 +7054,18 @@
       "status": ""
     },
     {
-      "name": "Epic 11: SaaS Tenancy and Platform Isolation",
+      "name": "Epic 11: Implementation, Migration, and Adoption",
+      "status": "governed implementation control-plane first slice complete."
+    },
+    {
+      "name": "Epic 12: SaaS Tenancy and Platform Isolation",
       "status": "S1–S6 first slice complete for every task (tenant partitioning, tenant-scoped service auth, tenant/platform human sessions, tenant user admin, access reviews, service-key rotation, isolation suite, hash-chained audit spine + evidence export, tenant portability export + evidenced offboarding, disclosed sub-processor register, 6-hour incident-notification workflow, audited platform-staff break-glass access, uniform audit provenance stamping)."
     }
   ],
   "tests": {
-    "pass": 271,
+    "pass": 277,
     "fail": 0,
-    "total": 276,
+    "total": 282,
     "ran": true
   }
 }

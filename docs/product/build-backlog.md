@@ -15,8 +15,8 @@ capability rows remain the source of truth for individual features.
 | C | Live/certified CIC, CKYCRR, FIU, CERSAI, bureau, AA, bank-verification, eSign, V-CIP, payment, and communication integrations | Product control plane complete — all 15 families have fail-closed certification/readiness governance; CIC/CKYCRR/AA join the existing transports and signed reconciliation boundary. Each RE must still complete external contracts, credentials and provider/regulator certification before real mode can become ready. |
 | D | Audit integrity and data governance: external/WORM anchoring, event-completeness reconciliation, retention, evidence, lineage, and data-quality controls | Product control plane complete — exact-head WORM evidence, five-registry completeness, custody/hold/deletion proof, field lineage and declarative DQ certification are executable. External TSA/object-lock custody, schedules and institution-wide catalogue/remediation remain deployment depth. |
 | E | Enterprise security and scale: federation, SCIM, KMS/HSM, SIEM custody, HA/PITR, Postgres scale, event/API governance, and deployment automation | Product control plane complete — certified tenant federation/SCIM state, managed-key and log-custody attestations, dependency-linked PostgreSQL HA/PITR/capacity, OpenAPI/event/webhook governance and automation readiness are executable. Live IdP/KMS/SIEM/database/queue/deployment controllers remain external deployment work. |
-| F | Risk, AML, and fraud depth: ongoing CDD, transaction monitoring, fraud signals, portfolio analytics, limits, stress, RCSA, and recurring model monitoring | Planned |
-| G | Migration and go-live: mapping, conversion, balance validation, parallel run, UAT, training, readiness, cutover, and hypercare | Planned |
+| F | Risk, AML, and fraud depth: ongoing CDD, transaction monitoring, fraud signals, portfolio analytics, limits, stress, RCSA, and recurring model monitoring | Product control plane complete — current-list CDD, exact-paise monitoring, deterministic fraud policy, exposure/limit/stress, RCSA, recurring model reports and sealed committee evidence are executable; live feeds and institutional operations remain external. |
+| G | Migration and go-live: mapping, conversion, balance validation, parallel run, UAT, training, readiness, cutover, and hypercare | Product control plane complete — approved configuration/mapping, exact count/paise conversion reconciliation, account balance/schedule validation, parallel/UAT/training gates, joined readiness, cutover rollback and hypercare exit are executable; source ETL and production command execution remain external. |
 
 ## Epic 1: Tenant and Regulated Entity Setup
 
@@ -304,7 +304,29 @@ Done when:
 
 - Production readiness gate can be reviewed by security, compliance, and risk.
 
-## Epic 11: SaaS Tenancy and Platform Isolation
+## Epic 11: Implementation, Migration, and Adoption
+
+Status: governed implementation control-plane first slice complete.
+
+Goal: a regulated entity can prove that configuration, migrated data, finance/regulatory outputs, users, controls, cutover, and hypercare were independently checked before production reliance.
+
+Tasks:
+
+- Configuration workbook and approval. Done at the control layer: products, source systems, roles, environment, configuration/checksum, freeze time, owner, rollback and maker-checker evidence are immutable project facts.
+- Source inventory, mapping and cleansing. Done at the control layer for customer, application, loan, ledger, document and audit entities with counts/checksums, required fields, versioned transforms, cleansing evidence and reconciliation method. Source discovery and cleansing execution remain external.
+- Mock conversion, dress rehearsal and migration reconciliation. Done at the evidence layer: source equals accepted plus rejected, exact-paise control totals reconcile, mapped lineage is mandatory, and failures block. ETL execution and object transfer remain external.
+- Opening balances and schedules. Done: account principal, interest, fees, ledger debit/credit totals, installment count and schedule checksum compare exactly and any difference blocks.
+- Parallel run. Done at the evidence layer: at least five days with exact finance/regulatory/portfolio count, amount, checksum and unexplained-difference controls.
+- UAT and training. Done at the evidence layer: product/role/exception/regulatory coverage, severe-defect gate, role certification at 80%, SOP lineage and expiry. Institution test execution and training delivery remain external.
+- Go-live, cutover and rollback. Done at the control layer: readiness resolves dress, balances, parallel, UAT, all roles, DR/security/provider readiness and three-function sign-off; cutover requires five evidenced steps and failed execution requires rollback evidence.
+- Hypercare and exit. Done at the control layer: at least seven days, no unresolved high/critical issue and no issue SLA breach.
+
+Done when:
+
+- No go-live can be represented as ready without independently approved, source-linked migration, finance, regulatory, control, people and resilience evidence. First slice done.
+- Real source extracts, transformation jobs, witnessed business execution and production switching remain customer/vendor responsibilities.
+
+## Epic 12: SaaS Tenancy and Platform Isolation
 
 Status: S1–S6 first slice complete for every task (tenant partitioning, tenant-scoped service auth, tenant/platform human sessions, tenant user admin, access reviews, service-key rotation, isolation suite, hash-chained audit spine + evidence export, tenant portability export + evidenced offboarding, disclosed sub-processor register, 6-hour incident-notification workflow, audited platform-staff break-glass access, uniform audit provenance stamping).
 

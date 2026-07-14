@@ -23,7 +23,7 @@ The current implementation is intentionally small:
 - Internal staff workspace in `apps/dashboard/`.
 - Borrower customer portal in `apps/customer/`: a responsive, white-labelled journey home with prioritised next actions, visual application milestones, repayment schedules, a document centre, guided media, grievance tracking, and DPDP access/correction/erasure controls.
 - Shared design system tokens in `apps/shared/`.
-- Automated tests in `tests/`: 271 file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
+- Automated tests in `tests/`: 277 file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
 
 Run it:
 
@@ -101,6 +101,8 @@ npm run dev:api
 | `apps/api/src/server.js` | HTTP API with tenant isolation, borrower one-time-code sessions and resource ownership authorization, security headers, server-grounded KFS issuance and separate borrower acceptance, centralized audit stamping, bounded request bodies, admin/platform routes, and LOS/LMS/LWS/compliance endpoints. Production startup requires Postgres, evidenced database encryption, active per-tenant rules routing, and a real email provider. |
 | `packages/core/src/risk-aml-governance.js` | Pure risk control functions for current-list CDD/rescreening, transaction monitoring, fraud scoring, portfolio limits/stress, RCSA, recurring model monitoring, and risk-committee evidence packs. |
 | `apps/api/src/routes/risk-aml-controls.js` | Tenant-authenticated persistence and audit projection for the risk, AML, fraud, and recurring model-monitoring control plane. |
+| `packages/core/src/implementation-governance.js` | Pure implementation controls for project configuration, mapping, conversion and balance reconciliation, parallel/UAT/training gates, joined readiness, cutover/rollback, and hypercare exit. |
+| `apps/api/src/routes/implementation-controls.js` | Tenant-authenticated persistence and audit projection for implementation, migration, go-live and hypercare records. |
 | `apps/api/src/observability.js` | Bounded process-local HTTP telemetry registry: normalized route/status aggregates, availability and latency SLIs, configurable SLO/error-budget state, in-flight/capacity signals, tenant-scoped snapshots, and Prometheus text output without tenant labels. |
 | `apps/api/src/recovery.js` | Encrypted platform recovery-package format and fail-closed validator: domain-separated AES-256-GCM encryption, authenticated India-resident manifest, package/content checksums, state/audit-chain verification, RTO/RPO evaluation, and governed exercise evidence. |
 | `apps/api/src/resilience-probe.js` | Dependency-free bounded concurrent HTTP probe with per-request timeout, status/error counts, p50/p95/p99 latency, throughput, duration, and concurrency evidence. |
@@ -124,6 +126,7 @@ npm run dev:api
 | `tests/data-governance.test.js` | WORM anchor matching, audit completeness, evidence custody/holds/deletion, lineage, DQ failure/certification, and tenant API persistence tests. |
 | `tests/enterprise-platform.test.js` | Federation/SCIM, managed keys/log custody, PostgreSQL HA/PITR/capacity, deployment readiness, API/event compatibility, webhooks, and HTTP persistence. |
 | `tests/risk-aml-governance.test.js` | Current-list CDD, exact-paise transaction alerts, deterministic fraud scoring, exposure/stress controls, RCSA/model reports, evidence packs, and tenant API persistence. |
+| `tests/implementation-governance.test.js` | Configuration/mapping lineage, exact-paise migration/balance failures, parallel/UAT/training readiness, rollback/hypercare gates, and tenant API persistence. |
 
 ## Implemented API Endpoints
 
@@ -131,6 +134,11 @@ npm run dev:api
 | --- | --- |
 | `GET /health` | Service and bounded runtime SLI health. Open route, no tenant context. |
 | `GET /risk/controls` | Role-gated tenant projection of screening/CDD/TM, fraud, portfolio/stress, RCSA, model-report and risk-pack records. |
+| `GET /implementation/controls` | Role-gated tenant projection of implementation projects through hypercare reviews. |
+| `POST /implementation/projects`, `/implementation/mappings`, `/implementation/migration-runs` | Approves configuration/source-transform lineage and records mock/dress/final count and exact-paise conversion reconciliation. |
+| `POST /implementation/opening-balance-validations`, `/implementation/parallel-runs` | Compares account balances/schedules and finance/regulatory/portfolio parallel outputs fail-closed. |
+| `POST /implementation/uat-campaigns`, `/implementation/training-certifications` | Records complete control UAT and score/expiry-bound role certification. |
+| `POST /implementation/go-live-readiness`, `/implementation/cutovers`, `/implementation/hypercare-reviews` | Joins readiness evidence and governs stepwise cutover/rollback and time/severity/SLA-bound exit. |
 | `POST /aml/screening-lists`, `/aml/cdd-reviews` | Registers approved current list evidence and performs complete ongoing CDD/rescreening. |
 | `POST /aml/transaction-monitoring/rules`, `/aml/transaction-monitoring/assessments` | Approves deterministic scenarios and evaluates exact-paise transaction facts into restricted alerts. |
 | `POST /fraud/risk-policies`, `/fraud/signal-assessments` | Approves versioned fraud weights and produces deterministic clear/refer/block assessments. |
@@ -619,9 +627,12 @@ npm run dev:api
 | Customer-facing AI disclosure | Generated only for a customer-facing, active model; blocked for back-office, inactive, or globally kill-switched models. |
 | AI human handoff | Handoff requests move `pending → handled` by a named human agent, sealing `ai.human_handoff.*` events into the audit spine. |
 | AI incident and clearance | A kill-switch trigger opens an incident; the global switch cannot be cleared until a post-incident review (root cause, remediation) is recorded, and clearance closes the incident while retaining the review evidence. |
+| Migration and adoption | Configuration/mapping approval, source/transform checksums, conversion counts and exact-paise totals, account balance/schedule comparison, parallel/UAT/training evidence and joined readiness are tenant-scoped and fail closed. |
+| Cutover and hypercare | Requires freeze/export/import/reconcile/switch evidence; a failed step requires rollback proof, and hypercare exit requires seven days with no severe open issue or SLA breach. |
 
 ## Known Limitations
 
+- Implementation governance validates submitted source, migration, UAT, training and cutover evidence but does not discover legacy systems, run ETL/cleansing, transfer binaries, operate customer UAT/training, execute production commands or witness continuity. Source-specific packs, scale validation and command-centre operation remain customer/vendor work. See [implementation, migration, and go-live governance](implementation-migration-go-live.md).
 - Control assurance is a governed record slice, not a full GRC, workpaper, regulator-portal or board-management system. It lacks granular obligation/control hierarchy, policy/risk mapping, recurring campaigns, statistical sampling, evidence connectors, document retention/e-signature, materiality methodology, automated issue escalation/risk acceptance, confidential auditor spaces, regulator correspondence, rendered papers/minutes/actions, trend/KRI dashboards, WORM timestamps, audit-universe planning and independent operating-effectiveness execution. See [compliance control assurance and audit workspace](control-assurance.md).
 - SOC operations retain governed references and checksums, and Bundle E can certify authenticated schema-bound collectors, trusted time and searchable immutable India custody for supported source families. LoanOS still does not operate the SIEM/log lake, WORM vault, NTP, collectors, correlation/UEBA/threat-intelligence feeds, SOAR, forensic tooling, SOC roster/quality management, hunting, purple-team exercises, or independent effectiveness tests. See [enterprise security and scale](enterprise-security-and-scale.md).
 - Security assurance governs submitted evidence but does not run scanners or validate external report, SBOM, signature, provenance, CVE or exploitability content. Production requires independently administered SAST/DAST/SCA/secret/container/IaC tooling, authenticated pipeline submission, signed-artifact/SBOM verification, CVE/KEV/VEX/advisory feeds, duplicate/reachability analysis, ticketing/escalation and emergency patch automation, scanner/ruleset governance, maintained threat models, independent penetration/red-team exercises, metrics and demonstrated SLA effectiveness. See [secure SDLC and vulnerability assurance](security-assurance.md).

@@ -69,7 +69,7 @@ LoanOS currently has a strong compliance-first domain foundation and executable 
 
 The principal gaps before bank production are live integrations, downstream GL certification, regulatory submission formats, product-specific lending depth, repossession/auction and legal-expense depth, live IdP/KMS/SIEM/database/deployment infrastructure, and independent bank-assurance evidence. The product now governs federation/SCIM state, purpose-attested keys, security-log custody, PostgreSQL HA/PITR/capacity dependencies, API/event/webhook contracts and deployment readiness alongside bounded observability, encrypted recovery, governed release, security assurance, SOC investigation and compliance evidence. Actual token/signature validation, KMS grants, SIEM/WORM/NTP/collectors, managed replication/WAL/PITR, queue/dispatch/replay workers, cloud rollout controllers, institutional control methodology, pen tests, ITSM/paging, 24x7 staffing, production-scale soak/chaos, contract enforcement, real failover/failback and exercised continuity remain open. Collections/legal recovery also retains partner depth for dialers, route/capacity optimization, court integration, possession, auction and recovery accounting. Public positioning must remain narrower than this catalogue until each advertised journey reaches agreed maturity.
 
-The detailed register contains **453 individually identified capabilities**. At this snapshot, 87 are classified `Implemented`, 239 `Partial`, 100 `Missing`, and 27 are mock, partner, external, or composite-status obligations. These counts measure scope coverage, not delivery percentage: a single missing ledger, reconciliation, security, or recovery control can block production even if many smaller capabilities exist.
+The detailed register contains **453 individually identified capabilities**. At this snapshot, 87 are classified `Implemented`, 247 `Partial`, 92 `Missing`, and 27 are mock, partner, external, or composite-status obligations. These counts measure scope coverage, not delivery percentage: a single missing ledger, reconciliation, security, or recovery control can block production even if many smaller capabilities exist.
 
 ## Capability Index
 
@@ -106,7 +106,7 @@ The detailed register contains **453 individually identified capabilities**. At 
 | Integration and data platform | Reliable APIs, events, data quality and lineage | Partial |
 | Reliability and service operations | Observable, recoverable, supportable production service | Partial; local SLI/SLO, provider and stuck-work monitoring slice |
 | User experiences | Borrower, staff, branch, partner and field journeys | Partial |
-| Implementation and migration | Repeatable adoption, migration and cutover | Mostly missing |
+| Implementation and migration | Repeatable adoption, migration and cutover | Partial |
 
 ## Detailed Capability Register
 
@@ -716,15 +716,15 @@ The detailed register contains **453 individually identified capabilities**. At 
 | --- | --- | --- | --- |
 | IMP-001 | Product discovery and target-operating-model assessment | Core | External |
 | IMP-002 | Regulatory applicability and control-mapping workshop | Core | External |
-| IMP-003 | Configuration workbook and approval | Core | Missing |
-| IMP-004 | Source-data inventory, mapping, cleansing, and reconciliation | Core | Missing |
-| IMP-005 | Customer, application, loan, ledger, document, and audit migration | Core | Missing |
-| IMP-006 | Opening-balance and historical-schedule validation | Core | Missing |
-| IMP-007 | Mock conversion, dress rehearsal, cutover, and rollback | Core | Missing |
-| IMP-008 | Parallel run and finance/regulatory reconciliation | Institution | Missing |
+| IMP-003 | Configuration workbook and approval | Core | Partial |
+| IMP-004 | Source-data inventory, mapping, cleansing, and reconciliation | Core | Partial |
+| IMP-005 | Customer, application, loan, ledger, document, and audit migration | Core | Partial |
+| IMP-006 | Opening-balance and historical-schedule validation | Core | Partial |
+| IMP-007 | Mock conversion, dress rehearsal, cutover, and rollback | Core | Partial |
+| IMP-008 | Parallel run and finance/regulatory reconciliation | Institution | Partial |
 | IMP-009 | UAT packs by product, role, exception, and regulatory control | Core | Partial |
-| IMP-010 | Training, role certification, SOPs, and operating manuals | Core | Missing |
-| IMP-011 | Go-live readiness, hypercare, issue triage, and exit criteria | Core | Missing |
+| IMP-010 | Training, role certification, SOPs, and operating manuals | Core | Partial |
+| IMP-011 | Go-live readiness, hypercare, issue triage, and exit criteria | Core | Partial |
 | IMP-012 | Tenant due-diligence pack, audit rights, contracts, and certifications | Core | External |
 | IMP-013 | Data exit, transition support, and independent deletion assurance | Core | Partial |
 

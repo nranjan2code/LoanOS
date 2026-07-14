@@ -92,6 +92,13 @@ node docs/gtm/automation/gtm-backlog-sync.mjs
 | C-59 | RCSA evidence connects controls, KRIs, loss events, root causes and mandatory high-risk actions | Partial | architecture/risk-aml-fraud-governance.md; institution-wide operation remains deployment-specific |
 | C-60 | Recurring model reports bind cohort fairness, bad rate and drift to an active model version | Partial | architecture/risk-aml-fraud-governance.md; independent validation and source certification remain institutional |
 | C-61 | Risk-committee packs validate source records and seal their evidence references | Partial | architecture/risk-aml-fraud-governance.md; board/committee operation remains institutional |
+| C-62 | Implementation projects bind an approved configuration checksum, source scope, roles, freeze time and rollback plan | Partial | architecture/implementation-migration-go-live.md; customer discovery and execution remain external |
+| C-63 | Migration evidence reconciles source counts and exact-paise control totals and blocks unresolved cleansing or rejects | Partial | architecture/implementation-migration-go-live.md; source ETL remains customer/vendor execution |
+| C-64 | Opening balances compare principal, interest, fees, ledger totals, installments and schedule checksums account by account | Partial | architecture/implementation-migration-go-live.md; production source extraction remains external |
+| C-65 | Parallel run requires five days of exact finance, regulatory and portfolio reconciliation | Partial | architecture/implementation-migration-go-live.md; bank operating execution remains institutional |
+| C-66 | UAT covers product, role, exception and regulatory controls while severe defects block and role training expires | Partial | architecture/implementation-migration-go-live.md; customer testing and training delivery remain external |
+| C-67 | Go-live readiness joins migration, balances, parallel run, UAT, role training, DR, security, providers and three-function sign-off | Partial | architecture/implementation-migration-go-live.md; production switching remains external |
+| C-68 | Cutover records five controlled steps, requires rollback proof on failure, and gates hypercare exit on time, severity and SLA | Partial | architecture/implementation-migration-go-live.md; command-centre operation remains external |
 
 ## Change process
 
