@@ -777,17 +777,17 @@
       {
         "type": "code",
         "ref": "packages/core/src/customer-channel-operations.js",
-        "note": "approved exact payout basis, cap and clawback policy"
+        "note": "exact policy, assessment, tax/net, approval, settlement and clawback lifecycle"
       },
       {
         "type": "endpoint",
-        "ref": "POST /channels/commission-policies",
-        "note": "commission governance"
+        "ref": "POST /channels/commission-assessments",
+        "note": "converted-lead eligible-event assessment"
       },
       {
-        "type": "doc",
-        "ref": "docs/architecture/customer-channel-experiences.md",
-        "note": "finance execution boundary"
+        "type": "test",
+        "ref": "tests/customer-channel-operations.test.js",
+        "note": "exact amount, four-eyes, reconciliation and window controls"
       }
     ],
     "acceptance": "",
@@ -6166,7 +6166,7 @@
       {
         "type": "doc",
         "ref": "docs/architecture/customer-channel-experiences.md",
-        "note": "production partner-entitlement boundary"
+        "note": "identity-bound tenant, partner and operating-unit entitlement boundary"
       }
     ],
     "acceptance": "",

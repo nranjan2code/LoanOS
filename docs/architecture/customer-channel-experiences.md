@@ -16,6 +16,8 @@ The implementation deliberately separates lead capture from credit approval. A c
 | Duplicate handling | Normalised contact hashes detect open leads; customer contacts detect known borrowers. A match enters `duplicate_review` and can only continue or close as duplicate with reason and evidence. No automatic customer merge occurs. |
 | Lead lifecycle | State-specific transitions govern contact, qualification, follow-up, duplicate resolution, conversion, and abandonment. Every transition retains actor, reason, evidence, timestamp, and lineage checksum. Conversion requires existing borrower/application identifiers. |
 | Commission policy | Approved policy records flat-paise or disbursed-amount basis points, exact payout cap, eligible event, tax reference, and clawback window. Calculation, accrual, invoice, tax withholding, settlement, and clawback execution remain future finance work. |
+| Channel entitlement | Every tenant user carries an explicit `tenant`, `partner`, or `operating_unit` scope. Partner/unit projections contain only authorised programmes, partners, policies, assessments, and leads; customer-master collections are removed and out-of-scope mutations fail closed. Service credentials remain tenant-scoped integration identities. |
+| Commission execution | A converted partner lead and the policy's eligible event produce an exact-paise assessed gross, cap, tax withholding and net payable. Independent approval precedes settlement; settlement requires payment and reconciliation evidence; clawback is limited to the approved window. |
 | Party graph | Approved typed edges cover co-applicant, co-borrower, guarantor, household, group, JLG, connected party, nominee, legal heir, and authorised representative, including liability and evidence. |
 | Merge governance | A four-eyes `approved_not_executed` plan identifies survivor, duplicates, match evidence, field-conflict choices, migration scope, and rollback evidence. Destructive merge execution is intentionally absent. |
 | Customer intent | Preferred/communication language, vulnerability, accessibility, assisted-journey, do-not-contact, contact-window, consent, and recording actor are retained per borrower. |
@@ -37,15 +39,14 @@ All mutations append actor-attributed records to the tenant audit chain. API-key
 
 The following remain before a bank can treat this as a complete channel/CRM system:
 
-1. Bind each external partner user to a partner/branch scope and filter every projection and mutation to that entitlement. Until then, deploy the workspace only to institution-managed users authorised for the tenant-wide channel desk.
-2. Add partner onboarding UI, credential lifecycle, field hierarchy, territory/capacity allocation, and conduct-monitoring cases.
-3. Implement conversion orchestration that creates or links a governed application without duplicating borrower identity.
-4. Implement commission event calculation, GST/TDS invoice reconciliation, payable accounting, settlement, dispute, and clawback ledgers.
-5. Execute customer merges transactionally across every governed object with dry run, conflict report, audit proof, rollback, and downstream identity reconciliation.
-6. Add succession servicing actions, document/legal review queues, payment/communication authority changes, and account closure/transfer controls.
-7. Add Indian-language content packs and institution-approved templates; storing language preference is not equivalent to translated content.
-8. Complete assistive-technology testing, device/browser certification, field/offline encrypted work queues, and production PWA security review. Business data must never enter general browser caches.
+1. Add partner onboarding UI, credential lifecycle, field hierarchy, territory/capacity allocation, periodic access certification, and conduct-monitoring cases. Partner/unit row-level entitlement is now enforced in the application layer; production database policies and negative isolation tests remain required.
+2. Implement conversion orchestration that creates or links a governed application without duplicating borrower identity.
+3. Extend commission assessment/approval/settlement/clawback with invoice validation, GST/TDS documents, GL payable postings, bank-file generation, disputes, reversals and partner statements.
+4. Execute customer merges transactionally across every governed object with dry run, conflict report, audit proof, rollback, and downstream identity reconciliation.
+5. Add succession servicing actions, document/legal review queues, payment/communication authority changes, and account closure/transfer controls.
+6. Add Indian-language content packs and institution-approved templates; storing language preference is not equivalent to translated content.
+7. Complete assistive-technology testing, device/browser certification, field/offline encrypted work queues, and production PWA security review. Business data must never enter general browser caches.
 
 ## Test evidence
 
-`tests/customer-channel-operations.test.js` covers partner/commission governance, serviceability/product rejection, multi-channel matching, controlled lead lifecycle, party/merge/preferences, succession approval, exact related exposure, API persistence, customer-360, and the static/PWA surface. The wider suite protects tenancy, audit, money, origination, servicing, and integration boundaries.
+`tests/customer-channel-operations.test.js` covers partner authority, identity scope isolation, exact commission lifecycle, serviceability/product rejection, multi-channel matching, controlled lead lifecycle, party/merge/preferences, succession approval, exact related exposure, API persistence, customer-360, and the static/PWA surface. The wider suite protects tenancy, audit, money, origination, servicing, and integration boundaries.

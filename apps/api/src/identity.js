@@ -731,6 +731,7 @@ function normalizeTenantUser(input = {}, existing = {}, now = new Date()) {
     roles: normalizeStringList(input.roles ?? existing.roles),
     queues: normalizeStringList(input.queues ?? existing.queues),
     canAssignQueues: normalizeStringList(input.canAssignQueues ?? existing.canAssignQueues),
+    channelScope: normalizeChannelScope(input.channelScope ?? existing.channelScope),
     country: input.country ?? existing.country ?? "IN",
     authenticationSource: input.authenticationSource ?? existing.authenticationSource ?? "local",
     federationPolicyId: input.federationPolicyId ?? existing.federationPolicyId ?? null,
@@ -808,6 +809,9 @@ function validateTenantUser(user, { isCreate, passwordProvided, rawPassword, all
   if ((user.roles ?? []).length > 0 && user.country !== "IN") {
     findings.push({ code: "user_country_invalid", message: "A user with staff roles must be India-operational for this platform." });
   }
+  if (!user.channelScope || !["tenant", "partner", "operating_unit"].includes(user.channelScope.mode)) findings.push({ code: "user_channel_scope_invalid", message: "Channel scope is invalid." });
+  if (user.channelScope?.mode === "partner" && user.channelScope.partnerIds.length === 0) findings.push({ code: "user_channel_scope_invalid", message: "Partner scope requires at least one partner id." });
+  if (user.channelScope?.mode === "operating_unit" && user.channelScope.operatingUnitIds.length === 0) findings.push({ code: "user_channel_scope_invalid", message: "Operating-unit scope requires at least one unit id." });
   return findings;
 }
 
@@ -851,6 +855,11 @@ function normalizeStringList(value) {
     return [];
   }
   return [...new Set(value.filter((entry) => typeof entry === "string" && entry.trim()).map((entry) => entry.trim()))];
+}
+
+function normalizeChannelScope(value) {
+  const input = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  return { mode: input.mode ?? "tenant", partnerIds: normalizeStringList(input.partnerIds), operatingUnitIds: normalizeStringList(input.operatingUnitIds) };
 }
 
 function idFromEmail(prefix, email) {

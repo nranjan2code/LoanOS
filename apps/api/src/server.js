@@ -866,6 +866,7 @@ async function route(req, res, dataDir, platformAdminKey, observability) {
         email: user.email,
         displayName: user.displayName,
         roles: user.adminRoles ?? [],
+        channelScope: user.channelScope ?? { mode: "tenant", partnerIds: [], operatingUnitIds: [] },
         sessionId: sessionRecord.session.sessionId
       };
     } else {

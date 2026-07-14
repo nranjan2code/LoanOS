@@ -287,6 +287,7 @@ export {
 
 export {
   buildCustomer360,
+  assessPartnerCommission,
   createChannelLead,
   createCustomerMergePlan,
   createSuccessionCase,
@@ -295,6 +296,7 @@ export {
   registerCustomerRelationship,
   registerPartnerCommissionPolicy,
   transitionChannelLead,
+  transitionPartnerCommission,
   transitionSuccessionCase
 } from "./customer-channel-operations.js";
 export {
