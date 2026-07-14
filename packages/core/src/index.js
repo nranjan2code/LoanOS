@@ -665,6 +665,15 @@ export { emptyIntegrationWorkerState, integrationPayloadChecksum, createIntegrat
 export { registerSecurityAdapterProfile, createSecurityProviderPort, recordSecurityCompromiseExercise } from "./production-security-adapters.js";
 export { registerProviderMappingPack, recordSandboxCertificationCampaign, createVendorRfqComparison, approveVendorActivation, projectVendorActivationDashboard } from "./vendor-onboarding-operations.js";
 export { scheduleWorkflowTimer, claimDueWorkflowTimers, completeWorkflowTimer, routeWorkflowTask, pauseWorkflowCase, resumeWorkflowCase, migrateWorkflowCase, executeTransactionalBulkAction } from "./workflow-runtime-operations.js";
+export { PRODUCT_JOURNEY_TYPES, REQUIRED_CHECKS, createProductJourneyDraft, configureProductJourney, approveProductJourney, activateProductJourney, suspendProductJourney, retireProductJourney, cloneProductJourneyTemplate, projectProductJourneyReadiness } from "./product-journey-administration.js";
+export { JOURNEY_SUPPORT_LEVELS, certifyProductJourneySupport, suspendProductJourneySupport, projectProductJourneySupport, assessTenantJourneyActivation } from "./product-journey-certification.js";
+export { SPECIALISED_JOURNEY_FAMILIES, registerSpecialisedJourney, assessSpecialisedJourney } from "./specialised-lending-journeys.js";
+export { TRADE_JOURNEY_TYPES, configureTradeJourneyPack, registerTradeParty, registerTradeAsset, approveTradeFacilityTransaction, drawTradeFacility, settleTradeProceeds } from "./working-capital-trade-journeys.js";
+export { startGettingStartedSession, recordGettingStartedPrerequisites, assignGettingStartedAdministrators, bindGettingStartedConfiguration, recordGettingStartedValidation, approveGettingStartedLaunch, startProductAmendment, resumeGettingStartedSession, projectGettingStartedProgress } from "./tenant-getting-started.js";
+export { registerTenantCustomProduct, projectPlatformProductCatalogue, createTenantProductSubscription, requestProductAddon, decideProductAddon, grantProductAdminRole, revokeProductAdminRole, assessTenantProductEntitlement, projectTenantProductReadiness } from "./tenant-product-entitlements.js";
+export { PRODUCT_TEMPLATE_CATALOGUE, validateProductTemplateCatalogue, registerPlatformProductTemplate, deriveTenantProductTemplate, planTenantProductImplementation, activatePlannedTenantProducts } from "./product-template-catalogue.js";
+export { planTenantProvisioningSaga, acquireProvisioningStep, approveIrreversibleProvisioningStep, completeProvisioningStep, failProvisioningStep, nextProvisioningCompensation, recordProvisioningCompensation, reconcileProvisioningSaga, completeProvisioningHandover } from "./tenant-provisioning-saga.js";
+export { SAAS_DEPLOYMENT_MODELS, REQUIRED_DEPLOYMENT_COMPONENTS, createDeploymentBlueprintDraft, approveDeploymentBlueprint, compileTenantProvisioningPlan, assessTenantProvisioningReadiness } from "./saas-deployment-blueprints.js";
 
 export {
   ASSET_TYPES,

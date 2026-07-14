@@ -23,7 +23,7 @@ The current implementation is intentionally small:
 - Internal staff workspace in `apps/dashboard/`.
 - Borrower customer portal in `apps/customer/`: a responsive, white-labelled journey home with prioritised next actions, visual application milestones, repayment schedules, a document centre, guided media, grievance tracking, and DPDP access/correction/erasure controls.
 - Shared design system tokens in `apps/shared/`.
-- Automated tests in `tests/`: 430 tracked file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
+- Automated tests in `tests/`: 474 tracked file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
 
 Run it:
 
@@ -79,6 +79,15 @@ npm run dev:api
 | `packages/core/src/production-security-adapters.js` | Governed India-resident profiles and injected SDK ports for cloud KMS/HSM, vault workload identity, PGP custody and SIEM/WORM export, with non-exportable attestations, purpose isolation and compromise exercises. |
 | `packages/core/src/vendor-onboarding-operations.js` | Tenant-scoped provider mapping packs, adverse sandbox certification campaigns, exact-paise three-year RFQ comparisons, contract/SLA/residency/DR/exit activation gates and module-category readiness projection. |
 | `packages/core/src/workflow-runtime-operations.js` | Durable workflow timers with fencing, deterministic capacity routing, evidenced pause/resume, version migration with rollback snapshots, and preflighted bounded bulk execution. |
+| `packages/core/src/product-journey-administration.js` | SaaS tenant administration for the canonical 21 journey types: draft/configure/approve/activate/suspend/retire, version/effective dates, RE/policy/channel/partner bindings, roles, controls, onboarding evidence, readiness and tenant-safe template cloning. |
+| `packages/core/src/product-journey-certification.js` | Evidence-tier certification separating platform journey support from tenant production activation; missing or expired support, tenant configuration, UAT or provider readiness blocks activation. |
+| `packages/core/src/specialised-lending-journeys.js` | Thirteen tenant-scoped retail, secured, asset and priority-sector product packs with exact-paise/ratio configuration and fail-closed property, vehicle, gold, education, agriculture, group, merchant and professional-practice gates. |
+| `packages/core/src/working-capital-trade-journeys.js` | Tenant-scoped invoice-discounting, purchase-order, supply-chain and trade-workflow packs with parties/assets, assignment/shipment evidence, exact-paise limits and concentration, milestone approval, draws, accounting-bound proceeds settlement and disputes. |
+| `packages/core/src/tenant-getting-started.js` | Resumable self-service tenant launch and add-product amendments covering prerequisites, administrators/owners, governed bindings, sandbox, UAT, maker-checker launch, progress and blocker projection. |
+| `packages/core/src/tenant-product-entitlements.js` | Tenant subscriptions, governed add-ons, future and tenant-derived template lineage, time-bounded product administration roles, revocation and fail-closed entitlement/readiness projection. |
+| `packages/core/src/product-template-catalogue.js` | Exact 21-template built-in catalogue plus versioned platform and tenant-derived extensions, full prerequisite manifests, dependency plans and additive activation. |
+| `packages/core/src/tenant-provisioning-saga.js` | Dependency-ordered tenant/add-product provisioning with revision checkpoints, leased fencing, retries, irreversible approvals, reverse compensation, reconciliation and evidence-bound handover. |
+| `packages/core/src/saas-deployment-blueprints.js` | Approved shared, dedicated-data-plane, dedicated-environment and customer-managed deployment blueprints with responsibility matrices, 17-component plans, rollback metadata and evidence readiness. |
 | `apps/api/src/provider-callback-dispatcher.js` | Bounded executable callback worker with tenant lease claims, exact-body HMAC delivery, HTTPS/timeout/Retry-After handling, response classification, per-provider circuit breaker and queue/run health. Scheduler/target/KMS resolvers remain deployment-owned. |
 | `packages/core/src/provider-governance.js` | Fifteen-family provider certification registry: production/India/time/evidence scope, four-eyes approval, suspension, expiry assessment, and live-readiness authority. |
 | `packages/core/src/data-governance.js` | Verified audit anchoring, source-to-event completeness reconciliation, immutable evidence custody/legal hold/deletion proof, field lineage, and declarative data-quality assessment/certification. |
