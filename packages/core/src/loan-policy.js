@@ -2,6 +2,7 @@ import { createFinding, summarizeFindings } from "./compliance-controls.js";
 import { evaluateModelUse } from "./model-governance.js";
 import { GST_RATE_BPS, summarizeGst, withGstDisclosure } from "./tax.js";
 import { randomUUID } from "node:crypto";
+import { generateContractualSchedule, periodsForTenor, periodsPerYearForFrequency } from "./repayment-schedule.js";
 
 export const ALLOWED_RE_TYPES = new Set([
   "commercial_bank",
@@ -44,16 +45,6 @@ function roundMoney(value) {
   return Number.isFinite(value) ? Math.round((value + Number.EPSILON) * 100) / 100 : null;
 }
 
-function addMonthsUtc(date, months) {
-  const next = new Date(date);
-  const originalDay = next.getUTCDate();
-  next.setUTCDate(1);
-  next.setUTCMonth(next.getUTCMonth() + months);
-  const lastDay = new Date(Date.UTC(next.getUTCFullYear(), next.getUTCMonth() + 1, 0)).getUTCDate();
-  next.setUTCDate(Math.min(originalDay, lastDay));
-  return next;
-}
-
 function addWorkingDays(date, days) {
   const result = new Date(date);
   let remaining = days;
@@ -65,35 +56,7 @@ function addWorkingDays(date, days) {
   return result;
 }
 
-function buildKfsAmortizationSchedule(principalAmount, annualInterestRateBps, tenorMonths, startDate) {
-  if (!Number.isFinite(principalAmount) || principalAmount <= 0 || !Number.isInteger(tenorMonths) || tenorMonths <= 0) return [];
-  const monthlyRate = Number.isFinite(annualInterestRateBps) ? annualInterestRateBps / 120000 : 0;
-  const principalPaise = Math.round(principalAmount * 100);
-  const factor = monthlyRate === 0 ? 1 : (1 + monthlyRate) ** tenorMonths;
-  const emiPaise = monthlyRate === 0
-    ? Math.round(principalPaise / tenorMonths)
-    : Math.round((principalPaise * monthlyRate * factor) / (factor - 1));
-  let openingPaise = principalPaise;
-  const schedule = [];
-  for (let index = 1; index <= tenorMonths; index += 1) {
-    const interestPaise = Math.round(openingPaise * monthlyRate);
-    const principalDuePaise = index === tenorMonths ? openingPaise : Math.min(openingPaise, emiPaise - interestPaise);
-    const totalDuePaise = principalDuePaise + interestPaise;
-    schedule.push({
-      installmentNumber: index,
-      dueDate: addMonthsUtc(startDate, index).toISOString().slice(0, 10),
-      openingPrincipal: openingPaise / 100,
-      principalDue: principalDuePaise / 100,
-      interestDue: interestPaise / 100,
-      totalDue: totalDuePaise / 100,
-      closingPrincipal: (openingPaise - principalDuePaise) / 100
-    });
-    openingPaise -= principalDuePaise;
-  }
-  return schedule;
-}
-
-function calculateCashFlowAprBps(principalAmount, upfrontCharges, schedule) {
+function calculateCashFlowAprBps(principalAmount, upfrontCharges, schedule, periodsPerYear = 12) {
   const netDisbursal = principalAmount - upfrontCharges;
   if (!Number.isFinite(netDisbursal) || netDisbursal <= 0 || !Array.isArray(schedule) || schedule.length === 0) return null;
   let low = 0;
@@ -105,7 +68,7 @@ function calculateCashFlowAprBps(principalAmount, upfrontCharges, schedule) {
     else high = rate;
   }
   const monthlyIrr = (low + high) / 2;
-  return Math.round((((1 + monthlyIrr) ** 12) - 1) * 10000);
+  return Math.round((((1 + monthlyIrr) ** periodsPerYear) - 1) * 10000);
 }
 
 export function calculateAgeYears(dateOfBirth, now = new Date()) {
@@ -166,12 +129,18 @@ export function buildKeyFactStatement(application, terms, now = new Date()) {
   const principalAmount = terms?.principalAmount ?? product.requestedAmount ?? null;
   const tenorMonths = terms?.tenorMonths ?? product.requestedTenorMonths ?? product.defaultTenorMonths ?? null;
   const annualInterestRateBps = terms?.annualInterestRateBps ?? product.annualInterestRateBps ?? null;
-  const amortizationSchedule = buildKfsAmortizationSchedule(principalAmount, annualInterestRateBps, tenorMonths, now);
+  const facilityType = terms?.facilityType ?? product.facilityType ?? "term_loan";
+  const isRevolving = ["revolving_credit", "overdraft"].includes(facilityType);
+  const repaymentFrequency = terms?.repaymentFrequency ?? product.repaymentFrequency ?? "monthly";
+  const repaymentStructure = isRevolving ? "bullet" : (terms?.repaymentStructure ?? product.repaymentStructure ?? "amortizing");
+  const illustrativePrincipalAmount = isRevolving ? (terms?.creditLimit ?? product.creditLimit) : principalAmount;
+  const scheduleResult = generateContractualSchedule({ principalAmount: illustrativePrincipalAmount, annualInterestRateBps, tenorMonths, startDate: now, repaymentFrequency, repaymentStructure, moratoriumPeriods: terms?.moratoriumPeriods ?? product.moratoriumPeriods ?? 0, moratoriumInterestTreatment: terms?.moratoriumInterestTreatment ?? product.moratoriumInterestTreatment ?? "serviced", stepUpBps: terms?.stepUpBps ?? product.stepUpBps ?? 0, stepUpEveryPeriods: terms?.stepUpEveryPeriods ?? product.stepUpEveryPeriods });
+  const amortizationSchedule = scheduleResult.schedule;
   const mandatoryUpfrontCharges = chargesWithGst.reduce(
     (sum, charge) => sum + (Number.isFinite(charge.amount) ? charge.amount : 0),
     0
   );
-  const aprBps = calculateCashFlowAprBps(principalAmount, mandatoryUpfrontCharges, amortizationSchedule);
+  const aprBps = calculateCashFlowAprBps(illustrativePrincipalAmount, mandatoryUpfrontCharges, amortizationSchedule, periodsPerYearForFrequency(repaymentFrequency));
   const proposalNumber = createLoanId("proposal");
   const validUntil = addWorkingDays(now, tenorMonths && tenorMonths > 0 ? 3 : 1);
 
@@ -193,13 +162,22 @@ export function buildKeyFactStatement(application, terms, now = new Date()) {
     aprBps,
     aprComputation: {
       method: "cash_flow_irr_effective_annual",
-      amountDisbursed: roundMoney(principalAmount - mandatoryUpfrontCharges),
+      amountDisbursed: roundMoney(illustrativePrincipalAmount - mandatoryUpfrontCharges),
+      assumption: isRevolving ? "full_sanctioned_limit_utilized_for_full_tenor" : "contractual_cash_flows",
       mandatoryUpfrontCharges: roundMoney(mandatoryUpfrontCharges),
       installmentCount: amortizationSchedule.length,
       totalRepaymentAmount: roundMoney(amortizationSchedule.reduce((sum, row) => sum + row.totalDue, 0))
     },
     amortizationSchedule,
-    repaymentFrequency: terms?.repaymentFrequency ?? product.repaymentFrequency ?? "monthly",
+    repaymentFrequency,
+    repaymentStructure: isRevolving ? "revolving" : repaymentStructure,
+    scheduleNature: isRevolving ? "illustrative_full_utilization" : "contractual",
+    moratoriumPeriods: terms?.moratoriumPeriods ?? product.moratoriumPeriods ?? 0,
+    moratoriumInterestTreatment: terms?.moratoriumInterestTreatment ?? product.moratoriumInterestTreatment ?? "serviced",
+    stepUpBps: terms?.stepUpBps ?? product.stepUpBps ?? 0,
+    stepUpEveryPeriods: terms?.stepUpEveryPeriods ?? product.stepUpEveryPeriods ?? null,
+    facilityType,
+    facilityTerms: isRevolving ? { creditLimit: terms?.creditLimit ?? product.creditLimit, drawingPower: terms?.drawingPower ?? product.drawingPower ?? product.creditLimit, minimumPaymentPercent: terms?.minimumPaymentPercent ?? product.minimumPaymentPercent, reviewFrequencyMonths: terms?.reviewFrequencyMonths ?? product.reviewFrequencyMonths, facilityExpiryDate: terms?.facilityExpiryDate ?? product.facilityExpiryDate, interestBasis: "daily_utilized_balance_actual_365" } : null,
     coolingOffDays: terms?.coolingOffDays ?? product.coolingOffDays ?? 1,
     charges: chargesWithGst,
     contingentCharges: contingentChargesWithGst,
@@ -291,9 +269,11 @@ export function validateKfs(kfs) {
   if (!kfs.aprComputation?.method || !Number.isFinite(kfs.aprComputation?.totalRepaymentAmount)) {
     findings.push(createFinding("error", "RBI-KFS-2024", "KFS must include an APR computation sheet.", "kfs.aprComputation"));
   }
-  if (!Array.isArray(kfs.amortizationSchedule) || kfs.amortizationSchedule.length !== kfs.tenorMonths) {
+  const expectedInstallmentCount = periodsForTenor(kfs.tenorMonths, kfs.repaymentFrequency);
+  if (!Array.isArray(kfs.amortizationSchedule) || kfs.amortizationSchedule.length !== expectedInstallmentCount) {
     findings.push(createFinding("error", "RBI-KFS-2024", "KFS must include the complete amortisation schedule.", "kfs.amortizationSchedule"));
   }
+  if (["revolving_credit", "overdraft"].includes(kfs.facilityType) && (!Number.isFinite(kfs.facilityTerms?.creditLimit) || !Number.isFinite(kfs.facilityTerms?.drawingPower) || !kfs.facilityTerms?.facilityExpiryDate || kfs.scheduleNature !== "illustrative_full_utilization")) findings.push(createFinding("error", "RBI-KFS-2024", "Revolving KFS must disclose limit, drawing power, expiry, daily-interest basis, and illustrative cash flows.", "kfs.facilityTerms"));
   if (!Number.isFinite(kfs.coolingOffDays) || kfs.coolingOffDays < 1) {
     findings.push(createFinding("error", "RBI-KFS-2024", "Digital loans require coolingOffDays of at least one day.", "kfs.coolingOffDays"));
   }

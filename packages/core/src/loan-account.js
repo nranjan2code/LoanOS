@@ -2,70 +2,13 @@ import { createHash } from "node:crypto";
 import { createFinding, summarizeFindings } from "./compliance-controls.js";
 import { createLoanId } from "./loan-policy.js";
 import { decomposeGstInclusive } from "./tax.js";
+import { generateContractualSchedule } from "./repayment-schedule.js";
 
 const ACTIVE_STATUS = "active";
 const CLOSED_STATUS = "closed";
 
 export function generateRepaymentSchedule(input) {
-  const principalAmount = roundMoney(input.principalAmount);
-  const annualInterestRateBps = input.annualInterestRateBps ?? 0;
-  const tenorMonths = input.tenorMonths;
-  const startDate = input.startDate ? new Date(input.startDate) : new Date();
-  const findings = [];
-
-  if (!Number.isFinite(principalAmount) || principalAmount <= 0) {
-    findings.push(createFinding("error", "RBI-DL-2025", "principalAmount must be positive.", "principalAmount"));
-  }
-  if (!Number.isFinite(tenorMonths) || tenorMonths <= 0) {
-    findings.push(createFinding("error", "RBI-DL-2025", "tenorMonths must be positive.", "tenorMonths"));
-  }
-  if (!Number.isFinite(annualInterestRateBps) || annualInterestRateBps < 0) {
-    findings.push(createFinding("error", "RBI-KFS-2024", "annualInterestRateBps must be non-negative.", "annualInterestRateBps"));
-  }
-
-  const summary = summarizeFindings(findings);
-  if (summary.status === "blocked") {
-    return {
-      schedule: [],
-      findings,
-      summary
-    };
-  }
-
-  const monthlyRate = annualInterestRateBps / 10000 / 12;
-  const emiPaise = computeEmiPaise(toPaise(principalAmount), monthlyRate, tenorMonths);
-  const schedule = [];
-  // Carry the outstanding principal as exact integer paise so it never
-  // accumulates floating-point drift across a long schedule (REV-20).
-  let openingPaise = toPaise(principalAmount);
-
-  for (let index = 1; index <= tenorMonths; index += 1) {
-    const interestPaise = interestForPeriodPaise(openingPaise, monthlyRate);
-    const principalPaise =
-      index === tenorMonths
-        ? openingPaise
-        : Math.min(openingPaise, Math.max(0, emiPaise - interestPaise));
-    const closingPaise = Math.max(0, openingPaise - principalPaise);
-
-    schedule.push({
-      installmentNumber: index,
-      dueDate: addMonthsUtc(startDate, index).toISOString().slice(0, 10),
-      openingPrincipal: fromPaise(openingPaise),
-      principalDue: fromPaise(principalPaise),
-      interestDue: fromPaise(interestPaise),
-      totalDue: fromPaise(principalPaise + interestPaise),
-      closingPrincipal: fromPaise(closingPaise),
-      status: "scheduled"
-    });
-
-    openingPaise = closingPaise;
-  }
-
-  return {
-    schedule,
-    findings,
-    summary
-  };
+  return generateContractualSchedule(input);
 }
 
 export function createLoanAccountFromApplication(application, disbursement, now = new Date()) {
@@ -81,11 +24,21 @@ export function createLoanAccountFromApplication(application, disbursement, now 
   const principalAmount = application.kfs?.principalAmount ?? application.product?.requestedAmount;
   const tenorMonths = application.kfs?.tenorMonths ?? application.product?.requestedTenorMonths;
   const annualInterestRateBps = application.kfs?.annualInterestRateBps ?? application.product?.annualInterestRateBps ?? 0;
-  const scheduleResult = generateRepaymentSchedule({
+  const facilityType = application.kfs?.facilityType ?? application.product?.facilityType ?? "term_loan";
+  const isRevolving = ["revolving_credit", "overdraft"].includes(facilityType);
+  const creditLimit = application.kfs?.facilityTerms?.creditLimit ?? application.product?.creditLimit;
+  if (isRevolving && (!Number.isFinite(creditLimit) || creditLimit <= 0 || principalAmount > creditLimit)) findings.push(createFinding("error", "RBI-DL-2025", "Revolving initial draw must be within the approved credit limit.", "creditLimit"));
+  const scheduleResult = isRevolving ? { schedule: [], findings: [], summary: summarizeFindings([]) } : generateRepaymentSchedule({
     principalAmount,
     annualInterestRateBps,
     tenorMonths,
-    startDate: disbursement.disbursedAt ?? now.toISOString()
+    startDate: disbursement.disbursedAt ?? now.toISOString(),
+    repaymentFrequency: application.kfs?.repaymentFrequency ?? application.product?.repaymentFrequency ?? "monthly",
+    repaymentStructure: application.kfs?.repaymentStructure ?? application.product?.repaymentStructure ?? "amortizing",
+    moratoriumPeriods: application.kfs?.moratoriumPeriods ?? application.product?.moratoriumPeriods ?? 0,
+    moratoriumInterestTreatment: application.kfs?.moratoriumInterestTreatment ?? application.product?.moratoriumInterestTreatment ?? "serviced",
+    stepUpBps: application.kfs?.stepUpBps ?? application.product?.stepUpBps ?? 0,
+    stepUpEveryPeriods: application.kfs?.stepUpEveryPeriods ?? application.product?.stepUpEveryPeriods
   });
   findings.push(...scheduleResult.findings);
 
@@ -101,7 +54,7 @@ export function createLoanAccountFromApplication(application, disbursement, now 
   const loanAccountId = createLoanId("acct");
   const disbursementEvent = {
     eventId: createLoanId("ledger"),
-    type: "disbursement",
+    type: isRevolving ? "revolving_drawdown" : "disbursement",
     eventDate: disbursement.disbursedAt ?? now.toISOString(),
     amount: roundMoney(principalAmount),
     principalDebit: roundMoney(principalAmount),
@@ -129,6 +82,17 @@ export function createLoanAccountFromApplication(application, disbursement, now 
     aprBps: application.kfs?.aprBps ?? application.product?.aprBps ?? annualInterestRateBps,
     tenorMonths,
     repaymentFrequency: application.kfs?.repaymentFrequency ?? application.product?.repaymentFrequency ?? "monthly",
+    repaymentStructure: application.kfs?.repaymentStructure ?? application.product?.repaymentStructure ?? "amortizing",
+    moratoriumPeriods: application.kfs?.moratoriumPeriods ?? application.product?.moratoriumPeriods ?? 0,
+    moratoriumInterestTreatment: application.kfs?.moratoriumInterestTreatment ?? application.product?.moratoriumInterestTreatment ?? "serviced",
+    stepUpBps: application.kfs?.stepUpBps ?? application.product?.stepUpBps ?? 0,
+    stepUpEveryPeriods: application.kfs?.stepUpEveryPeriods ?? application.product?.stepUpEveryPeriods ?? null,
+    facilityType,
+    creditLimit: isRevolving ? roundMoney(application.kfs?.facilityTerms?.creditLimit ?? application.product?.creditLimit ?? principalAmount) : null,
+    drawingPower: isRevolving ? roundMoney(application.kfs?.facilityTerms?.drawingPower ?? application.product?.drawingPower ?? application.product?.creditLimit ?? principalAmount) : null,
+    minimumPaymentPercent: isRevolving ? (application.kfs?.facilityTerms?.minimumPaymentPercent ?? application.product?.minimumPaymentPercent ?? 5) : null,
+    reviewFrequencyMonths: isRevolving ? (application.kfs?.facilityTerms?.reviewFrequencyMonths ?? application.product?.reviewFrequencyMonths ?? 12) : null,
+    facilityExpiryDate: isRevolving ? (application.kfs?.facilityTerms?.facilityExpiryDate ?? application.product?.facilityExpiryDate ?? addMonthsUtc(now, tenorMonths).toISOString().slice(0, 10)) : null,
     coolingOffDays: application.kfs?.coolingOffDays ?? application.product?.coolingOffDays ?? 1,
     openedAt: now.toISOString(),
     disbursedAt: disbursement.disbursedAt ?? now.toISOString(),
@@ -170,7 +134,8 @@ export function summarizeLoanAccount(account, asOf = new Date()) {
   const dueInstallmentsAsOf = (account.schedule ?? []).filter(
     (installment) => new Date(`${installment.dueDate}T00:00:00.000Z`).getTime() <= asOf.getTime()
   );
-  const interestDueAsOf = sumMoney(dueInstallmentsAsOf, (installment) => installment.interestDue);
+  const scheduledInterestDueAsOf = sumMoney(dueInstallmentsAsOf, (installment) => installment.interestDue);
+  const interestDueAsOf = roundMoney(Math.max(scheduledInterestDueAsOf, interestAccrued));
   const principalDueAsOf = sumMoney(dueInstallmentsAsOf, (installment) => installment.principalDue);
   const interestOutstanding = roundMoney(Math.max(0, interestDueAsOf - interestPaid - interestWaived));
   const chargesOutstanding = roundMoney(Math.max(0, chargesAssessed - chargesWaived - chargesPaid));
@@ -197,6 +162,7 @@ export function summarizeLoanAccount(account, asOf = new Date()) {
     chargesOutstanding,
     principalOverdue,
     totalOutstanding: roundMoney(principalOutstanding + interestOutstanding + chargesOutstanding),
+    facility: ["revolving_credit", "overdraft"].includes(account.facilityType) ? { facilityType: account.facilityType, creditLimit: account.creditLimit, drawingPower: account.drawingPower, utilizedAmount: principalOutstanding, availableAmount: roundMoney(Math.max(0, Math.min(account.creditLimit, account.drawingPower) - principalOutstanding)), minimumPaymentDue: roundMoney(interestOutstanding + chargesOutstanding + (principalOutstanding * account.minimumPaymentPercent) / 100), expiryDate: account.facilityExpiryDate } : null,
     nextDue: nextInstallment
       ? {
           dueDate: nextInstallment.dueDate,
@@ -280,7 +246,52 @@ export function accrueInterest(account, input = {}, now = new Date()) {
   };
 }
 
+export function drawRevolvingCredit(account, input = {}, now = new Date()) {
+  const findings = []; const drawnAt = input.drawnAt ? new Date(input.drawnAt) : now;
+  if (!account || account.status !== ACTIVE_STATUS || !["revolving_credit", "overdraft"].includes(account?.facilityType)) findings.push(createFinding("error", "RBI-DL-2025", "An active revolving or overdraft facility is required.", "facilityType"));
+  if (Number.isNaN(drawnAt.getTime())) findings.push(createFinding("error", "RBI-IT-GRC", "drawnAt must be a valid timestamp.", "drawnAt"));
+  if (!Number.isFinite(input.amount) || input.amount <= 0 || Math.abs(input.amount * 100 - Math.round(input.amount * 100)) >= 1e-8) findings.push(createFinding("error", "RBI-DL-2025", "Draw amount must be positive and paise-exact.", "amount"));
+  if (!input.drawdownId || !input.destinationAccountRef || !input.proposedBy || !input.approvedBy || input.proposedBy === input.approvedBy || !input.approvalRef) findings.push(createFinding("error", "RBI-IT-GRC", "Drawdown ID, destination, and independent approval are required.", "approval"));
+  if (!Number.isNaN(drawnAt.getTime()) && account?.facilityExpiryDate && drawnAt.getTime() > new Date(`${account.facilityExpiryDate}T23:59:59.999Z`).getTime()) findings.push(createFinding("error", "RBI-DL-2025", "Facility has expired and cannot be drawn.", "facilityExpiryDate"));
+  if ((account?.ledger ?? []).some((event) => event.drawdownId === input.drawdownId)) findings.push(createFinding("error", "RBI-IT-GRC", "drawdownId already exists.", "drawdownId"));
+  const balance = account ? summarizeLoanAccount(account, drawnAt) : null; const available = balance?.facility?.availableAmount ?? 0;
+  if (Number.isFinite(input.amount) && input.amount > available) findings.push(createFinding("error", "RBI-DL-2025", "Draw exceeds the lower of sanctioned limit and current drawing power.", "amount"));
+  const summary = summarizeFindings(findings); if (summary.status === "blocked") return { loanAccount: account, drawdownEvent: null, findings, summary };
+  const drawdownEvent = { eventId: createLoanId("ledger"), type: "revolving_drawdown", eventDate: drawnAt.toISOString(), amount: roundMoney(input.amount), principalDebit: roundMoney(input.amount), principalCredit: 0, interestCredit: 0, chargesDebit: 0, chargesCredit: 0, chargesWaiverCredit: 0, drawdownId: input.drawdownId, destinationAccountRef: input.destinationAccountRef, proposedBy: input.proposedBy, approvedBy: input.approvedBy, approvalRef: input.approvalRef, actor: input.approvedBy };
+  return { loanAccount: { ...account, ledger: [...account.ledger, drawdownEvent], updatedAt: now.toISOString() }, drawdownEvent, findings, summary };
+}
+
+export function accrueRevolvingInterest(account, input = {}, now = new Date()) {
+  const findings = []; const start = new Date(`${input.periodStart}T00:00:00.000Z`); const end = new Date(`${input.periodEnd}T00:00:00.000Z`); const days = Math.round((end.getTime() - start.getTime()) / 86400000);
+  if (!account || account.status !== ACTIVE_STATUS || !["revolving_credit", "overdraft"].includes(account?.facilityType)) findings.push(createFinding("error", "RBI-DL-2025", "An active revolving or overdraft facility is required.", "facilityType"));
+  if (!input.accrualId || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || days <= 0) findings.push(createFinding("error", "RBI-IT-GRC", "accrualId and a valid positive interest period are required.", "period"));
+  if ((account?.ledger ?? []).some((event) => event.accrualId === input.accrualId || (event.type === "revolving_interest_accrual" && event.periodStart === input.periodStart && event.periodEnd === input.periodEnd))) findings.push(createFinding("error", "RBI-IT-GRC", "Revolving interest period is already accrued.", "accrualId"));
+  const summary = summarizeFindings(findings); if (summary.status === "blocked") return { loanAccount: account, accrualEvent: null, findings, summary };
+  let balancePaiseDays = 0; const dailyBalances = [];
+  for (let offset = 0; offset < days; offset += 1) { const day = new Date(start.getTime() + offset * 86400000); const dayBalance = summarizeLoanAccount(account, day).principalOutstanding; balancePaiseDays += toPaise(dayBalance); dailyBalances.push({ date: day.toISOString().slice(0, 10), utilizedAmount: dayBalance }); }
+  const interestPaise = Math.round((balancePaiseDays * account.annualInterestRateBps) / 3650000); const accrualEvent = { eventId: createLoanId("ledger"), type: "revolving_interest_accrual", eventDate: end.toISOString(), amount: fromPaise(interestPaise), principalDebit: 0, principalCredit: 0, interestDebit: fromPaise(interestPaise), interestCredit: 0, chargesDebit: 0, chargesCredit: 0, chargesWaiverCredit: 0, accrualId: input.accrualId, periodStart: input.periodStart, periodEnd: input.periodEnd, days, balancePaiseDays, dailyBalances, annualInterestRateBps: account.annualInterestRateBps, actor: input.actor ?? "system" };
+  return { loanAccount: { ...account, ledger: [...account.ledger, accrualEvent], updatedAt: now.toISOString() }, accrualEvent, findings, summary };
+}
+
+export function reviewRevolvingFacility(account, input = {}, now = new Date()) {
+  const findings = []; const effectiveAt = input.effectiveAt ? new Date(input.effectiveAt) : now; const expiryAt = new Date(`${input.facilityExpiryDate}T23:59:59.999Z`);
+  if (!account || account.status !== ACTIVE_STATUS || !["revolving_credit", "overdraft"].includes(account?.facilityType)) findings.push(createFinding("error", "RBI-DL-2025", "An active revolving or overdraft facility is required.", "facilityType"));
+  if (!input.reviewId || !Number.isFinite(input.creditLimit) || input.creditLimit <= 0 || !Number.isFinite(input.drawingPower) || input.drawingPower < 0 || input.drawingPower > input.creditLimit || !input.facilityExpiryDate || !input.proposedBy || !input.approvedBy || input.proposedBy === input.approvedBy || !input.approvalRef) findings.push(createFinding("error", "RBI-IT-GRC", "Review economics, expiry, and independent approval are required.", "review"));
+  if (Number.isNaN(effectiveAt.getTime()) || Number.isNaN(expiryAt.getTime()) || expiryAt.getTime() < effectiveAt.getTime()) findings.push(createFinding("error", "RBI-DL-2025", "Review effective date and a non-expired facility expiry date are required.", "facilityExpiryDate"));
+  if ((account?.facilityReviews ?? []).some((review) => review.reviewId === input.reviewId)) findings.push(createFinding("error", "RBI-IT-GRC", "reviewId already exists.", "reviewId"));
+  const outstanding = account ? summarizeLoanAccount(account, effectiveAt).principalOutstanding : 0; if (Number.isFinite(input.drawingPower) && input.drawingPower < outstanding) findings.push(createFinding("error", "RBI-DL-2025", "Drawing power cannot be reduced below current utilization without an approved excess regularization workflow.", "drawingPower"));
+  const summary = summarizeFindings(findings); if (summary.status === "blocked") return { loanAccount: account, review: null, findings, summary };
+  const review = { reviewId: input.reviewId, priorCreditLimit: account.creditLimit, creditLimit: roundMoney(input.creditLimit), priorDrawingPower: account.drawingPower, drawingPower: roundMoney(input.drawingPower), facilityExpiryDate: input.facilityExpiryDate, effectiveAt: effectiveAt.toISOString(), proposedBy: input.proposedBy, approvedBy: input.approvedBy, approvalRef: input.approvalRef };
+  return { loanAccount: { ...account, creditLimit: review.creditLimit, drawingPower: review.drawingPower, facilityExpiryDate: review.facilityExpiryDate, facilityReviews: [...(account.facilityReviews ?? []), review], updatedAt: now.toISOString() }, review, findings, summary };
+}
+
 export function computeDelinquency(account, asOf = new Date()) {
+  if (["revolving_credit", "overdraft"].includes(account?.facilityType)) {
+    const summary = summarizeLoanAccount(account, asOf); const accruals = (account.ledger ?? []).filter((event) => event.type === "revolving_interest_accrual" && new Date(event.eventDate).getTime() <= asOf.getTime()).sort((left, right) => left.eventDate.localeCompare(right.eventDate)); let paidInterestPaise = toPaise(summary.interestPaid); let earliest = null;
+    for (const accrual of accruals) { const duePaise = toPaise(accrual.interestDebit); if (paidInterestPaise >= duePaise) paidInterestPaise -= duePaise; else { earliest = accrual; break; } }
+    const dueDate = earliest?.periodEnd ?? null; const daysPastDue = dueDate ? Math.max(0, Math.floor((asOf.getTime() - new Date(`${dueDate}T00:00:00.000Z`).getTime()) / 86400000)) : 0;
+    return { asOf: asOf.toISOString(), bucket: delinquencyBucket(daysPastDue), daysPastDue, earliestUnpaidDueDate: dueDate, overdueInstallmentCount: earliest ? accruals.length - accruals.indexOf(earliest) : 0, principalOverdue: 0, interestOutstanding: summary.interestOutstanding, chargesOutstanding: summary.chargesOutstanding, totalOverdue: roundMoney(summary.interestOutstanding + summary.chargesOutstanding) };
+  }
   const dueInstallments = (account.schedule ?? []).filter(
     (installment) => new Date(`${installment.dueDate}T00:00:00.000Z`).getTime() <= asOf.getTime()
   );
@@ -422,6 +433,9 @@ export function generateCicSnapshot(account, asOf = new Date()) {
     productCode: account.productCode,
     accountStatus: account.status,
     currency: account.currency,
+    facilityType: account.facilityType ?? "term_loan",
+    repaymentStructure: account.repaymentStructure ?? "amortizing",
+    facilitySnapshot: summarizeLoanAccount(account, asOf).facility,
     openedAt: account.openedAt,
     closedAt: account.closedAt ?? null,
     sanctionedAmount: account.principalAmount,
@@ -624,11 +638,12 @@ export function postPaymentToLoanAccount(account, input, now = new Date()) {
     actor: input.actor ?? "system"
   };
   const updatedLedger = [...(account.ledger ?? []), paymentEvent];
+  const revolving = ["revolving_credit", "overdraft"].includes(account.facilityType);
   const updated = {
     ...account,
     ledger: updatedLedger,
-    status: roundMoney(balance.principalOutstanding - principalCredit) === 0 ? CLOSED_STATUS : ACTIVE_STATUS,
-    closedAt: roundMoney(balance.principalOutstanding - principalCredit) === 0 ? receivedAt.toISOString() : account.closedAt ?? null,
+    status: !revolving && roundMoney(balance.principalOutstanding - principalCredit) === 0 ? CLOSED_STATUS : ACTIVE_STATUS,
+    closedAt: !revolving && roundMoney(balance.principalOutstanding - principalCredit) === 0 ? receivedAt.toISOString() : account.closedAt ?? null,
     updatedAt: now.toISOString()
   };
 
@@ -2101,6 +2116,9 @@ export function generateLoanStatement(account, input = {}, now = new Date()) {
     periodStart: periodStart.toISOString().slice(0, 10),
     periodEnd: periodEnd.toISOString().slice(0, 10),
     currency: account.currency,
+    facilityType: account.facilityType ?? "term_loan",
+    repaymentStructure: account.repaymentStructure ?? "amortizing",
+    facilitySnapshot: summarizeLoanAccount(account, periodEnd).facility,
     openingSummary: summarizeLoanAccount(account, openingAsOf),
     closingSummary: summarizeLoanAccount(account, periodEnd),
     scheduledDues,
@@ -2108,6 +2126,8 @@ export function generateLoanStatement(account, input = {}, now = new Date()) {
     totals: {
       principalDue: sumMoney(scheduledDues, (installment) => installment.principalDue),
       interestDue: sumMoney(scheduledDues, (installment) => installment.interestDue),
+      revolvingInterestAccrued: sumMoney(transactions.filter((event) => event.type === "revolving_interest_accrual"), (event) => event.interestDebit),
+      revolvingDrawdowns: sumMoney(transactions.filter((event) => event.type === "revolving_drawdown"), (event) => event.principalDebit),
       chargesAssessed: sumMoney(transactions, (event) => event.chargesDebit),
       // GST component within the charges assessed this period, disclosed
       // separately for borrower transparency (REV-42). chargesAssessed is

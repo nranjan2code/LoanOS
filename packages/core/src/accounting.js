@@ -67,8 +67,8 @@ function journalLines(event, configuredAccounts = {}) {
   const interest = abs(event.interestCredit || event.interestDebit || event.interestWaiverCredit);
   const charges = abs(event.chargesCredit || event.chargesDebit || event.chargesWaiverCredit);
   const amount = abs(event.amount);
-  if (event.type === "disbursement") return [{ account: accounts.principalReceivable, side: "debit", amount: principal }, { account: accounts.bankClearing, side: "credit", amount: principal }];
-  if (event.type === "interest_accrual") return [{ account: accounts.interestReceivable, side: "debit", amount }, { account: accounts.interestIncome, side: "credit", amount }];
+  if (["disbursement", "revolving_drawdown"].includes(event.type)) return [{ account: accounts.principalReceivable, side: "debit", amount: principal }, { account: accounts.bankClearing, side: "credit", amount: principal }];
+  if (["interest_accrual", "revolving_interest_accrual"].includes(event.type)) return [{ account: accounts.interestReceivable, side: "debit", amount }, { account: accounts.interestIncome, side: "credit", amount }];
   if (event.type === "charge_assessed") {
     const gst = abs(event.gstAmount);
     const base = gst ? abs(event.baseAmount) : amount;

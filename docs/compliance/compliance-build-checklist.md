@@ -160,7 +160,8 @@ Legend:
 | --- | --- | --- |
 | Loan account opened after disbursement | Disbursement creates an LMS account linked to application, borrower, RE, product, and KFS terms. | Done |
 | Ledger event for disbursement | Loan account ledger starts with a disbursement event. | Done |
-| Repayment schedule | Reducing-balance monthly schedule generated from principal, rate, tenor, and disbursement date. | Done |
+| Repayment schedule | Shared KFS/LMS generator produces paise-exact weekly, fortnightly, monthly, or quarterly amortising, bullet, serviced/deferred moratorium, and step-up schedules. | Done |
+| Revolving and overdraft servicing | Separately typed facilities disclose limit/drawing power/expiry/minimum due; maker-checker draws and reviews, daily utilised-balance interest, repayments, statements, CIC snapshot, and balanced journals are executable. Stock-statement/covenant/renewal depth remains planned. | Partial |
 | Balance reconstruction | Account summary reconstructs principal paid/outstanding, interest paid/outstanding, and next due from schedule plus ledger. | Done |
 | Payment posting | Payment endpoint records a ledger payment and allocates due interest before principal. | Done |
 | Borrower statements | Statement generation from ledger and schedule for a requested period. | Done |

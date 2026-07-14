@@ -34,8 +34,8 @@ cite the ID in commits and PRs.
 | REV-31 | Account Aggregator → income/obligations/FOIR analytics layer | D | P1 | DONE |
 | REV-32 | Bureau-derived obligations into FOIR (not only self-declared) | D | P2 | DONE |
 | REV-33 | Microfinance (MFI): household income, 50% aggregate FOIR cap, JLG | D | P2 | DECIDE |
-| REV-40 | Multi-structure amortization: honor `repaymentFrequency`; bullet/moratorium/step-up | E | P2 | TODO |
-| REV-41 | Revolving / credit line / overdraft product type (MSME/BNPL) | E | P2 | TODO |
+| REV-40 | Multi-structure amortization: honor `repaymentFrequency`; bullet/moratorium/step-up | E | P2 | DONE |
+| REV-41 | Revolving / credit line / overdraft product type (MSME/BNPL) | E | P2 | DONE |
 | REV-42 | GST (18%) on charges/fees in KFS, charge assessment, statements | E | P1 | DONE |
 | REV-43 | Credit-insurance product modeling and disclosure | E | P3 | DECIDE |
 | REV-50 | Legal-recovery workflow: SARFAESI notices, Sec-138, Lok Adalat/arbitration/DRT | F | P2 | TODO |
@@ -212,15 +212,11 @@ in, this is net-new domain work; if out, state it in `what-we-are-building.md` N
 
 ## WS-E — Product breadth and India tax
 
-### REV-40 — Multi-structure amortization · P2 · TODO
-The amortizer is hardcoded monthly reducing-balance (`annualRate/12`, `monthlyRate`) even though
-`repaymentFrequency` is stored on the account — a field the math ignores (a latent correctness trap).
-Add weekly/fortnightly (MFI), bullet, moratorium/EMI-holiday, and step-up. **Acceptance:** `repaymentFrequency` drives the schedule; a non-monthly loan amortizes correctly.
+### REV-40 — Multi-structure amortization · P2 · DONE
+KFS and LMS now share `repayment-schedule.js`, eliminating the prior disclosure/runtime duplicate. Weekly, fortnightly, monthly, and quarterly cadence drives period count, dates, and interest rate. Paise-exact amortising, bullet, deferred-or-serviced moratorium, and step-up schedules reconcile the original principal exactly; KFS validates the frequency-derived instalment count and renders the disclosed structure. Irregular calendars, balloon, step-down, seasonal cash flows, and holiday movement remain explicitly outside this slice.
 
-### REV-41 — Revolving / credit line / overdraft product type · P2 · TODO
-Only amortizing term loans exist (no revolving, credit line, overdraft, cash-credit, BNPL). Add a
-non-amortizing product with drawdowns, minimum-due, and interest-on-utilization — core to MSME and BNPL.
-**Acceptance:** a credit-line account services drawdowns/repayments without a fixed EMI schedule.
+### REV-41 — Revolving / credit line / overdraft product type · P2 · DONE
+Product policy now distinguishes `term_loan`, `revolving_credit`, and `overdraft`, with dedicated working-capital/OD product types. The KFS discloses sanctioned limit, drawing power, minimum payment, expiry, review cadence, actual/365 daily-utilisation interest, and a clearly labelled full-utilisation illustration. The LMS opens a non-amortising account, bounds maker-checker drawdowns by available drawing power, accrues exact daily interest, keeps zero-balance facilities active, restores availability on repayment, blocks reviews below current utilisation, exposes facility statements/CIC snapshots, and projects draw/accrual/payment journals through normal posting. Stock statements, covenant-derived drawing power, ad-hoc limits, renewal/recall, and current-account sweeps remain follow-on working-capital depth.
 
 ### REV-42 — GST on charges/fees · P1 · DONE
 No GST anywhere. India charges 18% GST on processing/foreclosure/bounce fees, which must appear on the

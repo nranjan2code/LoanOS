@@ -8,6 +8,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 import {
   accrueInterest,
+  accrueRevolvingInterest,
   acceptKfs,
   attachKfs,
   applyDecisionApproval,
@@ -31,6 +32,7 @@ import {
   commentOnWorkflowTask,
   completeWorkflowTask,
   createLoanAccountFromApplication,
+  drawRevolvingCredit,
   createLoanId,
   computeDelinquency,
   createComplaint,
@@ -100,6 +102,7 @@ import {
   prepayLoanAccount,
   proposeDecision,
   recordCollectionsReminder,
+  reviewRevolvingFacility,
   restructureLoanAccount,
   resetFloatingRate,
   settleLoanAccount,
@@ -5057,9 +5060,41 @@ async function route(req, res, dataDir, platformAdminKey) {
     }
     sendJson(res, 200, {
       loanAccountId: loanAccount.loanAccountId,
+      facilityType: loanAccount.facilityType ?? "term_loan",
+      repaymentFrequency: loanAccount.repaymentFrequency,
+      repaymentStructure: loanAccount.repaymentStructure,
       schedule: loanAccount.schedule
     });
     return;
+  }
+
+  const revolvingDrawdownMatch = path.match(/^\/loan-accounts\/([^/]+)\/drawdowns$/);
+  if (method === "POST" && revolvingDrawdownMatch) {
+    const body = await readJson(req); const state = await store.load(); const loanAccountId = decodeURIComponent(revolvingDrawdownMatch[1]); const account = state.loanAccounts?.[loanAccountId];
+    if (!account) { sendJson(res, 404, { error: { code: "not_found", message: "Loan account not found." } }); return; }
+    const prior = account.ledger?.find((event) => event.drawdownId === body.drawdownId); if (prior) { sendJson(res, 200, { loanAccount: account, drawdownEvent: prior, idempotent: true }); return; }
+    if (isAccountingDateClosed(state, body.drawnAt ?? new Date().toISOString())) { sendJson(res, 422, { error: { code: "revolving_drawdown_closed_period", message: "Drawdown cannot post into a closed accounting period." } }); return; }
+    const result = drawRevolvingCredit(account, body); if (result.summary.status === "blocked") { sendJson(res, 422, { error: { code: "revolving_drawdown_blocked", message: "Revolving drawdown is blocked." }, findings: result.findings }); return; }
+    await store.save(appendEvent({ ...state, loanAccounts: { ...state.loanAccounts, [loanAccountId]: result.loanAccount } }, { type: "loan_account.revolving_drawdown.posted", loanAccountId, drawdownId: result.drawdownEvent.drawdownId, amount: result.drawdownEvent.amount, approvedBy: result.drawdownEvent.approvedBy })); sendJson(res, 201, { loanAccount: result.loanAccount, drawdownEvent: result.drawdownEvent, summary: summarizeLoanAccount(result.loanAccount, new Date(result.drawdownEvent.eventDate)), idempotent: false }); return;
+  }
+
+  const revolvingAccrualMatch = path.match(/^\/loan-accounts\/([^/]+)\/revolving-interest-accruals$/);
+  if (method === "POST" && revolvingAccrualMatch) {
+    const body = await readJson(req); const state = await store.load(); const loanAccountId = decodeURIComponent(revolvingAccrualMatch[1]); const account = state.loanAccounts?.[loanAccountId];
+    if (!account) { sendJson(res, 404, { error: { code: "not_found", message: "Loan account not found." } }); return; }
+    const prior = account.ledger?.find((event) => event.accrualId === body.accrualId); if (prior) { sendJson(res, 200, { loanAccount: account, accrualEvent: prior, idempotent: true }); return; }
+    if (isAccountingDateClosed(state, body.periodEnd)) { sendJson(res, 422, { error: { code: "revolving_accrual_closed_period", message: "Interest accrual cannot post into a closed accounting period." } }); return; }
+    const result = accrueRevolvingInterest(account, body); if (result.summary.status === "blocked") { sendJson(res, 422, { error: { code: "revolving_accrual_blocked", message: "Revolving interest accrual is blocked." }, findings: result.findings }); return; }
+    await store.save(appendEvent({ ...state, loanAccounts: { ...state.loanAccounts, [loanAccountId]: result.loanAccount } }, { type: "loan_account.revolving_interest.accrued", loanAccountId, accrualId: result.accrualEvent.accrualId, periodStart: result.accrualEvent.periodStart, periodEnd: result.accrualEvent.periodEnd, amount: result.accrualEvent.amount })); sendJson(res, 201, { loanAccount: result.loanAccount, accrualEvent: result.accrualEvent, summary: summarizeLoanAccount(result.loanAccount, new Date(`${body.periodEnd}T00:00:00.000Z`)), idempotent: false }); return;
+  }
+
+  const revolvingReviewMatch = path.match(/^\/loan-accounts\/([^/]+)\/facility-reviews$/);
+  if (method === "POST" && revolvingReviewMatch) {
+    const body = await readJson(req); const state = await store.load(); const loanAccountId = decodeURIComponent(revolvingReviewMatch[1]); const account = state.loanAccounts?.[loanAccountId];
+    if (!account) { sendJson(res, 404, { error: { code: "not_found", message: "Loan account not found." } }); return; }
+    const prior = account.facilityReviews?.find((record) => record.reviewId === body.reviewId); if (prior) { sendJson(res, 200, { loanAccount: account, review: prior, idempotent: true }); return; }
+    const result = reviewRevolvingFacility(account, body); if (result.summary.status === "blocked") { sendJson(res, 422, { error: { code: "revolving_review_blocked", message: "Facility review is blocked." }, findings: result.findings }); return; }
+    await store.save(appendEvent({ ...state, loanAccounts: { ...state.loanAccounts, [loanAccountId]: result.loanAccount } }, { type: "loan_account.revolving_facility.reviewed", loanAccountId, reviewId: result.review.reviewId, creditLimit: result.review.creditLimit, drawingPower: result.review.drawingPower, approvedBy: result.review.approvedBy })); sendJson(res, 201, { loanAccount: result.loanAccount, review: result.review, summary: summarizeLoanAccount(result.loanAccount, new Date(result.review.effectiveAt)), idempotent: false }); return;
   }
 
   const loanAccountStatementMatch = path.match(/^\/loan-accounts\/([^/]+)\/statement$/);

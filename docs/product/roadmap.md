@@ -14,7 +14,7 @@ evidence, acceptance). This section is a rollup only — update status in the tr
 | B | Decision engine: real, proven, multi-tenant | P1 | REV-10 gateway tests, REV-11 CI service lane, REV-12 per-tenant routing, REV-13 reason lineage, REV-14 wire-vs-pause **decision** |
 | C | Live-path correctness | P1 | REV-20 exact money math, REV-21 NPA upgrade rule |
 | D | Credit depth | P1 | REV-30 multi-bureau, REV-31 AA→income/FOIR, REV-32 bureau obligations, REV-33 MFI **decision** |
-| E | Product breadth & India tax | P1–P2 | REV-42 GST, REV-40 multi-structure amortization, REV-41 revolving/credit-line, REV-43 insurance |
+| E | Product breadth & India tax | P1–P2 | REV-40 multi-structure, REV-41 revolving/OD, and REV-42 GST done; REV-43 insurance decision |
 | F | LWS recovery depth | P2 | REV-50 SARFAESI/Sec-138 legal recovery, REV-51 field-collections |
 | G | Regulatory format fidelity & live integrations | P2 | REV-60 CIC URCF, REV-61 CKYC, REV-62 FIU FINnet, REV-63 CERSAI, REV-64 live providers |
 | H | Architecture & scale | P2 | REV-70 split `server.js`, REV-71 storage scale; REV-72 co-lending accounting, ECL, tax, escrow and CBS boundary done |
@@ -89,12 +89,13 @@ Exit criteria:
 
 ## Phase 2: LMS MVP
 
-Status: started. Current LMS slices open loan accounts on disbursement, generate repayment schedules, reconstruct balances, accrue scheduled interest into immutable ledger events, post payments, generate statements, control charges/waivers/reversals, compute delinquency, classify assets, enforce noticed recovery plus same-day cash posting and RBI FPC-hours-gated collections reminders, restructure stressed loans and settle/write off accounts under four-eyes approval, issue No-Objection closure certificates on full settlement, render borrower-facing statement documents, and generate CIC-ready internal snapshots.
+Status: started. Current LMS slices cover amortising, bullet, moratorium, step-up, and non-amortising revolving/OD accounts; reconstruct balances and available limits; accrue scheduled or daily-utilisation interest; post payments; generate statements; control charges/waivers/reversals; compute delinquency and asset class; enforce recovery controls; restructure or resolve term accounts; and generate CIC-ready internal snapshots.
 
 Deliverables:
 
 - Loan account ledger. First slice done.
-- Repayment schedule and amortization. First slice done.
+- Repayment schedule and amortization. Multi-structure slice done: weekly/fortnightly/monthly/quarterly amortising, bullet, moratorium, and step-up schedules share the KFS/LMS generator and reconcile to paise.
+- Revolving credit and overdraft. First governed slice done: limit/drawing power, KFS illustration, maker-checker draw/review, daily utilised-balance interest, minimum due, repayment-restored availability, statements, and journals.
 - EMI, floating-rate reset, statements, part-prepayment, foreclosure. Statement data, part-prepayment re-amortization, and foreclosure payoff/closure first slices done.
 - Penal-charge policy, waivers, reversals, and audit. First slice done.
 - Delinquency, recovery assignment, and same-day cash recovery posting. First slice done.

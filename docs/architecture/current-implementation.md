@@ -22,7 +22,7 @@ The current implementation is intentionally small:
 - Internal staff workspace in `apps/dashboard/`.
 - Borrower customer portal in `apps/customer/`: a responsive, white-labelled journey home with prioritised next actions, visual application milestones, repayment schedules, a document centre, guided media, grievance tracking, and DPDP access/correction/erasure controls.
 - Shared design system tokens in `apps/shared/`.
-- Automated tests in `tests/`: 179 file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
+- Automated tests in `tests/`: 181 file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
 
 Run it:
 
@@ -51,7 +51,8 @@ npm run dev:api
 | `packages/core/src/fraud-case.js` | Fraud case module: natural-justice gate (show-cause notice + response or 21-day RBI FRM-2024 window) and four-eyes classification, plus a checksum-sealed committee pack generator. |
 | `packages/core/src/recovery-agent.js` | Recovery-agent empanelment registry: an active agent requires due-diligence/police-verification, training certification, code-of-conduct acknowledgment, and authorization-letter/ID-card evidence, referencing an active regulated entity. |
 | `packages/core/src/application-workflow.js` | LOS application state machine, KFS workflow, human review, decision proposal, manual underwriting override gate for referred applications, coded decline-reason taxonomy, maker-checker approval, disbursement transition. |
-| `packages/core/src/loan-account.js` | LMS loan account creation, amortization schedule, ledger balance reconstruction, interest accrual, payment posting, part-prepayment re-amortization, foreclosure quote and payoff, closure No-Objection Certificate, statements, charges, waivers, reversals, delinquency, collections reminders (RBI FPC contact-hours gate), recovery controls, hardship restructure, floating-rate interest rate resets, settlement/write-off, asset classification, and CIC snapshots. |
+| `packages/core/src/repayment-schedule.js` | Shared KFS/LMS paise-exact schedule engine for weekly, fortnightly, monthly, and quarterly amortising, bullet, moratorium, and step-up structures. |
+| `packages/core/src/loan-account.js` | LMS term and revolving account creation, ledger reconstruction, scheduled/daily-utilisation interest, bounded drawdowns, facility reviews, payment posting, part-prepayment, foreclosure, statements, charges, recovery controls, restructure/reset, resolution, classification, and CIC snapshots. |
 | `packages/core/src/finance-accounting.js` | Governed ECL assessment and allowance movements, including co-lender entity allocation, finance-only journal projection, IRAC income-reversal journals, TDS journals/return extracts, and GST invoice/credit-note return aggregation. |
 | `packages/core/src/payment-operations.js` | Suspense-receipt creation, partial loan allocation, and independently approved residual write-off; all amounts remain exact to paise and resolutions post through the canonical loan-payment function. |
 | `packages/core/src/finance-management.js` | EIR fee-amortisation journals, funding-cost attribution, ALM maturity buckets, profitability, economic-capital, and RAROC reporting. |
@@ -322,7 +323,10 @@ npm run dev:api
 | `GET /loans/marketplace-offers/:id` | Reads a stored marketplace offer evaluation record. |
 | `GET /loan-accounts` | Lists loan accounts. |
 | `GET /loan-accounts/:id` | Reads a loan account with balance summary. |
-| `GET /loan-accounts/:id/schedule` | Reads repayment schedule. |
+| `GET /loan-accounts/:id/schedule` | Reads facility type, frequency, structure, and contractual schedule; revolving/OD facilities correctly return no fixed EMI schedule. |
+| `POST /loan-accounts/:id/drawdowns` | Posts an idempotent maker-checker revolving draw within sanctioned limit, drawing power, and expiry. |
+| `POST /loan-accounts/:id/revolving-interest-accruals` | Accrues immutable actual/365 interest from exact daily utilised balances, blocking duplicate periods and closed dates. |
+| `POST /loan-accounts/:id/facility-reviews` | Reviews limit, drawing power, and expiry under maker-checker control without permitting drawing power below utilisation. |
 | `GET /loan-accounts/:id/statement` | Generates borrower statement for a `from`/`to` period. |
 | `GET /loan-accounts/:id/statement/document` | Renders the period statement as a checksum-sealed borrower-facing document. |
 | `GET /loan-accounts/:id/delinquency` | Computes DPD, bucket, overdue amounts, and earliest unpaid due. |
@@ -405,15 +409,16 @@ npm run dev:api
 | Natural justice and four-eyes fraud classification | An adverse (fraud) classification is blocked until a show-cause notice was issued (with delivery proof) and the borrower responded or the RBI FRM-2024 21-day window elapsed, and the classifier must be independent of the investigator. |
 | Fraud committee pack | A checksum-sealed, read-only pack assembling case facts, the natural-justice trail, the event timeline, and an explicit `classificationPermitted`/`blockers` verdict. |
 | Loan account opening | Disbursement opens an LMS loan account and creates a disbursement ledger event. |
-| Repayment schedule | Generates monthly reducing-balance amortization schedule from KFS/product terms. |
+| Repayment schedule | KFS and LMS share one deterministic engine: frequency drives period rate/count/dates, and amortising, bullet, serviced/deferred moratorium, and step-up structures reconcile principal exactly to paise. |
+| Revolving/OD facilities | Product/KFS distinguish non-amortising facilities; account summary exposes limit, drawing power, utilisation, availability, minimum due, and expiry. Drawdowns require independent approval and cannot breach availability; actual/365 interest derives from exact daily utilisation; repayment restores availability without closing a zero-balance facility; reviews cannot strand excess utilisation. |
 | Loan ledger | Reconstructs principal, interest, paid amounts, outstanding balance, and next due from ledger and schedule. |
-| Interest accrual | Recognizes scheduled interest as immutable `interest_accrual` ledger events once each installment period closes; idempotent per installment, reconstructable from the ledger, and reconciled against the schedule in the balance summary. |
+| Interest accrual | Term accounts recognize scheduled interest once per installment. Revolving accounts recognize checksum-free deterministic actual/365 interest once per period from retained daily-balance evidence. Both are immutable, idempotent, payable through the common waterfall, and journalled to interest receivable/income. |
 | Foreclosure | Quotes a payoff of outstanding principal plus interest and charges already due (no future interest); any foreclosure charge must be KFS-disclosed, and enforces lock-in period and floating-rate individual retail fee prohibitions. Execution requires the amount to cover the payoff, settles it through the ledger, and closes the account. |
 | Closure NOC | A settled (closed, zero-dues) account can issue a checksum-sealed No-Objection Certificate declaring no dues remain and no objection to releasing securities; re-issue returns the same certificate. |
 | Payment posting | Posts payment events, allocates to due interest first and principal next, and updates account status. A duplicate `paymentRef` on the same loan account (payment, prepayment, foreclosure, settlement, or cash recovery — all funnel through `postPaymentToLoanAccount`) is rejected as a blocking finding rather than double-crediting the ledger, so a client retry after a network timeout is safe. |
 | Ledger summation exactness | `summarizeLoanAccount` and `generateLoanStatement` sum ledger/schedule amounts using exact integer-paise arithmetic (`sumMoney`) rather than float-sum-then-round, eliminating dependence on `roundMoney`'s epsilon-rounding heuristic continuing to absorb accumulated floating-point drift as ledgers grow. |
 | Part-prepayment | Enforces lock-in period and floating-rate individual retail fee prohibitions, clears dues then reduces principal, requiring a real principal reduction, and rebuilds the future schedule either to lower each EMI over the same term (`reduce_emi`) or keep the EMI and shorten the tenure (`reduce_tenure`). |
-| Borrower statements | Generates period statement from schedule and ledger transactions. |
+| Borrower statements | Generates period statement from schedule and ledger transactions; revolving statements additionally expose facility utilisation, availability, minimum due, draws, and daily-utilisation interest. |
 | Rendered statement document | Renders the period statement into a checksum-sealed HTML/text borrower document (opening/closing balances, dues, transactions, totals) in the same shape as the execution packet. |
 | Charge controls | Grounds KFS charges in Product Policy, validates KFS limits, and blocks ad-hoc ledger charge assessment, foreclosure charges, and prepayment charges exceeding KFS caps and policy ceilings. |
 | Waivers and reversals | Requires approval evidence for waivers and reversals, and prevents duplicate reversal of the same event. |

@@ -1,5 +1,6 @@
 import { createFinding, summarizeFindings } from "./compliance-controls.js";
 import { ALLOWED_RE_TYPES, ALLOWED_CHARGE_TYPES } from "./loan-policy.js";
+import { periodsForTenor } from "./repayment-schedule.js";
 
 const ACTIVE_STATUS = "active";
 const ALLOWED_PRODUCT_TYPES = new Set([
@@ -11,7 +12,9 @@ const ALLOWED_PRODUCT_TYPES = new Set([
   "housing_loan",
   "education_loan",
   "gold_loan",
-  "loan_against_property"
+  "loan_against_property",
+  "working_capital_line",
+  "overdraft"
 ]);
 const ALLOWED_LSP_STATUSES = new Set(["draft", "active", "suspended", "terminated"]);
 const ALLOWED_LSP_SERVICES = new Set([
@@ -629,6 +632,18 @@ export function validateProductPolicy(product, regulatedEntities = {}) {
   if (!Number.isFinite(product?.aprBps) || product.aprBps < product.annualInterestRateBps) {
     findings.push(createFinding("error", "RBI-KFS-2024", "Product aprBps must be at least annualInterestRateBps.", "aprBps"));
   }
+  const facilityType = product?.facilityType ?? "term_loan"; const revolving = ["revolving_credit", "overdraft"].includes(facilityType);
+  if (!["term_loan", "revolving_credit", "overdraft"].includes(facilityType)) findings.push(createFinding("error", "RBI-DL-2025", "facilityType must be term_loan, revolving_credit, or overdraft.", "facilityType"));
+  if (!["weekly", "fortnightly", "monthly", "quarterly"].includes(product?.repaymentFrequency)) findings.push(createFinding("error", "RBI-KFS-2024", "repaymentFrequency must be weekly, fortnightly, monthly, or quarterly.", "repaymentFrequency"));
+  if (!revolving && !["amortizing", "bullet", "moratorium", "step_up"].includes(product?.repaymentStructure)) findings.push(createFinding("error", "RBI-KFS-2024", "Term-loan repaymentStructure is invalid.", "repaymentStructure"));
+  if (product?.repaymentStructure === "moratorium") { const periods = periodsForTenor(product.maxTenorMonths, product.repaymentFrequency); if (!Number.isInteger(product.moratoriumPeriods) || product.moratoriumPeriods <= 0 || product.moratoriumPeriods >= periods || !["serviced", "deferred"].includes(product.moratoriumInterestTreatment)) findings.push(createFinding("error", "RBI-KFS-2024", "Moratorium policy requires valid periods and serviced/deferred interest treatment.", "moratoriumPeriods")); }
+  if (product?.repaymentStructure === "step_up" && (!Number.isInteger(product.stepUpBps) || product.stepUpBps <= 0 || product.stepUpBps > 10000 || !Number.isInteger(product.stepUpEveryPeriods) || product.stepUpEveryPeriods <= 0)) findings.push(createFinding("error", "RBI-KFS-2024", "Step-up policy requires valid escalation bps and cadence.", "stepUpBps"));
+  if (revolving) {
+    if (!Number.isFinite(product.creditLimit) || product.creditLimit <= 0 || !Number.isFinite(product.drawingPower) || product.drawingPower < 0 || product.drawingPower > product.creditLimit) findings.push(createFinding("error", "RBI-DL-2025", "Revolving facility requires valid creditLimit and drawingPower.", "creditLimit"));
+    if (!Number.isFinite(product.minimumPaymentPercent) || product.minimumPaymentPercent <= 0 || product.minimumPaymentPercent > 100) findings.push(createFinding("error", "RBI-KFS-2024", "Revolving minimumPaymentPercent must be above 0 and at most 100.", "minimumPaymentPercent"));
+    if (!Number.isInteger(product.reviewFrequencyMonths) || product.reviewFrequencyMonths <= 0 || !product.facilityExpiryDate || Number.isNaN(new Date(`${product.facilityExpiryDate}T23:59:59.999Z`).getTime())) findings.push(createFinding("error", "RBI-DL-2025", "Revolving facility requires review cadence and a valid expiry date.", "reviewFrequencyMonths"));
+    if (facilityType === "overdraft" && product.productType !== "overdraft") findings.push(createFinding("error", "RBI-DL-2025", "Overdraft facility requires overdraft productType.", "productType"));
+  }
 
   // Interest calculation method: must be declared and valid.
   const interestCalcMethod = product?.interestCalcMethod;
@@ -781,7 +796,18 @@ export function normalizeProductPolicy(input, now = new Date()) {
     aprBps: input.aprBps ?? input.annualInterestRateBps,
     interestCalcMethod: input.interestCalcMethod ?? "reducing_balance",
     flatToEirBps: Number.isFinite(input.flatToEirBps) ? input.flatToEirBps : null,
+    facilityType: input.facilityType ?? "term_loan",
     repaymentFrequency: input.repaymentFrequency ?? "monthly",
+    repaymentStructure: input.repaymentStructure ?? "amortizing",
+    moratoriumPeriods: Number.isInteger(input.moratoriumPeriods) ? input.moratoriumPeriods : 0,
+    moratoriumInterestTreatment: input.moratoriumInterestTreatment ?? "serviced",
+    stepUpBps: Number.isInteger(input.stepUpBps) ? input.stepUpBps : 0,
+    stepUpEveryPeriods: Number.isInteger(input.stepUpEveryPeriods) ? input.stepUpEveryPeriods : 12,
+    creditLimit: Number.isFinite(input.creditLimit) ? input.creditLimit : null,
+    drawingPower: Number.isFinite(input.drawingPower) ? input.drawingPower : (Number.isFinite(input.creditLimit) ? input.creditLimit : null),
+    minimumPaymentPercent: Number.isFinite(input.minimumPaymentPercent) ? input.minimumPaymentPercent : null,
+    reviewFrequencyMonths: Number.isInteger(input.reviewFrequencyMonths) ? input.reviewFrequencyMonths : null,
+    facilityExpiryDate: input.facilityExpiryDate ?? null,
     coolingOffDays: input.coolingOffDays ?? 1,
     recoveryMechanism: input.recoveryMechanism,
     interestRateType: input.interestRateType ?? "fixed",

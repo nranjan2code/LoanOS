@@ -65,11 +65,11 @@ Composite labels such as `Partial/Mock` identify a mixed capability: some intern
 
 ## Executive Current-State Summary
 
-LoanOS currently has a strong compliance-first domain foundation and a credible executable slice for a monthly amortising term loan. Its best-developed capabilities are tenant isolation, KFS and fund-flow gates, policy/evidence lineage, maker-checker, audit integrity, borrower privacy rights, model governance, and deterministic decision-engine infrastructure.
+LoanOS currently has a strong compliance-first domain foundation and executable slices for amortising, bullet, moratorium, step-up, and revolving facilities. Its best-developed capabilities are tenant isolation, KFS and fund-flow gates, policy/evidence lineage, maker-checker, audit integrity, borrower privacy rights, model governance, deterministic decision-engine infrastructure, and finance controls.
 
 The principal gaps before bank production are live integrations, downstream GL certification, regulatory submission formats, product-specific lending depth, full collections/legal recovery, enterprise IAM and key management, observability/DR/BCP, and bank-assurance evidence. Payment operations now have a controlled internal first slice, but live rail/file transport and operating-scale automation remain open. Public product positioning must remain narrower than this catalogue until each advertised journey reaches an agreed maturity level.
 
-The detailed register contains **453 individually identified capabilities**. At this snapshot, 79 are classified `Implemented`, 162 `Partial`, 184 `Missing`, and 28 are mock, partner, external, or composite-status obligations. These counts measure scope coverage, not delivery percentage: a single missing ledger, reconciliation, security, or recovery control can block production even if many smaller capabilities exist.
+The detailed register contains **453 individually identified capabilities**. At this snapshot, 80 are classified `Implemented`, 167 `Partial`, 178 `Missing`, and 28 are mock, partner, external, or composite-status obligations. These counts measure scope coverage, not delivery percentage: a single missing ledger, reconciliation, security, or recovery control can block production even if many smaller capabilities exist.
 
 ## Capability Index
 
@@ -378,13 +378,13 @@ The detailed register contains **453 individually identified capabilities**. At 
 | --- | --- | --- | --- |
 | LMS-001 | Monthly reducing-balance amortisation | Core | Implemented |
 | LMS-002 | Flat-rate disclosure and effective-rate equivalence | Product | Partial |
-| LMS-003 | Weekly, fortnightly, quarterly, and irregular frequency | Product | Missing |
-| LMS-004 | Bullet, balloon, step-up, step-down, and seasonal schedules | Product | Missing |
-| LMS-005 | Moratorium, pre-EMI, EMI holiday, and capitalised interest | Product | Missing |
+| LMS-003 | Weekly, fortnightly, quarterly, and irregular frequency | Product | Partial |
+| LMS-004 | Bullet, balloon, step-up, step-down, and seasonal schedules | Product | Partial |
+| LMS-005 | Moratorium, pre-EMI, EMI holiday, and capitalised interest | Product | Partial |
 | LMS-006 | Broken-period interest and first/last instalment variants | Product | Missing |
-| LMS-007 | Daily reducing balance and utilisation-based interest | Product | Missing |
-| LMS-008 | Revolving credit, OD, cash credit, and drawdown facilities | Product | Missing |
-| LMS-009 | Credit limit, available limit, minimum due, and limit review | Product | Missing |
+| LMS-007 | Daily reducing balance and utilisation-based interest | Product | Partial |
+| LMS-008 | Revolving credit, OD, cash credit, and drawdown facilities | Product | Partial |
+| LMS-009 | Credit limit, available limit, minimum due, and limit review | Product | Implemented |
 | LMS-010 | Holiday calendar, due-date movement, and grace days | Core | Missing |
 | LMS-011 | Floating benchmark, spread, reset date, and rate history | Product | Partial |
 | LMS-012 | Borrower choice on floating-rate reset | Product | Implemented |
@@ -745,7 +745,7 @@ The complete-system catalogue must be filtered into a product pack before a prod
 ### Working capital, overdraft, and cash credit
 
 - Limits, drawing power, stock/book-debt statements, drawdowns, utilisation interest, renewals, ad-hoc limits, covenants, current-account flows, and non-amortising servicing.
-- Currently missing and must not be represented as supported merely because a term loan can be labelled “working capital.”
+- A governed first slice now supports separately typed revolving/OD products, KFS limit and daily-interest disclosures, sanctioned limit versus drawing power, maker-checker drawdowns and reviews, daily utilised-balance interest, repayments that restore availability, minimum due, statements, and balanced accounting. Stock/book-debt statements, formula-driven drawing power, covenants, ad-hoc limits, current-account sweeps, expiry renewal/recall, and cash-credit-specific operations remain missing.
 
 ### Home loan and loan against property
 

@@ -287,6 +287,9 @@ function buildKfsDocument(application, generatedAt) {
     ["Annual interest rate", bps(kfs.annualInterestRateBps)],
     ["APR", bps(kfs.aprBps)],
     ["Repayment frequency", kfs.repaymentFrequency],
+    ["Facility type", kfs.facilityType ?? "term_loan"],
+    ["Repayment structure", kfs.repaymentStructure ?? "amortizing"],
+    ...(kfs.facilityTerms ? [["Credit limit", money(kfs.facilityTerms.creditLimit, kfs.currency)], ["Drawing power", money(kfs.facilityTerms.drawingPower, kfs.currency)], ["Facility expiry", kfs.facilityTerms.facilityExpiryDate], ["Interest basis", kfs.facilityTerms.interestBasis], ["Illustration", "Full-utilisation illustration; actual interest follows daily utilised balance"]] : []),
     ["Cooling-off period", `${kfs.coolingOffDays} day(s)`],
     ["Recovery mechanism", kfs.recoveryMechanism],
     ["Grievance officer", `${kfs.grievanceOfficer?.name ?? ""} <${kfs.grievanceOfficer?.email ?? ""}>`]

@@ -161,12 +161,14 @@ export {
 
 export {
   accrueInterest,
+  accrueRevolvingInterest,
   assignRecoveryAgent,
   assessChargeToLoanAccount,
   CASH_RECOVERY_EXCEPTION_REASONS,
   classifyLoanAsset,
   computeDelinquency,
   createLoanAccountFromApplication,
+  drawRevolvingCredit,
   forecloseLoanAccount,
   generateClosureCertificate,
   generateCicSnapshot,
@@ -175,6 +177,7 @@ export {
   postCashRecoveryToLoanAccount,
   prepayLoanAccount,
   recordCollectionsReminder,
+  reviewRevolvingFacility,
   restructureLoanAccount,
   resetFloatingRate,
   settleLoanAccount,
