@@ -24,6 +24,7 @@ const MOCK_BANK_ACCOUNTS = {
     bankName: "ICICI Bank"
   }
 };
+const PROVIDER_CIRCUITS = new Map();
 
 /**
  * Service Manager to switch between mock and real integrations.
@@ -94,6 +95,8 @@ export class ExternalServiceManager {
       providerCallbackSecrets: config.providerCallbackSecrets ?? (typeof process !== "undefined" && process.env.LOANOS_PROVIDER_CALLBACK_SECRETS ? JSON.parse(process.env.LOANOS_PROVIDER_CALLBACK_SECRETS) : {})
       ,providerTimeoutMs: Number(config.providerTimeoutMs ?? (typeof process !== "undefined" ? process.env.LOANOS_PROVIDER_TIMEOUT_MS : 5000) ?? 5000),
       providerMaxAttempts: Number(config.providerMaxAttempts ?? (typeof process !== "undefined" ? process.env.LOANOS_PROVIDER_MAX_ATTEMPTS : 2) ?? 2)
+      ,providerCircuitFailureThreshold: Number(config.providerCircuitFailureThreshold ?? (typeof process !== "undefined" ? process.env.LOANOS_PROVIDER_CIRCUIT_FAILURE_THRESHOLD : 3) ?? 3),
+      providerCircuitCooldownMs: Number(config.providerCircuitCooldownMs ?? (typeof process !== "undefined" ? process.env.LOANOS_PROVIDER_CIRCUIT_COOLDOWN_MS : 30000) ?? 30000)
     };
 
     if (config.isSandbox) {
@@ -673,13 +676,15 @@ function normalizeName(value) {
 }
 
 async function postProviderJson(url, payload, apiKey, idempotencyKey, provider, config) {
+  const circuit = PROVIDER_CIRCUITS.get(provider); const now = Date.now();
+  if (circuit?.openUntil && circuit.openUntil > now) throw new Error(`${provider} provider circuit is open until ${new Date(circuit.openUntil).toISOString()}.`);
   const attempts = Math.max(1, Math.min(3, Number.isInteger(config.providerMaxAttempts) ? config.providerMaxAttempts : 2));
   const timeoutMs = Math.max(250, Math.min(30000, Number.isFinite(config.providerTimeoutMs) ? config.providerTimeoutMs : 5000));
   let lastError = null;
   for (let attempt = 1; attempt <= attempts; attempt++) {
     try {
       const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}`, "Idempotency-Key": idempotencyKey }, body: JSON.stringify(payload), signal: AbortSignal.timeout(timeoutMs) });
-      if (res.ok) return await res.json();
+      if (res.ok) { PROVIDER_CIRCUITS.delete(provider); return await res.json(); }
       if (res.status < 500 || attempt === attempts) throw new Error(`${provider} provider failed with status ${res.status}`);
       lastError = new Error(`${provider} provider transiently failed with status ${res.status}`);
     } catch (error) {
@@ -687,6 +692,9 @@ async function postProviderJson(url, payload, apiKey, idempotencyKey, provider, 
       if (attempt === attempts) break;
     }
   }
+  const threshold = Math.max(1, Math.min(10, Number.isInteger(config.providerCircuitFailureThreshold) ? config.providerCircuitFailureThreshold : 3));
+  const failures = (circuit?.failures ?? 0) + 1; const cooldownMs = Math.max(1000, Math.min(300000, Number.isFinite(config.providerCircuitCooldownMs) ? config.providerCircuitCooldownMs : 30000));
+  PROVIDER_CIRCUITS.set(provider, { failures, openUntil: failures >= threshold ? now + cooldownMs : null });
   throw new Error(`${provider} provider unavailable after ${attempts} attempt(s): ${lastError?.message ?? "unknown error"}`);
 }
 

@@ -50,6 +50,17 @@ test("CERSAI real submission retries transient failures with a stable idempotenc
   } finally { globalThis.fetch = originalFetch; }
 });
 
+test("CERSAI circuit opens after configured provider failure threshold", async () => {
+  const originalFetch = globalThis.fetch; let calls = 0;
+  globalThis.fetch = async () => { calls++; return new Response("down", { status: 503 }); };
+  try {
+    const manager = new ExternalServiceManager({ cersaiProvider: "real", cersaiApiUrl: "https://cersai.example.in", cersaiApiKey: "key", providerMaxAttempts: 1, providerCircuitFailureThreshold: 1, providerCircuitCooldownMs: 1000 });
+    await assert.rejects(() => manager.fileCersaiSecurityInterest({ checksumSha256: "c".repeat(64) }), /unavailable after 1 attempt/);
+    await assert.rejects(() => manager.fileCersaiSecurityInterest({ checksumSha256: "c".repeat(64) }), /circuit is open/);
+    assert.equal(calls, 1);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
 test("ExternalServiceManager email and WhatsApp providers default to mock with India data posture", async () => {
   const manager = new ExternalServiceManager();
 
