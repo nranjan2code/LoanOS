@@ -47,7 +47,7 @@ cite the ID in commits and PRs.
 | REV-64 | Live integrations to replace mock providers (bureau, bank-verify, eSign, NACH, comms, V-CIP) | G | P2 | TODO |
 | REV-70 | Split `server.js` (20,415 lines / 212 handlers) into per-resource routers | H | P2 | TODO |
 | REV-71 | Storage scale: control-plane/sandbox off whole-state on Postgres; PG per-tenant encryption | H | P2 | TODO |
-| REV-72 | LMS co-lending economics in the loan-account ledger (split servicing by legs) | H | P2 | TODO |
+| REV-72 | LMS co-lending economics in the loan-account ledger (split servicing by legs) | H | P2 | DONE |
 | REV-80 | Positioning: lead with compliance & AI-governance control plane | I | P3 | DECIDE |
 | REV-81 | Beachhead: mid/small NBFCs, fintech-LSP+RE, co-op banks first | I | P3 | DECIDE |
 | REV-82 | Depth over breadth: take 1–2 product shapes fully live before widening | I | P3 | DECIDE |
@@ -296,9 +296,8 @@ The file store serializes all writes behind one whole-state lock; the Postgres d
 loads for the control plane and sandbox ops. Migrate those to per-tenant fetching and wire the
 per-tenant AES-GCM envelope into Postgres rows (today file-store only). **Acceptance:** concurrent tenants do not serialize on control-plane ops; PG rows are per-tenant encrypted.
 
-### REV-72 — LMS co-lending economics · P2 · TODO
-`co-lending.js` records allocation legs, but the loan-account ledger doesn't reflect co-lending servicing
-economics (each partner's book, income split). **Acceptance:** a co-lent loan's ledger attributes principal/interest to each partner per the disclosed shares.
+### REV-72 — LMS co-lending economics · P2 · DONE
+Co-lending allocations are now paise-exact and frozen onto the account before GL posting. Loan journals split principal, interest, fees, collections, and recovery payments into balanced regulated-entity books, using explicit inter-company balancing where economic shares differ. Transfer-pricing reports, approved partner statements, settlement payment reconciliation, servicing-fee journals, finance exceptions, and close-blocking inter-company certification complete the first governed economics slice. Live escrow/core-banking transport and partner-level ECL/tax exchange remain later production integrations.
 
 ---
 

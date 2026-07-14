@@ -11,13 +11,51 @@ export function buildLoanJournalEntries(account) {
       ? reverseLines(linesByEventId.get(event.reversalOfEventId) ?? [])
       : journalLines(event, account.accountingProfile?.accounts);
     if (!lines.length) continue;
+    linesByEventId.set(event.eventId, lines);
+    const allocation = account.coLendingAllocation;
+    if (allocation?.legs?.length) {
+      entries.push(...splitCoLendingJournal(account, event, lines, allocation));
+      continue;
+    }
     const debit = lines.filter((line) => line.side === "debit").reduce((sum, line) => sum + line.amount, 0);
     const credit = lines.filter((line) => line.side === "credit").reduce((sum, line) => sum + line.amount, 0);
     if (Math.round(debit * 100) !== Math.round(credit * 100)) throw new Error(`Unbalanced journal projection for ${event.eventId}`);
     entries.push({ journalId: `jrnl_${event.eventId}`, loanAccountId: account.loanAccountId, eventId: event.eventId, eventType: event.type, eventDate: event.eventDate, currency: account.currency, lines, debitTotal: debit, creditTotal: credit });
-    linesByEventId.set(event.eventId, lines);
   }
   return entries;
+}
+
+function splitCoLendingJournal(account, event, lines, allocation) {
+  const ordered = [...allocation.legs].sort((left, right) => (left.role === "originating" ? 1 : 0) - (right.role === "originating" ? 1 : 0));
+  const partnerLines = new Map(ordered.map((leg) => [leg.regulatedEntityId, []]));
+  for (const line of lines) {
+    const amountPaise = Math.round(line.amount * 100); let allocatedPaise = 0;
+    for (let index = 0; index < ordered.length; index += 1) {
+      const leg = ordered[index]; const share = shareForLine(line.account, leg); const linePaise = index === ordered.length - 1 ? amountPaise - allocatedPaise : Math.round((amountPaise * share) / 100); allocatedPaise += index === ordered.length - 1 ? 0 : linePaise;
+      if (!linePaise) continue;
+      partnerLines.get(leg.regulatedEntityId).push({ ...line, account: coLendingAccount(line.account, line.side, event.type, leg.role), amount: linePaise / 100 });
+    }
+  }
+  return ordered.map((leg) => {
+    const entityLines = partnerLines.get(leg.regulatedEntityId); const debitPaise = entityLines.filter((line) => line.side === "debit").reduce((sum, line) => sum + Math.round(line.amount * 100), 0); const creditPaise = entityLines.filter((line) => line.side === "credit").reduce((sum, line) => sum + Math.round(line.amount * 100), 0);
+    if (debitPaise > creditPaise) entityLines.push({ account: "intercompany_due_to_co_lender", side: "credit", amount: (debitPaise - creditPaise) / 100 });
+    if (creditPaise > debitPaise) entityLines.push({ account: "intercompany_due_from_co_lender", side: "debit", amount: (creditPaise - debitPaise) / 100 });
+    const totalPaise = Math.max(debitPaise, creditPaise);
+    return { journalId: `jrnl_${event.eventId}:${leg.regulatedEntityId}`, loanAccountId: account.loanAccountId, eventId: event.eventId, eventType: event.type, eventDate: event.eventDate, currency: account.currency, entityId: leg.regulatedEntityId, partnerRole: leg.role, coLendingArrangementId: allocation.coLendingArrangementId, allocationId: allocation.allocationId, book: "co_lending_entity", lines: entityLines, debitTotal: totalPaise / 100, creditTotal: totalPaise / 100 };
+  });
+}
+
+function shareForLine(account, leg) {
+  if (String(account).includes("interest")) return Number(leg.interestSharePercent ?? leg.sharePercent);
+  if (String(account).includes("charges") || String(account).includes("gst")) return Number(leg.feeSharePercent ?? leg.sharePercent);
+  return Number(leg.sharePercent);
+}
+
+function coLendingAccount(account, side, eventType, role) {
+  if (role !== "partner" || account !== "bank_clearing") return account;
+  if (eventType === "disbursement" && side === "credit") return "co_lending_funding_clearing";
+  if (["payment", "cash_recovery_payment", "cooling_off_cancellation"].includes(eventType) && side === "debit") return "co_lending_collections_clearing";
+  return account;
 }
 
 function journalLines(event, configuredAccounts = {}) {

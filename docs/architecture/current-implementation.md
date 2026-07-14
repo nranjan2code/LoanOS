@@ -22,7 +22,7 @@ The current implementation is intentionally small:
 - Internal staff workspace in `apps/dashboard/`.
 - Borrower customer portal in `apps/customer/`: a responsive, white-labelled journey home with prioritised next actions, visual application milestones, repayment schedules, a document centre, guided media, grievance tracking, and DPDP access/correction/erasure controls.
 - Shared design system tokens in `apps/shared/`.
-- Automated tests in `tests/`: 176 file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
+- Automated tests in `tests/`: 177 file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
 
 Run it:
 
@@ -55,6 +55,8 @@ npm run dev:api
 | `packages/core/src/finance-accounting.js` | Governed ECL assessment and allowance movements, finance-only journal projection, IRAC income-reversal journals, TDS journals/return extracts, and GST invoice/credit-note return aggregation. |
 | `packages/core/src/payment-operations.js` | Suspense-receipt creation, partial loan allocation, and independently approved residual write-off; all amounts remain exact to paise and resolutions post through the canonical loan-payment function. |
 | `packages/core/src/finance-management.js` | EIR fee-amortisation journals, funding-cost attribution, ALM maturity buckets, profitability, economic-capital, and RAROC reporting. |
+| `packages/core/src/co-lending.js` | RBI CLA agreement validation, partner funding/interest/fee economics, originating-RE retention, escrow evidence, exposure, and paise-exact loan allocation. |
+| `packages/core/src/co-lending-finance.js` | Partner transfer-pricing economics, approved settlement statements, exact settlement-payment reconciliation, and balanced partner/servicing journals. |
 | `packages/core/src/loan-policy.js` | India-only loan validation, KFS validation (including prepayment/foreclosure checks), sanction readiness, disbursement checks. |
 | `packages/core/src/model-governance.js` | AI/model inventory (including generative model class), model status, governed lifecycle transitions with a validation gate (fairness/explainability/monitoring for high-risk, adversarial/hallucination testing for generative), drift monitoring with auto kill-switch, global/model kill switch, kill-switch incident and post-incident review workflow, runtime model-use evaluation. |
 | `packages/core/src/ai-interaction.js` | Customer-facing AI disclosure generation (blocked for back-office/inactive/kill-switched models) and human-handoff request/resolution workflow. |
@@ -150,7 +152,7 @@ npm run dev:api
 | `GET /accounting/journals` | Projects immutable loan-ledger events into balanced, read-only double-entry journals using the accounting profile frozen on each loan at disbursement; optionally filters by `loanAccountId`. |
 | `GET /accounting/trial-balance` | Returns a tenant-scoped derived trial balance from journal projections, optionally for one loan account. |
 | `GET /accounting/posting-runs` | Lists immutable, approval-evidenced tenant GL posting-run snapshots. |
-| `GET /accounting/gl-export` | Exports posted journals in a versioned GL-line schema with a SHA-256 checksum; may filter by `postingRunId`. |
+| `GET /accounting/gl-export` | Exports posted journals in a versioned GL-line schema with a SHA-256 checksum and entity/book/co-lending dimensions; may filter by `postingRunId`. |
 | `GET/POST /accounting/gl-deliveries` | Lists or creates an immutable API/SFTP/file delivery attempt for one posting run, retaining target, exact totals, line count, and export checksum. |
 | `POST /accounting/gl-deliveries/:id/acknowledgement` | Records one immutable downstream acknowledgement; acceptance requires the exact exported checksum and line count, otherwise a finance exception is opened. |
 | `GET/POST /accounting/gl-reconciliations` | Lists or independently certifies downstream GL versus posted subledger checksum, debit/credit totals, and line count; variances fail closed into the exception queue. |
@@ -238,6 +240,13 @@ npm run dev:api
 | `GET /regulated-entities` | Lists regulated entities. |
 | `POST /regulated-entities` | Creates or updates a regulated entity after compliance validation. |
 | `GET /regulated-entities/:id` | Reads one regulated entity. |
+| `GET/POST /co-lending-arrangements` | Lists or validates co-lending agreements with regulated-entity roles, funding/interest/fee shares, transfer pricing, servicing fees, retention floor, blended rate, and escrow evidence. |
+| `POST /co-lending-arrangements/:id/allocations` | Freezes one paise-exact partner allocation onto an existing loan before any GL posting, preventing later accounting-shape drift. |
+| `GET /co-lending-arrangements/:id/partner-subledger` | Returns balanced entity-dimension loan journals with inter-company due-to/due-from balancing; filterable by entity and loan. |
+| `GET /co-lending-arrangements/:id/transfer-pricing` | Reports partner average outstanding, funding cost, collection economics, servicing fee, payable, and contribution margin for a period. |
+| `GET/POST /co-lending-arrangements/:id/settlement-statements` | Lists or creates non-overlapping checksum-sealed partner settlement statements under maker-checker approval. |
+| `POST /co-lending-settlement-statements/:id/payments` | Reconciles an approved partner payable to an exact bank confirmation; mismatches enter the finance-exception queue and cannot post settlement journals. |
+| `GET/POST /co-lending-arrangements/:id/intercompany-reconciliation` | Reports or certifies equality of due-to/due-from balances for finance close under independent approval. |
 | `GET /lending-service-providers` | Lists LSPs governed by regulated entities. |
 | `POST /lending-service-providers` | Creates or updates an LSP after agreement, due-diligence, review, data, recovery, and fee-control validation. |
 | `GET /lending-service-providers/:id` | Reads one LSP record. |
@@ -444,7 +453,7 @@ npm run dev:api
 - Registries are file-backed; tenant user administration and access reviews exist, but external IAM sync and maker-checker approval for admin changes are still planned.
 - Borrower/consent/KYC records are file-backed, but support CKYC registry and V-CIP evidence vault validation boundaries.
 - Workflow is file-backed; the local dashboard is not a production workflow UI and outbound RBI CMS API integration is still planned.
-- LMS restructure/settlement/write-off, cooling-off cancellation, refunds, and collections reminders have first slices. UPI collect and NACH presentment settlement reconciliation now have idempotent callback-to-ledger slices; bank-statement credit matching now provides a first provider-to-bank-to-ledger control. A derived balanced journal, trial balance, and approval-evidenced posting-run snapshot now cover the loan ledger; formal business-date close, downstream GL export, external CIC file/API submission, and full multi-channel recovery contact logging remain planned.
+- LMS restructure/settlement/write-off, cooling-off cancellation, refunds, and collections reminders have first slices. UPI/NACH and bank matching provide provider-to-bank-to-ledger controls. Balanced journals, trial balance, governed posting/GL delivery/reconciliation, EOD/BOD and period close cover the finance path. Co-lent loans now split into regulated-entity books with transfer pricing, partner settlement, and inter-company certification. Live core-banking/partner transport, external CIC submission, partner ECL/tax exchange, and full multi-channel recovery operations remain planned.
 - Document packet renders HTML/text and stores document-vault receipts, but does not yet create PDFs or external eSign envelopes.
 - UI is limited to the local operations/admin dashboard; there is no production borrower application yet.
 - AI governance has first slices for lifecycle, validation gates (fairness/explainability/monitoring for high-risk, adversarial/hallucination for generative), drift-triggered kill switch, disclosure, and human handoff; recurring fairness reports and a sectoral incident-intelligence pack are still planned.

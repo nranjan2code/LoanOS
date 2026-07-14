@@ -1,4 +1,5 @@
 import { classifyLoanAsset, summarizeLoanAccount } from "./loan-account.js";
+import { buildCoLendingSettlementJournals } from "./co-lending-finance.js";
 
 const money = (value) => Math.round(Number(value ?? 0) * 100) / 100;
 const paise = (value) => Math.round(Number(value ?? 0) * 100);
@@ -25,7 +26,7 @@ export function buildFinanceJournalEntries(state) {
     const writeOff = record.writeOff ? [{ journalId: `jrnl_${record.writeOff.writeOffId}`, eventId: record.writeOff.writeOffId, eventType: "payment_suspense_written_off", eventDate: record.writeOff.eventDate, currency: "INR", lines: [{ account: "payment_suspense_liability", side: "debit", amount: record.writeOff.amount }, { account: "payment_suspense_writeoff_income", side: "credit", amount: record.writeOff.amount }], debitTotal: record.writeOff.amount, creditTotal: record.writeOff.amount }] : [];
     return [receipt, ...resolutions, ...writeOff];
   });
-  return [...provisionJournals, ...iracJournals, ...tdsJournals, ...creditNoteJournals, ...suspenseJournals];
+  return [...provisionJournals, ...iracJournals, ...tdsJournals, ...creditNoteJournals, ...suspenseJournals, ...buildCoLendingSettlementJournals(state)];
 }
 
 function movementJournal(record, debitAccount, creditAccount) {

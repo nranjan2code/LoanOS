@@ -226,6 +226,13 @@ export {
 } from "./co-lending.js";
 
 export {
+  buildCoLendingSettlementJournals,
+  buildCoLendingTransferPricingReport,
+  createCoLendingSettlementStatement,
+  recordCoLendingSettlementPayment
+} from "./co-lending-finance.js";
+
+export {
   AA_CONSENT_MODES,
   AA_CONSENT_STATUSES,
   AA_FETCH_TYPES,

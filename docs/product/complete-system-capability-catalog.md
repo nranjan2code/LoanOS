@@ -69,7 +69,7 @@ LoanOS currently has a strong compliance-first domain foundation and a credible 
 
 The principal gaps before bank production are live integrations, downstream GL certification, regulatory submission formats, product-specific lending depth, full collections/legal recovery, enterprise IAM and key management, observability/DR/BCP, and bank-assurance evidence. Payment operations now have a controlled internal first slice, but live rail/file transport and operating-scale automation remain open. Public product positioning must remain narrower than this catalogue until each advertised journey reaches an agreed maturity level.
 
-The detailed register contains **453 individually identified capabilities**. At this snapshot, 78 are classified `Implemented`, 159 `Partial`, 188 `Missing`, and 28 are mock, partner, external, or composite-status obligations. These counts measure scope coverage, not delivery percentage: a single missing ledger, reconciliation, security, or recovery control can block production even if many smaller capabilities exist.
+The detailed register contains **453 individually identified capabilities**. At this snapshot, 78 are classified `Implemented`, 163 `Partial`, 184 `Missing`, and 28 are mock, partner, external, or composite-status obligations. These counts measure scope coverage, not delivery percentage: a single missing ledger, reconciliation, security, or recovery control can block production even if many smaller capabilities exist.
 
 ## Capability Index
 
@@ -370,7 +370,7 @@ The detailed register contains **453 individually identified capabilities**. At 
 | ACC-012 | Charges, waivers, reversals, GST, and audit | Core | Partial |
 | ACC-013 | Accounting reconciliation by event, day, provider, and GL | Core | Partial |
 | ACC-014 | Trial balance, journal report, and finance sign-off | Core | Partial |
-| ACC-015 | Multi-entity and co-lender accounting legs | Product | Missing |
+| ACC-015 | Multi-entity and co-lender accounting legs | Product | Partial |
 
 ### 15. Repayment Schedule, Interest, and Product Structures
 
@@ -496,9 +496,9 @@ The detailed register contains **453 individually identified capabilities**. At 
 | PAR-005 | Co-lending agreement, roles, shares, retention, rate, and escrow | Product | Implemented |
 | PAR-006 | Loan-level allocation and share reconciliation | Product | Implemented |
 | PAR-007 | Partner funding, disbursement, and settlement confirmation | Product | Partial |
-| PAR-008 | Partner principal, interest, fee, tax, and provision ledger legs | Product | Missing |
-| PAR-009 | Collection and recovery allocation by partner share | Product | Missing |
-| PAR-010 | Partner reconciliation, break management, and statements | Product | Missing |
+| PAR-008 | Partner principal, interest, fee, tax, and provision ledger legs | Product | Partial |
+| PAR-009 | Collection and recovery allocation by partner share | Product | Partial |
+| PAR-010 | Partner reconciliation, break management, and statements | Product | Partial |
 | PAR-011 | Servicing transfer, portfolio sale, assignment, and participation | Product | Missing |
 | PAR-012 | Partner SLA, performance, concentration, and audit | Channel | Missing |
 | PAR-013 | DSA/BC/dealer/merchant commission and clawback | Channel | Missing |
