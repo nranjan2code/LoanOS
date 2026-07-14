@@ -40,6 +40,7 @@ capability rows remain the source of truth for individual features.
 | AB | Partner oversight and grievance completion | Product control first slice complete — LSP incidents/exits, transfers, SLA/concentration/audit, RCA/CAPA/redress, assisted complaints, board analytics and Ombudsman compliance are executable; live monitoring, staff/payment and regulator evidence remain. |
 | AC | Regulatory reporting and governed data integration | Product control first slice complete — CRILC/SMA, XBRL/CIMS, PSL, acknowledgement/amendment, certified connectors, purpose-separated data products, CDC/marts and reference governance are executable; certified endpoints/runtime/stewardship remain. |
 | AD | Role-specific operational workspaces | UI first slice complete — servicing, collections/field and control-function workspaces are accessible, authorized and privacy-safe; deeper transaction forms, institution design validation and production rollout remain. |
+| AE | Full-system vendor procurement and mock conformance | Catalogue complete — required APIs, callbacks, files, reconciliation, Indian vendor candidates and commercial units are documented across customer, lending, finance, recovery, regulatory and platform domains. Production-grade deterministic adverse simulators, vendor selection, contracts, current quotations, credentials and certification remain. |
 
 ## Epic 1: Tenant and Regulated Entity Setup
 
