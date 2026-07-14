@@ -452,6 +452,39 @@ export class ExternalServiceManager {
     };
   }
 
+  // Creates a single NACH debit presentment against an already-registered
+  // mandate. Initiation is deliberately distinct from settlement: no loan
+  // payment exists until the provider callback is reconciled.
+  async createNachPresentment(input = {}) {
+    ensureIndiaDataResidency("Payment rail", this.config.paymentRailDataResidencyCountry);
+    const mandateRef = String(input.mandateRef ?? "").trim();
+    if (!mandateRef) throw new Error("NACH presentment requires mandateRef.");
+    if (!Number.isFinite(input.amount) || input.amount <= 0) {
+      throw new Error("NACH presentment amount must be positive.");
+    }
+    if (this.config.paymentRailProvider === "real") {
+      if (!this.config.paymentRailApiUrl || !this.config.paymentRailApiKey) {
+        throw new Error("Real payment rail provider configured but API URL or API key is missing.");
+      }
+      const res = await fetch(`${this.config.paymentRailApiUrl}/nach/presentments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${this.config.paymentRailApiKey}` },
+        body: JSON.stringify({ mandateRef, amount: input.amount, currency: input.currency ?? "INR", dueDate: input.dueDate ?? null })
+      });
+      if (!res.ok) throw new Error(`Real payment rail provider returned status ${res.status}`);
+      return await res.json();
+    }
+    return {
+      success: true,
+      provider: "mock",
+      channel: "nach",
+      presentmentRef: `NACH-PRESENTMENT-MOCK-${Date.now()}`,
+      status: "pending",
+      dataResidencyCountry: this.config.paymentRailDataResidencyCountry,
+      createdAt: new Date().toISOString()
+    };
+  }
+
   /**
    * Verifies Aadhaar-based eSign OTP.
    */

@@ -20,19 +20,16 @@ export function engineMode() {
 }
 
 function engineBaseUrl(tenantId) {
-  if (process.env.LOANOS_RULES_ENGINE_URLS) {
-    let urls;
-    try {
-      urls = JSON.parse(process.env.LOANOS_RULES_ENGINE_URLS);
-    } catch {
-      throw new Error("LOANOS_RULES_ENGINE_URLS must be valid JSON");
-    }
-    if (typeof urls?.[tenantId] !== "string" || !urls[tenantId]) {
-      throw new Error(`rules-engine: no isolated instance configured for tenant ${tenantId}`);
-    }
-    return urls[tenantId].replace(/\/$/, "");
+  let urls;
+  try {
+    urls = JSON.parse(process.env.LOANOS_RULES_ENGINE_URLS ?? "{}");
+  } catch {
+    throw new Error("LOANOS_RULES_ENGINE_URLS must be valid JSON");
   }
-  return (process.env.LOANOS_RULES_ENGINE_URL ?? "http://127.0.0.1:47311").replace(/\/$/, "");
+  if (typeof urls?.[tenantId] !== "string" || !urls[tenantId]) {
+    throw new Error(`rules-engine: no isolated instance configured for tenant ${tenantId}`);
+  }
+  return urls[tenantId].replace(/\/$/, "");
 }
 
 const money = (value) => (Number.isFinite(value) ? value.toFixed(2) : undefined);
@@ -136,13 +133,14 @@ export async function decideEligibilityWithEngine({
 
 // The gated eligibility assessment used by server.js call sites.
 //
-// Always runs the JS evaluator first (its assessment payload shape feeds the
-// downstream workflow), then per LOANOS_RULES_ENGINE:
+// Always runs the JS evaluator first in off/shadow mode. In active mode the
+// engine is authoritative for the decision and its reason lineage; local
+// metrics remain only as non-authoritative operational context.
 //   off    return the JS result untouched;
 //   shadow consult the engine, log divergences, attach an engineShadow
 //          record to the assessment; engine failure NEVER affects the caller;
-//   active the engine's decision overrides the JS decision (JS metrics are
-//          kept for the payload); engine failure fails CLOSED to "refer"
+//   active the engine's decision, findings, summary, outputs and signed
+//          lineage are persisted; engine failure fails CLOSED to "refer"
 //          (INV-5 — the engine being unreachable is not an approval).
 export async function assessEligibilityGated({ evaluateJs, application, tenantId, stage }) {
   const jsResult = evaluateJs(application);
@@ -178,20 +176,27 @@ export async function assessEligibilityGated({ evaluateJs, application, tenantId
         }
       };
     }
-    // active
+    // Active mode is a greenfield cutover: do not retain JavaScript findings
+    // as the recorded decision rationale when the Rust engine is decisive.
+    const reasons = engineReasonsToFindings(engineResponse.reasons);
     return {
       ...jsResult,
       assessment: {
         ...jsResult.assessment,
         decision: engineResponse.decision,
+        reasons,
+        summary: summarizeEngineReasons(reasons),
         engine: {
           decidedBy: "rules-engine",
-          reasons: engineResponse.reasons,
+          outputs: engineResponse.outputs,
           ruleset: engineResponse.ruleset,
           traceRef: engineResponse.trace_ref,
-          instance: engineResponse.engine
+          instance: engineResponse.engine,
+          evaluatedAt: engineResponse.evaluated_at
         }
-      }
+      },
+      findings: reasons,
+      summary: summarizeEngineReasons(reasons)
     };
   } catch (err) {
     if (mode === "active") {
@@ -203,13 +208,49 @@ export async function assessEligibilityGated({ evaluateJs, application, tenantId
         assessment: {
           ...jsResult.assessment,
           decision: "refer",
+          reasons: [engineUnavailableFinding()],
+          summary: { status: "review", errorCount: 0, warningCount: 1 },
           engine: { decidedBy: "rules-engine", error: "engine_unavailable_fail_closed" }
-        }
+        },
+        findings: [engineUnavailableFinding()],
+        summary: { status: "review", errorCount: 0, warningCount: 1 }
       };
     }
     console.warn(`[rules-engine shadow] engine unreachable (caller unaffected): ${err.message}`);
     return jsResult;
   }
+}
+
+function engineReasonsToFindings(reasons) {
+  return (Array.isArray(reasons) ? reasons : []).map((reason) => ({
+    severity: reason.severity === "error" ? "error" : reason.severity === "warn" ? "warning" : "info",
+    controlId: reason.regulation ?? "PLATFORM",
+    code: reason.code ?? "ENGINE_REASON",
+    message: reason.message ?? "Decision-engine finding.",
+    path: reason.path || null,
+    audience: reason.audience ?? "internal"
+  }));
+}
+
+function summarizeEngineReasons(reasons) {
+  const errors = reasons.filter((reason) => reason.severity === "error").length;
+  const warnings = reasons.filter((reason) => reason.severity === "warning").length;
+  return {
+    status: errors > 0 ? "blocked" : warnings > 0 ? "review" : "ready",
+    errorCount: errors,
+    warningCount: warnings
+  };
+}
+
+function engineUnavailableFinding() {
+  return {
+    severity: "warning",
+    controlId: "PLATFORM",
+    code: "ENGINE_UNAVAILABLE_FAIL_CLOSED",
+    message: "Automated decisioning is unavailable; the application requires manual review.",
+    path: null,
+    audience: "internal"
+  };
 }
 
 // Shadow-mode comparison record: log these and require a clean window before

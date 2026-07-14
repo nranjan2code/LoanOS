@@ -49,6 +49,10 @@ const DLA_CIMS_COLUMNS = [
   { key: "grievanceOfficerMobile", label: "Mobile number of Grievance Redressal Officer" },
   { key: "reWebsite", label: "Website of RE" }
 ];
+const REQUIRED_ACCOUNTING_KEYS = ["bankClearing", "principalReceivable", "interestReceivable", "interestIncome", "chargesReceivable", "chargesIncome", "outputGstPayable", "customerCreditBalance", "chargeWaiverExpense", "settlementLoss"];
+const DEFAULT_ACCOUNTING_PROFILE = {
+  bankClearing: "bank_clearing", principalReceivable: "loan_principal_receivable", interestReceivable: "interest_receivable", interestIncome: "interest_income", chargesReceivable: "charges_receivable", chargesIncome: "charges_income", outputGstPayable: "output_gst_payable", customerCreditBalance: "customer_credit_balance", chargeWaiverExpense: "charge_waiver_expense", settlementLoss: "settlement_loss"
+};
 
 export function validateRegulatedEntity(entity, now = new Date()) {
   const findings = [];
@@ -733,6 +737,11 @@ export function validateProductPolicy(product, regulatedEntities = {}) {
   validateCharges("charges", product?.charges, findings);
   validateCharges("contingentCharges", product?.contingentCharges, findings);
   validateCharges("penalCharges", product?.penalCharges, findings, { penal: true });
+  for (const key of REQUIRED_ACCOUNTING_KEYS) {
+    if (typeof product?.accountingProfile?.accounts?.[key] !== "string" || product.accountingProfile.accounts[key].trim() === "") {
+      findings.push(createFinding("error", "RBI-IT-GRC", `Accounting profile account '${key}' is required.`, `accountingProfile.accounts.${key}`));
+    }
+  }
 
   return {
     findings,
@@ -813,6 +822,10 @@ export function normalizeProductPolicy(input, now = new Date()) {
       boardApprovalRef: input.policyRefs?.boardApprovalRef ?? null,
       pricingPolicyRef: input.policyRefs?.pricingPolicyRef ?? null,
       penalChargesPolicyRef: input.policyRefs?.penalChargesPolicyRef ?? null
+    },
+    accountingProfile: {
+      profileId: input.accountingProfile?.profileId ?? `${input.productCode ?? "product"}_v${Number.isFinite(input.version) ? input.version : 1}`,
+      accounts: { ...DEFAULT_ACCOUNTING_PROFILE, ...(input.accountingProfile?.accounts ?? {}) }
     },
     createdAt: input.createdAt ?? now.toISOString(),
     updatedAt: now.toISOString()

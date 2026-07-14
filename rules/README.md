@@ -89,9 +89,9 @@ Every decision appends `{request, response}` to the tenant's audit JSONL; verify
 
 - `off` (default) — JS evaluator only, zero behavior change.
 - `shadow` — JS decides; the engine runs alongside; divergences are logged; engine failure never affects the caller. Run this in every environment first.
-- `active` — the engine's decision is authoritative with signed-bundle lineage; an unreachable engine fails closed to `refer`.
+- `active` — the engine's decision, findings, summary, and signed-bundle lineage are authoritative; an unreachable engine fails closed to `refer` for manual handling.
 
-`LOANOS_RULES_ENGINE_URL` points at the tenant's instance (default `http://127.0.0.1:47311`).
+`LOANOS_RULES_ENGINE_URLS` is a required JSON object mapping every tenant ID to its isolated instance URL. There is no shared-instance or single-URL fallback: an absent tenant mapping fails closed before a request is sent.
 
 ## Rules of engagement for changes
 

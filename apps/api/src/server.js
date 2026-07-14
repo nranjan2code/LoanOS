@@ -18,6 +18,14 @@ import {
   assessChargeToLoanAccount,
   buildAiDisclosure,
   buildKeyFactStatement,
+  buildLoanJournalEntries,
+  buildFinanceJournalEntries,
+  buildGstReturnData,
+  buildTdsReturnData,
+  buildAlmReport,
+  buildManagementFinanceJournals,
+  buildProfitabilityReport,
+  calculateEclAssessment,
   classifyLoanAsset,
   clearGlobalKillSwitch,
   commentOnWorkflowTask,
@@ -84,6 +92,8 @@ import {
   markDisbursed,
   postCashRecoveryToLoanAccount,
   postPaymentToLoanAccount,
+  reconcileBankStatementEntry,
+  reconcilePaymentRailSettlement,
   prepayLoanAccount,
   proposeDecision,
   recordCollectionsReminder,
@@ -93,6 +103,10 @@ import {
   writeOffLoanAccount,
   quoteForeclosure,
   reverseLoanAccountEvent,
+  refundUnappliedPayment,
+  returnFailedDisbursement,
+  quoteCoolingOffCancellation,
+  executeCoolingOffCancellation,
   summarizeLoanAccount,
   startComplaintReview,
   startWorkflowTask,
@@ -1093,6 +1107,121 @@ async function route(req, res, dataDir, platformAdminKey) {
     return;
   }
 
+  if (method === "GET" && path === "/payment-reconciliations") {
+    const state = await store.load();
+    const status = url.searchParams.get("status");
+    const outcome = url.searchParams.get("outcome");
+    const loanAccountId = url.searchParams.get("loanAccountId");
+    const reconciliations = Object.values(state.paymentReconciliations ?? {}).filter((record) =>
+      (!status || record.status === status) &&
+      (!outcome || record.outcome === outcome) &&
+      (!loanAccountId || record.loanAccountId === loanAccountId)
+    );
+    sendJson(res, 200, { count: reconciliations.length, reconciliations });
+    return;
+  }
+
+  if (method === "GET" && path === "/bank-reconciliations") {
+    const state = await store.load();
+    const outcome = url.searchParams.get("outcome");
+    const entries = Object.values(state.bankReconciliations ?? {}).filter((record) => !outcome || record.outcome === outcome);
+    sendJson(res, 200, { count: entries.length, bankReconciliations: entries });
+    return;
+  }
+
+  const paymentReconciliationResolutionMatch = path.match(/^\/payment-reconciliations\/([^/]+)\/resolution$/);
+  if (method === "POST" && paymentReconciliationResolutionMatch) {
+    const body = await readJson(req);
+    const state = await store.load();
+    const reconciliationId = decodeURIComponent(paymentReconciliationResolutionMatch[1]);
+    const record = state.paymentReconciliations?.[reconciliationId];
+    if (!record) { sendJson(res, 404, { error: { code: "not_found", message: "Payment reconciliation not found." } }); return; }
+    if (record.outcome !== "exception") { sendJson(res, 422, { error: { code: "resolution_blocked", message: "Only an unresolved payment exception can be resolved." } }); return; }
+    if (!body.resolvedBy || !body.approvalRef || !body.reason) { sendJson(res, 422, { error: { code: "resolution_blocked", message: "resolvedBy, approvalRef, and reason are required." } }); return; }
+    const resolved = { ...record, outcome: "exception_resolved", resolution: { resolvedBy: body.resolvedBy, approvalRef: body.approvalRef, reason: body.reason, resolvedAt: new Date().toISOString() } };
+    await store.save(appendEvent({ ...state, paymentReconciliations: { ...state.paymentReconciliations, [reconciliationId]: resolved } }, { type: "finance.payment_reconciliation.exception_resolved", reconciliationId, resolvedBy: body.resolvedBy, approvalRef: body.approvalRef }));
+    sendJson(res, 200, { reconciliation: resolved });
+    return;
+  }
+
+  const bankReconciliationResolutionMatch = path.match(/^\/bank-reconciliations\/([^/]+)\/resolution$/);
+  if (method === "POST" && bankReconciliationResolutionMatch) {
+    const body = await readJson(req);
+    const state = await store.load();
+    const bankReconciliationId = decodeURIComponent(bankReconciliationResolutionMatch[1]);
+    const record = state.bankReconciliations?.[bankReconciliationId];
+    if (!record) { sendJson(res, 404, { error: { code: "not_found", message: "Bank reconciliation not found." } }); return; }
+    if (record.outcome !== "exception") { sendJson(res, 422, { error: { code: "resolution_blocked", message: "Only an unresolved bank exception can be resolved." } }); return; }
+    if (!body.resolvedBy || !body.approvalRef || !body.reason) { sendJson(res, 422, { error: { code: "resolution_blocked", message: "resolvedBy, approvalRef, and reason are required." } }); return; }
+    const resolved = { ...record, outcome: "exception_resolved", resolution: { resolvedBy: body.resolvedBy, approvalRef: body.approvalRef, reason: body.reason, resolvedAt: new Date().toISOString() } };
+    await store.save(appendEvent({ ...state, bankReconciliations: { ...state.bankReconciliations, [bankReconciliationId]: resolved } }, { type: "finance.bank_reconciliation.exception_resolved", bankReconciliationId, resolvedBy: body.resolvedBy, approvalRef: body.approvalRef }));
+    sendJson(res, 200, { bankReconciliation: resolved });
+    return;
+  }
+
+  if (method === "POST" && path === "/bank-statements/entries") {
+    const body = await readJson(req);
+    const state = await store.load();
+    const result = reconcileBankStatementEntry(state, body);
+    if (result.summary.status === "blocked") {
+      sendJson(res, 422, { error: { code: "bank_reconciliation_blocked", message: "Bank statement entry is invalid." }, findings: result.findings });
+      return;
+    }
+    if (result.duplicate) {
+      sendJson(res, 200, { bankReconciliation: result.bankReconciliation, duplicate: true });
+      return;
+    }
+    await store.save(appendEvent(
+      { ...state, bankReconciliations: result.bankReconciliations },
+      { type: "finance.bank_statement.reconciled", bankReconciliationId: result.bankReconciliation.bankReconciliationId, transactionRef: result.bankReconciliation.transactionRef, outcome: result.bankReconciliation.outcome, amount: result.bankReconciliation.amount, paymentReconciliationId: result.bankReconciliation.paymentReconciliationId }
+    ));
+    sendJson(res, result.bankReconciliation.outcome === "matched" ? 200 : 202, { bankReconciliation: result.bankReconciliation, findings: result.findings });
+    return;
+  }
+
+  if (method === "POST" && path === "/integrations/payment-rails/settlements") {
+    const body = await readJson(req);
+    const state = await store.load();
+    const result = reconcilePaymentRailSettlement(state, body);
+    if (result.summary.status === "blocked") {
+      sendJson(res, 422, {
+        error: { code: "payment_reconciliation_blocked", message: "Payment reconciliation is blocked by invalid callback data." },
+        findings: result.findings
+      });
+      return;
+    }
+    if (result.duplicate) {
+      sendJson(res, 200, { reconciliation: result.reconciliation, duplicate: true });
+      return;
+    }
+    const nextState = appendEvent(
+      {
+        ...state,
+        paymentRails: result.paymentRails,
+        paymentReconciliations: result.reconciliations,
+        loanAccounts: result.loanAccounts
+      },
+      {
+        type: "integration.payment_rail.settlement_reconciled",
+        reconciliationId: result.reconciliation.reconciliationId,
+        paymentRailId: result.reconciliation.paymentRailId,
+        providerEventRef: result.reconciliation.providerEventRef,
+        loanAccountId: result.reconciliation.loanAccountId,
+        outcome: result.reconciliation.outcome,
+        status: result.reconciliation.status,
+        amount: result.reconciliation.amount,
+        paymentEventId: result.reconciliation.paymentEventId
+      }
+    );
+    await store.save(nextState);
+    sendJson(res, result.reconciliation.outcome === "matched_posted" ? 200 : 202, {
+      reconciliation: result.reconciliation,
+      paymentEvent: result.paymentEvent ?? null,
+      findings: result.findings
+    });
+    return;
+  }
+
   if (method === "POST" && path === "/integrations/payment-rails/nach-mandates") {
     const body = await readJson(req);
     const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox });
@@ -1131,6 +1260,34 @@ async function route(req, res, dataDir, platformAdminKey) {
         amount: record.maxAmount,
         dataResidencyCountry: record.dataResidencyCountry
       }
+    );
+    await store.save(nextState);
+    sendJson(res, providerResult.success === false ? 422 : 201, { paymentRail: record });
+    return;
+  }
+
+  if (method === "POST" && path === "/integrations/payment-rails/nach-presentments") {
+    const body = await readJson(req);
+    const state = await store.load();
+    const mandate = Object.values(state.paymentRails ?? {}).find(
+      (record) => record.type === "nach_mandate" && (record.paymentRailId === body.mandateId || record.providerRef === body.mandateRef)
+    );
+    if (!mandate || mandate.status !== "registered") {
+      sendJson(res, 422, { error: { code: "nach_mandate_unavailable", message: "An active registered NACH mandate is required for presentment." } });
+      return;
+    }
+    const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox });
+    let providerResult;
+    try {
+      providerResult = await manager.createNachPresentment({ ...body, mandateRef: mandate.providerRef });
+    } catch (err) {
+      sendJson(res, 422, { error: { code: "payment_rail_nach_presentment_failed", message: err.message } });
+      return;
+    }
+    const record = buildNachPresentmentRecord(body, mandate, providerResult);
+    const nextState = appendEvent(
+      { ...state, paymentRails: { ...(state.paymentRails ?? {}), [record.paymentRailId]: record } },
+      { type: "integration.payment_rail.nach_presentment_created", paymentRailId: record.paymentRailId, loanAccountId: record.loanAccountId, providerRef: record.providerRef, amount: record.amount, status: record.status }
     );
     await store.save(nextState);
     sendJson(res, providerResult.success === false ? 422 : 201, { paymentRail: record });
@@ -2472,6 +2629,369 @@ async function route(req, res, dataDir, platformAdminKey) {
       asOf: url.searchParams.get("asOf") ?? undefined
     });
     sendJson(res, result.summary.status === "blocked" ? 422 : 200, result);
+    return;
+  }
+
+  if (method === "GET" && path === "/accounting/journals") {
+    const state = await store.load();
+    const loanAccountId = url.searchParams.get("loanAccountId");
+    const accounts = loanAccountId
+      ? [state.loanAccounts[loanAccountId]].filter(Boolean)
+      : Object.values(state.loanAccounts);
+    const financeJournals = buildFinanceJournalEntries(state).concat(buildManagementFinanceJournals(state));
+    const journals = accounts.flatMap(buildLoanJournalEntries).concat(loanAccountId ? financeJournals.filter((journal) => journal.loanAccountId === loanAccountId) : financeJournals);
+    sendJson(res, 200, {
+      count: journals.length,
+      journals
+    });
+    return;
+  }
+
+  if (method === "GET" && path === "/accounting/trial-balance") {
+    const state = await store.load();
+    const loanAccountId = url.searchParams.get("loanAccountId");
+    const accounts = loanAccountId
+      ? [state.loanAccounts[loanAccountId]].filter(Boolean)
+      : Object.values(state.loanAccounts);
+    const balances = new Map();
+    const financeJournals = buildFinanceJournalEntries(state).concat(buildManagementFinanceJournals(state));
+    const journals = accounts.flatMap(buildLoanJournalEntries).concat(loanAccountId ? financeJournals.filter((journal) => journal.loanAccountId === loanAccountId) : financeJournals);
+    for (const journal of journals) {
+      for (const line of journal.lines) {
+        const balance = balances.get(line.account) ?? { account: line.account, debit: 0, credit: 0 };
+        balance[line.side] += line.amount;
+        balances.set(line.account, balance);
+      }
+    }
+    const accountsBalance = [...balances.values()]
+      .map((balance) => ({ ...balance, debit: Math.round(balance.debit * 100) / 100, credit: Math.round(balance.credit * 100) / 100, netDebit: Math.round((balance.debit - balance.credit) * 100) / 100 }))
+      .sort((left, right) => left.account.localeCompare(right.account));
+    const debitTotal = accountsBalance.reduce((total, balance) => total + Math.round(balance.debit * 100), 0) / 100;
+    const creditTotal = accountsBalance.reduce((total, balance) => total + Math.round(balance.credit * 100), 0) / 100;
+    sendJson(res, 200, {
+      asOf: new Date().toISOString(),
+      loanAccountId: loanAccountId ?? null,
+      accounts: accountsBalance,
+      debitTotal,
+      creditTotal,
+      balanced: Math.round(debitTotal * 100) === Math.round(creditTotal * 100)
+    });
+    return;
+  }
+
+  if (method === "GET" && path === "/accounting/posting-runs") {
+    const state = await store.load();
+    const postingRuns = Object.values(state.accountingPostingRuns ?? {}).sort((left, right) => right.postedAt.localeCompare(left.postedAt));
+    sendJson(res, 200, { count: postingRuns.length, postingRuns });
+    return;
+  }
+
+  if (method === "GET" && path === "/accounting/gl-export") {
+    const state = await store.load();
+    const requestedRunId = url.searchParams.get("postingRunId");
+    const postingRuns = Object.values(state.accountingPostingRuns ?? {}).filter((run) => !requestedRunId || run.postingRunId === requestedRunId);
+    if (requestedRunId && !postingRuns.length) { sendJson(res, 404, { error: { code: "not_found", message: "Posting run not found." } }); return; }
+    const lines = postingRuns.flatMap((run) => run.journals.flatMap((journal) => journal.lines.map((line, lineNumber) => ({ postingRunId: run.postingRunId, businessDate: run.throughDate, journalId: journal.journalId, eventId: journal.eventId, eventDate: journal.eventDate, loanAccountId: journal.loanAccountId, currency: journal.currency, lineNumber: lineNumber + 1, glAccount: line.account, debit: line.side === "debit" ? line.amount : 0, credit: line.side === "credit" ? line.amount : 0 }))));
+    const checksum = createHash("sha256").update(JSON.stringify(lines)).digest("hex");
+    sendJson(res, 200, { exportFormat: "loanos.gl.v1", generatedAt: new Date().toISOString(), postingRunIds: postingRuns.map((run) => run.postingRunId), lineCount: lines.length, checksum, lines });
+    return;
+  }
+
+  if (method === "GET" && path === "/accounting/ecl-parameter-sets") {
+    const state = await store.load();
+    sendJson(res, 200, { parameterSets: Object.values(state.eclParameterSets ?? {}) });
+    return;
+  }
+
+  if (method === "POST" && path === "/accounting/ecl-parameter-sets") {
+    const body = await readJson(req); const state = await store.load();
+    if (!body.parameterSetId || !body.proposedBy || !body.approvedBy || body.proposedBy === body.approvedBy || !body.approvalRef || !Number.isInteger(body.pdBps) || !Number.isInteger(body.lgdBps) || body.pdBps < 0 || body.pdBps > 10000 || body.lgdBps < 0 || body.lgdBps > 10000) { sendJson(res, 422, { error: { code: "ecl_parameter_set_blocked", message: "ID, independent proposer/approver, approvalRef, and PD/LGD bps are required." } }); return; }
+    const existing = state.eclParameterSets?.[body.parameterSetId]; if (existing) { sendJson(res, 200, { parameterSet: existing, idempotent: true }); return; }
+    const parameterSet = { parameterSetId: body.parameterSetId, version: body.version ?? 1, pdBps: body.pdBps, lgdBps: body.lgdBps, effectiveFrom: body.effectiveFrom ?? new Date().toISOString().slice(0, 10), proposedBy: body.proposedBy, approvedBy: body.approvedBy, approvalRef: body.approvalRef, status: "approved", approvedAt: new Date().toISOString() };
+    await store.save(appendEvent({ ...state, eclParameterSets: { ...(state.eclParameterSets ?? {}), [parameterSet.parameterSetId]: parameterSet } }, { type: "finance.ecl.parameter_set.approved", parameterSetId: parameterSet.parameterSetId, version: parameterSet.version, approvedBy: parameterSet.approvedBy }));
+    sendJson(res, 201, { parameterSet, idempotent: false }); return;
+  }
+
+  if (method === "GET" && path === "/accounting/ecl-provisions") {
+    const state = await store.load(); const loanAccountId = url.searchParams.get("loanAccountId");
+    const provisions = Object.values(state.eclProvisions ?? {}).filter((record) => !loanAccountId || record.loanAccountId === loanAccountId);
+    sendJson(res, 200, { count: provisions.length, provisions }); return;
+  }
+
+  if (method === "GET" && path === "/accounting/eir-amortizations") {
+    const state = await store.load(); sendJson(res, 200, { count: Object.keys(state.eirAmortizations ?? {}).length, amortizations: Object.values(state.eirAmortizations ?? {}) }); return;
+  }
+
+  if (method === "POST" && path === "/accounting/eir-amortizations") {
+    const body = await readJson(req); const state = await store.load(); const account = state.loanAccounts[body.loanAccountId];
+    const start = new Date(body.periodStart); const end = new Date(body.periodEnd); const days = Math.ceil((end - start) / 86400000);
+    if (!body.amortizationId || !account || !Number.isFinite(body.openingAmortizedCost) || body.openingAmortizedCost <= 0 || !Number.isInteger(body.effectiveInterestRateBps) || body.effectiveInterestRateBps < 0 || !Number.isFinite(body.contractualInterest) || body.contractualInterest < 0 || days <= 0 || !body.proposedBy || !body.approvedBy || body.proposedBy === body.approvedBy || !body.approvalRef) { sendJson(res, 422, { error: { code: "eir_amortization_blocked", message: "Loan, valid period/carrying amount/EIR/cash interest, and independent approval are required." } }); return; }
+    if (isAccountingDateClosed(state, body.periodEnd)) { sendJson(res, 422, { error: { code: "eir_amortization_closed_period", message: "EIR amortization cannot be posted in a closed period." } }); return; }
+    const existing = state.eirAmortizations?.[body.amortizationId]; if (existing) { sendJson(res, 200, { amortization: existing, idempotent: true }); return; }
+    const eirIncomePaise = Math.round(Math.round(body.openingAmortizedCost * 100) * body.effectiveInterestRateBps * days / 3650000); const contractualPaise = Math.round(body.contractualInterest * 100); const amortizedPaise = eirIncomePaise - contractualPaise;
+    if (amortizedPaise < 0) { sendJson(res, 422, { error: { code: "eir_amortization_blocked", message: "This first slice requires EIR income to be at least contractual interest." } }); return; }
+    const amortization = { amortizationId: body.amortizationId, loanAccountId: body.loanAccountId, periodStart: start.toISOString(), periodEnd: end.toISOString(), days, openingAmortizedCost: body.openingAmortizedCost, effectiveInterestRateBps: body.effectiveInterestRateBps, contractualInterest: contractualPaise / 100, eirInterestIncome: eirIncomePaise / 100, amortizedAmount: amortizedPaise / 100, closingAmortizedCost: (Math.round(body.openingAmortizedCost * 100) + amortizedPaise) / 100, proposedBy: body.proposedBy, approvedBy: body.approvedBy, approvalRef: body.approvalRef };
+    await store.save(appendEvent({ ...state, eirAmortizations: { ...(state.eirAmortizations ?? {}), [amortization.amortizationId]: amortization } }, { type: "finance.eir.amortization_posted", amortizationId: amortization.amortizationId, loanAccountId: amortization.loanAccountId, amount: amortization.amortizedAmount, approvedBy: amortization.approvedBy }));
+    sendJson(res, 201, { amortization, idempotent: false }); return;
+  }
+
+  if (method === "GET" && path === "/accounting/funding-facilities") {
+    const state = await store.load(); sendJson(res, 200, { count: Object.keys(state.fundingFacilities ?? {}).length, facilities: Object.values(state.fundingFacilities ?? {}) }); return;
+  }
+
+  if (method === "POST" && path === "/accounting/funding-facilities") {
+    const body = await readJson(req); const state = await store.load();
+    if (!body.facilityId || !body.lenderId || !body.maturityDate || !Number.isFinite(body.limitAmount) || body.limitAmount <= 0 || !Number.isFinite(body.outstandingAmount) || body.outstandingAmount < 0 || body.outstandingAmount > body.limitAmount || !Number.isInteger(body.annualCostBps) || body.annualCostBps < 0 || !body.proposedBy || !body.approvedBy || body.proposedBy === body.approvedBy || !body.approvalRef) { sendJson(res, 422, { error: { code: "funding_facility_blocked", message: "Valid facility economics and independent approval are required." } }); return; }
+    const existing = state.fundingFacilities?.[body.facilityId]; if (existing) { sendJson(res, 200, { facility: existing, idempotent: true }); return; }
+    const facility = { facilityId: body.facilityId, lenderId: body.lenderId, facilityType: body.facilityType ?? "term_borrowing", currency: "INR", limitAmount: body.limitAmount, outstandingAmount: body.outstandingAmount, annualCostBps: body.annualCostBps, startDate: body.startDate ?? new Date().toISOString().slice(0, 10), maturityDate: body.maturityDate, proposedBy: body.proposedBy, approvedBy: body.approvedBy, approvalRef: body.approvalRef, status: "active" };
+    await store.save(appendEvent({ ...state, fundingFacilities: { ...(state.fundingFacilities ?? {}), [facility.facilityId]: facility } }, { type: "finance.funding_facility.approved", facilityId: facility.facilityId, lenderId: facility.lenderId, outstandingAmount: facility.outstandingAmount }));
+    sendJson(res, 201, { facility, idempotent: false }); return;
+  }
+
+  if (method === "POST" && path === "/accounting/funding-allocations") {
+    const body = await readJson(req); const state = await store.load(); const facility = state.fundingFacilities?.[body.facilityId]; const account = state.loanAccounts[body.loanAccountId];
+    const allocatedPaise = Object.values(state.loanFundingAllocations ?? {}).filter((item) => item.facilityId === body.facilityId).reduce((sum, item) => sum + Math.round(item.amount * 100), 0);
+    if (!body.allocationId || !facility || !account || !Number.isFinite(body.amount) || body.amount <= 0 || allocatedPaise + Math.round(body.amount * 100) > Math.round(facility.outstandingAmount * 100) || !body.allocatedBy || !body.approvalRef) { sendJson(res, 422, { error: { code: "funding_allocation_blocked", message: "Valid facility, loan, available amount, allocator, and approval are required." } }); return; }
+    const existing = state.loanFundingAllocations?.[body.allocationId]; if (existing) { sendJson(res, 200, { allocation: existing, idempotent: true }); return; }
+    const allocation = { allocationId: body.allocationId, facilityId: body.facilityId, loanAccountId: body.loanAccountId, amount: Math.round(body.amount * 100) / 100, allocatedAt: body.allocatedAt ?? new Date().toISOString(), allocatedBy: body.allocatedBy, approvalRef: body.approvalRef };
+    await store.save(appendEvent({ ...state, loanFundingAllocations: { ...(state.loanFundingAllocations ?? {}), [allocation.allocationId]: allocation } }, { type: "finance.loan_funding.allocated", allocationId: allocation.allocationId, facilityId: allocation.facilityId, loanAccountId: allocation.loanAccountId, amount: allocation.amount }));
+    sendJson(res, 201, { allocation, idempotent: false }); return;
+  }
+
+  if (method === "GET" && path === "/accounting/alm-report") {
+    const state = await store.load(); const asOf = url.searchParams.get("asOf") ? new Date(url.searchParams.get("asOf")) : new Date(); sendJson(res, 200, buildAlmReport(state, asOf)); return;
+  }
+
+  if (method === "GET" && path === "/accounting/profitability-report") {
+    const state = await store.load(); const asOf = url.searchParams.get("asOf") ? new Date(url.searchParams.get("asOf")) : new Date(); const capitalBps = Number(url.searchParams.get("economicCapitalBps") ?? 1000);
+    if (!Number.isInteger(capitalBps) || capitalBps <= 0) { sendJson(res, 422, { error: { code: "profitability_report_blocked", message: "economicCapitalBps must be a positive integer." } }); return; }
+    sendJson(res, 200, buildProfitabilityReport(state, asOf, capitalBps)); return;
+  }
+
+  if (method === "GET" && path === "/accounting/tax/gst-return-data") {
+    const from = url.searchParams.get("from"); const to = url.searchParams.get("to");
+    if (!from || !to) { sendJson(res, 422, { error: { code: "gst_return_blocked", message: "from and to dates are required." } }); return; }
+    const state = await store.load(); sendJson(res, 200, buildGstReturnData(state.gstInvoices, state.gstCreditNotes, from, to)); return;
+  }
+
+  if (method === "GET" && path === "/accounting/tax/gst-invoices") {
+    const state = await store.load(); sendJson(res, 200, { count: Object.keys(state.gstInvoices ?? {}).length, invoices: Object.values(state.gstInvoices ?? {}) }); return;
+  }
+
+  if (method === "POST" && path === "/accounting/tax/gst-invoices") {
+    const body = await readJson(req); const state = await store.load(); const account = state.loanAccounts[body.loanAccountId];
+    const charge = account?.ledger?.find((event) => event.eventId === body.chargeEventId && event.type === "charge_assessed");
+    if (!body.invoiceId || !body.invoiceNumber || !body.issuedAt || !charge?.gstApplicable || !body.issuedBy || !body.supplierState || !body.placeOfSupply) { sendJson(res, 422, { error: { code: "gst_invoice_blocked", message: "A taxable charge, invoice identifiers, issue date, issuer, supplier state, and place of supply are required." } }); return; }
+    if (isAccountingDateClosed(state, body.issuedAt)) { sendJson(res, 422, { error: { code: "gst_invoice_closed_period", message: "GST invoice cannot be issued in a closed period." } }); return; }
+    const existing = state.gstInvoices?.[body.invoiceId]; if (existing) { sendJson(res, 200, { invoice: existing, idempotent: true }); return; }
+    if (Object.values(state.gstInvoices ?? {}).some((invoice) => invoice.invoiceNumber === body.invoiceNumber || invoice.chargeEventId === body.chargeEventId)) { sendJson(res, 409, { error: { code: "gst_invoice_conflict", message: "Invoice number and charge event must be unique." } }); return; }
+    const gstPaise = Math.round(charge.gstAmount * 100); const intraState = body.supplierState === body.placeOfSupply;
+    const cgstPaise = intraState ? Math.floor(gstPaise / 2) : 0; const sgstPaise = intraState ? gstPaise - cgstPaise : 0;
+    const invoice = { invoiceId: body.invoiceId, invoiceNumber: body.invoiceNumber, loanAccountId: body.loanAccountId, chargeEventId: body.chargeEventId, issuedAt: new Date(body.issuedAt).toISOString(), issuedBy: body.issuedBy, recipientGstin: body.recipientGstin ?? null, supplierState: body.supplierState, placeOfSupply: body.placeOfSupply, supplyType: intraState ? "intra_state" : "inter_state", taxableValue: charge.baseAmount, gstAmount: charge.gstAmount, cgstAmount: cgstPaise / 100, sgstAmount: sgstPaise / 100, igstAmount: intraState ? 0 : gstPaise / 100, grossAmount: charge.amount, gstRateBps: charge.gstRateBps, accountingAccounts: account.accountingProfile?.accounts ?? null, status: "issued" };
+    await store.save(appendEvent({ ...state, gstInvoices: { ...(state.gstInvoices ?? {}), [invoice.invoiceId]: invoice } }, { type: "finance.gst.invoice_issued", invoiceId: invoice.invoiceId, invoiceNumber: invoice.invoiceNumber, loanAccountId: invoice.loanAccountId, gstAmount: invoice.gstAmount }));
+    sendJson(res, 201, { invoice, idempotent: false }); return;
+  }
+
+  if (method === "POST" && path === "/accounting/tax/gst-credit-notes") {
+    const body = await readJson(req); const state = await store.load(); const invoice = state.gstInvoices?.[body.invoiceId];
+    if (!body.creditNoteId || !body.creditNoteNumber || !body.issuedAt || !body.reason || !body.proposedBy || !body.approvedBy || body.proposedBy === body.approvedBy || !body.approvalRef || !invoice) { sendJson(res, 422, { error: { code: "gst_credit_note_blocked", message: "Invoice, credit-note identifiers, reason, date, and independent approval are required." } }); return; }
+    if (isAccountingDateClosed(state, body.issuedAt)) { sendJson(res, 422, { error: { code: "gst_credit_note_closed_period", message: "GST credit note cannot be issued in a closed period." } }); return; }
+    const existing = state.gstCreditNotes?.[body.creditNoteId]; if (existing) { sendJson(res, 200, { creditNote: existing, idempotent: true }); return; }
+    if (Object.values(state.gstCreditNotes ?? {}).some((note) => note.invoiceId === body.invoiceId || note.creditNoteNumber === body.creditNoteNumber)) { sendJson(res, 409, { error: { code: "gst_credit_note_conflict", message: "Invoice already credited or credit-note number already exists." } }); return; }
+    const creditNote = { creditNoteId: body.creditNoteId, creditNoteNumber: body.creditNoteNumber, invoiceId: invoice.invoiceId, loanAccountId: invoice.loanAccountId, issuedAt: new Date(body.issuedAt).toISOString(), reason: body.reason, taxableValue: invoice.taxableValue, gstAmount: invoice.gstAmount, cgstAmount: invoice.cgstAmount, sgstAmount: invoice.sgstAmount, igstAmount: invoice.igstAmount, grossAmount: invoice.grossAmount, gstRateBps: invoice.gstRateBps, accountingAccounts: invoice.accountingAccounts, proposedBy: body.proposedBy, approvedBy: body.approvedBy, approvalRef: body.approvalRef, status: "issued" };
+    await store.save(appendEvent({ ...state, gstInvoices: { ...state.gstInvoices, [invoice.invoiceId]: { ...invoice, status: "credited", creditNoteId: creditNote.creditNoteId } }, gstCreditNotes: { ...(state.gstCreditNotes ?? {}), [creditNote.creditNoteId]: creditNote } }, { type: "finance.gst.credit_note_issued", creditNoteId: creditNote.creditNoteId, invoiceId: invoice.invoiceId, gstAmount: creditNote.gstAmount, approvedBy: creditNote.approvedBy }));
+    sendJson(res, 201, { creditNote, idempotent: false }); return;
+  }
+
+  if (method === "GET" && path === "/accounting/tax/withholdings") {
+    const state = await store.load(); sendJson(res, 200, { count: Object.keys(state.taxWithholdings ?? {}).length, withholdings: Object.values(state.taxWithholdings ?? {}) }); return;
+  }
+
+  if (method === "GET" && path === "/accounting/tax/tds-return-data") {
+    const from = url.searchParams.get("from"); const to = url.searchParams.get("to");
+    if (!from || !to) { sendJson(res, 422, { error: { code: "tds_return_blocked", message: "from and to dates are required." } }); return; }
+    const state = await store.load(); sendJson(res, 200, buildTdsReturnData(state.taxWithholdings, state.tdsCertificates, from, to)); return;
+  }
+
+  if (method === "GET" && path === "/accounting/tax/filings") {
+    const state = await store.load(); sendJson(res, 200, { count: Object.keys(state.taxFilings ?? {}).length, filings: Object.values(state.taxFilings ?? {}) }); return;
+  }
+
+  if (method === "POST" && path === "/accounting/tax/filings") {
+    const body = await readJson(req); const state = await store.load();
+    if (!body.filingId || !["gst", "tds"].includes(body.taxType) || !body.periodFrom || !body.periodTo || !body.proposedBy || !body.approvedBy || body.proposedBy === body.approvedBy || !body.approvalRef) { sendJson(res, 422, { error: { code: "tax_filing_blocked", message: "Filing identifiers, type, period, and independent approval are required." } }); return; }
+    const existing = state.taxFilings?.[body.filingId]; if (existing) { sendJson(res, 200, { filing: existing, idempotent: true }); return; }
+    const payload = body.taxType === "gst" ? buildGstReturnData(state.gstInvoices, state.gstCreditNotes, body.periodFrom, body.periodTo) : buildTdsReturnData(state.taxWithholdings, state.tdsCertificates, body.periodFrom, body.periodTo);
+    const filing = { filingId: body.filingId, taxType: body.taxType, periodFrom: body.periodFrom, periodTo: body.periodTo, payload, payloadChecksum: createHash("sha256").update(JSON.stringify(payload)).digest("hex"), proposedBy: body.proposedBy, approvedBy: body.approvedBy, approvalRef: body.approvalRef, status: "approved_for_filing", createdAt: new Date().toISOString(), acknowledgement: null };
+    await store.save(appendEvent({ ...state, taxFilings: { ...(state.taxFilings ?? {}), [filing.filingId]: filing } }, { type: "finance.tax.filing_approved", filingId: filing.filingId, taxType: filing.taxType, periodTo: filing.periodTo, payloadChecksum: filing.payloadChecksum }));
+    sendJson(res, 201, { filing, idempotent: false }); return;
+  }
+
+  const taxFilingAcknowledgementMatch = path.match(/^\/accounting\/tax\/filings\/([^/]+)\/acknowledgement$/);
+  if (method === "POST" && taxFilingAcknowledgementMatch) {
+    const body = await readJson(req); const state = await store.load(); const filingId = decodeURIComponent(taxFilingAcknowledgementMatch[1]); const filing = state.taxFilings?.[filingId];
+    if (!filing) { sendJson(res, 404, { error: { code: "not_found", message: "Tax filing not found." } }); return; }
+    if (!body.acknowledgementRef || !["accepted", "rejected"].includes(body.status) || !body.recordedBy) { sendJson(res, 422, { error: { code: "tax_acknowledgement_blocked", message: "Acknowledgement reference, accepted/rejected status, and recorder are required." } }); return; }
+    if (filing.acknowledgement) { sendJson(res, 200, { filing, idempotent: true }); return; }
+    const updated = { ...filing, status: body.status, acknowledgement: { acknowledgementRef: body.acknowledgementRef, status: body.status, receivedAt: body.receivedAt ?? new Date().toISOString(), recordedBy: body.recordedBy, rejectionReason: body.rejectionReason ?? null } };
+    await store.save(appendEvent({ ...state, taxFilings: { ...state.taxFilings, [filingId]: updated } }, { type: "finance.tax.filing_acknowledged", filingId, taxType: filing.taxType, status: updated.status, acknowledgementRef: body.acknowledgementRef }));
+    sendJson(res, 200, { filing: updated, idempotent: false }); return;
+  }
+
+  if (method === "POST" && path === "/accounting/tax/withholdings") {
+    const body = await readJson(req); const state = await store.load();
+    if (!body.withholdingId || !body.section || !body.payeeId || !body.expenseAccount || !body.paymentDate || !Number.isFinite(body.grossAmount) || body.grossAmount <= 0 || !Number.isInteger(body.rateBps) || body.rateBps < 0 || body.rateBps > 10000 || !body.proposedBy || !body.approvedBy || body.proposedBy === body.approvedBy || !body.approvalRef) { sendJson(res, 422, { error: { code: "tax_withholding_blocked", message: "Valid payment, TDS section/rate, payee, account, and independent approval evidence are required." } }); return; }
+    if (isAccountingDateClosed(state, body.paymentDate)) { sendJson(res, 422, { error: { code: "tax_withholding_closed_period", message: "Tax withholding cannot be recorded in a closed period." } }); return; }
+    const existing = state.taxWithholdings?.[body.withholdingId]; if (existing) { sendJson(res, 200, { withholding: existing, idempotent: true }); return; }
+    const grossPaise = Math.round(body.grossAmount * 100); const tdsPaise = Math.round(grossPaise * body.rateBps / 10000);
+    const withholding = { withholdingId: body.withholdingId, section: body.section, payeeId: body.payeeId, expenseAccount: body.expenseAccount, paymentDate: body.paymentDate, grossAmount: grossPaise / 100, rateBps: body.rateBps, tdsAmount: tdsPaise / 100, netAmount: (grossPaise - tdsPaise) / 100, proposedBy: body.proposedBy, approvedBy: body.approvedBy, approvalRef: body.approvalRef, createdAt: new Date().toISOString() };
+    await store.save(appendEvent({ ...state, taxWithholdings: { ...(state.taxWithholdings ?? {}), [withholding.withholdingId]: withholding } }, { type: "finance.tax.withholding_recorded", withholdingId: withholding.withholdingId, section: withholding.section, tdsAmount: withholding.tdsAmount, approvedBy: withholding.approvedBy }));
+    sendJson(res, 201, { withholding, idempotent: false }); return;
+  }
+
+  const tdsCertificateMatch = path.match(/^\/accounting\/tax\/withholdings\/([^/]+)\/certificate$/);
+  if (method === "POST" && tdsCertificateMatch) {
+    const body = await readJson(req); const state = await store.load(); const withholdingId = decodeURIComponent(tdsCertificateMatch[1]); const withholding = state.taxWithholdings?.[withholdingId];
+    if (!withholding) { sendJson(res, 404, { error: { code: "not_found", message: "Tax withholding not found." } }); return; }
+    if (!body.certificateId || !body.certificateNumber || !body.issuedAt || !body.issuedBy) { sendJson(res, 422, { error: { code: "tds_certificate_blocked", message: "Certificate identifiers, issue date, and issuer are required." } }); return; }
+    const existing = state.tdsCertificates?.[body.certificateId]; if (existing) { sendJson(res, 200, { certificate: existing, idempotent: true }); return; }
+    if (Object.values(state.tdsCertificates ?? {}).some((certificate) => certificate.withholdingId === withholdingId || certificate.certificateNumber === body.certificateNumber)) { sendJson(res, 409, { error: { code: "tds_certificate_conflict", message: "Withholding already certified or certificate number already exists." } }); return; }
+    const certificate = { certificateId: body.certificateId, certificateNumber: body.certificateNumber, withholdingId, payeeId: withholding.payeeId, section: withholding.section, grossAmount: withholding.grossAmount, tdsAmount: withholding.tdsAmount, issuedAt: new Date(body.issuedAt).toISOString(), issuedBy: body.issuedBy };
+    await store.save(appendEvent({ ...state, tdsCertificates: { ...(state.tdsCertificates ?? {}), [certificate.certificateId]: certificate } }, { type: "finance.tax.tds_certificate_issued", certificateId: certificate.certificateId, withholdingId, certificateNumber: certificate.certificateNumber }));
+    sendJson(res, 201, { certificate, idempotent: false }); return;
+  }
+
+  if (method === "GET" && path === "/accounting/irac-income-adjustments") {
+    const state = await store.load(); sendJson(res, 200, { count: Object.keys(state.iracIncomeAdjustments ?? {}).length, adjustments: Object.values(state.iracIncomeAdjustments ?? {}) }); return;
+  }
+
+  if (method === "GET" && path === "/accounting/irac-memorandum-interest") {
+    const state = await store.load(); sendJson(res, 200, { count: Object.keys(state.iracMemorandumInterest ?? {}).length, records: Object.values(state.iracMemorandumInterest ?? {}) }); return;
+  }
+
+  if (method === "POST" && path === "/accounting/irac-memorandum-interest") {
+    const body = await readJson(req); const state = await store.load(); const account = state.loanAccounts[body.loanAccountId];
+    if (!account) { sendJson(res, 404, { error: { code: "not_found", message: "Loan account not found." } }); return; }
+    const asOf = body.asOf ? new Date(body.asOf) : new Date(); const asset = classifyLoanAsset(account, asOf);
+    if (!body.memorandumId || asset.assetClass !== "npa" || !Number.isFinite(body.amount) || body.amount <= 0 || !body.recordedBy || !body.policyRef) { sendJson(res, 422, { error: { code: "memorandum_interest_blocked", message: "NPA account, positive amount, recorder, and policy reference are required." } }); return; }
+    if (isAccountingDateClosed(state, asOf.toISOString().slice(0, 10))) { sendJson(res, 422, { error: { code: "memorandum_interest_closed_period", message: "Memorandum interest cannot be recorded in a closed period." } }); return; }
+    const existing = state.iracMemorandumInterest?.[body.memorandumId]; if (existing) { sendJson(res, 200, { memorandumInterest: existing, idempotent: true }); return; }
+    const memorandumInterest = { memorandumId: body.memorandumId, loanAccountId: body.loanAccountId, asOf: asOf.toISOString(), amount: Math.round(body.amount * 100) / 100, recordedBy: body.recordedBy, policyRef: body.policyRef, status: "memorandum", createdAt: new Date().toISOString() };
+    await store.save(appendEvent({ ...state, iracMemorandumInterest: { ...(state.iracMemorandumInterest ?? {}), [memorandumInterest.memorandumId]: memorandumInterest } }, { type: "finance.irac.memorandum_interest_recorded", memorandumId: memorandumInterest.memorandumId, loanAccountId: memorandumInterest.loanAccountId, amount: memorandumInterest.amount }));
+    sendJson(res, 201, { memorandumInterest, idempotent: false }); return;
+  }
+
+  if (method === "POST" && path === "/accounting/irac-recovery-recognitions") {
+    const body = await readJson(req); const state = await store.load(); const account = state.loanAccounts[body.loanAccountId]; const reversal = state.iracIncomeAdjustments?.[body.adjustmentId];
+    const payment = account?.ledger?.find((event) => event.eventId === body.paymentEventId && ["payment", "cash_recovery_payment"].includes(event.type));
+    const alreadyRecognized = Object.values(state.iracRecoveryRecognitions ?? {}).filter((record) => record.adjustmentId === body.adjustmentId).reduce((sum, record) => sum + record.amount, 0);
+    const available = Math.min(reversal?.movementAmount ?? 0, payment?.interestCredit ?? 0) - alreadyRecognized;
+    if (!body.recognitionId || !account || !reversal || reversal.loanAccountId !== body.loanAccountId || !payment || !Number.isFinite(body.amount) || body.amount <= 0 || body.amount > available || !body.approvedBy || !body.approvalRef) { sendJson(res, 422, { error: { code: "irac_recovery_recognition_blocked", message: "Linked reversal, interest-bearing payment, available amount, and approval evidence are required." }, available: Math.max(0, available) }); return; }
+    const existing = state.iracRecoveryRecognitions?.[body.recognitionId]; if (existing) { sendJson(res, 200, { recognition: existing, idempotent: true }); return; }
+    const recognition = { recognitionId: body.recognitionId, loanAccountId: body.loanAccountId, adjustmentId: body.adjustmentId, paymentEventId: body.paymentEventId, amount: Math.round(body.amount * 100) / 100, recognizedAt: new Date().toISOString(), approvedBy: body.approvedBy, approvalRef: body.approvalRef };
+    await store.save(appendEvent({ ...state, iracRecoveryRecognitions: { ...(state.iracRecoveryRecognitions ?? {}), [recognition.recognitionId]: recognition } }, { type: "finance.irac.recovery_recognized", recognitionId: recognition.recognitionId, loanAccountId: recognition.loanAccountId, paymentEventId: recognition.paymentEventId, amount: recognition.amount }));
+    sendJson(res, 201, { recognition, idempotent: false }); return;
+  }
+
+  if (method === "POST" && path === "/accounting/irac-income-adjustments") {
+    const body = await readJson(req); const state = await store.load(); const account = state.loanAccounts[body.loanAccountId];
+    if (!account) { sendJson(res, 404, { error: { code: "not_found", message: "Loan account not found." } }); return; }
+    const asOf = body.asOf ? new Date(body.asOf) : new Date(); const asset = classifyLoanAsset(account, asOf); const balance = summarizeLoanAccount(account, asOf);
+    const priorReversals = Object.values(state.iracIncomeAdjustments ?? {}).filter((record) => record.loanAccountId === body.loanAccountId).reduce((sum, record) => sum + record.movementAmount, 0);
+    const recognizedInterestAvailable = Math.round(Math.max(0, balance.interestAccrued - balance.interestPaid - priorReversals) * 100) / 100;
+    if (asset.assetClass !== "npa" || !Number.isFinite(body.amount) || body.amount <= 0 || body.amount > recognizedInterestAvailable || !body.adjustmentId || !body.proposedBy || !body.approvedBy || body.proposedBy === body.approvedBy || !body.approvalRef) { sendJson(res, 422, { error: { code: "irac_adjustment_blocked", message: "NPA status, accrued-uncollected interest, and independent approval evidence are required." }, recognizedInterestAvailable }); return; }
+    if (isAccountingDateClosed(state, asOf.toISOString().slice(0, 10))) { sendJson(res, 422, { error: { code: "irac_adjustment_closed_period", message: "IRAC adjustment cannot be recorded in a closed period." } }); return; }
+    const existing = state.iracIncomeAdjustments?.[body.adjustmentId]; if (existing) { sendJson(res, 200, { adjustment: existing, idempotent: true }); return; }
+    const adjustment = { adjustmentId: body.adjustmentId, loanAccountId: body.loanAccountId, asOf: asOf.toISOString(), movementAmount: Math.round(body.amount * 100) / 100, recognizedInterestAvailable, assetClass: asset.assetClass, reason: body.reason ?? "npa_income_reversal", proposedBy: body.proposedBy, approvedBy: body.approvedBy, approvalRef: body.approvalRef, createdAt: new Date().toISOString() };
+    await store.save(appendEvent({ ...state, iracIncomeAdjustments: { ...(state.iracIncomeAdjustments ?? {}), [adjustment.adjustmentId]: adjustment } }, { type: "finance.irac.income_reversed", adjustmentId: adjustment.adjustmentId, loanAccountId: adjustment.loanAccountId, amount: adjustment.movementAmount, approvedBy: adjustment.approvedBy }));
+    sendJson(res, 201, { adjustment, idempotent: false }); return;
+  }
+
+  if (method === "POST" && path === "/accounting/posting-runs") {
+    const body = await readJson(req);
+    if (!body.approvedBy || !body.throughDate || Number.isNaN(new Date(body.throughDate).getTime())) {
+      sendJson(res, 422, { error: { code: "posting_run_blocked", message: "approvedBy and a valid throughDate are required." } });
+      return;
+    }
+    const state = await store.load();
+    const closedThroughDate = Object.values(state.businessDateClosures ?? {}).filter((closure) => closure.status === "closed").map((closure) => closure.businessDate).sort().at(-1);
+    if (closedThroughDate && body.throughDate.slice(0, 10) <= closedThroughDate) { sendJson(res, 422, { error: { code: "posting_run_closed_period", message: `Posting through ${body.throughDate.slice(0, 10)} is blocked because business date ${closedThroughDate} is closed.` } }); return; }
+    const postingRunId = body.postingRunId ?? createLoanId("glpost");
+    const existing = state.accountingPostingRuns?.[postingRunId];
+    if (existing) { sendJson(res, 200, { postingRun: existing, idempotent: true }); return; }
+    const postedJournalIds = new Set(Object.values(state.accountingPostingRuns ?? {}).flatMap((run) => run.journals.map((journal) => journal.journalId)));
+    const cutoff = new Date(`${body.throughDate.slice(0, 10)}T23:59:59.999Z`).getTime();
+    const journals = Object.values(state.loanAccounts).flatMap(buildLoanJournalEntries).concat(buildFinanceJournalEntries(state), buildManagementFinanceJournals(state))
+      .filter((journal) => new Date(journal.eventDate).getTime() <= cutoff && !postedJournalIds.has(journal.journalId));
+    if (!journals.length) { sendJson(res, 422, { error: { code: "posting_run_empty", message: "No unposted journals exist through the requested date." } }); return; }
+    const debitTotal = journals.reduce((total, journal) => total + Math.round(journal.debitTotal * 100), 0) / 100;
+    const creditTotal = journals.reduce((total, journal) => total + Math.round(journal.creditTotal * 100), 0) / 100;
+    if (Math.round(debitTotal * 100) !== Math.round(creditTotal * 100)) { sendJson(res, 422, { error: { code: "posting_run_unbalanced", message: "Posting run is not balanced." } }); return; }
+    const postingRun = { postingRunId, throughDate: body.throughDate.slice(0, 10), approvedBy: body.approvedBy, approvalRef: body.approvalRef ?? null, postedAt: new Date().toISOString(), journals, debitTotal, creditTotal, status: "posted" };
+    await store.save(appendEvent({ ...state, accountingPostingRuns: { ...(state.accountingPostingRuns ?? {}), [postingRunId]: postingRun } }, { type: "accounting.posting_run.posted", postingRunId, throughDate: postingRun.throughDate, approvedBy: postingRun.approvedBy, journalCount: journals.length, debitTotal, creditTotal }));
+    sendJson(res, 201, { postingRun, idempotent: false });
+    return;
+  }
+
+  if (method === "GET" && path === "/accounting/reconciliation-certifications") {
+    const state = await store.load();
+    const certifications = Object.values(state.reconciliationCertifications ?? {}).sort((left, right) => right.businessDate.localeCompare(left.businessDate));
+    sendJson(res, 200, { count: certifications.length, certifications });
+    return;
+  }
+
+  if (method === "POST" && path === "/accounting/reconciliation-certifications") {
+    const body = await readJson(req);
+    const businessDate = String(body.businessDate ?? "").slice(0, 10);
+    if (!body.certifiedBy || !body.approvalRef || Number.isNaN(new Date(`${businessDate}T00:00:00.000Z`).getTime())) {
+      sendJson(res, 422, { error: { code: "reconciliation_certification_blocked", message: "businessDate, certifiedBy, and approvalRef are required." } });
+      return;
+    }
+    const state = await store.load();
+    const existing = state.reconciliationCertifications?.[businessDate];
+    if (existing) { sendJson(res, 200, { certification: existing, idempotent: true }); return; }
+    const cutoff = new Date(`${businessDate}T23:59:59.999Z`).getTime();
+    const postedJournalIds = new Set(Object.values(state.accountingPostingRuns ?? {}).flatMap((run) => run.journals.map((journal) => journal.journalId)));
+    const unpostedJournals = Object.values(state.loanAccounts).flatMap(buildLoanJournalEntries).concat(buildFinanceJournalEntries(state), buildManagementFinanceJournals(state)).filter((journal) => new Date(journal.eventDate).getTime() <= cutoff && !postedJournalIds.has(journal.journalId));
+    const paymentExceptions = Object.values(state.paymentReconciliations ?? {}).filter((record) => record.outcome === "exception" && new Date(record.settledAt ?? record.receivedAt).getTime() <= cutoff);
+    const bankExceptions = Object.values(state.bankReconciliations ?? {}).filter((record) => record.outcome === "exception" && new Date(record.valueDate ?? record.receivedAt).getTime() <= cutoff);
+    const unacknowledgedTaxFilings = Object.values(state.taxFilings ?? {}).filter((filing) => filing.periodTo <= businessDate && filing.status !== "accepted");
+    if (unpostedJournals.length || paymentExceptions.length || bankExceptions.length || unacknowledgedTaxFilings.length) {
+      sendJson(res, 422, { error: { code: "reconciliation_certification_blocked", message: "Finance close is blocked by unposted journals, reconciliation exceptions, or unacknowledged tax filings." }, blockers: { unpostedJournalCount: unpostedJournals.length, paymentExceptionCount: paymentExceptions.length, bankExceptionCount: bankExceptions.length, unacknowledgedTaxFilingCount: unacknowledgedTaxFilings.length } });
+      return;
+    }
+    const certification = { businessDate, certifiedBy: body.certifiedBy, approvalRef: body.approvalRef, certifiedAt: new Date().toISOString(), status: "certified", postingRunIds: Object.values(state.accountingPostingRuns ?? {}).filter((run) => run.throughDate <= businessDate).map((run) => run.postingRunId), paymentExceptionCount: 0, bankExceptionCount: 0 };
+    await store.save(appendEvent({ ...state, reconciliationCertifications: { ...(state.reconciliationCertifications ?? {}), [businessDate]: certification } }, { type: "accounting.reconciliation.certified", businessDate, certifiedBy: certification.certifiedBy, approvalRef: certification.approvalRef }));
+    sendJson(res, 201, { certification, idempotent: false });
+    return;
+  }
+
+  const businessDateCloseMatch = path.match(/^\/accounting\/business-dates\/(\d{4}-\d{2}-\d{2})\/close$/);
+  if (method === "POST" && businessDateCloseMatch) {
+    const body = await readJson(req);
+    const state = await store.load();
+    const businessDate = businessDateCloseMatch[1];
+    if (!body.closedBy || !body.approvalRef) { sendJson(res, 422, { error: { code: "business_date_close_blocked", message: "closedBy and approvalRef are required." } }); return; }
+    if (!state.reconciliationCertifications?.[businessDate]) { sendJson(res, 422, { error: { code: "business_date_close_blocked", message: "A reconciliation certification is required before close." } }); return; }
+    const existing = state.businessDateClosures?.[businessDate];
+    if (existing?.status === "closed") { sendJson(res, 200, { closure: existing, idempotent: true }); return; }
+    const closure = { businessDate, status: "closed", closedBy: body.closedBy, approvalRef: body.approvalRef, closedAt: new Date().toISOString(), reopenedAt: null, reopenedBy: null, reopenApprovalRef: null, reopenReason: null };
+    await store.save(appendEvent({ ...state, businessDateClosures: { ...(state.businessDateClosures ?? {}), [businessDate]: closure } }, { type: "accounting.business_date.closed", businessDate, closedBy: body.closedBy, approvalRef: body.approvalRef }));
+    sendJson(res, 201, { closure, idempotent: false });
+    return;
+  }
+
+  const businessDateReopenMatch = path.match(/^\/accounting\/business-dates\/(\d{4}-\d{2}-\d{2})\/reopen$/);
+  if (method === "POST" && businessDateReopenMatch) {
+    const body = await readJson(req);
+    const state = await store.load();
+    const businessDate = businessDateReopenMatch[1];
+    const existing = state.businessDateClosures?.[businessDate];
+    if (!existing || existing.status !== "closed") { sendJson(res, 422, { error: { code: "business_date_reopen_blocked", message: "Only a closed business date can be reopened." } }); return; }
+    if (!body.reopenedBy || !body.approvalRef || !body.reason || body.reopenedBy === existing.closedBy) { sendJson(res, 422, { error: { code: "business_date_reopen_blocked", message: "Independent reopenedBy, approvalRef, and reason are required." } }); return; }
+    const closure = { ...existing, status: "reopened", reopenedBy: body.reopenedBy, reopenApprovalRef: body.approvalRef, reopenReason: body.reason, reopenedAt: new Date().toISOString() };
+    await store.save(appendEvent({ ...state, businessDateClosures: { ...state.businessDateClosures, [businessDate]: closure } }, { type: "accounting.business_date.reopened", businessDate, reopenedBy: body.reopenedBy, approvalRef: body.approvalRef }));
+    sendJson(res, 200, { closure });
     return;
   }
 
@@ -4227,6 +4747,35 @@ async function route(req, res, dataDir, platformAdminKey) {
     return;
   }
 
+  const loanAccountEclMatch = path.match(/^\/loan-accounts\/([^/]+)\/ecl-assessment$/);
+  if (method === "GET" && loanAccountEclMatch) {
+    const state = await store.load();
+    const loanAccount = state.loanAccounts[decodeURIComponent(loanAccountEclMatch[1])];
+    if (!loanAccount) { sendJson(res, 404, { error: { code: "not_found", message: "Loan account not found." } }); return; }
+    const parameterSet = state.eclParameterSets?.[url.searchParams.get("parameterSetId")];
+    if (!parameterSet || parameterSet.status !== "approved") { sendJson(res, 422, { error: { code: "ecl_assessment_blocked", message: "An approved parameterSetId is required." } }); return; }
+    const asOf = url.searchParams.get("asOf") ? new Date(url.searchParams.get("asOf")) : new Date();
+    sendJson(res, 200, calculateEclAssessment(loanAccount, parameterSet, asOf));
+    return;
+  }
+
+  const loanAccountEclProvisionMatch = path.match(/^\/loan-accounts\/([^/]+)\/ecl-provisions$/);
+  if (method === "POST" && loanAccountEclProvisionMatch) {
+    const body = await readJson(req); const state = await store.load(); const loanAccountId = decodeURIComponent(loanAccountEclProvisionMatch[1]);
+    const loanAccount = state.loanAccounts[loanAccountId];
+    if (!loanAccount) { sendJson(res, 404, { error: { code: "not_found", message: "Loan account not found." } }); return; }
+    const parameterSet = state.eclParameterSets?.[body.parameterSetId];
+    if (!body.proposedBy || !body.approvedBy || body.proposedBy === body.approvedBy || !body.approvalRef || !parameterSet) { sendJson(res, 422, { error: { code: "ecl_provision_blocked", message: "Approved parameter set, independent proposer/approver, and approvalRef are required." } }); return; }
+    const provisionId = body.provisionId ?? createLoanId("ecl"); const existing = state.eclProvisions?.[provisionId];
+    if (existing) { sendJson(res, 200, { provision: existing, idempotent: true }); return; }
+    const asOf = body.asOf ? new Date(body.asOf) : new Date(); const assessment = calculateEclAssessment(loanAccount, parameterSet, asOf);
+    if (isAccountingDateClosed(state, asOf.toISOString().slice(0, 10))) { sendJson(res, 422, { error: { code: "ecl_provision_closed_period", message: "ECL provision cannot be recorded in a closed period." } }); return; }
+    const prior = Object.values(state.eclProvisions ?? {}).filter((record) => record.loanAccountId === loanAccountId).sort((left, right) => right.asOf.localeCompare(left.asOf))[0];
+    const provision = { provisionId, ...assessment, priorProvisionAmount: prior?.expectedCreditLoss ?? 0, movementAmount: Math.round((assessment.expectedCreditLoss - (prior?.expectedCreditLoss ?? 0)) * 100) / 100, proposedBy: body.proposedBy, approvedBy: body.approvedBy, approvalRef: body.approvalRef, createdAt: new Date().toISOString() };
+    await store.save(appendEvent({ ...state, eclProvisions: { ...(state.eclProvisions ?? {}), [provisionId]: provision } }, { type: "finance.ecl.provision_recorded", provisionId, loanAccountId, stage: provision.stage, expectedCreditLoss: provision.expectedCreditLoss, approvedBy: provision.approvedBy }));
+    sendJson(res, 201, { provision, idempotent: false }); return;
+  }
+
   const loanAccountCicSnapshotMatch = path.match(/^\/loan-accounts\/([^/]+)\/cic-snapshot$/);
   if (method === "GET" && loanAccountCicSnapshotMatch) {
     const state = await store.load();
@@ -4556,6 +5105,60 @@ async function route(req, res, dataDir, platformAdminKey) {
       paymentEvent: result.paymentEvent,
       summary: summarizeLoanAccount(stored, new Date(result.paymentEvent.eventDate))
     });
+    return;
+  }
+
+  const loanAccountRefundMatch = path.match(/^\/loan-accounts\/([^/]+)\/refunds$/);
+  if (method === "POST" && loanAccountRefundMatch) {
+    const body = await readJson(req);
+    const state = await store.load();
+    const loanAccountId = decodeURIComponent(loanAccountRefundMatch[1]);
+    const account = state.loanAccounts[loanAccountId];
+    if (!account) { sendJson(res, 404, { error: { code: "not_found", message: "Loan account not found." } }); return; }
+    const result = refundUnappliedPayment(account, body);
+    if (result.summary.status === "blocked") { sendJson(res, 422, { error: { code: "refund_blocked", message: "Refund is blocked by LMS findings." }, findings: result.findings }); return; }
+    await store.save(appendEvent({ ...state, loanAccounts: { ...state.loanAccounts, [loanAccountId]: result.loanAccount } }, { type: "loan_account.refund.posted", loanAccountId, eventId: result.refundEvent.eventId, refundRef: result.refundEvent.refundRef, amount: result.refundEvent.amount }));
+    sendJson(res, 200, { loanAccount: result.loanAccount, refundEvent: result.refundEvent, summary: summarizeLoanAccount(result.loanAccount) });
+    return;
+  }
+
+  const loanAccountDisbursementReturnMatch = path.match(/^\/loan-accounts\/([^/]+)\/disbursement-return$/);
+  if (method === "POST" && loanAccountDisbursementReturnMatch) {
+    const body = await readJson(req);
+    const state = await store.load();
+    const loanAccountId = decodeURIComponent(loanAccountDisbursementReturnMatch[1]);
+    const account = state.loanAccounts[loanAccountId];
+    if (!account) { sendJson(res, 404, { error: { code: "not_found", message: "Loan account not found." } }); return; }
+    const result = returnFailedDisbursement(account, body);
+    if (result.summary.status === "blocked") { sendJson(res, 422, { error: { code: "disbursement_return_blocked", message: "Failed disbursement return is blocked by LMS findings." }, findings: result.findings }); return; }
+    await store.save(appendEvent({ ...state, loanAccounts: { ...state.loanAccounts, [loanAccountId]: result.loanAccount } }, { type: "loan_account.disbursement_return.posted", loanAccountId, eventId: result.returnEvent.eventId, returnRef: result.returnEvent.returnRef, amount: result.returnEvent.amount }));
+    sendJson(res, 200, { loanAccount: result.loanAccount, returnEvent: result.returnEvent, summary: summarizeLoanAccount(result.loanAccount) });
+    return;
+  }
+
+  const loanAccountCoolingOffQuoteMatch = path.match(/^\/loan-accounts\/([^/]+)\/cooling-off-quote$/);
+  if (method === "GET" && loanAccountCoolingOffQuoteMatch) {
+    const state = await store.load();
+    const loanAccountId = decodeURIComponent(loanAccountCoolingOffQuoteMatch[1]);
+    const account = state.loanAccounts[loanAccountId];
+    if (!account) { sendJson(res, 404, { error: { code: "not_found", message: "Loan account not found." } }); return; }
+    const result = quoteCoolingOffCancellation(account, { asOf: url.searchParams.get("asOf") });
+    if (result.summary.status === "blocked") { sendJson(res, 422, { error: { code: "cooling_off_quote_blocked", message: "Cooling-off quote is unavailable." }, findings: result.findings }); return; }
+    sendJson(res, 200, result);
+    return;
+  }
+
+  const loanAccountCoolingOffCancellationMatch = path.match(/^\/loan-accounts\/([^/]+)\/cooling-off-cancellation$/);
+  if (method === "POST" && loanAccountCoolingOffCancellationMatch) {
+    const body = await readJson(req);
+    const state = await store.load();
+    const loanAccountId = decodeURIComponent(loanAccountCoolingOffCancellationMatch[1]);
+    const account = state.loanAccounts[loanAccountId];
+    if (!account) { sendJson(res, 404, { error: { code: "not_found", message: "Loan account not found." } }); return; }
+    const result = executeCoolingOffCancellation(account, body);
+    if (result.summary.status === "blocked") { sendJson(res, 422, { error: { code: "cooling_off_cancellation_blocked", message: "Cooling-off cancellation is blocked." }, findings: result.findings, quote: result.quote }); return; }
+    await store.save(appendEvent({ ...state, loanAccounts: { ...state.loanAccounts, [loanAccountId]: result.loanAccount } }, { type: "loan_account.cooling_off.cancelled", loanAccountId, eventId: result.cancellationEvent.eventId, paymentRef: result.cancellationEvent.coolingOffPaymentRef, amount: result.cancellationEvent.amount }));
+    sendJson(res, 200, { loanAccount: result.loanAccount, cancellationEvent: result.cancellationEvent, quote: result.quote });
     return;
   }
 
@@ -7299,6 +7902,15 @@ function sendJson(res, statusCode, payload, headers = {}) {
   res.end(body);
 }
 
+function isAccountingDateClosed(state, date) {
+  const latestClosed = Object.values(state.businessDateClosures ?? {})
+    .filter((closure) => closure.status === "closed")
+    .map((closure) => closure.businessDate)
+    .sort()
+    .at(-1);
+  return Boolean(latestClosed && String(date).slice(0, 10) <= latestClosed);
+}
+
 function auditFiltersFromUrl(url) {
   const filters = {};
   for (const key of ["type", "subjectId", "from", "to"]) {
@@ -7534,6 +8146,28 @@ function buildUpiCollectRecord(input, providerResult, now = new Date()) {
     dataResidencyCountry: providerResult.dataResidencyCountry ?? "IN",
     createdAt: providerResult.createdAt ?? now.toISOString(),
     expiresAt: input.expiresAt ?? null
+  };
+}
+
+function buildNachPresentmentRecord(input, mandate, providerResult, now = new Date()) {
+  return {
+    paymentRailId: input.paymentRailId ?? input.presentmentId ?? createLoanId("payrail"),
+    type: "nach_presentment",
+    channel: "nach",
+    borrowerId: input.borrowerId ?? mandate.borrowerId ?? null,
+    applicationId: input.applicationId ?? mandate.applicationId ?? null,
+    loanAccountId: input.loanAccountId ?? mandate.loanAccountId ?? null,
+    mandateId: mandate.paymentRailId,
+    mandateRef: mandate.providerRef,
+    amount: Number(input.amount),
+    currency: input.currency ?? mandate.currency ?? "INR",
+    purpose: input.purpose ?? "repayment",
+    provider: providerResult.provider,
+    providerRef: providerResult.presentmentRef ?? providerResult.ref ?? providerResult.providerRef ?? null,
+    status: providerResult.status ?? (providerResult.success ? "pending" : "failed"),
+    dataResidencyCountry: providerResult.dataResidencyCountry ?? "IN",
+    createdAt: providerResult.createdAt ?? now.toISOString(),
+    dueDate: input.dueDate ?? null
   };
 }
 

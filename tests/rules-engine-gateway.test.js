@@ -5,6 +5,7 @@ import { assessEligibilityGated } from "../apps/api/src/rules-engine.js";
 describe("Rules Engine Gateway Client", () => {
   const originalFetch = globalThis.fetch;
   const originalEnvMode = process.env.LOANOS_RULES_ENGINE;
+  const originalEngineUrls = process.env.LOANOS_RULES_ENGINE_URLS;
   let mockFetchCalled = false;
   let mockFetchArgs = [];
   let mockFetchResponse = null;
@@ -27,12 +28,18 @@ describe("Rules Engine Gateway Client", () => {
     } else {
       process.env.LOANOS_RULES_ENGINE = originalEnvMode;
     }
+    if (originalEngineUrls === undefined) {
+      delete process.env.LOANOS_RULES_ENGINE_URLS;
+    } else {
+      process.env.LOANOS_RULES_ENGINE_URLS = originalEngineUrls;
+    }
   });
 
   beforeEach(() => {
     mockFetchCalled = false;
     mockFetchArgs = [];
     mockFetchResponse = null;
+    process.env.LOANOS_RULES_ENGINE_URLS = JSON.stringify({ dev: "http://engine-dev:47311" });
   });
 
   // Mock JS evaluator
@@ -164,7 +171,7 @@ describe("Rules Engine Gateway Client", () => {
       status: 200,
       json: async () => ({
         decision: "ineligible", // Overrides JS 'eligible'
-        reasons: [{ code: "MAX_FOIR_EXCEEDED" }],
+        reasons: [{ severity: "error", code: "MAX_FOIR_EXCEEDED", regulation: "RBI-DL-2025", message: "FOIR exceeds the approved ceiling.", path: "/economic_profile/monthly_income", audience: "tenant_ops" }],
         ruleset: "lending-v1",
         trace_ref: "trace_active_fail",
         engine: "eng-dev-1"
@@ -183,6 +190,19 @@ describe("Rules Engine Gateway Client", () => {
     assert.ok(result.assessment.engine);
     assert.strictEqual(result.assessment.engine.decidedBy, "rules-engine");
     assert.strictEqual(result.assessment.engine.ruleset, "lending-v1");
+    assert.deepStrictEqual(result.assessment.reasons, [
+      {
+        severity: "error",
+        controlId: "RBI-DL-2025",
+        code: "MAX_FOIR_EXCEEDED",
+        message: "FOIR exceeds the approved ceiling.",
+        path: "/economic_profile/monthly_income",
+        audience: "tenant_ops"
+      }
+    ]);
+    assert.strictEqual(result.assessment.summary.status, "blocked");
+    assert.strictEqual(result.findings, result.assessment.reasons);
+    assert.match(mockFetchArgs[0], /^http:\/\/engine-dev:47311\/v1\/decide$/);
   });
 
   test("Mode 'active': fails closed to 'refer' if engine is unreachable", async () => {
@@ -200,6 +220,35 @@ describe("Rules Engine Gateway Client", () => {
     assert.strictEqual(result.assessment.decision, "refer"); // Fails closed!
     assert.ok(result.assessment.engine);
     assert.strictEqual(result.assessment.engine.error, "engine_unavailable_fail_closed");
+    assert.strictEqual(result.assessment.summary.status, "review");
+    assert.strictEqual(result.assessment.reasons[0].code, "ENGINE_UNAVAILABLE_FAIL_CLOSED");
+  });
+
+  test("routes each tenant only to its configured isolated instance", async () => {
+    process.env.LOANOS_RULES_ENGINE = "active";
+    process.env.LOANOS_RULES_ENGINE_URLS = JSON.stringify({ tenant_a: "http://engine-a:47311", tenant_b: "http://engine-b:47311" });
+    mockFetchResponse = {
+      ok: true,
+      status: 200,
+      json: async () => ({ decision: "eligible", reasons: [], ruleset: "lending-v1", trace_ref: "trace_a", engine: "eng-a" })
+    };
+
+    await assessEligibilityGated({ evaluateJs: mockEvaluateJs, application: sampleApp, tenantId: "tenant_a", stage: "underwriting" });
+    assert.match(mockFetchArgs[0], /^http:\/\/engine-a:47311\/v1\/decide$/);
+
+    await assessEligibilityGated({ evaluateJs: mockEvaluateJs, application: sampleApp, tenantId: "tenant_b", stage: "underwriting" });
+    assert.match(mockFetchArgs[0], /^http:\/\/engine-b:47311\/v1\/decide$/);
+  });
+
+  test("fails closed when the tenant has no configured instance", async () => {
+    process.env.LOANOS_RULES_ENGINE = "active";
+    process.env.LOANOS_RULES_ENGINE_URLS = JSON.stringify({ tenant_a: "http://engine-a:47311" });
+
+    const result = await assessEligibilityGated({ evaluateJs: mockEvaluateJs, application: sampleApp, tenantId: "tenant_b", stage: "underwriting" });
+
+    assert.strictEqual(mockFetchCalled, false);
+    assert.strictEqual(result.assessment.decision, "refer");
+    assert.strictEqual(result.assessment.reasons[0].code, "ENGINE_UNAVAILABLE_FAIL_CLOSED");
   });
 
   test("Live Integration: queries actual running rules-service when available", async () => {
@@ -213,6 +262,7 @@ describe("Rules Engine Gateway Client", () => {
     }
 
     process.env.LOANOS_RULES_ENGINE = "active";
+    process.env.LOANOS_RULES_ENGINE_URLS = JSON.stringify({ dev: "http://127.0.0.1:47311" });
     globalThis.fetch = originalFetch; // restore original fetch
 
     const result = await assessEligibilityGated({

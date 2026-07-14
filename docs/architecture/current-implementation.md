@@ -15,14 +15,14 @@ The current implementation is intentionally small:
   - **Postgres-backed** (opt-in, `LOANOS_STORAGE_DRIVER=postgres`): tenant data-plane documents live one-per-row in a `tenant_data` table under Postgres Row-Level Security — a second, database-enforced isolation layer beneath the application-layer one — with per-tenant advisory locking and per-tenant fetching so concurrent requests for different tenants no longer serialize behind one global lock. See [`db/schema.sql`](../../db/schema.sql), [`apps/api/src/postgres-store.js`](../../apps/api/src/postgres-store.js), and the [Postgres migration doc](postgres-migration.md) for the full v1/v2/v3 design and live-verification results.
 - Multi-tenant: every data-plane request runs inside exactly one tenant, resolved from a tenant user session or `x-api-key`/bearer service token; cross-tenant access is impossible by construction because each request only ever receives its own tenant's partition (and, on the Postgres driver, is also blocked at the database layer by RLS).
 - Core domain logic in `packages/core/src`.
-- Decision engine (Rust) in `rules/`: API eligibility, KFS and decision call sites are wired through `LOANOS_RULES_ENGINE=off|shadow|active`. Production startup requires `active` and a JSON `LOANOS_RULES_ENGINE_URLS` map with one URL per tenant; missing tenant routing fails closed. Development may use one `LOANOS_RULES_ENGINE_URL`. The engine remains tenant-bound, bundle-verified, deterministic and fail-closed as specified in the [decision engine design](decision-engine-design.md); that document's §15 checklist remains authoritative for phase status.
+- Decision engine (Rust) in `rules/`: API eligibility, KFS and decision call sites are wired through `LOANOS_RULES_ENGINE=off|shadow|active`. Enabled engine modes require a JSON `LOANOS_RULES_ENGINE_URLS` map with one URL per tenant; missing tenant routing fails closed before a request is sent. In active mode, the engine owns the stored decision, reasons, summary, outputs, and signed lineage. The engine remains tenant-bound, bundle-verified, deterministic and fail-closed as specified in the [decision engine design](decision-engine-design.md); that document's §15 checklist remains authoritative for phase status.
 - Pure backend API in `apps/api/src`.
 - Public platform website in `apps/web/`.
 - Tenant-branded landing template in `apps/tenant/`.
 - Internal staff workspace in `apps/dashboard/`.
 - Borrower customer portal in `apps/customer/`: a responsive, white-labelled journey home with prioritised next actions, visual application milestones, repayment schedules, a document centre, guided media, grievance tracking, and DPDP access/correction/erasure controls.
 - Shared design system tokens in `apps/shared/`.
-- Automated tests in `tests/`: 167 file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
+- Automated tests in `tests/`: 172 file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
 
 Run it:
 
@@ -52,6 +52,8 @@ npm run dev:api
 | `packages/core/src/recovery-agent.js` | Recovery-agent empanelment registry: an active agent requires due-diligence/police-verification, training certification, code-of-conduct acknowledgment, and authorization-letter/ID-card evidence, referencing an active regulated entity. |
 | `packages/core/src/application-workflow.js` | LOS application state machine, KFS workflow, human review, decision proposal, manual underwriting override gate for referred applications, coded decline-reason taxonomy, maker-checker approval, disbursement transition. |
 | `packages/core/src/loan-account.js` | LMS loan account creation, amortization schedule, ledger balance reconstruction, interest accrual, payment posting, part-prepayment re-amortization, foreclosure quote and payoff, closure No-Objection Certificate, statements, charges, waivers, reversals, delinquency, collections reminders (RBI FPC contact-hours gate), recovery controls, hardship restructure, floating-rate interest rate resets, settlement/write-off, asset classification, and CIC snapshots. |
+| `packages/core/src/finance-accounting.js` | Governed ECL assessment and allowance movements, finance-only journal projection, IRAC income-reversal journals, TDS journals/return extracts, and GST invoice/credit-note return aggregation. |
+| `packages/core/src/finance-management.js` | EIR fee-amortisation journals, funding-cost attribution, ALM maturity buckets, profitability, economic-capital, and RAROC reporting. |
 | `packages/core/src/loan-policy.js` | India-only loan validation, KFS validation (including prepayment/foreclosure checks), sanction readiness, disbursement checks. |
 | `packages/core/src/model-governance.js` | AI/model inventory (including generative model class), model status, governed lifecycle transitions with a validation gate (fairness/explainability/monitoring for high-risk, adversarial/hallucination testing for generative), drift monitoring with auto kill-switch, global/model kill switch, kill-switch incident and post-incident review workflow, runtime model-use evaluation. |
 | `packages/core/src/ai-interaction.js` | Customer-facing AI disclosure generation (blocked for back-office/inactive/kill-switched models) and human-handoff request/resolution workflow. |
@@ -128,7 +130,45 @@ npm run dev:api
 | `POST /integrations/communications` | Dispatches SMS/email/WhatsApp through `ExternalServiceManager`, stores a masked/hash-only communication receipt, and seals the attempt into the tenant audit chain. |
 | `GET /payment-rails` | Lists NACH/UPI payment rail initiation receipts, filterable by type, channel, status, borrower, application, loan account, or provider reference. |
 | `POST /integrations/payment-rails/nach-mandates` | Registers a NACH mandate through `ExternalServiceManager`, stores sanitized mandate evidence (account last-four/hash, provider ref, amount/frequency, consent/bank-verification refs), and seals the initiation into the tenant audit chain. |
+| `POST /integrations/payment-rails/nach-presentments` | Creates a single NACH debit presentment against a registered mandate; initiation itself cannot credit a loan account. |
 | `POST /integrations/payment-rails/upi-collects` | Creates a UPI collect request through `ExternalServiceManager`, stores masked/hash-only VPA evidence with provider/status data, and seals the initiation into the tenant audit chain. |
+| `POST /integrations/payment-rails/settlements` | Reconciles one idempotent UPI provider callback. Only an exact match to an initiated collect and active loan account posts a repayment; failed, returned, mismatched, and unknown callbacks remain exception records. |
+| `GET /payment-reconciliations` | Lists provider settlement reconciliation records, including matched postings and unresolved exceptions. |
+| `POST /payment-reconciliations/:id/resolution` | Resolves an unresolved provider-settlement exception with named resolver, approval evidence, and reason. |
+| `POST /bank-statements/entries` | Matches an idempotent bank-statement credit to an already-posted provider settlement; unmatched or mismatched credits remain finance exceptions and cannot create a borrower payment. |
+| `GET /bank-reconciliations` | Lists matched and exception bank-statement reconciliation records. |
+| `POST /bank-reconciliations/:id/resolution` | Resolves an unresolved bank-statement exception with named resolver, approval evidence, and reason. |
+| `GET /accounting/journals` | Projects immutable loan-ledger events into balanced, read-only double-entry journals using the accounting profile frozen on each loan at disbursement; optionally filters by `loanAccountId`. |
+| `GET /accounting/trial-balance` | Returns a tenant-scoped derived trial balance from journal projections, optionally for one loan account. |
+| `GET /accounting/posting-runs` | Lists immutable, approval-evidenced tenant GL posting-run snapshots. |
+| `GET /accounting/gl-export` | Exports posted journals in a versioned GL-line schema with a SHA-256 checksum; may filter by `postingRunId`. |
+| `GET/POST /accounting/ecl-parameter-sets` | Lists or approves versioned PD/LGD parameter sets under maker-checker control. |
+| `GET /accounting/ecl-provisions` | Lists approved ECL provision snapshots and allowance movements. |
+| `GET/POST /accounting/eir-amortizations` | Lists or records maker-checker EIR period amortisation and balanced journals. |
+| `GET/POST /accounting/funding-facilities` | Lists or approves funding facilities with limits, outstanding, maturity, and cost. |
+| `POST /accounting/funding-allocations` | Attributes available facility funding to a loan account. |
+| `GET /accounting/alm-report` | Produces contractual inflow/outflow maturity buckets and cumulative liquidity gaps. |
+| `GET /accounting/profitability-report` | Produces loan/product contribution, funding cost, ECL, economic capital, and RAROC. |
+| `GET /accounting/tax/gst-return-data` | Nets issued GST invoices and credit notes for a requested date range. |
+| `GET/POST /accounting/tax/gst-invoices` | Lists or issues uniquely numbered invoices grounded in taxable charge events. |
+| `POST /accounting/tax/gst-credit-notes` | Issues a maker-checker full credit note and balanced reversal journal against one invoice. |
+| `GET/POST /accounting/tax/withholdings` | Lists or records maker-checker TDS withholdings and balanced finance journals. |
+| `POST /accounting/tax/withholdings/:id/certificate` | Issues one uniquely numbered TDS certificate for a withholding. |
+| `GET /accounting/tax/tds-return-data` | Produces a dated TDS return extract with certificate linkage. |
+| `GET/POST /accounting/tax/filings` | Lists or creates checksum-sealed, maker-checker GST/TDS filing snapshots. |
+| `POST /accounting/tax/filings/:id/acknowledgement` | Records accepted/rejected filing acknowledgement evidence. |
+| `GET/POST /accounting/irac-income-adjustments` | Lists or records NPA income reversals limited to accrued, uncollected interest. |
+| `GET/POST /accounting/irac-memorandum-interest` | Lists or records off-book NPA memorandum interest with policy evidence. |
+| `POST /accounting/irac-recovery-recognitions` | Links cash-basis recovery recognition to an earlier reversal and an actual interest-bearing payment. |
+| `POST /accounting/posting-runs` | Posts all unposted balanced journals through a date into an immutable tenant batch; run ID retries are idempotent. |
+| `GET /accounting/reconciliation-certifications` | Lists dated finance reconciliation certifications for the tenant. |
+| `POST /accounting/reconciliation-certifications` | Certifies a business date only after all journals are posted and provider/bank exceptions are clear, retaining named approval evidence. |
+| `POST /accounting/business-dates/:date/close` | Closes a reconciliation-certified business date, blocking later posting through that date. |
+| `POST /accounting/business-dates/:date/reopen` | Reopens a closed date only with independent actor, approval evidence, and reason. |
+| `POST /loan-accounts/:id/refunds` | Issues an approved, idempotent refund only against the unapplied portion of an existing payment; principal and interest corrections remain ledger reversals. |
+| `POST /loan-accounts/:id/disbursement-return` | Cancels a failed outward disbursement before any repayment or servicing activity, reversing the original principal debit with approval evidence. |
+| `GET /loan-accounts/:id/cooling-off-quote` | Quotes principal plus proportionate interest within the KFS cooling-off period; execution/payout remains the next workflow step. |
+| `POST /loan-accounts/:id/cooling-off-cancellation` | Cancels an account within the quoted KFS cooling-off window after exact borrower repayment, preserving the principal and proportionate-interest evidence. |
 | `POST /integrations/bank-account-verification` | Verifies a borrower/end-beneficiary bank account through `ExternalServiceManager`, returning sanitized evidence (`verificationRef`, IFSC, last four digits, status/name match) and sealing the attempt into the tenant audit chain. |
 | `POST /integrations/credit-bureau` | Queries Credit Bureau (CIBIL equivalent) score for a given PAN; enforces data residency and returns the bureau report. |
 | `POST /integrations/vcip/video-analysis` | Invokes V-CIP video analysis / facial match; enforces data residency and returns V-CIP verification outcome. |
@@ -250,6 +290,8 @@ npm run dev:api
 | `GET /loan-accounts/:id/statement/document` | Renders the period statement as a checksum-sealed borrower-facing document. |
 | `GET /loan-accounts/:id/delinquency` | Computes DPD, bucket, overdue amounts, and earliest unpaid due. |
 | `GET /loan-accounts/:id/asset-classification` | Computes standard, SMA, or NPA asset class from DPD. |
+| `GET /loan-accounts/:id/ecl-assessment` | Calculates a Stage 1/2/3 ECL estimate using a named approved parameter set. |
+| `POST /loan-accounts/:id/ecl-provisions` | Records maker-checker ECL allowance and movement journals without changing borrower dues. |
 | `GET /loan-accounts/:id/cic-snapshot` | Generates a CIC-ready internal reporting snapshot for one account. |
 | `GET /reporting/cic/snapshots` | Generates CIC-ready internal reporting snapshots for the portfolio. |
 | `POST /loan-accounts/:id/recovery-assignments` | Assigns a recovery agent only with borrower notice evidence. |
@@ -380,14 +422,14 @@ npm run dev:api
 - Registries are file-backed; tenant user administration and access reviews exist, but external IAM sync and maker-checker approval for admin changes are still planned.
 - Borrower/consent/KYC records are file-backed, but support CKYC registry and V-CIP evidence vault validation boundaries.
 - Workflow is file-backed; the local dashboard is not a production workflow UI and outbound RBI CMS API integration is still planned.
-- LMS restructure/settlement/write-off and collections reminders have first slices; full NACH file exchange, payment reconciliation, refunds, external CIC file/API submission, and full multi-channel recovery contact logging are still planned.
+- LMS restructure/settlement/write-off, cooling-off cancellation, refunds, and collections reminders have first slices. UPI collect and NACH presentment settlement reconciliation now have idempotent callback-to-ledger slices; bank-statement credit matching now provides a first provider-to-bank-to-ledger control. A derived balanced journal, trial balance, and approval-evidenced posting-run snapshot now cover the loan ledger; formal business-date close, downstream GL export, external CIC file/API submission, and full multi-channel recovery contact logging remain planned.
 - Document packet renders HTML/text and stores document-vault receipts, but does not yet create PDFs or external eSign envelopes.
 - UI is limited to the local operations/admin dashboard; there is no production borrower application yet.
 - AI governance has first slices for lifecycle, validation gates (fairness/explainability/monitoring for high-risk, adversarial/hallucination for generative), drift-triggered kill switch, disclosure, and human handoff; recurring fairness reports and a sectoral incident-intelligence pack are still planned.
 - The audit spine stamps a uniform actor/actorType/dataClass envelope on every event at the seal seam; signed external anchoring is a follow-on.
 - Compliance docs are source-grounded but still require counsel/compliance review before production.
-- The Rust decision engine is wired into the API but off by default (`LOANOS_RULES_ENGINE=off`); when enabled it needs signed platform+tenant bundles and a running per-tenant `rules-service`. The JS→engine gateway path has no automated test coverage, CI does not start the service, the gateway targets a single `LOANOS_RULES_ENGINE_URL` (single-tenant until per-tenant routing lands), and `active` mode overrides only the decision, not the stored reason lineage. Tracked in [review-findings-2026-07-12](../product/review-findings-2026-07-12.md) (WS-B).
-- The live decision path today is the JS evaluator, whose EMI/interest/foreclosure math uses float + epsilon rounding (`roundMoney`); exact integer-paise/decimal arithmetic covers ledger summation (`sumMoney`) and the (unwired-by-default) Rust engine, but not the JS EMI/affordability path. Tracked in [review-findings-2026-07-12](../product/review-findings-2026-07-12.md) (REV-20).
+- The Rust decision engine remains off by default until each tenant has completed its signed-bundle, kill-switch, shadow-divergence, and operational-readiness checks. The gateway is covered for off, shadow, active, tenant-routing, and fail-closed behavior; active mode has no single-instance fallback. The remaining decision-engine release decision is tracked in [review-findings-2026-07-12](../product/review-findings-2026-07-12.md) (REV-14).
+- The live JS affordability path now quantises money at the boundary and calculates EMI and FOIR with integer paise/BigInt arithmetic; the LMS ledger path is likewise paise-exact. Product inputs must use integral basis-point rates. The Rust differential corpus is regenerated and tested against this path.
 
 ## Test Coverage
 

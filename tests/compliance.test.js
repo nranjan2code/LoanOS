@@ -483,7 +483,33 @@ test("asset classification promotes overdue accounts through SMA to NPA", async 
   assert.equal(classifyLoanAsset(account, new Date(`${addDays(firstDueDate, 1)}T00:00:00.000Z`)).assetClass, "sma_0");
   assert.equal(classifyLoanAsset(account, new Date(`${addDays(firstDueDate, 45)}T00:00:00.000Z`)).assetClass, "sma_1");
   assert.equal(classifyLoanAsset(account, new Date(`${addDays(firstDueDate, 75)}T00:00:00.000Z`)).assetClass, "sma_2");
-  assert.equal(classifyLoanAsset(account, new Date(`${addDays(firstDueDate, 91)}T00:00:00.000Z`)).assetClass, "npa");
+  const npaDate = addDays(firstDueDate, 91);
+  assert.equal(classifyLoanAsset(account, new Date(`${npaDate}T00:00:00.000Z`)).assetClass, "npa");
+  const accrualResponse = await postJson(`${base}/loan-accounts/${account.loanAccountId}/accruals`, { asOf: `${npaDate}T00:00:00.000Z` });
+  assert.equal(accrualResponse.status, 200);
+  const iracResponse = await postJson(`${base}/accounting/irac-income-adjustments`, {
+    adjustmentId: "irac_reversal_001", loanAccountId: account.loanAccountId, asOf: npaDate,
+    amount: account.schedule[0].interestDue, reason: "NPA income suspension",
+    proposedBy: "finance_maker_001", approvedBy: "finance_checker_001", approvalRef: "irac_approval_001"
+  });
+  assert.equal(iracResponse.status, 201);
+  assert.equal(iracResponse.body.adjustment.assetClass, "npa");
+  const memorandumResponse = await postJson(`${base}/accounting/irac-memorandum-interest`, {
+    memorandumId: "memo_interest_001", loanAccountId: account.loanAccountId, asOf: npaDate,
+    amount: 50, recordedBy: "finance_officer_001", policyRef: "irac_policy_001"
+  });
+  assert.equal(memorandumResponse.status, 201);
+  const recoveryPayment = await postJson(`${base}/loan-accounts/${account.loanAccountId}/payments`, {
+    amount: account.schedule[0].totalDue, receivedAt: `${npaDate}T12:00:00.000Z`, paymentRef: "npa_recovery_001", channel: "bank_transfer"
+  });
+  assert.equal(recoveryPayment.status, 200);
+  const recognitionAmount = Math.min(iracResponse.body.adjustment.movementAmount, recoveryPayment.body.paymentEvent.interestCredit);
+  const recognitionResponse = await postJson(`${base}/accounting/irac-recovery-recognitions`, {
+    recognitionId: "irac_recovery_001", loanAccountId: account.loanAccountId, adjustmentId: "irac_reversal_001",
+    paymentEventId: recoveryPayment.body.paymentEvent.eventId, amount: recognitionAmount,
+    approvedBy: "finance_checker_002", approvalRef: "recovery_recognition_001"
+  });
+  assert.equal(recognitionResponse.status, 201);
 });
 
 function buildScheduledAccount(payments = []) {
@@ -2719,6 +2745,124 @@ test("API opens loan account on disbursement and posts ledger payment", async (t
   const scheduleBody = await scheduleResponse.json();
   assert.equal(scheduleBody.schedule.length, 12);
 
+  const parameterResponse = await postJson(`${base}/accounting/ecl-parameter-sets`, {
+    parameterSetId: "ecl_retail_v1", version: 1, pdBps: 250, lgdBps: 4500,
+    effectiveFrom: firstInstallment.dueDate, proposedBy: "risk_maker_001",
+    approvedBy: "risk_checker_001", approvalRef: "ecl_policy_001"
+  });
+  assert.equal(parameterResponse.status, 201);
+  const assessmentResponse = await apiFetch(`${base}/loan-accounts/${account.loanAccountId}/ecl-assessment?parameterSetId=ecl_retail_v1&asOf=${firstInstallment.dueDate}`);
+  assert.equal(assessmentResponse.status, 200);
+  const assessment = await assessmentResponse.json();
+  assert.equal(assessment.parameterSetId, "ecl_retail_v1");
+  assert(assessment.expectedCreditLoss > 0);
+  const provisionResponse = await postJson(`${base}/loan-accounts/${account.loanAccountId}/ecl-provisions`, {
+    provisionId: "ecl_provision_001", parameterSetId: "ecl_retail_v1", asOf: firstInstallment.dueDate,
+    proposedBy: "finance_maker_001", approvedBy: "finance_checker_001", approvalRef: "ecl_post_001"
+  });
+  assert.equal(provisionResponse.status, 201);
+  assert.equal(provisionResponse.body.provision.movementAmount, assessment.expectedCreditLoss);
+
+  const withholdingResponse = await postJson(`${base}/accounting/tax/withholdings`, {
+    withholdingId: "tds_001", section: "194J", payeeId: "vendor_001", expenseAccount: "professional_fees",
+    paymentDate: firstInstallment.dueDate, grossAmount: 10000, rateBps: 1000,
+    proposedBy: "tax_maker_001", approvedBy: "tax_checker_001", approvalRef: "tds_approval_001"
+  });
+  assert.equal(withholdingResponse.status, 201);
+  assert.equal(withholdingResponse.body.withholding.tdsAmount, 1000);
+  const certificateResponse = await postJson(`${base}/accounting/tax/withholdings/tds_001/certificate`, {
+    certificateId: "tds_cert_001", certificateNumber: "FORM16A-001", issuedAt: firstInstallment.dueDate, issuedBy: "tax_officer_001"
+  });
+  assert.equal(certificateResponse.status, 201);
+  const tdsReturnResponse = await apiFetch(`${base}/accounting/tax/tds-return-data?from=${firstInstallment.dueDate}&to=${firstInstallment.dueDate}`);
+  assert.equal(tdsReturnResponse.status, 200);
+  const tdsReturn = await tdsReturnResponse.json();
+  assert.equal(tdsReturn.tdsAmount, 1000);
+  assert.equal(tdsReturn.rows[0].certificateNumber, "FORM16A-001");
+  const taxFilingResponse = await postJson(`${base}/accounting/tax/filings`, {
+    filingId: "tds_filing_001", taxType: "tds", periodFrom: firstInstallment.dueDate, periodTo: firstInstallment.dueDate,
+    proposedBy: "tax_maker_001", approvedBy: "tax_checker_001", approvalRef: "tds_filing_approval_001"
+  });
+  assert.equal(taxFilingResponse.status, 201);
+  const taxAckResponse = await postJson(`${base}/accounting/tax/filings/tds_filing_001/acknowledgement`, {
+    acknowledgementRef: "TDS-ACK-001", status: "accepted", recordedBy: "tax_officer_001"
+  });
+  assert.equal(taxAckResponse.status, 200);
+
+  const facilityResponse = await postJson(`${base}/accounting/funding-facilities`, {
+    facilityId: "facility_001", lenderId: "bank_001", limitAmount: 5000000, outstandingAmount: 1000000,
+    annualCostBps: 900, startDate: account.disbursedAt.slice(0, 10), maturityDate: addDays(firstInstallment.dueDate, 365),
+    proposedBy: "treasury_maker_001", approvedBy: "treasury_checker_001", approvalRef: "facility_approval_001"
+  });
+  assert.equal(facilityResponse.status, 201);
+  const allocationResponse = await postJson(`${base}/accounting/funding-allocations`, {
+    allocationId: "funding_allocation_001", facilityId: "facility_001", loanAccountId: account.loanAccountId,
+    amount: 125000, allocatedAt: account.disbursedAt, allocatedBy: "treasury_officer_001", approvalRef: "allocation_approval_001"
+  });
+  assert.equal(allocationResponse.status, 201);
+  const eirResponse = await postJson(`${base}/accounting/eir-amortizations`, {
+    amortizationId: "eir_001", loanAccountId: account.loanAccountId, periodStart: account.disbursedAt,
+    periodEnd: `${firstInstallment.dueDate}T00:00:00.000Z`, openingAmortizedCost: 125000,
+    effectiveInterestRateBps: 2400, contractualInterest: firstInstallment.interestDue,
+    proposedBy: "finance_maker_001", approvedBy: "finance_checker_001", approvalRef: "eir_approval_001"
+  });
+  assert.equal(eirResponse.status, 201);
+  assert(eirResponse.body.amortization.amortizedAmount >= 0);
+  const almResponse = await apiFetch(`${base}/accounting/alm-report?asOf=${account.disbursedAt}`);
+  assert.equal(almResponse.status, 200);
+  assert.equal((await almResponse.json()).rows.length, 5);
+  const profitabilityResponse = await apiFetch(`${base}/accounting/profitability-report?asOf=${firstInstallment.dueDate}&economicCapitalBps=1000`);
+  assert.equal(profitabilityResponse.status, 200);
+  assert.equal((await profitabilityResponse.json()).rows[0].loanAccountId, account.loanAccountId);
+
+  const journalsResponse = await apiFetch(`${base}/accounting/journals?loanAccountId=${account.loanAccountId}`);
+  assert.equal(journalsResponse.status, 200);
+  const journals = await journalsResponse.json();
+  assert.equal(journals.count, 4);
+  assert(journals.journals.every((journal) => journal.debitTotal === journal.creditTotal));
+
+  const trialBalanceResponse = await apiFetch(`${base}/accounting/trial-balance?loanAccountId=${account.loanAccountId}`);
+  assert.equal(trialBalanceResponse.status, 200);
+  const trialBalance = await trialBalanceResponse.json();
+  assert.equal(trialBalance.balanced, true);
+  assert.equal(trialBalance.debitTotal, trialBalance.creditTotal);
+
+  const postingResponse = await postJson(`${base}/accounting/posting-runs`, {
+    postingRunId: "gl_posting_001",
+    throughDate: firstInstallment.dueDate,
+    approvedBy: "finance_checker_001",
+    approvalRef: "finance_approval_001"
+  });
+  assert.equal(postingResponse.status, 201);
+  assert.equal(postingResponse.body.postingRun.status, "posted");
+  assert.equal(postingResponse.body.postingRun.debitTotal, postingResponse.body.postingRun.creditTotal);
+
+  const glExportResponse = await apiFetch(`${base}/accounting/gl-export?postingRunId=gl_posting_001`);
+  assert.equal(glExportResponse.status, 200);
+  const glExport = await glExportResponse.json();
+  assert.equal(glExport.exportFormat, "loanos.gl.v1");
+  assert.equal(glExport.postingRunIds[0], "gl_posting_001");
+  assert(glExport.lines.every((line) => line.debit === 0 || line.credit === 0));
+  assert(glExport.lines.some((line) => line.glAccount === "ecl_loss_allowance"));
+  assert(glExport.lines.some((line) => line.glAccount === "tds_payable"));
+  assert(glExport.lines.some((line) => line.glAccount === "deferred_origination_fee"));
+
+  const postingRetry = await postJson(`${base}/accounting/posting-runs`, {
+    postingRunId: "gl_posting_001",
+    throughDate: firstInstallment.dueDate,
+    approvedBy: "finance_checker_001"
+  });
+  assert.equal(postingRetry.status, 200);
+  assert.equal(postingRetry.body.idempotent, true);
+
+  const certificationResponse = await postJson(`${base}/accounting/reconciliation-certifications`, {
+    businessDate: firstInstallment.dueDate,
+    certifiedBy: "finance_controller_001",
+    approvalRef: "close_approval_001"
+  });
+  assert.equal(certificationResponse.status, 201);
+  assert.equal(certificationResponse.body.certification.status, "certified");
+
   // A client retry (network timeout, gateway ambiguity) resubmitting the same
   // paymentRef must not double-credit the ledger: the second post is blocked,
   // and the outstanding balance is unchanged from the first successful post.
@@ -2937,6 +3081,40 @@ test("API controls disclosed charges, waivers, and reversals", async (t) => {
   assert.equal(reversal.status, 200);
   assert.equal(reversal.body.reversalEvent.type, "reversal");
   assert.equal(reversal.body.summary.chargesOutstanding, 0);
+
+  const processingFee = await postJson(`${base}/loan-accounts/${account.loanAccountId}/charges`, {
+    name: "Processing fee", reason: "One-time processing charge disclosed upfront", amount: 1000, type: "processing_fee"
+  });
+  assert.equal(processingFee.status, 201);
+  const taxDate = processingFee.body.chargeEvent.eventDate.slice(0, 10);
+  const invoiceResponse = await postJson(`${base}/accounting/tax/gst-invoices`, {
+    invoiceId: "gst_invoice_001", invoiceNumber: "INV-2026-001", loanAccountId: account.loanAccountId,
+    chargeEventId: processingFee.body.chargeEvent.eventId, issuedAt: taxDate, issuedBy: "tax_officer_001", supplierState: "KA", placeOfSupply: "KA"
+  });
+  assert.equal(invoiceResponse.status, 201);
+  const gstResponse = await apiFetch(`${base}/accounting/tax/gst-return-data?from=${taxDate}&to=${taxDate}`);
+  assert.equal(gstResponse.status, 200);
+  const gst = await gstResponse.json();
+  assert.equal(gst.rowCount, 1);
+  assert.equal(gst.outputGst, processingFee.body.chargeEvent.gstAmount);
+  const creditNoteResponse = await postJson(`${base}/accounting/tax/gst-credit-notes`, {
+    creditNoteId: "gst_credit_001", creditNoteNumber: "CN-2026-001", invoiceId: "gst_invoice_001", issuedAt: taxDate,
+    reason: "Fee reversed", proposedBy: "tax_maker_001", approvedBy: "tax_checker_001", approvalRef: "credit_note_approval_001"
+  });
+  assert.equal(creditNoteResponse.status, 201);
+  const netGst = await (await apiFetch(`${base}/accounting/tax/gst-return-data?from=${taxDate}&to=${taxDate}`)).json();
+  assert.equal(netGst.rowCount, 2);
+  assert.equal(netGst.outputGst, 0);
+  const gstFiling = await postJson(`${base}/accounting/tax/filings`, {
+    filingId: "gst_filing_001", taxType: "gst", periodFrom: taxDate, periodTo: taxDate,
+    proposedBy: "tax_maker_001", approvedBy: "tax_checker_001", approvalRef: "gst_filing_approval_001"
+  });
+  assert.equal(gstFiling.status, 201);
+  assert.equal(gstFiling.body.filing.payloadChecksum.length, 64);
+  const gstAcknowledgement = await postJson(`${base}/accounting/tax/filings/gst_filing_001/acknowledgement`, {
+    acknowledgementRef: "GSTN-ACK-001", status: "accepted", recordedBy: "tax_officer_001"
+  });
+  assert.equal(gstAcknowledgement.status, 200);
 });
 
 test("API accrues scheduled interest into the ledger and reconciles with the schedule", async (t) => {
@@ -3218,7 +3396,7 @@ test("API settles a loan for less than outstanding and writes off another, both 
     approvedBy: "collections-lead-1",
     approvalReference: "SET-3"
   });
-  assert.equal(settled.status, 200);
+  assert.equal(settled.status, 200, JSON.stringify(settled.body));
   assert.equal(settled.body.loanAccount.status, "closed");
   assert.equal(settled.body.loanAccount.closureType, "settled");
   assert.equal(settled.body.settlement.settlementAmount, settlementAmount);
@@ -4740,6 +4918,12 @@ test("eligibility engine assesses affordability and product bounds", () => {
   );
   assert.equal(refer.assessment.decision, ELIGIBILITY_DECISIONS.REFER);
   assert.equal(refer.summary.status, "review");
+});
+
+test("eligibility EMI uses exact paise arithmetic and rejects non-integral rate policy", () => {
+  assert.equal(estimateEmi(100000.01, 1801, 84), 2102.37);
+  assert.equal(estimateEmi(100000.01, 0, 84), 1190.48);
+  assert.equal(estimateEmi(100000, 1800.5, 12), null);
 });
 
 test("eligibility engine blocks borrower with low credit score", () => {
@@ -6759,6 +6943,103 @@ test("API initiates payment rails with masked ledger evidence", async (t) => {
   assert.equal(events.chainValid, true);
   assert.equal(paymentRailEvents.length, 2);
   assert(paymentRailEvents.every((event) => event.dataClass === "financial"));
+});
+
+test("payment rail settlement reconciles once before posting a UPI repayment", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-payment-reconciliation-"));
+  t.after(async () => {
+    await rm(dataDir, { recursive: true, force: true });
+  });
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
+  await listen(server);
+  t.after(async () => {
+    await close(server);
+  });
+
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const application = await approveAndDisburseApplication(base);
+  const account = await (await apiFetch(`${base}/loan-accounts/${application.loanAccountId}`)).json();
+  const amount = account.schedule[0].totalDue;
+  const collect = await postJson(`${base}/integrations/payment-rails/upi-collects`, {
+    borrowerId: "bor_001",
+    loanAccountId: application.loanAccountId,
+    vpa: "asha@upi",
+    amount,
+    purpose: "repayment"
+  });
+  assert.equal(collect.status, 201);
+
+  const callback = {
+    providerRef: collect.body.paymentRail.providerRef,
+    providerEventRef: "upi_settlement_001",
+    status: "settled",
+    amount,
+    bankReference: "HDFC-SETTLED-001",
+    settledAt: `${account.schedule[0].dueDate}T00:00:00.000Z`
+  };
+  const settled = await postJson(`${base}/integrations/payment-rails/settlements`, callback);
+  assert.equal(settled.status, 200);
+  assert.equal(settled.body.reconciliation.outcome, "matched_posted");
+  assert.equal(settled.body.paymentEvent.channel, "upi");
+
+  const duplicate = await postJson(`${base}/integrations/payment-rails/settlements`, callback);
+  assert.equal(duplicate.status, 200);
+  assert.equal(duplicate.body.duplicate, true);
+
+  const reconciliations = await (await apiFetch(`${base}/payment-reconciliations?outcome=matched_posted`)).json();
+  assert.equal(reconciliations.count, 1);
+  const updatedAccount = await (await apiFetch(`${base}/loan-accounts/${application.loanAccountId}?asOf=${account.schedule[0].dueDate}`)).json();
+  assert.equal(updatedAccount.ledger.filter((event) => event.type === "payment" && event.channel === "upi").length, 1);
+
+  const bankEntry = await postJson(`${base}/bank-statements/entries`, {
+    transactionRef: "bank_credit_001", bankReference: "HDFC-SETTLED-001", amount, currency: "INR", valueDate: account.schedule[0].dueDate, accountRef: "RE_COLLECTION_ACCOUNT"
+  });
+  assert.equal(bankEntry.status, 200);
+  assert.equal(bankEntry.body.bankReconciliation.outcome, "matched");
+  const repeatedBankEntry = await postJson(`${base}/bank-statements/entries`, {
+    transactionRef: "bank_credit_001", bankReference: "HDFC-SETTLED-001", amount
+  });
+  assert.equal(repeatedBankEntry.status, 200);
+  assert.equal(repeatedBankEntry.body.duplicate, true);
+
+  const unmatched = await postJson(`${base}/integrations/payment-rails/settlements`, {
+    providerRef: "unknown-provider-ref",
+    providerEventRef: "upi_settlement_unknown",
+    status: "settled",
+    amount: 100,
+    bankReference: "HDFC-UNKNOWN-001"
+  });
+  assert.equal(unmatched.status, 202);
+  assert.equal(unmatched.body.reconciliation.outcome, "exception");
+  assert.equal(unmatched.body.reconciliation.exceptionCode, "unmatched_payment_rail");
+});
+
+test("NACH presentment settles through the same reconciliation gate", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-nach-reconciliation-"));
+  t.after(async () => { await rm(dataDir, { recursive: true, force: true }); });
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] });
+  await listen(server);
+  t.after(async () => { await close(server); });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const application = await approveAndDisburseApplication(base);
+  const account = await (await apiFetch(`${base}/loan-accounts/${application.loanAccountId}`)).json();
+  const amount = account.schedule[0].totalDue;
+
+  const mandate = await postJson(`${base}/integrations/payment-rails/nach-mandates`, {
+    borrowerId: "bor_001", loanAccountId: application.loanAccountId, accountNumber: "123456789012", ifsc: "HDFC0000001", maxAmount: amount, frequency: "monthly", consentRef: "consent_nach_001", bankAccountVerificationRef: "BANK-VERIFY-MOCK-001"
+  });
+  assert.equal(mandate.status, 201);
+  const presentment = await postJson(`${base}/integrations/payment-rails/nach-presentments`, {
+    mandateId: mandate.body.paymentRail.paymentRailId, amount, dueDate: account.schedule[0].dueDate
+  });
+  assert.equal(presentment.status, 201);
+  assert.equal(presentment.body.paymentRail.type, "nach_presentment");
+
+  const settled = await postJson(`${base}/integrations/payment-rails/settlements`, {
+    providerRef: presentment.body.paymentRail.providerRef, providerEventRef: "nach_settlement_001", status: "settled", amount, bankReference: "NACH-BANK-001", settledAt: `${account.schedule[0].dueDate}T00:00:00.000Z`
+  });
+  assert.equal(settled.status, 200);
+  assert.equal(settled.body.paymentEvent.channel, "nach");
 });
 
 function eligibilityApplication(overrides = {}) {

@@ -120,6 +120,7 @@ export function createLoanAccountFromApplication(application, disbursement, now 
     regulatedEntityId: application.regulatedEntityId ?? null,
     productId: application.productId ?? application.product?.productId ?? null,
     productCode: application.product?.productCode ?? null,
+    accountingProfile: application.product?.accountingProfile ?? null,
     status: ACTIVE_STATUS,
     currency: application.kfs?.currency ?? application.product?.currency ?? "INR",
     principalAmount: roundMoney(principalAmount),
@@ -127,6 +128,7 @@ export function createLoanAccountFromApplication(application, disbursement, now 
     aprBps: application.kfs?.aprBps ?? application.product?.aprBps ?? annualInterestRateBps,
     tenorMonths,
     repaymentFrequency: application.kfs?.repaymentFrequency ?? application.product?.repaymentFrequency ?? "monthly",
+    coolingOffDays: application.kfs?.coolingOffDays ?? application.product?.coolingOffDays ?? 1,
     openedAt: now.toISOString(),
     disbursedAt: disbursement.disbursedAt ?? now.toISOString(),
     disclosedChargeCatalog: normalizeChargeCatalog(application.kfs),
@@ -2003,6 +2005,74 @@ export function reverseLoanAccountEvent(account, input, now = new Date()) {
     findings,
     summary
   };
+}
+
+// Refund only cash that was never allocated to principal, interest, or charges.
+// Any principal/interest correction remains a separately approved ledger reversal.
+export function refundUnappliedPayment(account, input, now = new Date()) {
+  const findings = [];
+  const payment = (account?.ledger ?? []).find((event) => event.eventId === input?.paymentEventId && event.type === "payment");
+  const priorRefunded = (account?.ledger ?? [])
+    .filter((event) => event.refundOfPaymentEventId === input?.paymentEventId)
+    .reduce((sum, event) => sum + Math.abs(event.amount ?? 0), 0);
+  if (!payment) findings.push(createFinding("error", "RBI-IT-GRC", "Refund must reference an existing payment event.", "paymentEventId"));
+  if (!Number.isFinite(input?.amount) || input.amount <= 0) findings.push(createFinding("error", "RBI-IT-GRC", "Refund amount must be positive.", "amount"));
+  if (!input?.refundRef || !input?.approvedBy || !input?.reason) findings.push(createFinding("error", "RBI-IT-GRC", "Refund requires refundRef, approvedBy, and reason.", "refund"));
+  const available = Math.max(0, (payment?.unappliedAmount ?? 0) - priorRefunded);
+  if (Number.isFinite(input?.amount) && input.amount > available) findings.push(createFinding("error", "RBI-DL-2025", "Refund cannot exceed the payment's unapplied amount.", "amount"));
+  if ((account?.ledger ?? []).some((event) => event.refundRef === input?.refundRef)) findings.push(createFinding("error", "RBI-IT-GRC", "Refund reference has already been used.", "refundRef"));
+  const summary = summarizeFindings(findings);
+  if (summary.status === "blocked") return { loanAccount: account, refundEvent: null, findings, summary };
+  const refundedAt = input.refundedAt ? new Date(input.refundedAt) : now;
+  const refundEvent = { eventId: createLoanId("ledger"), type: "refund", eventDate: refundedAt.toISOString(), amount: -roundMoney(input.amount), principalDebit: 0, principalCredit: 0, interestCredit: 0, chargesDebit: 0, chargesCredit: 0, chargesWaiverCredit: 0, refundOfPaymentEventId: payment.eventId, refundRef: input.refundRef, reason: input.reason, approvedBy: input.approvedBy, actor: input.approvedBy };
+  return { loanAccount: { ...account, ledger: [...(account.ledger ?? []), refundEvent], updatedAt: now.toISOString() }, refundEvent, findings, summary };
+}
+
+// A failed outward disbursement can be returned only before the account has
+// any servicing activity. It cancels the principal debit itself; it is not a
+// borrower refund and cannot be used to unwind a live loan.
+export function returnFailedDisbursement(account, input, now = new Date()) {
+  const findings = [];
+  const disbursement = (account?.ledger ?? []).find((event) => event.type === "disbursement");
+  const alreadyReturned = (account?.ledger ?? []).some((event) => event.returnOfDisbursementEventId === disbursement?.eventId);
+  const servicingActivity = (account?.ledger ?? []).some((event) => !["disbursement", "interest_accrual"].includes(event.type));
+  if (!account || account.status !== ACTIVE_STATUS) findings.push(createFinding("error", "RBI-DL-2025", "Only an active loan account can record a failed disbursement return.", "status"));
+  if (!disbursement) findings.push(createFinding("error", "RBI-IT-GRC", "Original disbursement event was not found.", "loanAccount"));
+  if (alreadyReturned) findings.push(createFinding("error", "RBI-IT-GRC", "Disbursement has already been returned.", "returnRef"));
+  if (servicingActivity) findings.push(createFinding("error", "RBI-DL-2025", "Disbursement return is blocked after repayment, charges, or other servicing activity; use a governed reversal/refund workflow.", "loanAccount"));
+  if (!input?.returnRef || !input?.approvedBy || !input?.reason) findings.push(createFinding("error", "RBI-IT-GRC", "Failed disbursement return requires returnRef, approvedBy, and reason.", "return"));
+  const summary = summarizeFindings(findings);
+  if (summary.status === "blocked") return { loanAccount: account, returnEvent: null, findings, summary };
+  const returnedAt = input.returnedAt ? new Date(input.returnedAt) : now;
+  const returnEvent = { eventId: createLoanId("ledger"), type: "disbursement_return", eventDate: returnedAt.toISOString(), amount: -roundMoney(disbursement.amount), principalDebit: -roundMoney(disbursement.principalDebit), principalCredit: 0, interestCredit: 0, chargesDebit: 0, chargesCredit: 0, chargesWaiverCredit: 0, returnOfDisbursementEventId: disbursement.eventId, returnRef: input.returnRef, reason: input.reason, approvedBy: input.approvedBy, actor: input.approvedBy };
+  return { loanAccount: { ...account, ledger: [...(account.ledger ?? []), returnEvent], status: "cancelled", closedAt: returnedAt.toISOString(), updatedAt: now.toISOString() }, returnEvent, findings, summary };
+}
+
+export function quoteCoolingOffCancellation(account, input = {}, now = new Date()) {
+  const findings = [];
+  const asOf = input.asOf ? new Date(input.asOf) : now;
+  const elapsedDays = Math.max(0, Math.ceil((asOf.getTime() - new Date(account?.disbursedAt).getTime()) / 86400000));
+  if (!account || account.status !== ACTIVE_STATUS) findings.push(createFinding("error", "RBI-KFS-2024", "Cooling-off quote requires an active loan account.", "status"));
+  if (Number.isNaN(asOf.getTime()) || elapsedDays > (account?.coolingOffDays ?? 0)) findings.push(createFinding("error", "RBI-KFS-2024", "Cooling-off period has expired.", "asOf"));
+  const summary = summarizeFindings(findings);
+  if (summary.status === "blocked") return { quote: null, findings, summary };
+  const principal = account.principalAmount;
+  const proportionateInterest = roundMoney((principal * account.annualInterestRateBps * elapsedDays) / (10000 * 365));
+  return { quote: { loanAccountId: account.loanAccountId, asOf: asOf.toISOString(), elapsedDays, principalAmount: principal, proportionateInterest, permittedCharges: 0, totalPayable: roundMoney(principal + proportionateInterest), currency: account.currency }, findings, summary };
+}
+
+export function executeCoolingOffCancellation(account, input, now = new Date()) {
+  const quoteResult = quoteCoolingOffCancellation(account, { asOf: input?.paidAt }, now);
+  const findings = [...quoteResult.findings];
+  const duplicate = (account?.ledger ?? []).some((event) => event.coolingOffPaymentRef === input?.paymentRef);
+  if (!input?.paymentRef || !input?.paidBy) findings.push(createFinding("error", "RBI-IT-GRC", "Cooling-off cancellation requires paymentRef and paidBy.", "payment"));
+  if (duplicate) findings.push(createFinding("error", "RBI-IT-GRC", "Cooling-off payment reference has already been used.", "paymentRef"));
+  if (!Number.isFinite(input?.amount) || input.amount !== quoteResult.quote?.totalPayable) findings.push(createFinding("error", "RBI-KFS-2024", "Cooling-off payment must exactly equal the quoted total payable.", "amount"));
+  const summary = summarizeFindings(findings);
+  if (summary.status === "blocked") return { loanAccount: account, cancellationEvent: null, quote: quoteResult.quote, findings, summary };
+  const paidAt = input.paidAt ? new Date(input.paidAt) : now;
+  const cancellationEvent = { eventId: createLoanId("ledger"), type: "cooling_off_cancellation", eventDate: paidAt.toISOString(), amount: roundMoney(input.amount), principalDebit: 0, principalCredit: quoteResult.quote.principalAmount, interestDebit: 0, interestCredit: 0, chargesDebit: 0, chargesCredit: 0, chargesWaiverCredit: 0, coolingOffInterestCollected: quoteResult.quote.proportionateInterest, coolingOffPaymentRef: input.paymentRef, actor: input.paidBy };
+  return { loanAccount: { ...account, ledger: [...(account.ledger ?? []), cancellationEvent], status: "cancelled", closedAt: paidAt.toISOString(), coolingOffCancelledAt: paidAt.toISOString(), updatedAt: now.toISOString() }, cancellationEvent, quote: quoteResult.quote, findings, summary };
 }
 
 export function generateLoanStatement(account, input = {}, now = new Date()) {

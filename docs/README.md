@@ -8,13 +8,15 @@ This folder is the working documentation set for the LoanOS India build. It expl
 2. [LoanOS architecture blueprint](/Users/nisheethranjan/Projects/AIBank/docs/architecture/loanos-india-blueprint.md)
 3. [India regulatory register](/Users/nisheethranjan/Projects/AIBank/docs/compliance/india-regulatory-register.md)
 4. [Current implementation map](/Users/nisheethranjan/Projects/AIBank/docs/architecture/current-implementation.md)
-5. [Build backlog](/Users/nisheethranjan/Projects/AIBank/docs/product/build-backlog.md)
+5. [Complete-system capability catalogue](/Users/nisheethranjan/Projects/AIBank/docs/product/complete-system-capability-catalog.md)
+6. [Build backlog](/Users/nisheethranjan/Projects/AIBank/docs/product/build-backlog.md)
 
 ## Documentation Map
 
 | Document | Purpose |
 | --- | --- |
 | [What we are building](/Users/nisheethranjan/Projects/AIBank/docs/product/what-we-are-building.md) | Product definition, users, modules, scope, non-goals, and success criteria. |
+| [Complete-system capability catalogue](/Users/nisheethranjan/Projects/AIBank/docs/product/complete-system-capability-catalog.md) | Canonical exhaustive target capability register across lending, operations, accounting, risk, compliance, technology, and product-specific journeys, with current maturity classifications. |
 | [Roadmap](/Users/nisheethranjan/Projects/AIBank/docs/product/roadmap.md) | Phased delivery plan from compliance foundation to AI governance hardening. |
 | [Build backlog](/Users/nisheethranjan/Projects/AIBank/docs/product/build-backlog.md) | Actionable engineering backlog grouped by epic. |
 | [Architecture blueprint](/Users/nisheethranjan/Projects/AIBank/docs/architecture/loanos-india-blueprint.md) | Target architecture across LOS, LMS, LWS, and compliance control plane. |
@@ -35,4 +37,3 @@ A feature is not considered complete unless it updates the relevant docs:
 - Architecture or service ownership: update `docs/architecture/`.
 - Compliance or risk control: update `docs/compliance/`.
 - Major irreversible technical choice: add a decision record under `docs/decisions/`.
-

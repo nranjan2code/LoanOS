@@ -25,10 +25,10 @@ cite the ID in commits and PRs.
 | REV-03 | Single source of truth for engine status to prevent re-drift | A | P1 | DONE |
 | REV-10 | Automated test coverage of the JS→engine gateway (shadow/active/fail-closed) | B | P1 | DONE |
 | REV-11 | CI lane that builds + starts `rules-service` and runs the gateway integration test | B | P1 | DONE |
-| REV-12 | Per-tenant engine routing in the JS gateway (retire the single hardcoded URL) | B | P1 | TODO |
-| REV-13 | `active`-mode reason-lineage fidelity (carry engine reasons/summary, not just decision) | B | P1 | TODO |
+| REV-12 | Per-tenant engine routing in the JS gateway (retire the single hardcoded URL) | B | P1 | DONE |
+| REV-13 | `active`-mode reason-lineage fidelity (carry engine reasons/summary, not just decision) | B | P1 | DONE |
 | REV-14 | Decision: wire engine to shadow now vs. pause PH-6+ engine work | B | P1 | DECIDE |
-| REV-20 | Exact money math on the live JS path (EMI/interest/foreclosure) | C | P1 | IN PROGRESS |
+| REV-20 | Exact money math on the live JS path (EMI/interest/foreclosure) | C | P1 | DONE |
 | REV-21 | NPA upgrade rule: standard only after all arrears cleared (RBI IRAC) | C | P1 | DONE |
 | REV-30 | Multi-bureau underwriting depth (bands + attributes, not one threshold) | D | P1 | DONE |
 | REV-31 | Account Aggregator → income/obligations/FOIR analytics layer | D | P1 | DONE |
@@ -90,19 +90,18 @@ Added a robust test suite at [rules-engine-gateway.test.js](file:///Users/nishee
 ### REV-11 — CI lane that starts `rules-service` and runs the gateway integration test · P1 · DONE
 Enhanced `loanos.sh` build script to compile the Rust workspace, run formatting/clippy/tests, sign bundles, output `fleet.json`, and run Node integration tests. In CI, because the new test suite runs as part of the standard `npm test` pipeline, the gateway and verification checks are fully covered on every push.
 
-### REV-12 — Per-tenant engine routing in the JS gateway · P1 · TODO
-`engineBaseUrl()` returns one hardcoded `LOANOS_RULES_ENGINE_URL` (default `127.0.0.1:47311`) for every
-tenant, but instances are tenant-bound and reject a mismatched `tenant_id` (INV-2). So the current
-gateway only works single-tenant/dev. Resolve the instance URL per tenant (registry/fleet lookup)
-before the fleet is multi-tenant. **Acceptance:** two tenants with two instances each route correctly; a
-mismatched `tenant_id` is rejected/alarmed, not silently misrouted.
+### REV-12 — Per-tenant engine routing in the JS gateway · P1 · DONE
+The gateway now requires `LOANOS_RULES_ENGINE_URLS`, a JSON tenant-ID-to-instance map. The former
+single `LOANOS_RULES_ENGINE_URL` fallback is removed. A missing tenant mapping fails closed before any
+network request, while gateway coverage proves tenant A and tenant B route to their respective isolated
+instances. The tenant-bound rules-service still independently rejects a mismatched `tenant_id` (INV-2).
 
-### REV-13 — `active`-mode reason-lineage fidelity · P1 · TODO
-In `active` mode `assessEligibilityGated` overrides only `assessment.decision`; `assessment.reasons`,
-`.summary`, and `.metrics` remain the JS evaluator's, and the engine's reasons land in a separate
-`assessment.engine.reasons`. So when the engine decides, the reason evidence stored on the application
-(used for adverse-action/decline-reason and audit lineage) reflects JS reasoning, not the engine's.
-**Acceptance:** in `active`, stored reasons/summary derive from the engine's trace; decline-reason evidence matches the deciding authority.
+### REV-13 — `active`-mode reason-lineage fidelity · P1 · DONE
+In active mode, the persisted assessment now takes its decision, findings, summary, outputs, ruleset,
+trace reference, instance, and evaluation timestamp from the rules engine. Engine reasons are translated
+into the application's finding schema while retaining code, regulation, path, and audience. JavaScript
+metrics remain operational context only and are no longer recorded as the decision rationale. An engine
+outage produces an explicit manual-review finding and a fail-closed `refer` outcome.
 
 ### REV-14 — Decision: wire to shadow now vs. pause PH-6+ engine work · P1 · DECIDE
 The engine is built to PH-5 (federation, AI guardrails, replay canary) yet is not on the critical path
@@ -114,11 +113,12 @@ lending breadth + live integrations. **Owner decision required before further en
 
 ## WS-C — Live-path correctness
 
-### REV-20 — Exact money math on the live JS path · P1 · IN PROGRESS
-`eligibility.js` (EMI/FOIR) and `loan-account.js` (interest/foreclosure) use float + `Number.EPSILON`
-rounding (`roundMoney`). Ledger *summation* already uses exact integer paise (`sumMoney`), but EMI,
-per-installment interest, and foreclosure math do not. Either move these to integer-paise arithmetic or
-route the decision through the decimal engine (WS-B). **Acceptance:** amortization and payoff are exact at scale, independent of epsilon heuristics.
+### REV-20 — Exact money math on the live JS path · P1 · DONE
+The LMS schedule, interest, foreclosure, and repayment paths already operate in integer paise. The
+remaining eligibility path now quantises input money once at the JavaScript boundary and computes
+reducing-balance EMI and FOIR using BigInt numerator/denominator arithmetic, rounded once to paise or
+four decimal ratio places. Fractional basis-point rates are rejected. The differential corpus was
+regenerated and the Rust evaluator continues to match all 542 cases with zero divergence.
 
 **LMS ledger path done this session.** `loan-account.js` now carries outstanding principal as exact
 integer paise through `generateRepaymentSchedule` and `reamortizeInstallments`, computes per-installment
@@ -130,10 +130,6 @@ generation, part-prepayment re-amortization, and the floating-rate reset rebuild
 the paise with zero drift over an awkward 84-month case; all 150 Node tests stay green (outputs are
 identical to the prior epsilon path, now guaranteed exact rather than heuristic).
 
-**Deferred (still TODO):** the affordability-path EMI in `eligibility.js` (`estimateEmi`) — it is an
-estimate that is never ledgered, and it is entangled with the Rust engine's differential corpus
-(`rules/tools/gen-eligibility-corpus.mjs`), so it is best cut over together with the decimal decision
-engine (WS-B) rather than dual-maintained. Track flip to DONE when that path is converted.
 
 ### REV-21 — NPA upgrade rule (RBI IRAC) · P1 · DONE
 Asset classification maps DPD → standard/SMA/NPA with a 90-day threshold, but the upgrade path needs the

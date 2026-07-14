@@ -34,12 +34,42 @@ export const ELIGIBILITY_DECISIONS = {
   INELIGIBLE: "ineligible"
 };
 
-function roundMoney(value) {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
+const PAISE_PER_RUPEE = 100n;
+const RATIO_SCALE = 10_000n;
+const MONTHLY_RATE_DENOMINATOR = 120_000n;
+const MAX_SAFE_MONEY_PAISE = BigInt(Number.MAX_SAFE_INTEGER) * PAISE_PER_RUPEE;
+
+// Amounts cross the JavaScript boundary as decimal JSON numbers. Quantise once
+// at that boundary, then perform every affordability calculation as integer
+// paise. This deliberately replaces the former Number.EPSILON-based money
+// math: an approval must never depend on floating-point drift.
+function toScaledInteger(value, fractionDigits) {
+  if (!Number.isFinite(value) || Math.abs(value) >= 1e21) return null;
+  const negative = value < 0;
+  const text = Math.abs(value).toFixed(fractionDigits);
+  const [whole, fraction = ""] = text.split(".");
+  const scale = 10n ** BigInt(fractionDigits);
+  const scaled = BigInt(whole) * scale + BigInt(fraction.padEnd(fractionDigits, "0"));
+  return negative ? -scaled : scaled;
 }
 
-function roundRatio(value) {
-  return Math.round((value + Number.EPSILON) * 10000) / 10000;
+function toPaise(value) {
+  return toScaledInteger(value, 2);
+}
+
+function roundedDivide(numerator, denominator) {
+  if (denominator <= 0n) return null;
+  return (numerator * 2n + denominator) / (denominator * 2n);
+}
+
+function moneyFromPaise(paise) {
+  if (paise === null || paise < 0n || paise > MAX_SAFE_MONEY_PAISE) return null;
+  return Number(paise) / Number(PAISE_PER_RUPEE);
+}
+
+function ratioFromScaled(value) {
+  if (value === null || value < 0n || value > BigInt(Number.MAX_SAFE_INTEGER)) return null;
+  return Number(value) / Number(RATIO_SCALE);
 }
 
 // Reducing-balance EMI, matching the amortization used by the LMS schedule so
@@ -48,18 +78,26 @@ export function estimateEmi(principalAmount, annualInterestRateBps, tenorMonths)
   if (!Number.isFinite(principalAmount) || principalAmount <= 0) {
     return null;
   }
-  if (!Number.isFinite(tenorMonths) || tenorMonths <= 0) {
+  if (!Number.isSafeInteger(tenorMonths) || tenorMonths <= 0) {
     return null;
   }
-  if (!Number.isFinite(annualInterestRateBps) || annualInterestRateBps < 0) {
+  if (!Number.isSafeInteger(annualInterestRateBps) || annualInterestRateBps < 0) {
     return null;
   }
-  const monthlyRate = annualInterestRateBps / 10000 / 12;
-  if (monthlyRate === 0) {
-    return roundMoney(principalAmount / tenorMonths);
+  const principalPaise = toPaise(principalAmount);
+  if (principalPaise === null || principalPaise <= 0n) return null;
+
+  const tenor = BigInt(tenorMonths);
+  if (annualInterestRateBps === 0) {
+    return moneyFromPaise(roundedDivide(principalPaise, tenor));
   }
-  const factor = (1 + monthlyRate) ** tenorMonths;
-  return roundMoney((principalAmount * monthlyRate * factor) / (factor - 1));
+
+  const rateBps = BigInt(annualInterestRateBps);
+  const factorNumerator = (MONTHLY_RATE_DENOMINATOR + rateBps) ** tenor;
+  const factorDenominator = MONTHLY_RATE_DENOMINATOR ** tenor;
+  const numerator = principalPaise * rateBps * factorNumerator;
+  const denominator = MONTHLY_RATE_DENOMINATOR * (factorNumerator - factorDenominator);
+  return moneyFromPaise(roundedDivide(numerator, denominator));
 }
 
 // Policy-driven creditworthiness/affordability assessment. Anchored to the
@@ -102,7 +140,8 @@ export function evaluateEligibility(application, options = {}) {
   const maxAgeYears = Number.isFinite(eligibilityPolicy.maxAgeYears) ? eligibilityPolicy.maxAgeYears : null;
   const minMonthlyIncome = Number.isFinite(eligibilityPolicy.minMonthlyIncome) ? eligibilityPolicy.minMonthlyIncome : 0;
   const maxFoir = Number.isFinite(eligibilityPolicy.maxFoir) ? eligibilityPolicy.maxFoir : DEFAULT_MAX_FOIR;
-  const referFoir = roundRatio(maxFoir * REFER_FOIR_FRACTION);
+  const maxFoirScaled = toScaledInteger(maxFoir, 4);
+  const referFoirScaled = maxFoirScaled === null ? null : roundedDivide(maxFoirScaled * 8n, 10n);
 
   const age = borrower.dateOfBirth ? calculateAgeYears(borrower.dateOfBirth, now) : borrower.ageYears;
   const tenorYears = Number.isFinite(requestedTenorMonths) ? Math.ceil(requestedTenorMonths / 12) : null;
@@ -162,8 +201,15 @@ export function evaluateEligibility(application, options = {}) {
 
   let foir = null;
   if (Number.isFinite(monthlyIncome) && monthlyIncome > 0 && Number.isFinite(estimatedEmi)) {
-    foir = roundRatio((obligationsUsed + estimatedEmi) / monthlyIncome);
-    if (foir > maxFoir) {
+    const incomePaise = toPaise(monthlyIncome);
+    const obligationsPaise = toPaise(obligationsUsed);
+    const emiPaise = toPaise(estimatedEmi);
+    const foirScaled =
+      incomePaise !== null && incomePaise > 0n && obligationsPaise !== null && emiPaise !== null
+        ? roundedDivide((obligationsPaise + emiPaise) * RATIO_SCALE, incomePaise)
+        : null;
+    foir = ratioFromScaled(foirScaled);
+    if (foirScaled !== null && maxFoirScaled !== null && foirScaled > maxFoirScaled) {
       findings.push(
         createFinding(
           "error",
@@ -172,7 +218,7 @@ export function evaluateEligibility(application, options = {}) {
           "economicProfile.monthlyIncome"
         )
       );
-    } else if (foir > referFoir) {
+    } else if (foirScaled !== null && referFoirScaled !== null && foirScaled > referFoirScaled) {
       findings.push(
         createFinding(
           "warning",
