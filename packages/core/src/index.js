@@ -319,6 +319,9 @@ export { approveProfitabilityParameters, approveProductAddon, approveRiskPricing
 export { acknowledgeBcAssistedKycUpdate, analyzeBankStatement, assessGuardianSpecialCategory, assignRiskGradeAndPrice, buildPeriodicKycAction, calculateHouseholdIndebtedness, recordPhysicalOriginalCustody, verifyUnderwritingSources } from "./kyc-underwriting-completion.js";
 export { authorizeDisbursementTranche, completeMultipartySigning, recordCollateralMonitoring, recordCollateralRelease, recordPostDisbursementFollowup, registerCollateralAssessment } from "./collateral-disbursement-completion.js";
 export { allocateCollectionPortfolio, approveServicingChange, buildCollectionPerformance, deriveCollectionTreatment, issueServicingDocument, registerCollectionStrategy, settleCollectionAgencyFee } from "./servicing-collections-completion.js";
+export { accountRecoveryProceeds, allocatePostWriteoffRecovery, assessClosureSla, authorizeRepossession, buildInstallmentVariants, conductRecoveryAuction, moveDueDateForHoliday, recordPossessionAndValuation, releaseOriginalsAndCollateral, releaseRepossessedAsset } from "./lms-recovery-closure-completion.js";
+export { approveGrievanceRcaCapa, approveServicingPortfolioTransfer, assessPartnerOversight, buildGrievanceAnalytics, closeOmbudsmanAward, createAssistedComplaint, manageLspIncident } from "./partner-grievance-completion.js";
+export { amendRegulatoryReturn, createRegulatoryReturn, publishMasterReferenceVersion, reconcileRegulatorySubmission, registerDataProduct, registerGovernedConnector } from "./reporting-data-integration-completion.js";
 export {
   PROVIDER_INTEGRATIONS,
   assessProviderCertification,

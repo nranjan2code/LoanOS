@@ -125,6 +125,10 @@ node docs/gtm/automation/gtm-backlog-sync.mjs
 | C-92 | Special-category KYC and underwriting retain authority, notices/grace, BC/custody evidence and exact cash-flow/FOIR/risk-price derivation | Partial | architecture/missing-capability-closure-wave.md; live feeds, institutional models and vault operations remain |
 | C-93 | Secured lending gates valuation/legal/LTV/insurance/perfection/custody and monitoring before checksum-bound signing and staged end-use disbursement | Partial | architecture/missing-capability-closure-wave.md; external registry/panel/insurer/custodian/payment operations remain |
 | C-94 | Servicing and collections govern material changes, documents, deterministic treatments, agency capacity, exact settlement and performance analytics | Partial | architecture/missing-capability-closure-wave.md; borrower/collector UX, live agency/finance feeds and production history remain |
+| C-95 | Recovery and closure govern schedule/calendar variants, repossession/auction, balanced proceeds, postwriteoff recovery, release and delay compensation | Partial | architecture/final-missing-capability-wave.md; live court/yard/auction/finance/custody operations remain |
+| C-96 | Partner and grievance operations govern LSP exits, portfolio transfers, oversight, RCA/redress, assisted complaints, analytics and Ombudsman awards | Partial | architecture/final-missing-capability-wave.md; live monitoring, staff/payment and regulator evidence remain |
+| C-97 | Regulatory and data controls cover exact CRILC/SMA, XBRL/CIMS, PSL, submission lineage, certified connectors, CDC/marts and reference versions | Partial | architecture/final-missing-capability-wave.md; certified endpoints, runtime and institution stewardship remain |
+| C-98 | Servicing, collections/field and control-function workspaces use authorized no-store access and retain no browser data | Partial | architecture/final-missing-capability-wave.md; deeper forms, institution validation and production certification remain |
 
 ## Change process
 

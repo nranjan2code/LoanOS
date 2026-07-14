@@ -381,11 +381,11 @@ The detailed register contains **453 individually identified capabilities**. At 
 | LMS-003 | Weekly, fortnightly, quarterly, and irregular frequency | Product | Partial |
 | LMS-004 | Bullet, balloon, step-up, step-down, and seasonal schedules | Product | Partial |
 | LMS-005 | Moratorium, pre-EMI, EMI holiday, and capitalised interest | Product | Partial |
-| LMS-006 | Broken-period interest and first/last instalment variants | Product | Missing |
+| LMS-006 | Broken-period interest and first/last instalment variants | Product | Partial |
 | LMS-007 | Daily reducing balance and utilisation-based interest | Product | Partial |
 | LMS-008 | Revolving credit, OD, cash credit, and drawdown facilities | Product | Partial |
 | LMS-009 | Credit limit, available limit, minimum due, and limit review | Product | Implemented |
-| LMS-010 | Holiday calendar, due-date movement, and grace days | Core | Missing |
+| LMS-010 | Holiday calendar, due-date movement, and grace days | Core | Partial |
 | LMS-011 | Floating benchmark, spread, reset date, and rate history | Product | Partial |
 | LMS-012 | Borrower choice on floating-rate reset | Product | Implemented |
 | LMS-013 | Part-prepayment with EMI/tenure choice | Product | Implemented |
@@ -456,16 +456,16 @@ The detailed register contains **453 individually identified capabilities**. At 
 | --- | --- | --- | --- |
 | REC-001 | Legal-recovery case and strategy selection | Product | Implemented |
 | REC-002 | SARFAESI demand notice and statutory clock | Product | Implemented |
-| REC-003 | Possession, publication, valuation, and sale process | Product | Missing |
+| REC-003 | Possession, publication, valuation, and sale process | Product | Partial |
 | REC-004 | Section 138 cheque-bounce notice and case | Product | Implemented |
 | REC-005 | Arbitration, Lok Adalat, DRT, civil suit, and insolvency tracks | Product | Partial |
 | REC-006 | Advocate panel, assignment, hearing, order, and expense | Product | Partial |
-| REC-007 | Repossession authorization, inventory, yard, and release | Product | Missing |
-| REC-008 | Auction reserve, bids, sale, proceeds, and shortfall | Product | Missing |
+| REC-007 | Repossession authorization, inventory, yard, and release | Product | Partial |
+| REC-008 | Auction reserve, bids, sale, proceeds, and shortfall | Product | Partial |
 | REC-009 | Legal notice/document generation and delivery evidence | Product | Implemented |
 | REC-010 | Settlement during legal action and case withdrawal | Product | Partial |
 | REC-011 | Limitation dates, next hearing, SLA, and escalation | Product | Partial |
-| REC-012 | Recovery proceeds and legal expense accounting | Product | Missing |
+| REC-012 | Recovery proceeds and legal expense accounting | Product | Partial |
 
 ### 20. Restructuring, Settlement, Write-off, and Closure
 
@@ -477,20 +477,20 @@ The detailed register contains **453 individually identified capabilities**. At 
 | CLS-004 | OTS/settlement proposal, sacrifice, policy, and authority matrix | Core | Partial |
 | CLS-005 | Settlement payment tracking and shortfall waiver | Core | Implemented |
 | CLS-006 | Technical write-off while retaining legal dues | Institution | Implemented |
-| CLS-007 | Recovery after write-off and accounting allocation | Institution | Missing |
+| CLS-007 | Recovery after write-off and accounting allocation | Institution | Partial |
 | CLS-008 | Closure on scheduled repayment, foreclosure, or settlement | Core | Implemented |
 | CLS-009 | NOC/no-dues certificate | Core | Implemented |
-| CLS-010 | Original-document and collateral release workflow | Product | Missing |
+| CLS-010 | Original-document and collateral release workflow | Product | Partial |
 | CLS-011 | CERSAI/registry satisfaction and closure evidence | Product | Partial/Mock |
 | CLS-012 | CIC closure update and borrower confirmation | Core | Partial/Mock |
-| CLS-013 | Closure SLA, delay compensation, and grievance linkage | Product | Missing |
+| CLS-013 | Closure SLA, delay compensation, and grievance linkage | Product | Partial |
 
 ### 21. Co-lending, DLG, LSP, and Partner Economics
 
 | ID | Capability | Applicability | Status |
 | --- | --- | --- | --- |
 | PAR-001 | LSP agreement, role, due diligence, review, data, and fee controls | Channel | Implemented |
-| PAR-002 | LSP incident, breach, remediation, suspension, and exit | Channel | Missing |
+| PAR-002 | LSP incident, breach, remediation, suspension, and exit | Channel | Partial |
 | PAR-003 | DLG provider eligibility, form, cap, tenor, and invocation | Product | Implemented |
 | PAR-004 | DLG exposure, replenishment, recovery, disclosure, and accounting | Product | Partial |
 | PAR-005 | Co-lending agreement, roles, shares, retention, rate, and escrow | Product | Implemented |
@@ -499,8 +499,8 @@ The detailed register contains **453 individually identified capabilities**. At 
 | PAR-008 | Partner principal, interest, fee, tax, and provision ledger legs | Product | Implemented |
 | PAR-009 | Collection and recovery allocation by partner share | Product | Partial |
 | PAR-010 | Partner reconciliation, break management, and statements | Product | Partial |
-| PAR-011 | Servicing transfer, portfolio sale, assignment, and participation | Product | Missing |
-| PAR-012 | Partner SLA, performance, concentration, and audit | Channel | Missing |
+| PAR-011 | Servicing transfer, portfolio sale, assignment, and participation | Product | Partial |
+| PAR-012 | Partner SLA, performance, concentration, and audit | Channel | Partial |
 | PAR-013 | DSA/BC/dealer/merchant commission and clawback | Channel | Partial |
 
 ### 22. Workflow, Maker-Checker, and Operations
@@ -532,11 +532,11 @@ The detailed register contains **453 individually identified capabilities**. At 
 | GRV-004 | 30-day clock and overdue escalation | Core | Implemented |
 | GRV-005 | Borrower dissatisfaction/rejection and RBI CMS eligibility | Core | Partial |
 | GRV-006 | RBI CMS link, submission, acknowledgement, and order tracking | Core | Partial/Mock |
-| GRV-007 | Root cause, corrective action, restitution, and compensation | Core | Missing |
+| GRV-007 | Root cause, corrective action, restitution, and compensation | Core | Partial |
 | GRV-008 | LSP/DLA/recovery-agent conduct attribution | Channel | Partial |
-| GRV-009 | Vulnerable customer, language, accessibility, and assisted complaint | Core | Missing |
-| GRV-010 | Complaint analytics, repeat issues, product/channel trends, and board reporting | Institution | Missing |
-| GRV-011 | Ombudsman award/compliance and closure evidence | Institution | Missing |
+| GRV-009 | Vulnerable customer, language, accessibility, and assisted complaint | Core | Partial |
+| GRV-010 | Complaint analytics, repeat issues, product/channel trends, and board reporting | Institution | Partial |
+| GRV-011 | Ombudsman award/compliance and closure evidence | Institution | Partial |
 
 ### 24. Regulatory and External Reporting
 
@@ -550,12 +550,12 @@ The detailed register contains **453 individually identified capabilities**. At 
 | RPT-006 | CKYCRR production upload/download format and acknowledgement | Institution | Partial |
 | RPT-007 | FIU FINnet 2.0 STR/CTR/CCR XML and acknowledgement | Institution | Partial |
 | RPT-008 | CERSAI production payload, payment, response, and certificate | Product | Partial |
-| RPT-009 | CRILC/SMA and large-exposure reporting | Institution | Missing |
-| RPT-010 | XBRL/CIMS statutory returns | Institution | Missing |
-| RPT-011 | PSL classification and reporting | Institution | Missing |
+| RPT-009 | CRILC/SMA and large-exposure reporting | Institution | Partial |
+| RPT-010 | XBRL/CIMS statutory returns | Institution | Partial |
+| RPT-011 | PSL classification and reporting | Institution | Partial |
 | RPT-012 | Fraud, wilful-default, LEA, and board reporting | Institution | Partial |
 | RPT-013 | Regulatory calendar, maker-checker, filing, and evidence vault | Institution | Partial |
-| RPT-014 | Submission reconciliation and amendment history | Institution | Missing |
+| RPT-014 | Submission reconciliation and amendment history | Institution | Partial |
 
 ### 25. Finance, Tax, Treasury, and Profitability
 
@@ -660,13 +660,13 @@ The detailed register contains **453 individually identified capabilities**. At 
 | INT-005 | Provider health, timeout, retry, circuit breaker, and fail-closed policy | Core | Partial |
 | INT-006 | Callback correlation, acknowledgement, and reconciliation | Core | Partial |
 | INT-007 | API catalogue, OpenAPI, examples, SDK, and sandbox | Core | Partial |
-| INT-008 | Core banking, GL, CRM, DMS, data warehouse, and identity connectors | Institution | Missing |
+| INT-008 | Core banking, GL, CRM, DMS, data warehouse, and identity connectors | Institution | Partial |
 | INT-009 | Bureau, AA, CKYC, V-CIP, eSign, bank verify, payment, comms, CERSAI, and FIU providers | Product | Partial/Mock |
 | INT-010 | Event schema registry, lineage, backward compatibility, and deprecation | Core | Partial |
-| INT-011 | Operational and analytical data models separated by purpose | Core | Missing |
+| INT-011 | Operational and analytical data models separated by purpose | Core | Partial |
 | INT-012 | Data-quality rules, profiling, exception queue, and certification | Core | Partial |
-| INT-013 | Warehouse/lake exports, CDC, and regulatory data marts | Institution | Missing |
-| INT-014 | Master/reference-data governance | Core | Missing |
+| INT-013 | Warehouse/lake exports, CDC, and regulatory data marts | Institution | Partial |
+| INT-014 | Master/reference-data governance | Core | Partial |
 
 ### 31. Reliability, Observability, DR, and Service Operations
 
@@ -701,9 +701,9 @@ The detailed register contains **453 individually identified capabilities**. At 
 | UX-007 | Borrower complaint and privacy-rights journey | Channel | Implemented |
 | UX-008 | Underwriter case desktop with financial, bureau, policy, deviations, and note | Core | Partial |
 | UX-009 | Operations/disbursement task workspace | Core | Partial |
-| UX-010 | Servicing account desktop and service-request workspace | Core | Missing |
-| UX-011 | Collections/telecalling desktop and field mobile app | Channel | Missing |
-| UX-012 | Compliance, CCO, risk, finance, and audit dashboards | Institution | Missing |
+| UX-010 | Servicing account desktop and service-request workspace | Core | Partial |
+| UX-011 | Collections/telecalling desktop and field mobile app | Channel | Partial |
+| UX-012 | Compliance, CCO, risk, finance, and audit dashboards | Institution | Partial |
 | UX-013 | Platform/tenant administration | Core | Partial |
 | UX-014 | Branch, DSA, BC, dealer, merchant, LSP, and partner portals | Channel | Partial |
 | UX-015 | Multilingual Indian-language content and templates | Core | Partial |

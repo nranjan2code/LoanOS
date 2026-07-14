@@ -1,22 +1,22 @@
 {
-  "generated": "2026-07-14T19:06:15.251Z",
+  "generated": "2026-07-14T19:11:46.169Z",
   "git": {
     "branch": "main",
-    "count": 166,
+    "count": 167,
     "commits": []
   },
   "overall": {
     "counts": {
       "Implemented": 87,
-      "Partial": 312,
+      "Partial": 339,
       "Partial/Mock": 11,
       "Mock": 7,
-      "Missing": 27,
+      "Missing": 0,
       "Partner": 3,
       "External": 6
     },
     "total": 453,
-    "pct": 49
+    "pct": 52
   },
   "planes": [
     {
@@ -95,7 +95,7 @@
         {
           "n": 15,
           "name": "Repayment Schedule, Interest, and Product Structures",
-          "pct": 55,
+          "pct": 60,
           "total": 15
         },
         {
@@ -119,27 +119,27 @@
         {
           "n": 19,
           "name": "Legal Recovery, Repossession, and Enforcement",
-          "pct": 47,
+          "pct": 60,
           "total": 12
         },
         {
           "n": 20,
           "name": "Restructuring, Settlement, Write-off, and Closure",
-          "pct": 54,
+          "pct": 63,
           "total": 13
         }
       ],
       "counts": {
         "Implemented": 25,
-        "Partial": 59,
+        "Partial": 68,
         "Partial/Mock": 4,
         "Mock": 0,
-        "Missing": 9,
+        "Missing": 0,
         "Partner": 1,
         "External": 0
       },
       "total": 98,
-      "pct": 52
+      "pct": 55
     },
     {
       "name": "LWS",
@@ -153,7 +153,7 @@
         {
           "n": 21,
           "name": "Co-lending, DLG, LSP, and Partner Economics",
-          "pct": 54,
+          "pct": 63,
           "total": 13
         },
         {
@@ -165,21 +165,21 @@
         {
           "n": 23,
           "name": "Grievance, Conduct, and Customer Protection",
-          "pct": 42,
+          "pct": 56,
           "total": 11
         }
       ],
       "counts": {
         "Implemented": 14,
-        "Partial": 27,
+        "Partial": 34,
         "Partial/Mock": 1,
         "Mock": 0,
-        "Missing": 7,
+        "Missing": 0,
         "Partner": 1,
         "External": 0
       },
       "total": 50,
-      "pct": 51
+      "pct": 57
     },
     {
       "name": "Compliance OS",
@@ -205,7 +205,7 @@
         {
           "n": 24,
           "name": "Regulatory and External Reporting",
-          "pct": 33,
+          "pct": 44,
           "total": 14
         },
         {
@@ -217,15 +217,15 @@
       ],
       "counts": {
         "Implemented": 16,
-        "Partial": 44,
+        "Partial": 48,
         "Partial/Mock": 0,
         "Mock": 0,
-        "Missing": 4,
+        "Missing": 0,
         "Partner": 0,
         "External": 1
       },
       "total": 65,
-      "pct": 52
+      "pct": 55
     },
     {
       "name": "Platform & Tenancy",
@@ -343,21 +343,21 @@
         {
           "n": 30,
           "name": "Integrations, APIs, Events, and Data Platform",
-          "pct": 33,
+          "pct": 44,
           "total": 14
         }
       ],
       "counts": {
         "Implemented": 1,
-        "Partial": 8,
+        "Partial": 12,
         "Partial/Mock": 1,
         "Mock": 0,
-        "Missing": 4,
+        "Missing": 0,
         "Partner": 0,
         "External": 0
       },
       "total": 14,
-      "pct": 33
+      "pct": 44
     },
     {
       "name": "Reliability & Ops",
@@ -387,7 +387,7 @@
         {
           "n": 32,
           "name": "Borrower, Staff, Branch, Partner, and Field Experiences",
-          "pct": 40,
+          "pct": 47,
           "total": 17
         },
         {
@@ -399,15 +399,15 @@
       ],
       "counts": {
         "Implemented": 2,
-        "Partial": 22,
+        "Partial": 25,
         "Partial/Mock": 0,
         "Mock": 0,
-        "Missing": 3,
+        "Missing": 0,
         "Partner": 0,
         "External": 3
       },
       "total": 30,
-      "pct": 40
+      "pct": 44
     }
   ],
   "categories": [
@@ -3605,14 +3605,25 @@
           "id": "LMS-006",
           "name": "Broken-period interest and first/last instalment variants",
           "applicability": "Product",
-          "status": "Missing",
-          "raw": "Missing",
-          "evidence": [],
+          "status": "Partial",
+          "raw": "Partial",
+          "evidence": [
+            {
+              "type": "code",
+              "ref": "packages/core/src/lms-recovery-closure-completion.js",
+              "note": "exact schedule/calendar, recovery/auction/accounting, release and closure SLA controls"
+            },
+            {
+              "type": "test",
+              "ref": "tests/lms-recovery-closure-completion.test.js",
+              "note": "balanced recovery and fail-closed custody/auction coverage"
+            }
+          ],
           "owner": "",
           "acceptance": "",
           "dependencies": [],
           "notes": "",
-          "lastReviewed": ""
+          "lastReviewed": "2026-07-15"
         },
         {
           "id": "LMS-007",
@@ -3657,8 +3668,8 @@
           "id": "LMS-010",
           "name": "Holiday calendar, due-date movement, and grace days",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -3734,15 +3745,15 @@
       ],
       "counts": {
         "Implemented": 5,
-        "Partial": 8,
+        "Partial": 10,
         "Partial/Mock": 0,
         "Mock": 0,
-        "Missing": 2,
+        "Missing": 0,
         "Partner": 0,
         "External": 0
       },
       "total": 15,
-      "pct": 55
+      "pct": 60
     },
     {
       "n": 16,
@@ -4403,8 +4414,8 @@
           "id": "REC-003",
           "name": "Possession, publication, valuation, and sale process",
           "applicability": "Product",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -4455,8 +4466,8 @@
           "id": "REC-007",
           "name": "Repossession authorization, inventory, yard, and release",
           "applicability": "Product",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -4468,8 +4479,8 @@
           "id": "REC-008",
           "name": "Auction reserve, bids, sale, proceeds, and shortfall",
           "applicability": "Product",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -4520,8 +4531,8 @@
           "id": "REC-012",
           "name": "Recovery proceeds and legal expense accounting",
           "applicability": "Product",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -4532,15 +4543,15 @@
       ],
       "counts": {
         "Implemented": 4,
-        "Partial": 4,
+        "Partial": 8,
         "Partial/Mock": 0,
         "Mock": 0,
-        "Missing": 4,
+        "Missing": 0,
         "Partner": 0,
         "External": 0
       },
       "total": 12,
-      "pct": 47
+      "pct": 60
     },
     {
       "n": 20,
@@ -4629,8 +4640,8 @@
           "id": "CLS-007",
           "name": "Recovery after write-off and accounting allocation",
           "applicability": "Institution",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -4668,8 +4679,8 @@
           "id": "CLS-010",
           "name": "Original-document and collateral release workflow",
           "applicability": "Product",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -4707,8 +4718,8 @@
           "id": "CLS-013",
           "name": "Closure SLA, delay compensation, and grievance linkage",
           "applicability": "Product",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -4719,15 +4730,15 @@
       ],
       "counts": {
         "Implemented": 5,
-        "Partial": 3,
+        "Partial": 6,
         "Partial/Mock": 2,
         "Mock": 0,
-        "Missing": 3,
+        "Missing": 0,
         "Partner": 0,
         "External": 0
       },
       "total": 13,
-      "pct": 54
+      "pct": 63
     },
     {
       "n": 21,
@@ -4751,14 +4762,25 @@
           "id": "PAR-002",
           "name": "LSP incident, breach, remediation, suspension, and exit",
           "applicability": "Channel",
-          "status": "Missing",
-          "raw": "Missing",
-          "evidence": [],
+          "status": "Partial",
+          "raw": "Partial",
+          "evidence": [
+            {
+              "type": "code",
+              "ref": "packages/core/src/partner-grievance-completion.js",
+              "note": "LSP incident/exit, transfer, oversight and grievance redress controls"
+            },
+            {
+              "type": "test",
+              "ref": "tests/partner-grievance-completion.test.js",
+              "note": "exact compensation, assisted complaint and Ombudsman compliance"
+            }
+          ],
           "owner": "",
           "acceptance": "",
           "dependencies": [],
           "notes": "",
-          "lastReviewed": ""
+          "lastReviewed": "2026-07-15"
         },
         {
           "id": "PAR-003",
@@ -4879,8 +4901,8 @@
           "id": "PAR-011",
           "name": "Servicing transfer, portfolio sale, assignment, and participation",
           "applicability": "Product",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -4892,8 +4914,8 @@
           "id": "PAR-012",
           "name": "Partner SLA, performance, concentration, and audit",
           "applicability": "Channel",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -4933,15 +4955,15 @@
       ],
       "counts": {
         "Implemented": 5,
-        "Partial": 5,
+        "Partial": 8,
         "Partial/Mock": 0,
         "Mock": 0,
-        "Missing": 3,
+        "Missing": 0,
         "Partner": 0,
         "External": 0
       },
       "total": 13,
-      "pct": 54
+      "pct": 63
     },
     {
       "n": 22,
@@ -5246,8 +5268,8 @@
           "id": "GRV-007",
           "name": "Root cause, corrective action, restitution, and compensation",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -5272,8 +5294,8 @@
           "id": "GRV-009",
           "name": "Vulnerable customer, language, accessibility, and assisted complaint",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -5285,8 +5307,8 @@
           "id": "GRV-010",
           "name": "Complaint analytics, repeat issues, product/channel trends, and board reporting",
           "applicability": "Institution",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -5298,8 +5320,8 @@
           "id": "GRV-011",
           "name": "Ombudsman award/compliance and closure evidence",
           "applicability": "Institution",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -5310,15 +5332,15 @@
       ],
       "counts": {
         "Implemented": 3,
-        "Partial": 3,
+        "Partial": 7,
         "Partial/Mock": 1,
         "Mock": 0,
-        "Missing": 4,
+        "Missing": 0,
         "Partner": 0,
         "External": 0
       },
       "total": 11,
-      "pct": 42
+      "pct": 56
     },
     {
       "n": 24,
@@ -5433,21 +5455,32 @@
           "id": "RPT-009",
           "name": "CRILC/SMA and large-exposure reporting",
           "applicability": "Institution",
-          "status": "Missing",
-          "raw": "Missing",
-          "evidence": [],
+          "status": "Partial",
+          "raw": "Partial",
+          "evidence": [
+            {
+              "type": "code",
+              "ref": "packages/core/src/reporting-data-integration-completion.js",
+              "note": "exact regulatory returns, submission lineage, certified connectors and governed data products"
+            },
+            {
+              "type": "test",
+              "ref": "tests/reporting-data-integration-completion.test.js",
+              "note": "CRILC/SMA, XBRL/CIMS, PSL, CDC/marts and reference governance"
+            }
+          ],
           "owner": "",
           "acceptance": "",
           "dependencies": [],
           "notes": "",
-          "lastReviewed": ""
+          "lastReviewed": "2026-07-15"
         },
         {
           "id": "RPT-010",
           "name": "XBRL/CIMS statutory returns",
           "applicability": "Institution",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -5459,8 +5492,8 @@
           "id": "RPT-011",
           "name": "PSL classification and reporting",
           "applicability": "Institution",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -5498,8 +5531,8 @@
           "id": "RPT-014",
           "name": "Submission reconciliation and amendment history",
           "applicability": "Institution",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -5510,15 +5543,15 @@
       ],
       "counts": {
         "Implemented": 1,
-        "Partial": 9,
+        "Partial": 13,
         "Partial/Mock": 0,
         "Mock": 0,
-        "Missing": 4,
+        "Missing": 0,
         "Partner": 0,
         "External": 0
       },
       "total": 14,
-      "pct": 33
+      "pct": 44
     },
     {
       "n": 25,
@@ -6602,8 +6635,8 @@
           "id": "INT-008",
           "name": "Core banking, GL, CRM, DMS, data warehouse, and identity connectors",
           "applicability": "Institution",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -6641,8 +6674,8 @@
           "id": "INT-011",
           "name": "Operational and analytical data models separated by purpose",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -6667,8 +6700,8 @@
           "id": "INT-013",
           "name": "Warehouse/lake exports, CDC, and regulatory data marts",
           "applicability": "Institution",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -6680,8 +6713,8 @@
           "id": "INT-014",
           "name": "Master/reference-data governance",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -6692,15 +6725,15 @@
       ],
       "counts": {
         "Implemented": 1,
-        "Partial": 8,
+        "Partial": 12,
         "Partial/Mock": 1,
         "Mock": 0,
-        "Missing": 4,
+        "Missing": 0,
         "Partner": 0,
         "External": 0
       },
       "total": 14,
-      "pct": 33
+      "pct": 44
     },
     {
       "n": 31,
@@ -7041,21 +7074,32 @@
           "id": "UX-010",
           "name": "Servicing account desktop and service-request workspace",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
-          "evidence": [],
+          "status": "Partial",
+          "raw": "Partial",
+          "evidence": [
+            {
+              "type": "code",
+              "ref": "apps/dashboard/workspaces.html",
+              "note": "servicing, collections/field and control-function role workspaces"
+            },
+            {
+              "type": "test",
+              "ref": "tests/operational-workspaces.test.js",
+              "note": "accessibility and no-store/no-browser-persistence controls"
+            }
+          ],
           "owner": "",
           "acceptance": "",
           "dependencies": [],
           "notes": "",
-          "lastReviewed": ""
+          "lastReviewed": "2026-07-15"
         },
         {
           "id": "UX-011",
           "name": "Collections/telecalling desktop and field mobile app",
           "applicability": "Channel",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -7067,8 +7111,8 @@
           "id": "UX-012",
           "name": "Compliance, CCO, risk, finance, and audit dashboards",
           "applicability": "Institution",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -7197,15 +7241,15 @@
       ],
       "counts": {
         "Implemented": 2,
-        "Partial": 12,
+        "Partial": 15,
         "Partial/Mock": 0,
         "Mock": 0,
-        "Missing": 3,
+        "Missing": 0,
         "Partner": 0,
         "External": 0
       },
       "total": 17,
-      "pct": 40
+      "pct": 47
     },
     {
       "n": 33,
@@ -7450,9 +7494,9 @@
     }
   ],
   "tests": {
-    "pass": 338,
+    "pass": 352,
     "fail": 0,
-    "total": 343,
+    "total": 357,
     "ran": true
   }
 }

@@ -23,7 +23,7 @@ The current implementation is intentionally small:
 - Internal staff workspace in `apps/dashboard/`.
 - Borrower customer portal in `apps/customer/`: a responsive, white-labelled journey home with prioritised next actions, visual application milestones, repayment schedules, a document centre, guided media, grievance tracking, and DPDP access/correction/erasure controls.
 - Shared design system tokens in `apps/shared/`.
-- Automated tests in `tests/`: 338 file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
+- Automated tests in `tests/`: 352 file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
 
 Run it:
 
@@ -118,6 +118,10 @@ npm run dev:api
 | `packages/core/src/kyc-underwriting-completion.js` | Special-category authority, KYC actions/grace/BC acknowledgement, original custody, cash-flow/source/FOIR and deterministic grade/price controls. |
 | `packages/core/src/collateral-disbursement-completion.js` | Collateral panels/valuation/legal/LTV/insurance/perfection/custody/monitoring/release plus multiparty signing, staged supplier tranches and end-use follow-up. |
 | `packages/core/src/servicing-collections-completion.js` | Servicing changes/documents and collection strategy/treatment/agency capacity/exact settlement/performance analytics. |
+| `packages/core/src/lms-recovery-closure-completion.js` | Schedule/calendar variants, repossession/auction, exact recovery accounting, release and closure-SLA compensation controls. |
+| `packages/core/src/partner-grievance-completion.js` | LSP incidents/exits, portfolio transfer, partner oversight, grievance RCA/redress/assistance/analytics and Ombudsman compliance. |
+| `packages/core/src/reporting-data-integration-completion.js` | CRILC/SMA, XBRL/CIMS, PSL, submission lineage, governed enterprise connectors, purpose-separated data products/CDC/marts and reference governance. |
+| `apps/dashboard/workspaces.*` | Authorized privacy-safe servicing, collections/field and control-function operational workspaces. |
 | `apps/api/src/routes/customer-channel-controls.js` | Tenant-authenticated persistence, role gates and audit projection for customer/channel operations. |
 | `apps/partner/` | Tenant-branded responsive branch/channel lead workspace with consent-led intake, matching review, evidence-bound actions, accessible/reduced-motion UI, and a static-shell-only PWA that never caches business API data. |
 | `apps/api/src/observability.js` | Bounded process-local HTTP telemetry registry: normalized route/status aggregates, availability and latency SLIs, configurable SLO/error-budget state, in-flight/capacity signals, tenant-scoped snapshots, and Prometheus text output without tenant labels. |
