@@ -661,7 +661,7 @@ The detailed register contains **453 individually identified capabilities**. At 
 | INT-006 | Callback correlation, acknowledgement, and reconciliation | Core | Partial |
 | INT-007 | API catalogue, OpenAPI, examples, SDK, and sandbox | Core | Partial |
 | INT-008 | Core banking, GL, CRM, DMS, data warehouse, and identity connectors | Institution | Partial |
-| INT-009 | External providers with deterministic simulation, executable callback delivery, signed-file transports and certified business-adapter port baseline | Product | Partial/Mock |
+| INT-009 | External providers with deterministic simulation, schema-bound vendor mapping, executable HTTPS/SFTP/portal and crypto ports, lease-fenced workers, signed-file transports, adverse UAT gate and certified business-adapter baseline | Product | Partial/Mock |
 | INT-010 | Event schema registry, lineage, backward compatibility, and deprecation | Core | Partial |
 | INT-011 | Operational and analytical data models separated by purpose | Core | Partial |
 | INT-012 | Data-quality rules, profiling, exception queue, and certification | Core | Partial |

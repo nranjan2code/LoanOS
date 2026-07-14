@@ -657,6 +657,11 @@ export {
   registerBusinessAdapter
 } from "./business-adapter-conformance.js";
 
+export { HttpsProviderClient, PortalProviderClient, SftpProviderClient } from "./provider-transport-clients.js";
+export { registerCryptographicKey, executeCryptographicOperation, rotateCryptographicKey } from "./cryptographic-execution-ports.js";
+export { IntegrationWorkerRuntime, createIntegrationWorkerHandlers } from "./integration-worker-runtime.js";
+export { VENDOR_MAPPING_TRANSFORMS, VENDOR_UAT_SCENARIOS, registerVendorMapping, mapVendorPayload, certifyVendorUat, assessVendorActivation } from "./vendor-payload-mapping.js";
+
 export {
   ASSET_TYPES,
   CHARGE_TYPES,

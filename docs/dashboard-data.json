@@ -1,8 +1,8 @@
 {
-  "generated": "2026-07-14T20:03:30.896Z",
+  "generated": "2026-07-14T20:07:38.523Z",
   "git": {
     "branch": "main",
-    "count": 175,
+    "count": 176,
     "commits": []
   },
   "overall": {
@@ -6646,7 +6646,7 @@
         },
         {
           "id": "INT-009",
-          "name": "External providers with deterministic simulation, executable callback delivery, signed-file transports and certified business-adapter port baseline",
+          "name": "External providers with deterministic simulation, schema-bound vendor mapping, executable HTTPS/SFTP/portal and crypto ports, lease-fenced workers, signed-file transports, adverse UAT gate and certified business-adapter baseline",
           "applicability": "Product",
           "status": "Partial/Mock",
           "raw": "Partial/Mock",
@@ -7494,9 +7494,9 @@
     }
   ],
   "tests": {
-    "pass": 394,
+    "pass": 411,
     "fail": 0,
-    "total": 399,
+    "total": 416,
     "ran": true
   }
 }

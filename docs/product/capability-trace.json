@@ -2918,7 +2918,7 @@
     "lastReviewed": ""
   },
   "INT-009": {
-    "capability": "External providers with deterministic simulation, executable callback delivery, signed-file transports and certified business-adapter port baseline",
+    "capability": "External providers with deterministic simulation, schema-bound vendor mapping, executable HTTPS/SFTP/portal and crypto ports, lease-fenced workers, signed-file transports, adverse UAT gate and certified business-adapter baseline",
     "category": "30. Integrations, APIs, Events, and Data Platform",
     "plane": "Data & Integration",
     "applicability": "Product",

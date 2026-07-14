@@ -213,6 +213,6 @@ Regulatory integration must be in the regulated entity’s name where required. 
 
 ## Completeness and change-control rule
 
-The complete-system scope is covered only when every row has an owner, versioned adapter/data classification, deterministic adverse mock, vendor/direct-authority and commercial unit, sandbox/UAT and production certification, authenticated callbacks/files, reconciliation/monitoring/DR/exit evidence, and a tracked implementation status.
+The complete-system scope is covered only when every row has an owner, versioned adapter/data classification, deterministic adverse mock, vendor/direct-authority and commercial unit, sandbox/UAT and production certification, authenticated callbacks/files, reconciliation/monitoring/DR/exit evidence, and a tracked implementation status. Shared execution controls now include schema-checksum-bound vendor mappings, mTLS HTTPS and injected SFTP/portal clients, KMS/HSM/PGP ports, lease-fenced integration jobs, and a 13-scenario adverse UAT gate; module owners still provide the selected vendor's profile and external evidence.
 
 When a feature introduces an external dependency, update this map first, then the procurement catalogue, complete-system capability catalogue, current implementation and backlog in the same change. No external call may be embedded directly in LOS/LMS/LWS domain logic; it must use a tenant-scoped adapter and fail closed.
