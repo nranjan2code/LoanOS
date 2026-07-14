@@ -209,6 +209,19 @@ export {
 
 export { reconcileBankStatementEntry, reconcilePaymentRailSettlement } from "./payment-reconciliation.js";
 export {
+  BUSINESS_EVENT_EXPECTATIONS,
+  assessDataQuality,
+  certifyDataQuality,
+  createAuditAnchor,
+  createDataQualityRule,
+  createEvidenceCustodyRecord,
+  deleteEvidenceWithProof,
+  placeEvidenceLegalHold,
+  releaseEvidenceLegalHold,
+  reconcileBusinessEventCompleteness,
+  registerDataLineage
+} from "./data-governance.js";
+export {
   PROVIDER_INTEGRATIONS,
   assessProviderCertification,
   certifyProvider,

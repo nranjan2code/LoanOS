@@ -23,7 +23,7 @@ The current implementation is intentionally small:
 - Internal staff workspace in `apps/dashboard/`.
 - Borrower customer portal in `apps/customer/`: a responsive, white-labelled journey home with prioritised next actions, visual application milestones, repayment schedules, a document centre, guided media, grievance tracking, and DPDP access/correction/erasure controls.
 - Shared design system tokens in `apps/shared/`.
-- Automated tests in `tests/`: 253 file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
+- Automated tests in `tests/`: 259 file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
 
 Run it:
 
@@ -65,6 +65,7 @@ npm run dev:api
 | `packages/core/src/co-lending-finance.js` | Partner transfer pricing, entity-level ECL/provision attribution, GST/TDS-adjusted statements, checksum-sealed tax exchange, exact settlement reconciliation, and balanced partner/servicing journals. |
 | `packages/core/src/external-services.js` | India-resident mock-or-real external provider boundary, including fail-closed checksum-bound co-lending escrow instructions and core-banking journal batches. |
 | `packages/core/src/provider-governance.js` | Fifteen-family provider certification registry: production/India/time/evidence scope, four-eyes approval, suspension, expiry assessment, and live-readiness authority. |
+| `packages/core/src/data-governance.js` | Verified audit anchoring, source-to-event completeness reconciliation, immutable evidence custody/legal hold/deletion proof, field lineage, and declarative data-quality assessment/certification. |
 | `packages/core/src/loan-policy.js` | India-only loan validation, KFS validation (including prepayment/foreclosure checks), sanction readiness, disbursement checks. |
 | `packages/core/src/model-governance.js` | AI/model inventory (including generative model class), model status, governed lifecycle transitions with a validation gate (fairness/explainability/monitoring for high-risk, adversarial/hallucination testing for generative), drift monitoring with auto kill-switch, global/model kill switch, kill-switch incident and post-incident review workflow, runtime model-use evaluation. |
 | `packages/core/src/ai-interaction.js` | Customer-facing AI disclosure generation (blocked for back-office/inactive/kill-switched models) and human-handoff request/resolution workflow. |
@@ -116,6 +117,7 @@ npm run dev:api
 | `tests/capability-tracking.test.js` | Exhaustive 453-capability/33-category parser invariant, 17-entry `UX-*` coverage, unique IDs, trace/dashboard artifact parity, and conservative status normalization. |
 | `tests/origination-journey.test.js` | Digital declaration/language gates, product checklist, malware quarantine, independent document review, conditions precedent, sanction expiry, non-English KFS acceptance, and authenticated borrower API isolation. |
 | `tests/provider-governance.test.js` | Provider certification/suspension/expiry, credential-safe readiness, CIC/CKYCRR/AA transport, live-mode fail-closed behavior, and tenant API persistence tests. |
+| `tests/data-governance.test.js` | WORM anchor matching, audit completeness, evidence custody/holds/deletion, lineage, DQ failure/certification, and tenant API persistence tests. |
 
 ## Implemented API Endpoints
 
@@ -226,6 +228,16 @@ npm run dev:api
 | `POST /admin/service-credential-compromises` | Emergency-compromise workflow: validates a high/critical incident, revokes selected or all active credentials before evidence persistence, links each revocation to the statutory incident, and starts CERT-In/RBI reporting clocks. |
 | `GET /audit/events` | Lists the tenant's sealed audit chain (filterable by `type`/`subjectId`/`from`/`to`) with a chain-validity verdict. |
 | `GET /audit/export` | Produces an integrity-attested evidence pack from the tenant's audit chain; 409 if the chain fails verification. |
+| `GET/POST /governance/audit-anchors` | Lists or records independently approved India-WORM/external-timestamp evidence bound to the exact verified audit head and event count. |
+| `POST /governance/audit-completeness` | Reconciles critical business registries to their required audit events and retains failed/certified evidence. |
+| `GET/POST /governance/evidence` | Lists or admits checksum-bound, India-resident immutable evidence under custody and retention controls. |
+| `POST /governance/evidence/:id/legal-holds` | Places an authority-backed legal hold and optionally extends retention. |
+| `POST /governance/evidence/:id/legal-holds/:holdId/release` | Independently releases an active legal hold. |
+| `POST /governance/evidence/:id/deletion` | Deletes only after retention/holds clear and retains a checksum-bound deletion proof. |
+| `GET/POST /governance/lineage` | Lists or records source-transform-output field lineage under independent approval. |
+| `GET/POST /governance/data-quality/rules` | Lists or creates declarative, owned, severity-rated DQ rules. |
+| `POST /governance/data-quality/assessments` | Profiles tenant collections against active rules and retains hashed exception evidence. |
+| `POST /governance/data-quality/assessments/:id/certification` | Certifies only when critical/high failures are absent. |
 | `GET /sub-processors` | Standing disclosure of the sub-processor register to every authenticated tenant, flagging cross-border processing. |
 | `GET /break-glass-grants` | Lists every break-glass grant scoped to the calling tenant, with effective status. |
 | `GET /document-vault` | Lists signed document-vault receipts, filterable by `applicationId`, `borrowerId`, or `packetId`. |
@@ -604,7 +616,7 @@ npm run dev:api
 - Document packets and the vault produce HTML and PDF checksum evidence; certified external eSign envelope onboarding remains planned.
 - UI includes public/tenant surfaces, a governed borrower self-service application and servicing portal, and the local operations/admin dashboard; production accessibility certification, native/mobile/offline support, full translated template libraries and specialized underwriter/servicing/collections workspaces remain planned.
 - AI governance has first slices for lifecycle, validation gates (fairness/explainability/monitoring for high-risk, adversarial/hallucination for generative), drift-triggered kill switch, disclosure, and human handoff; recurring fairness reports and a sectoral incident-intelligence pack are still planned.
-- The audit spine stamps a uniform actor/actorType/dataClass envelope on every event at the seal seam; signed external anchoring is a follow-on.
+- The audit spine stamps a uniform actor/actorType/dataClass envelope on every event at the seal seam. Tenant-local governance now records externally timestamped India-WORM anchors bound to exact verified heads, reconciles five critical registries to their creation events, and governs evidence custody, holds, deletion proof, lineage and DQ certification. A production TSA/object-lock service, automated schedules and institution-wide mapping remain deployment work. See [audit integrity and data governance](data-governance.md).
 - Compliance docs are source-grounded but still require counsel/compliance review before production.
 - The Rust decision engine remains off by default until each tenant has completed its signed-bundle, kill-switch, shadow-divergence, and operational-readiness checks. The gateway is covered for off, shadow, active, tenant-routing, and fail-closed behavior; active mode has no single-instance fallback. The remaining decision-engine release decision is tracked in [review-findings-2026-07-12](../product/review-findings-2026-07-12.md) (REV-14).
 - The live JS affordability path now quantises money at the boundary and calculates EMI and FOIR with integer paise/BigInt arithmetic; the LMS ledger path is likewise paise-exact. Product inputs must use integral basis-point rates. The Rust differential corpus is regenerated and tested against this path.

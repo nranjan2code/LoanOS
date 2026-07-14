@@ -76,6 +76,9 @@ node docs/gtm/automation/gtm-backlog-sync.mjs
 | C-43 | Revolving credit / overdraft accounts with daily utilised-balance interest | Built | roadmap.md Phase 2 revolving/OD slice |
 | C-44 | DLA registry exports active records in RBI CIMS-ready shape with compliance attestation | Built | what-we-are-building.md DLA registry |
 | C-45 | Real provider readiness fails closed without current production certification, India residency, endpoint, and credential evidence | Built | architecture/provider-integration-governance.md; GET /integrations/readiness |
+| C-46 | External audit-anchor evidence must match the verified tenant chain head and event count | Partial | architecture/data-governance.md; production TSA/WORM service remains deployment-specific |
+| C-47 | Evidence custody enforces India storage, retention, legal holds, and proof-bearing deletion | Built | architecture/data-governance.md; /governance/evidence APIs |
+| C-48 | Critical data-quality failures block maker-checker certification | Partial | architecture/data-governance.md; enterprise catalogue/stewardship remains deployment depth |
 
 ## Change process
 

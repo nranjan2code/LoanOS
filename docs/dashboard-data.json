@@ -1,17 +1,17 @@
 {
-  "generated": "2026-07-14T16:18:55.129Z",
+  "generated": "2026-07-14T16:31:39.134Z",
   "git": {
     "branch": "main",
-    "count": 149,
+    "count": 151,
     "commits": []
   },
   "overall": {
     "counts": {
       "Implemented": 87,
-      "Partial": 210,
+      "Partial": 215,
       "Partial/Mock": 11,
       "Mock": 7,
-      "Missing": 129,
+      "Missing": 124,
       "Partner": 3,
       "External": 6
     },
@@ -205,27 +205,27 @@
         {
           "n": 24,
           "name": "Regulatory and External Reporting",
-          "pct": 30,
+          "pct": 33,
           "total": 14
         },
         {
           "n": 28,
           "name": "Audit, Compliance Assurance, and Evidence",
-          "pct": 48,
+          "pct": 55,
           "total": 12
         }
       ],
       "counts": {
         "Implemented": 16,
-        "Partial": 32,
+        "Partial": 35,
         "Partial/Mock": 0,
         "Mock": 0,
-        "Missing": 16,
+        "Missing": 13,
         "Partner": 0,
         "External": 1
       },
       "total": 65,
-      "pct": 45
+      "pct": 47
     },
     {
       "name": "Platform & Tenancy",
@@ -343,21 +343,21 @@
         {
           "n": 30,
           "name": "Integrations, APIs, Events, and Data Platform",
-          "pct": 21,
+          "pct": 27,
           "total": 14
         }
       ],
       "counts": {
         "Implemented": 1,
-        "Partial": 4,
+        "Partial": 6,
         "Partial/Mock": 1,
         "Mock": 0,
-        "Missing": 8,
+        "Missing": 6,
         "Partner": 0,
         "External": 0
       },
       "total": 14,
-      "pct": 21
+      "pct": 27
     },
     {
       "name": "Reliability & Ops",
@@ -5155,8 +5155,8 @@
           "id": "RPT-013",
           "name": "Regulatory calendar, maker-checker, filing, and evidence vault",
           "applicability": "Institution",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -5180,15 +5180,15 @@
       ],
       "counts": {
         "Implemented": 1,
-        "Partial": 8,
+        "Partial": 9,
         "Partial/Mock": 0,
         "Mock": 0,
-        "Missing": 5,
+        "Missing": 4,
         "Partner": 0,
         "External": 0
       },
       "total": 14,
-      "pct": 30
+      "pct": 33
     },
     {
       "n": 25,
@@ -5807,8 +5807,8 @@
           "id": "AUD-004",
           "name": "External timestamp/anchor or WORM retention",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -5820,8 +5820,8 @@
           "id": "AUD-005",
           "name": "Business-event completeness reconciliation",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -5923,15 +5923,15 @@
       ],
       "counts": {
         "Implemented": 3,
-        "Partial": 7,
+        "Partial": 9,
         "Partial/Mock": 0,
         "Mock": 0,
-        "Missing": 2,
+        "Missing": 0,
         "Partner": 0,
         "External": 0
       },
       "total": 12,
-      "pct": 48
+      "pct": 55
     },
     {
       "n": 29,
@@ -6298,8 +6298,8 @@
           "id": "INT-010",
           "name": "Event schema registry, lineage, backward compatibility, and deprecation",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -6324,8 +6324,8 @@
           "id": "INT-012",
           "name": "Data-quality rules, profiling, exception queue, and certification",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -6362,15 +6362,15 @@
       ],
       "counts": {
         "Implemented": 1,
-        "Partial": 4,
+        "Partial": 6,
         "Partial/Mock": 1,
         "Mock": 0,
-        "Missing": 8,
+        "Missing": 6,
         "Partner": 0,
         "External": 0
       },
       "total": 14,
-      "pct": 21
+      "pct": 27
     },
     {
       "n": 31,
@@ -7059,9 +7059,9 @@
     }
   ],
   "tests": {
-    "pass": 253,
+    "pass": 259,
     "fail": 0,
-    "total": 258,
+    "total": 264,
     "ran": true
   }
 }

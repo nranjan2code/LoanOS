@@ -27,6 +27,8 @@ actually runs), then WS-D (credit depth) and REV-42 (GST) to make a single real 
 The current large-bundle execution order and completion status are maintained in
 the [build backlog's Large Delivery Bundle Sequence](build-backlog.md#large-delivery-bundle-sequence-2026-07-14).
 
+Bundle D status: audit/data-governance product controls are complete for verified external-anchor evidence, critical business-event completeness, evidence custody/legal holds/deletion proof, field lineage, and declarative DQ certification. Production TSA/WORM infrastructure and institution-wide stewardship remain external/deployment work.
+
 ## Cross-Cutting Workstream: SaaS Tenancy and Vendor Posture
 
 Status: S1–S9 first slice complete for every task (tenant partitioning, tenant-scoped service auth, tenant/platform human sessions, tenant user admin, access reviews, service-key rotation, isolation suite, hash-chained audit spine + evidence export, tenant portability export + evidenced offboarding, disclosed sub-processor register, 6-hour incident-notification workflow, audited platform-staff break-glass access, uniform audit provenance stamping, artifact-bound security assurance, governed SOC investigation records, and compliance-control assurance/audit evidence).

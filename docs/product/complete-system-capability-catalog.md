@@ -554,7 +554,7 @@ The detailed register contains **453 individually identified capabilities**. At 
 | RPT-010 | XBRL/CIMS statutory returns | Institution | Missing |
 | RPT-011 | PSL classification and reporting | Institution | Missing |
 | RPT-012 | Fraud, wilful-default, LEA, and board reporting | Institution | Partial |
-| RPT-013 | Regulatory calendar, maker-checker, filing, and evidence vault | Institution | Missing |
+| RPT-013 | Regulatory calendar, maker-checker, filing, and evidence vault | Institution | Partial |
 | RPT-014 | Submission reconciliation and amendment history | Institution | Missing |
 
 ### 25. Finance, Tax, Treasury, and Profitability
@@ -617,8 +617,8 @@ The detailed register contains **453 individually identified capabilities**. At 
 | AUD-001 | Tenant-scoped append-only hash-chained audit events | Core | Implemented |
 | AUD-002 | Uniform actor, role, data class, policy, and consent provenance | Core | Partial |
 | AUD-003 | Integrity verification and filtered evidence export | Core | Implemented |
-| AUD-004 | External timestamp/anchor or WORM retention | Core | Missing |
-| AUD-005 | Business-event completeness reconciliation | Core | Missing |
+| AUD-004 | External timestamp/anchor or WORM retention | Core | Partial |
+| AUD-005 | Business-event completeness reconciliation | Core | Partial |
 | AUD-006 | Regulatory control library and implementation anchors | Core | Implemented |
 | AUD-007 | Compliance testing plan, sample, result, issue, and remediation | Institution | Partial |
 | AUD-008 | Obligation owner, evidence, certification, and sign-off | Institution | Partial |
@@ -662,9 +662,9 @@ The detailed register contains **453 individually identified capabilities**. At 
 | INT-007 | API catalogue, OpenAPI, examples, SDK, and sandbox | Core | Missing |
 | INT-008 | Core banking, GL, CRM, DMS, data warehouse, and identity connectors | Institution | Missing |
 | INT-009 | Bureau, AA, CKYC, V-CIP, eSign, bank verify, payment, comms, CERSAI, and FIU providers | Product | Partial/Mock |
-| INT-010 | Event schema registry, lineage, backward compatibility, and deprecation | Core | Missing |
+| INT-010 | Event schema registry, lineage, backward compatibility, and deprecation | Core | Partial |
 | INT-011 | Operational and analytical data models separated by purpose | Core | Missing |
-| INT-012 | Data-quality rules, profiling, exception queue, and certification | Core | Missing |
+| INT-012 | Data-quality rules, profiling, exception queue, and certification | Core | Partial |
 | INT-013 | Warehouse/lake exports, CDC, and regulatory data marts | Institution | Missing |
 | INT-014 | Master/reference-data governance | Core | Missing |
 

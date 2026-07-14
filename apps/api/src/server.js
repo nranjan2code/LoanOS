@@ -1,6 +1,7 @@
 import { createServer } from "node:http";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { routeIntegrationControls } from "./routes/integration-controls.js";
+import { routeDataGovernanceControls } from "./routes/data-governance-controls.js";
 import { routeCersaiSearch } from "./routes/cersai-search.js";
 import { createObservabilityRegistry } from "./observability.js";
 import { readFile } from "node:fs/promises";
@@ -1079,6 +1080,8 @@ async function route(req, res, dataDir, platformAdminKey, observability) {
     sendJson(res, pack.integrity.valid ? 200 : 409, pack);
     return;
   }
+
+  if (await routeDataGovernanceControls({ method, path, req, res, tenant, store, readJson, sendJson, appendEvent })) return;
 
   // Standing sub-processor disclosure: every authenticated tenant RE can read
   // the platform-wide register of LoanOS sub-processors that apply to it.
