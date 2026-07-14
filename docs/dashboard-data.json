@@ -1,8 +1,8 @@
 {
-  "generated": "2026-07-14T18:05:26.052Z",
+  "generated": "2026-07-14T18:29:23.538Z",
   "git": {
     "branch": "main",
-    "count": 158,
+    "count": 159,
     "commits": []
   },
   "overall": {
@@ -1128,7 +1128,7 @@
             {
               "type": "test",
               "ref": "tests/customer-channel-operations.test.js",
-              "note": "qualification and conversion lifecycle"
+              "note": "qualification plus existing borrower/application conversion linkage"
             }
           ],
           "owner": "",
@@ -1291,17 +1291,17 @@
             {
               "type": "code",
               "ref": "packages/core/src/customer-channel-operations.js",
-              "note": "four-eyes non-destructive merge plan"
+              "note": "impact-sealed four-eyes transactional merge execution"
             },
             {
               "type": "endpoint",
-              "ref": "POST /customers/merge-plans",
-              "note": "approved merge planning"
+              "ref": "POST /customers/merge-plans/:id/execute",
+              "note": "stale-impact rejection and atomic remap"
             },
             {
-              "type": "doc",
-              "ref": "docs/architecture/customer-channel-experiences.md",
-              "note": "transactional execution remains"
+              "type": "test",
+              "ref": "tests/customer-channel-operations.test.js",
+              "note": "impact checksum, cross-record migration and rollback lineage"
             }
           ],
           "owner": "",
@@ -7291,9 +7291,9 @@
     }
   ],
   "tests": {
-    "pass": 293,
+    "pass": 294,
     "fail": 0,
-    "total": 298,
+    "total": 299,
     "ran": true
   }
 }

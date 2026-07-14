@@ -288,9 +288,11 @@ export {
 export {
   buildCustomer360,
   assessPartnerCommission,
+  assessCustomerMergeImpact,
   createChannelLead,
   createCustomerMergePlan,
   createSuccessionCase,
+  executeCustomerMerge,
   recordCustomerPreferences,
   registerChannelPartner,
   registerCustomerRelationship,

@@ -23,7 +23,7 @@ The current implementation is intentionally small:
 - Internal staff workspace in `apps/dashboard/`.
 - Borrower customer portal in `apps/customer/`: a responsive, white-labelled journey home with prioritised next actions, visual application milestones, repayment schedules, a document centre, guided media, grievance tracking, and DPDP access/correction/erasure controls.
 - Shared design system tokens in `apps/shared/`.
-- Automated tests in `tests/`: 293 file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
+- Automated tests in `tests/`: 294 file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
 
 Run it:
 
@@ -148,6 +148,7 @@ npm run dev:api
 | `POST /channels/commission-assessments`, `/channels/commission-assessments/:id/transitions` | Assesses a converted-lead eligible event exactly, caps gross, records tax/net, requires independent approval, and evidence-binds reconciled settlement or in-window clawback. |
 | `POST /channels/leads`, `/channels/leads/:id/transitions` | Creates serviceable, consent/disclosure/conduct-grounded leads and controls matching, contact, qualification, follow-up, conversion linkage and abandonment with evidence. |
 | `POST /customers/relationships`, `/customers/merge-plans`, `/customers/preferences` | Governs the customer party graph, non-destructive approved merge plans, and language/vulnerability/accessibility/contact intent. |
+| `POST /customers/merge-plans/:id/impact`, `/customers/merge-plans/:id/execute` | Seals the current affected-record set, rejects stale execution, and atomically remaps declared borrower references with four-eyes, rollback and reconciliation lineage. |
 | `POST /customers/succession-cases`, `/customers/succession-cases/:id/transitions` | Keeps deceased-borrower claims manually restricted through evidence verification and independent approval. |
 | `GET /customers/:id/360` | Joins tenant-local profile, preferences, parties, lifecycle records and exact-paise related exposure. |
 | `POST /institution/operations/units`, `/programmes`, `/applicability-profiles`, `/obligation-calendars` | Governs same-RE operating structure/programmes and canonical applicability-driven compliance schedules. |
