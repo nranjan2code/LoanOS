@@ -315,6 +315,10 @@ export { approveLanguagePack, approveLocalizedTemplate, certifyFieldDevice, enqu
 export { REQUIRED_PRODUCTION_COMPONENTS, assessProductionGoLive, attestProductionComponent, evaluateProductionDependencyGraph, recordProductionResilienceDrill } from "./production-infrastructure.js";
 export { assessProductionRelease, recordGovernanceSignoff, recordIndependentAssuranceTest, recordOperationalReadiness, recordSourceEtlRun, registerInstitutionConfiguration, remediateAssuranceFinding } from "./bank-assurance-operations.js";
 export { activateLiveIntegration, approveLiveIntegrationOnboarding, assessLiveIntegrationReadiness, recordLiveIntegrationConformance } from "./live-integration-operations.js";
+export { approveProfitabilityParameters, approveProductAddon, approveRiskPricingMatrix, approveTenantPlan, authorizePlanUsage, createTenantCommunication, diffProductVersions, importTenantPortablePackage, promoteEnvironmentConfiguration } from "./platform-product-completion.js";
+export { acknowledgeBcAssistedKycUpdate, analyzeBankStatement, assessGuardianSpecialCategory, assignRiskGradeAndPrice, buildPeriodicKycAction, calculateHouseholdIndebtedness, recordPhysicalOriginalCustody, verifyUnderwritingSources } from "./kyc-underwriting-completion.js";
+export { authorizeDisbursementTranche, completeMultipartySigning, recordCollateralMonitoring, recordCollateralRelease, recordPostDisbursementFollowup, registerCollateralAssessment } from "./collateral-disbursement-completion.js";
+export { allocateCollectionPortfolio, approveServicingChange, buildCollectionPerformance, deriveCollectionTreatment, issueServicingDocument, registerCollectionStrategy, settleCollectionAgencyFee } from "./servicing-collections-completion.js";
 export {
   PROVIDER_INTEGRATIONS,
   assessProviderCertification,

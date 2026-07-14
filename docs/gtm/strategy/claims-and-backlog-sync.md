@@ -121,6 +121,10 @@ node docs/gtm/automation/gtm-backlog-sync.mjs
 | C-88 | Production go-live requires current evidence for eight infrastructure families plus witnessed RTO/RPO drills and dependency readiness | Partial | architecture/production-completion-controls.md; actual managed services and real failover evidence remain external |
 | C-89 | Bank release fails closed without exact ETL, UAT/training/cutover/DR, four independent assurance domains and governance signoff | Partial | architecture/production-completion-controls.md; bank-owned and independent-assessor evidence remains external |
 | C-90 | Live provider activation requires India residency, contracts, vaulted credentials, allow-list/schema controls and complete adverse conformance | Partial | architecture/production-completion-controls.md; real contracts, credentials, endpoints and certification remain external |
+| C-91 | Tenant plans, promotion/import and product pricing/add-on/profitability controls are checksum-bound, exact and independently approved | Partial | architecture/missing-capability-closure-wave.md; live billing/deployment/finance adapters and authoring UX remain |
+| C-92 | Special-category KYC and underwriting retain authority, notices/grace, BC/custody evidence and exact cash-flow/FOIR/risk-price derivation | Partial | architecture/missing-capability-closure-wave.md; live feeds, institutional models and vault operations remain |
+| C-93 | Secured lending gates valuation/legal/LTV/insurance/perfection/custody and monitoring before checksum-bound signing and staged end-use disbursement | Partial | architecture/missing-capability-closure-wave.md; external registry/panel/insurer/custodian/payment operations remain |
+| C-94 | Servicing and collections govern material changes, documents, deterministic treatments, agency capacity, exact settlement and performance analytics | Partial | architecture/missing-capability-closure-wave.md; borrower/collector UX, live agency/finance feeds and production history remain |
 
 ## Change process
 

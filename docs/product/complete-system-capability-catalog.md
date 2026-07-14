@@ -121,14 +121,14 @@ The detailed register contains **453 individually identified capabilities**. At 
 | PLT-005 | Tenant onboarding with RE, product, owner, modules, and readiness | Core | Implemented |
 | PLT-006 | Sandbox environments with synthetic-data enforcement | Core | Implemented |
 | PLT-007 | Tenant branding and customer-facing identity | Core | Partial |
-| PLT-008 | Entitlements, subscribed modules, limits, and commercial plan controls | Core | Missing |
-| PLT-009 | Tenant configuration promotion across dev/test/UAT/production | Core | Missing |
+| PLT-008 | Entitlements, subscribed modules, limits, and commercial plan controls | Core | Partial |
+| PLT-009 | Tenant configuration promotion across dev/test/UAT/production | Core | Partial |
 | PLT-010 | Tenant portability export and evidenced offboarding | Core | Implemented |
-| PLT-011 | Data reload/import from the portability format | Core | Missing |
+| PLT-011 | Data reload/import from the portability format | Core | Partial |
 | PLT-012 | Platform operations console and tenant health view | Core | Partial |
 | PLT-013 | Time-boxed platform break-glass access with tenant visibility | Core | Implemented |
 | PLT-014 | Data-residency and processing-location policy per tenant | Core | Partial |
-| PLT-015 | Tenant-level SLA, maintenance, release, and incident communications | Core | Missing |
+| PLT-015 | Tenant-level SLA, maintenance, release, and incident communications | Core | Partial |
 
 ### 2. Regulated Entity, Programme, DLA, and Policy Governance
 
@@ -152,7 +152,7 @@ The detailed register contains **453 individually identified capabilities**. At 
 | PRD-001 | Product family, borrower segment, amount, tenor, and currency | Core | Implemented |
 | PRD-002 | Versioned product policy with effective dating | Core | Implemented |
 | PRD-003 | Fixed, floating, flat, and reducing-balance interest configuration | Product | Partial |
-| PRD-004 | Risk-based pricing and pricing matrices | Product | Missing |
+| PRD-004 | Risk-based pricing and pricing matrices | Product | Partial |
 | PRD-005 | APR composition and mandatory third-party charges | Core | Partial |
 | PRD-006 | GST applicability, inclusive/exclusive pricing, and tax disclosure | Core | Partial |
 | PRD-007 | Penal-charge policy without penal interest/capitalisation | Core | Implemented |
@@ -160,10 +160,10 @@ The detailed register contains **453 individually identified capabilities**. At 
 | PRD-009 | Product eligibility, bureau, FOIR, and knockout configuration | Core | Partial |
 | PRD-010 | Product approval, maker-checker publication, and rollback | Core | Partial |
 | PRD-011 | Product simulation and golden-case regression corpus | Core | Partial |
-| PRD-012 | Product authoring UI with version diff and impact analysis | Core | Missing |
+| PRD-012 | Product authoring UI with version diff and impact analysis | Core | Partial |
 | PRD-013 | Sanction validity, renewal, review, and expiry policy | Product | Partial |
-| PRD-014 | Credit insurance and optional add-on governance | Product | Missing |
-| PRD-015 | Product profitability and risk-adjusted return parameters | Institution | Missing |
+| PRD-014 | Credit insurance and optional add-on governance | Product | Partial |
+| PRD-015 | Product profitability and risk-adjusted return parameters | Institution | Partial |
 
 ### 4. Acquisition Channels, Leads, and CRM
 
@@ -213,7 +213,7 @@ The detailed register contains **453 individually identified capabilities**. At 
 | CON-010 | Automated deletion, anonymisation, and legal hold | Core | Partial |
 | CON-011 | Consent-preference centre for the borrower | Channel | Partial |
 | CON-012 | Privacy impact assessment and significant-data-fiduciary controls | Institution | External |
-| CON-013 | Child/guardian and other special-category processing controls | Product | Missing |
+| CON-013 | Child/guardian and other special-category processing controls | Product | Partial |
 | CON-014 | Data-breach notification to Board and affected principals | Core | Partial |
 
 ### 7. KYC, CDD, AML, and Screening
@@ -226,9 +226,9 @@ The detailed register contains **453 individually identified capabilities**. At 
 | KYC-004 | V-CIP evidence, liveness, location, and official approval | Channel | Partial/Mock |
 | KYC-005 | Aadhaar boundary with prohibited-data controls | Core | Implemented |
 | KYC-006 | Risk categorisation and periodic-review cycle | Core | Partial |
-| KYC-007 | Advance KYC-update notices and post-due reminders | Core | Missing |
-| KYC-008 | Low-risk customer grace and monitored continuation | Core | Missing |
-| KYC-009 | BC-assisted KYC update and acknowledgement | Channel | Missing |
+| KYC-007 | Advance KYC-update notices and post-due reminders | Core | Partial |
+| KYC-008 | Low-risk customer grace and monitored continuation | Core | Partial |
+| KYC-009 | BC-assisted KYC update and acknowledgement | Channel | Partial |
 | KYC-010 | Beneficial-owner threshold and control declarations | Product | Implemented |
 | KYC-011 | PEP, UAPA, UN sanctions, and internal negative-list screening | Core | Partial |
 | KYC-012 | Screening-list refresh, rescreening, and match disposition | Core | Partial |
@@ -271,7 +271,7 @@ The detailed register contains **453 individually identified capabilities**. At 
 | DOC-010 | Production PDF generation and accessible rendering | Core | Partial |
 | DOC-011 | eSign envelope, signer authentication, callback, and evidence | Core | Mock |
 | DOC-012 | Document vault, manifest, and borrower delivery | Core | Partial |
-| DOC-013 | Original physical-document custody and movement | Product | Missing |
+| DOC-013 | Original physical-document custody and movement | Product | Partial |
 
 ### 10. Credit Data, Underwriting, and Decisioning
 
@@ -283,11 +283,11 @@ The detailed register contains **453 individually identified capabilities**. At 
 | UWG-004 | Enquiry, vintage, write-off, settlement, and thin-file policy | Core | Partial |
 | UWG-005 | Account Aggregator consent and FI fetch | Product | Mock |
 | UWG-006 | AA income and obligation analytics with provenance | Product | Partial |
-| UWG-007 | Bank-statement categorisation, stability, bounce, and cash-flow analysis | Product | Missing |
-| UWG-008 | GST, ITR, Udyam, employment, and business verification | Product | Missing |
+| UWG-007 | Bank-statement categorisation, stability, bounce, and cash-flow analysis | Product | Partial |
+| UWG-008 | GST, ITR, Udyam, employment, and business verification | Product | Partial |
 | UWG-009 | EMI, FOIR, age, amount, and tenor eligibility | Core | Implemented |
-| UWG-010 | Household FOIR and microfinance indebtedness | Product | Missing |
-| UWG-011 | Credit scorecard, rating, grade, and risk-based pricing | Product | Missing |
+| UWG-010 | Household FOIR and microfinance indebtedness | Product | Partial |
+| UWG-011 | Credit scorecard, rating, grade, and risk-based pricing | Product | Partial |
 | UWG-012 | Policy deviations and approval-authority matrix | Core | Partial |
 | UWG-013 | Manual underwriting workspace and credit note | Core | Partial |
 | UWG-014 | Coded decline and borrower explanation | Core | Partial |
@@ -305,15 +305,15 @@ The detailed register contains **453 individually identified capabilities**. At 
 | COL-001 | Collateral and asset master | Product | Partial |
 | COL-002 | Property, vehicle, equipment, gold, receivable, deposit, and guarantee types | Product | Partial |
 | COL-003 | Ownership, encumbrance, and eligibility checks | Product | Partial/Mock |
-| COL-004 | Valuer panel, valuation order, report, review, and expiry | Product | Missing |
-| COL-005 | Legal counsel panel, title/legal opinion, and exception | Product | Missing |
-| COL-006 | LTV, margin, haircut, and revaluation policy | Product | Missing |
-| COL-007 | Insurance requirement, policy, renewal, assignment, and claim | Product | Missing |
+| COL-004 | Valuer panel, valuation order, report, review, and expiry | Product | Partial |
+| COL-005 | Legal counsel panel, title/legal opinion, and exception | Product | Partial |
+| COL-006 | LTV, margin, haircut, and revaluation policy | Product | Partial |
+| COL-007 | Insurance requirement, policy, renewal, assignment, and claim | Product | Partial |
 | COL-008 | CERSAI search, filing, registration, modification, and satisfaction | Product | Partial/Mock |
-| COL-009 | ROC, RTO, land registry, depository, lien, and other perfection evidence | Product | Missing |
-| COL-010 | Document custody, release approval, and borrower acknowledgement | Product | Missing |
-| COL-011 | Original-document release within the required closure timeline | Product | Missing |
-| COL-012 | Collateral inspection, covenant, impairment, and early-warning monitoring | Product | Missing |
+| COL-009 | ROC, RTO, land registry, depository, lien, and other perfection evidence | Product | Partial |
+| COL-010 | Document custody, release approval, and borrower acknowledgement | Product | Partial |
+| COL-011 | Original-document release within the required closure timeline | Product | Partial |
+| COL-012 | Collateral inspection, covenant, impairment, and early-warning monitoring | Product | Partial |
 
 ### 12. Offers, KFS, Sanction, and Contracting
 
@@ -329,7 +329,7 @@ The detailed register contains **453 individually identified capabilities**. At 
 | OFR-008 | Borrower acceptance bound to proposal and verified identity | Core | Implemented |
 | OFR-009 | Sanction letter with conditions and validity | Core | Partial |
 | OFR-010 | Agreement generation, versioning, negotiation, and acceptance | Core | Partial |
-| OFR-011 | Multi-party signing for co-borrowers/guarantors | Product | Missing |
+| OFR-011 | Multi-party signing for co-borrowers/guarantors | Product | Partial |
 | OFR-012 | Production eSign envelope and callback reconciliation | Core | Mock |
 | OFR-013 | Digitally signed document delivery and proof | Core | Partial |
 | OFR-014 | Cooling-off cancellation, proportionate cost, and refund | Core | Partial |
@@ -343,14 +343,14 @@ The detailed register contains **453 individually identified capabilities**. At 
 | DSB-003 | Direct fund flow without LSP/pass-through control | Core | Implemented |
 | DSB-004 | Maker-checker disbursement authorization | Core | Partial |
 | DSB-005 | Single full disbursement | Core | Implemented |
-| DSB-006 | Multiple, tranche, stage, and construction-linked disbursement | Product | Missing |
-| DSB-007 | Supplier/dealer/end-use payment and invoice linkage | Product | Missing |
+| DSB-006 | Multiple, tranche, stage, and construction-linked disbursement | Product | Partial |
+| DSB-007 | Supplier/dealer/end-use payment and invoice linkage | Product | Partial |
 | DSB-008 | Conditions-precedent satisfaction and waiver | Product | Partial |
 | DSB-009 | Payment initiation, bank response, settlement, and failure repair | Core | Mock |
 | DSB-010 | Disbursement cancellation, reversal, return, and refund | Core | Partial |
 | DSB-011 | Co-lending escrow and partner funding confirmation | Product | Partial |
 | DSB-012 | Disbursement advice and borrower communication | Core | Partial |
-| DSB-013 | Post-disbursement document and end-use follow-up | Product | Missing |
+| DSB-013 | Post-disbursement document and end-use follow-up | Product | Partial |
 
 ### 14. Loan Account, Ledger, and Accounting
 
@@ -420,34 +420,34 @@ The detailed register contains **453 individually identified capabilities**. At 
 | SRV-002 | Periodic and on-demand statements | Core | Implemented |
 | SRV-003 | Payment receipts and transaction history | Core | Partial |
 | SRV-004 | Contact, address, bank, mandate, and profile change request | Core | Partial |
-| SRV-005 | Due-date, EMI, tenure, and repayment-mode change | Product | Missing |
-| SRV-006 | Interest certificate, foreclosure letter, and tax documents | Product | Missing |
+| SRV-005 | Due-date, EMI, tenure, and repayment-mode change | Product | Partial |
+| SRV-006 | Interest certificate, foreclosure letter, and tax documents | Product | Partial |
 | SRV-007 | Rate-reset notice, options, consent, and revised schedule | Product | Partial |
 | SRV-008 | Service request catalogue, SLA, fulfilment, and communication | Core | Partial |
 | SRV-009 | Hardship request and assistance intake | Core | Partial |
-| SRV-010 | Borrower self-service payment and mandate management | Channel | Missing |
-| SRV-011 | Authorized representative and deceased-borrower servicing | Product | Missing |
+| SRV-010 | Borrower self-service payment and mandate management | Channel | Partial |
+| SRV-011 | Authorized representative and deceased-borrower servicing | Product | Partial |
 | SRV-012 | Customer communication history and delivery evidence | Core | Partial |
-| SRV-013 | Multilingual templates and preferred-language delivery | Core | Missing |
+| SRV-013 | Multilingual templates and preferred-language delivery | Core | Partial |
 
 ### 18. Delinquency, Collections, and Field Operations
 
 | ID | Capability | Applicability | Status |
 | --- | --- | --- | --- |
 | CLL-001 | DPD, overdue amount, bucket, and delinquency status | Core | Implemented |
-| CLL-002 | Collection strategy by product, risk, bucket, and customer | Core | Missing |
-| CLL-003 | Treatment plans, next-best action, and channel sequencing | Core | Missing |
+| CLL-002 | Collection strategy by product, risk, bucket, and customer | Core | Partial |
+| CLL-003 | Treatment plans, next-best action, and channel sequencing | Core | Partial |
 | CLL-004 | Reminder and notice logging with contact-hours guard | Core | Partial |
 | CLL-005 | Telecalling/dialer campaign and call disposition | Channel | Partial |
 | CLL-006 | Promise-to-pay, kept/broken PTP, and follow-up | Core | Implemented |
 | CLL-007 | Recovery-agent registry, due diligence, and authorization | Core | Implemented |
 | CLL-008 | Borrower notice before agent assignment/contact | Core | Implemented |
-| CLL-009 | Agency, portfolio, geography, capacity, and performance allocation | Channel | Missing |
+| CLL-009 | Agency, portfolio, geography, capacity, and performance allocation | Channel | Partial |
 | CLL-010 | Field mobile app, visit, geo/time evidence, and receipt | Channel | Partial |
 | CLL-011 | Cash exception approval and same-day account posting | Channel | Implemented |
 | CLL-012 | Conduct complaints, call recording, QA, and agent suspension | Core | Partial |
-| CLL-013 | Collection fees and LSP/agency settlement controls | Channel | Missing |
-| CLL-014 | Collection analytics, roll rates, cure, and liquidation | Core | Missing |
+| CLL-013 | Collection fees and LSP/agency settlement controls | Channel | Partial |
+| CLL-014 | Collection analytics, roll rates, cure, and liquidation | Core | Partial |
 | CLL-015 | Vulnerable-customer and hardship treatment | Core | Partial |
 
 ### 19. Legal Recovery, Repossession, and Enforcement

@@ -1,22 +1,22 @@
 {
-  "generated": "2026-07-14T18:59:40.454Z",
+  "generated": "2026-07-14T19:06:15.251Z",
   "git": {
     "branch": "main",
-    "count": 165,
+    "count": 166,
     "commits": []
   },
   "overall": {
     "counts": {
       "Implemented": 87,
-      "Partial": 273,
+      "Partial": 312,
       "Partial/Mock": 11,
       "Mock": 7,
-      "Missing": 66,
+      "Missing": 27,
       "Partner": 3,
       "External": 6
     },
     "total": 453,
-    "pct": 46
+    "pct": 49
   },
   "planes": [
     {
@@ -37,51 +37,51 @@
         {
           "n": 7,
           "name": "KYC, CDD, AML, and Screening",
-          "pct": 39,
+          "pct": 46,
           "total": 17
         },
         {
           "n": 9,
           "name": "Documents, OCR, and Verification",
-          "pct": 36,
+          "pct": 39,
           "total": 13
         },
         {
           "n": 10,
           "name": "Credit Data, Underwriting, and Decisioning",
-          "pct": 40,
+          "pct": 48,
           "total": 20
         },
         {
           "n": 11,
           "name": "Collateral, Valuation, Legal, and Security Perfection",
-          "pct": 13,
+          "pct": 40,
           "total": 12
         },
         {
           "n": 12,
           "name": "Offers, KFS, Sanction, and Contracting",
-          "pct": 58,
+          "pct": 61,
           "total": 14
         },
         {
           "n": 13,
           "name": "Disbursement and Fund Flow",
-          "pct": 43,
+          "pct": 52,
           "total": 13
         }
       ],
       "counts": {
         "Implemented": 14,
-        "Partial": 64,
+        "Partial": 84,
         "Partial/Mock": 5,
         "Mock": 7,
-        "Missing": 20,
+        "Missing": 0,
         "Partner": 1,
         "External": 0
       },
       "total": 111,
-      "pct": 40
+      "pct": 47
     },
     {
       "name": "LMS",
@@ -107,13 +107,13 @@
         {
           "n": 17,
           "name": "Customer and Account Servicing",
-          "pct": 34,
+          "pct": 49,
           "total": 13
         },
         {
           "n": 18,
           "name": "Delinquency, Collections, and Field Operations",
-          "pct": 47,
+          "pct": 60,
           "total": 15
         },
         {
@@ -131,15 +131,15 @@
       ],
       "counts": {
         "Implemented": 25,
-        "Partial": 49,
+        "Partial": 59,
         "Partial/Mock": 4,
         "Mock": 0,
-        "Missing": 19,
+        "Missing": 9,
         "Partner": 1,
         "External": 0
       },
       "total": 98,
-      "pct": 48
+      "pct": 52
     },
     {
       "name": "LWS",
@@ -193,13 +193,13 @@
         {
           "n": 3,
           "name": "Product, Pricing, and Policy Configuration",
-          "pct": 45,
+          "pct": 56,
           "total": 15
         },
         {
           "n": 6,
           "name": "Consent, Privacy, and Data-Principal Rights",
-          "pct": 65,
+          "pct": 68,
           "total": 14
         },
         {
@@ -217,15 +217,15 @@
       ],
       "counts": {
         "Implemented": 16,
-        "Partial": 39,
+        "Partial": 44,
         "Partial/Mock": 0,
         "Mock": 0,
-        "Missing": 9,
+        "Missing": 4,
         "Partner": 0,
         "External": 1
       },
       "total": 65,
-      "pct": 49
+      "pct": 52
     },
     {
       "name": "Platform & Tenancy",
@@ -233,21 +233,21 @@
         {
           "n": 1,
           "name": "Platform, Tenancy, and SaaS Control Plane",
-          "pct": 53,
+          "pct": 64,
           "total": 15
         }
       ],
       "counts": {
         "Implemented": 6,
-        "Partial": 5,
+        "Partial": 9,
         "Partial/Mock": 0,
         "Mock": 0,
-        "Missing": 4,
+        "Missing": 0,
         "Partner": 0,
         "External": 0
       },
       "total": 15,
-      "pct": 53
+      "pct": 64
     },
     {
       "name": "AI & Model Governance",
@@ -532,21 +532,32 @@
           "id": "PLT-008",
           "name": "Entitlements, subscribed modules, limits, and commercial plan controls",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
-          "evidence": [],
+          "status": "Partial",
+          "raw": "Partial",
+          "evidence": [
+            {
+              "type": "code",
+              "ref": "packages/core/src/platform-product-completion.js",
+              "note": "tenant plans/limits, promotion/import, communications and product economics governance"
+            },
+            {
+              "type": "test",
+              "ref": "tests/platform-product-completion.test.js",
+              "note": "tenant isolation, checksum, exact money and maker-checker coverage"
+            }
+          ],
           "owner": "",
           "acceptance": "",
           "dependencies": [],
           "notes": "",
-          "lastReviewed": ""
+          "lastReviewed": "2026-07-15"
         },
         {
           "id": "PLT-009",
           "name": "Tenant configuration promotion across dev/test/UAT/production",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -571,8 +582,8 @@
           "id": "PLT-011",
           "name": "Data reload/import from the portability format",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -623,8 +634,8 @@
           "id": "PLT-015",
           "name": "Tenant-level SLA, maintenance, release, and incident communications",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -635,15 +646,15 @@
       ],
       "counts": {
         "Implemented": 6,
-        "Partial": 5,
+        "Partial": 9,
         "Partial/Mock": 0,
         "Mock": 0,
-        "Missing": 4,
+        "Missing": 0,
         "Partner": 0,
         "External": 0
       },
       "total": 15,
-      "pct": 53
+      "pct": 64
     },
     {
       "n": 2,
@@ -841,8 +852,8 @@
           "id": "PRD-004",
           "name": "Risk-based pricing and pricing matrices",
           "applicability": "Product",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -945,8 +956,8 @@
           "id": "PRD-012",
           "name": "Product authoring UI with version diff and impact analysis",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -971,8 +982,8 @@
           "id": "PRD-014",
           "name": "Credit insurance and optional add-on governance",
           "applicability": "Product",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -984,8 +995,8 @@
           "id": "PRD-015",
           "name": "Product profitability and risk-adjusted return parameters",
           "applicability": "Institution",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -996,15 +1007,15 @@
       ],
       "counts": {
         "Implemented": 4,
-        "Partial": 7,
+        "Partial": 11,
         "Partial/Mock": 0,
         "Mock": 0,
-        "Missing": 4,
+        "Missing": 0,
         "Partner": 0,
         "External": 0
       },
       "total": 15,
-      "pct": 45
+      "pct": 56
     },
     {
       "n": 4,
@@ -1752,14 +1763,25 @@
           "id": "CON-013",
           "name": "Child/guardian and other special-category processing controls",
           "applicability": "Product",
-          "status": "Missing",
-          "raw": "Missing",
-          "evidence": [],
+          "status": "Partial",
+          "raw": "Partial",
+          "evidence": [
+            {
+              "type": "code",
+              "ref": "packages/core/src/kyc-underwriting-completion.js",
+              "note": "guardian and special-category authority plus monitored KYC actions"
+            },
+            {
+              "type": "test",
+              "ref": "tests/kyc-underwriting-completion.test.js",
+              "note": "authority, KYC, custody and exact underwriting controls"
+            }
+          ],
           "owner": "",
           "acceptance": "",
           "dependencies": [],
           "notes": "",
-          "lastReviewed": ""
+          "lastReviewed": "2026-07-15"
         },
         {
           "id": "CON-014",
@@ -1777,15 +1799,15 @@
       ],
       "counts": {
         "Implemented": 6,
-        "Partial": 6,
+        "Partial": 7,
         "Partial/Mock": 0,
         "Mock": 0,
-        "Missing": 1,
+        "Missing": 0,
         "Partner": 0,
         "External": 1
       },
       "total": 14,
-      "pct": 65
+      "pct": 68
     },
     {
       "n": 7,
@@ -1890,8 +1912,8 @@
           "id": "KYC-007",
           "name": "Advance KYC-update notices and post-due reminders",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -1903,8 +1925,8 @@
           "id": "KYC-008",
           "name": "Low-risk customer grace and monitored continuation",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -1916,8 +1938,8 @@
           "id": "KYC-009",
           "name": "BC-assisted KYC update and acknowledgement",
           "applicability": "Channel",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -2032,15 +2054,15 @@
       ],
       "counts": {
         "Implemented": 2,
-        "Partial": 8,
+        "Partial": 11,
         "Partial/Mock": 3,
         "Mock": 1,
-        "Missing": 3,
+        "Missing": 0,
         "Partner": 0,
         "External": 0
       },
       "total": 17,
-      "pct": 39
+      "pct": 46
     },
     {
       "n": 8,
@@ -2381,8 +2403,8 @@
           "id": "DOC-013",
           "name": "Original physical-document custody and movement",
           "applicability": "Product",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -2393,15 +2415,15 @@
       ],
       "counts": {
         "Implemented": 0,
-        "Partial": 10,
+        "Partial": 11,
         "Partial/Mock": 0,
         "Mock": 1,
-        "Missing": 1,
+        "Missing": 0,
         "Partner": 1,
         "External": 0
       },
       "total": 13,
-      "pct": 36
+      "pct": 39
     },
     {
       "n": 10,
@@ -2490,8 +2512,8 @@
           "id": "UWG-007",
           "name": "Bank-statement categorisation, stability, bounce, and cash-flow analysis",
           "applicability": "Product",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -2503,8 +2525,8 @@
           "id": "UWG-008",
           "name": "GST, ITR, Udyam, employment, and business verification",
           "applicability": "Product",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -2529,8 +2551,8 @@
           "id": "UWG-010",
           "name": "Household FOIR and microfinance indebtedness",
           "applicability": "Product",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -2542,8 +2564,8 @@
           "id": "UWG-011",
           "name": "Credit scorecard, rating, grade, and risk-based pricing",
           "applicability": "Product",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -2671,15 +2693,15 @@
       ],
       "counts": {
         "Implemented": 3,
-        "Partial": 11,
+        "Partial": 15,
         "Partial/Mock": 0,
         "Mock": 2,
-        "Missing": 4,
+        "Missing": 0,
         "Partner": 0,
         "External": 0
       },
       "total": 20,
-      "pct": 40
+      "pct": 48
     },
     {
       "n": 11,
@@ -2729,21 +2751,32 @@
           "id": "COL-004",
           "name": "Valuer panel, valuation order, report, review, and expiry",
           "applicability": "Product",
-          "status": "Missing",
-          "raw": "Missing",
-          "evidence": [],
+          "status": "Partial",
+          "raw": "Partial",
+          "evidence": [
+            {
+              "type": "code",
+              "ref": "packages/core/src/collateral-disbursement-completion.js",
+              "note": "panel, order, valuation/legal, LTV, insurance, perfection, custody, monitoring and release controls"
+            },
+            {
+              "type": "test",
+              "ref": "tests/collateral-disbursement-completion.test.js",
+              "note": "secured assessment, staged disbursement and release fail-closed coverage"
+            }
+          ],
           "owner": "",
           "acceptance": "",
           "dependencies": [],
           "notes": "",
-          "lastReviewed": ""
+          "lastReviewed": "2026-07-15"
         },
         {
           "id": "COL-005",
           "name": "Legal counsel panel, title/legal opinion, and exception",
           "applicability": "Product",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -2755,8 +2788,8 @@
           "id": "COL-006",
           "name": "LTV, margin, haircut, and revaluation policy",
           "applicability": "Product",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -2768,8 +2801,8 @@
           "id": "COL-007",
           "name": "Insurance requirement, policy, renewal, assignment, and claim",
           "applicability": "Product",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -2794,8 +2827,8 @@
           "id": "COL-009",
           "name": "ROC, RTO, land registry, depository, lien, and other perfection evidence",
           "applicability": "Product",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -2807,8 +2840,8 @@
           "id": "COL-010",
           "name": "Document custody, release approval, and borrower acknowledgement",
           "applicability": "Product",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -2820,8 +2853,8 @@
           "id": "COL-011",
           "name": "Original-document release within the required closure timeline",
           "applicability": "Product",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -2833,8 +2866,8 @@
           "id": "COL-012",
           "name": "Collateral inspection, covenant, impairment, and early-warning monitoring",
           "applicability": "Product",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -2845,15 +2878,15 @@
       ],
       "counts": {
         "Implemented": 0,
-        "Partial": 2,
+        "Partial": 10,
         "Partial/Mock": 2,
         "Mock": 0,
-        "Missing": 8,
+        "Missing": 0,
         "Partner": 0,
         "External": 0
       },
       "total": 12,
-      "pct": 13
+      "pct": 40
     },
     {
       "n": 12,
@@ -3021,8 +3054,8 @@
           "id": "OFR-011",
           "name": "Multi-party signing for co-borrowers/guarantors",
           "applicability": "Product",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -3072,15 +3105,15 @@
       ],
       "counts": {
         "Implemented": 5,
-        "Partial": 7,
+        "Partial": 8,
         "Partial/Mock": 0,
         "Mock": 1,
-        "Missing": 1,
+        "Missing": 0,
         "Partner": 0,
         "External": 0
       },
       "total": 14,
-      "pct": 58
+      "pct": 61
     },
     {
       "n": 13,
@@ -3156,8 +3189,8 @@
           "id": "DSB-006",
           "name": "Multiple, tranche, stage, and construction-linked disbursement",
           "applicability": "Product",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -3169,8 +3202,8 @@
           "id": "DSB-007",
           "name": "Supplier/dealer/end-use payment and invoice linkage",
           "applicability": "Product",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -3247,8 +3280,8 @@
           "id": "DSB-013",
           "name": "Post-disbursement document and end-use follow-up",
           "applicability": "Product",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -3259,15 +3292,15 @@
       ],
       "counts": {
         "Implemented": 3,
-        "Partial": 5,
+        "Partial": 8,
         "Partial/Mock": 0,
         "Mock": 2,
-        "Missing": 3,
+        "Missing": 0,
         "Partner": 0,
         "External": 0
       },
       "total": 13,
-      "pct": 43
+      "pct": 52
     },
     {
       "n": 14,
@@ -3985,21 +4018,32 @@
           "id": "SRV-005",
           "name": "Due-date, EMI, tenure, and repayment-mode change",
           "applicability": "Product",
-          "status": "Missing",
-          "raw": "Missing",
-          "evidence": [],
+          "status": "Partial",
+          "raw": "Partial",
+          "evidence": [
+            {
+              "type": "code",
+              "ref": "packages/core/src/servicing-collections-completion.js",
+              "note": "material servicing changes, documents, strategies, agency allocation, exact settlement and analytics"
+            },
+            {
+              "type": "test",
+              "ref": "tests/servicing-collections-completion.test.js",
+              "note": "mandate/disclosure gates and exact collection economics"
+            }
+          ],
           "owner": "",
           "acceptance": "",
           "dependencies": [],
           "notes": "",
-          "lastReviewed": ""
+          "lastReviewed": "2026-07-15"
         },
         {
           "id": "SRV-006",
           "name": "Interest certificate, foreclosure letter, and tax documents",
           "applicability": "Product",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -4050,8 +4094,8 @@
           "id": "SRV-010",
           "name": "Borrower self-service payment and mandate management",
           "applicability": "Channel",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -4063,8 +4107,8 @@
           "id": "SRV-011",
           "name": "Authorized representative and deceased-borrower servicing",
           "applicability": "Product",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -4089,8 +4133,8 @@
           "id": "SRV-013",
           "name": "Multilingual templates and preferred-language delivery",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -4101,15 +4145,15 @@
       ],
       "counts": {
         "Implemented": 2,
-        "Partial": 6,
+        "Partial": 11,
         "Partial/Mock": 0,
         "Mock": 0,
-        "Missing": 5,
+        "Missing": 0,
         "Partner": 0,
         "External": 0
       },
       "total": 13,
-      "pct": 34
+      "pct": 49
     },
     {
       "n": 18,
@@ -4133,8 +4177,8 @@
           "id": "CLL-002",
           "name": "Collection strategy by product, risk, bucket, and customer",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -4146,8 +4190,8 @@
           "id": "CLL-003",
           "name": "Treatment plans, next-best action, and channel sequencing",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -4224,8 +4268,8 @@
           "id": "CLL-009",
           "name": "Agency, portfolio, geography, capacity, and performance allocation",
           "applicability": "Channel",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -4276,8 +4320,8 @@
           "id": "CLL-013",
           "name": "Collection fees and LSP/agency settlement controls",
           "applicability": "Channel",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -4289,8 +4333,8 @@
           "id": "CLL-014",
           "name": "Collection analytics, roll rates, cure, and liquidation",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -4314,15 +4358,15 @@
       ],
       "counts": {
         "Implemented": 5,
-        "Partial": 5,
+        "Partial": 10,
         "Partial/Mock": 0,
         "Mock": 0,
-        "Missing": 5,
+        "Missing": 0,
         "Partner": 0,
         "External": 0
       },
       "total": 15,
-      "pct": 47
+      "pct": 60
     },
     {
       "n": 19,
@@ -7406,9 +7450,9 @@
     }
   ],
   "tests": {
-    "pass": 322,
+    "pass": 338,
     "fail": 0,
-    "total": 327,
+    "total": 343,
     "ran": true
   }
 }

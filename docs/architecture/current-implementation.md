@@ -23,7 +23,7 @@ The current implementation is intentionally small:
 - Internal staff workspace in `apps/dashboard/`.
 - Borrower customer portal in `apps/customer/`: a responsive, white-labelled journey home with prioritised next actions, visual application milestones, repayment schedules, a document centre, guided media, grievance tracking, and DPDP access/correction/erasure controls.
 - Shared design system tokens in `apps/shared/`.
-- Automated tests in `tests/`: 322 file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
+- Automated tests in `tests/`: 338 file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
 
 Run it:
 
@@ -114,6 +114,10 @@ npm run dev:api
 | `packages/core/src/production-infrastructure.js` | Evidence-expiring live-component attestations, dependency graph, witnessed resilience drills and go-live assessment. |
 | `packages/core/src/bank-assurance-operations.js` | Institution configuration, exact ETL, operational readiness, independent assurance/remediation, governance signoff and release decision. |
 | `packages/core/src/live-integration-operations.js` | India-resident provider onboarding, adverse conformance, activation evidence and required-family live-readiness assessment. |
+| `packages/core/src/platform-product-completion.js` | Tenant plans/limits, environment promotion, portability import, operational communications, exact risk pricing, product impact, add-ons and profitability parameters. |
+| `packages/core/src/kyc-underwriting-completion.js` | Special-category authority, KYC actions/grace/BC acknowledgement, original custody, cash-flow/source/FOIR and deterministic grade/price controls. |
+| `packages/core/src/collateral-disbursement-completion.js` | Collateral panels/valuation/legal/LTV/insurance/perfection/custody/monitoring/release plus multiparty signing, staged supplier tranches and end-use follow-up. |
+| `packages/core/src/servicing-collections-completion.js` | Servicing changes/documents and collection strategy/treatment/agency capacity/exact settlement/performance analytics. |
 | `apps/api/src/routes/customer-channel-controls.js` | Tenant-authenticated persistence, role gates and audit projection for customer/channel operations. |
 | `apps/partner/` | Tenant-branded responsive branch/channel lead workspace with consent-led intake, matching review, evidence-bound actions, accessible/reduced-motion UI, and a static-shell-only PWA that never caches business API data. |
 | `apps/api/src/observability.js` | Bounded process-local HTTP telemetry registry: normalized route/status aggregates, availability and latency SLIs, configurable SLO/error-budget state, in-flight/capacity signals, tenant-scoped snapshots, and Prometheus text output without tenant labels. |
