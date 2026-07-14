@@ -6,6 +6,7 @@ import { createLoanId } from "./loan-policy.js";
 import { enrichLegalRecoveryCase, evaluatePromisesToPay } from "./collections-recovery.js";
 import { enrichCicCorrection } from "./cic-reporting.js";
 import { REPORT_STATUSES, REPORT_TYPES, enrichFiuReport } from "./fiu-str.js";
+import { SECURITY_INTEREST_STATUSES, enrichSecurityInterest } from "./cersai.js";
 
 export const WORKFLOW_TASK_STATUSES = {
   OPEN: "open",
@@ -44,7 +45,10 @@ const TASK_SLA_HOURS = {
   "fiu.str_review": 24,
   "fiu.filing": 24,
   "fiu.acknowledgement": 24,
-  "fiu.repair": 24
+  "fiu.repair": 24,
+  "cersai.filing": 24,
+  "cersai.response": 24,
+  "cersai.repair": 24
 };
 
 export function normalizeWorkflowTaskStore(store = {}) {
@@ -65,12 +69,24 @@ export function deriveWorkflowTasks(state, options = {}) {
     ...deriveDataPrincipalTasks(state, asOf),
     ...deriveCicTasks(state, asOf),
     ...deriveCkycrrTasks(state, asOf),
-    ...deriveFiuTasks(state, asOf)
+    ...deriveFiuTasks(state, asOf),
+    ...deriveCersaiTasks(state, asOf)
   ]
     .map((task) => applyTaskRecord(task, taskStore.records[task.taskId]))
     .map((task) => withTaskSla(task, asOf));
 
   return tasks.filter((task) => matchesTaskFilters(task, options.filters ?? {}));
+}
+
+function deriveCersaiTasks(state, asOf) {
+  return Object.values(state?.securityInterests ?? {}).flatMap((interest) => {
+    if (!interest?.securityInterestId || interest.status === SECURITY_INTEREST_STATUSES.SATISFIED) return [];
+    const enriched = enrichSecurityInterest(interest, asOf); const base = { entityType: "security_interest", entityId: interest.securityInterestId, queue: "security_operations", regulatoryRefs: ["SARFAESI"], openedAt: interest.updatedAt ?? interest.createdAt };
+    if (interest.status === SECURITY_INTEREST_STATUSES.DRAFT) return [{ ...base, taskId: `task_cersai_filing_${interest.securityInterestId}`, type: "cersai.filing", title: "Submit CERSAI security interest", description: "Submit the authorised, checksum-sealed CERSAI packet before the filing deadline.", role: "security_officer", priority: enriched.filingOverdue ? "critical" : "high", dueAt: enriched.filingDeadline ?? null, action: { method: "POST", path: `/loan-accounts/${interest.loanAccountId}/security-interests/${interest.securityInterestId}/filing`, description: "Submit CERSAI packet." }, context: { filingDeadline: enriched.filingDeadline } }];
+    if (interest.status === SECURITY_INTEREST_STATUSES.FILED) return [{ ...base, taskId: `task_cersai_response_${interest.securityInterestId}`, type: "cersai.response", title: "Reconcile CERSAI response", description: "Record the CERSAI response, fee receipt, and certificate against the exact submitted packet checksum.", role: "security_officer", priority: "high", action: { method: "POST", path: `/loan-accounts/${interest.loanAccountId}/security-interests/${interest.securityInterestId}/registration`, description: "Record CERSAI response." }, context: { checksumSha256: interest.cersaiSubmission?.checksumSha256 ?? null, providerSubmissionRef: interest.cersaiTransactionId ?? null } }];
+    if (interest.status === SECURITY_INTEREST_STATUSES.REJECTED) return [{ ...base, taskId: `task_cersai_repair_${interest.securityInterestId}`, type: "cersai.repair", title: "Repair rejected CERSAI submission", description: "Correct source data and create an independently approved replacement security interest.", role: "security_officer", priority: "critical", action: { method: "POST", path: `/loan-accounts/${interest.loanAccountId}/security-interests/${interest.securityInterestId}/repairs`, description: "Create repaired CERSAI security interest." }, context: { errorCode: interest.cersaiResponse?.errorCode ?? null, errorMessage: interest.cersaiResponse?.errorMessage ?? null } }];
+    return [];
+  });
 }
 
 function deriveFiuTasks(state, asOf) {

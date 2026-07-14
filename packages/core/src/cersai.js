@@ -1,5 +1,6 @@
 import { createFinding, summarizeFindings } from "./compliance-controls.js";
 import { createLoanId } from "./loan-policy.js";
+import { createHash } from "node:crypto";
 
 // CERSAI (Central Registry of Securitisation Asset Reconstruction and Security
 // Interest of India) registration is mandatory under the SARFAESI Act for
@@ -10,9 +11,12 @@ export const SECURITY_INTEREST_STATUSES = {
   DRAFT: "draft",
   FILED: "filed",
   REGISTERED: "registered",
+  REJECTED: "rejected",
   MODIFIED: "modified",
   SATISFIED: "satisfied"
 };
+
+export const CERSAI_SUBMISSION_PROFILE = "cersai-canonical-security-interest-1.0";
 
 export const CHARGE_TYPES = {
   MORTGAGE: "mortgage",
@@ -98,6 +102,9 @@ export function fileSecurityInterest(si, input = {}, context = {}, now = new Dat
     findings.push(createFinding("error", "SARFAESI", "Filing requires an actor.", "actor"));
   }
 
+  const packetResult = buildCersaiSubmission(si, context, input, now);
+  findings.push(...packetResult.findings);
+
   const summary = summarizeFindings(findings);
   if (summary.status === "blocked") {
     return blockedResult(si, findings, now);
@@ -109,13 +116,12 @@ export function fileSecurityInterest(si, input = {}, context = {}, now = new Dat
     actor: input.actor
   }, now);
 
-  // Mock CERSAI transaction ID — in production the ExternalServiceManager
-  // would call the CERSAI API and return the real transaction ID.
-  const cersaiTransactionId = input.cersaiTransactionId ?? `CERSAI-${Date.now()}`;
   const updated = {
     ...si,
     status: SECURITY_INTEREST_STATUSES.FILED,
-    cersaiTransactionId,
+    cersaiSubmission: packetResult.packet,
+    cersaiTransactionId: input.providerSubmissionRef ?? null,
+    providerSubmittedAt: input.providerSubmittedAt ?? now.toISOString(),
     filedAt: now.toISOString(),
     filedBy: input.actor,
     events: [...(si.events ?? []), event],
@@ -125,43 +131,58 @@ export function fileSecurityInterest(si, input = {}, context = {}, now = new Dat
   return readyResult(updated, event, now);
 }
 
-export function registerSecurityInterest(si, input = {}, context = {}, now = new Date()) {
+export function buildCersaiSubmission(si, context = {}, input = {}, now = new Date()) {
   const findings = [];
-  if (!si) {
-    findings.push(createFinding("error", "SARFAESI", "Security interest is required.", "securityInterestId"));
-    return blockedResult(si, findings, now);
-  }
-  if (si.status !== SECURITY_INTEREST_STATUSES.FILED) {
-    findings.push(createFinding("error", "SARFAESI", "Only filed security interests can be registered.", "status"));
-  }
-  if (!input.cersaiRegistrationNumber) {
-    findings.push(createFinding("error", "SARFAESI", "Registration requires a cersaiRegistrationNumber.", "cersaiRegistrationNumber"));
-  }
-  if (!input.actor) {
-    findings.push(createFinding("error", "SARFAESI", "Registration requires an actor.", "actor"));
-  }
-
-  const summary = summarizeFindings(findings);
-  if (summary.status === "blocked") {
-    return blockedResult(si, findings, now);
-  }
-
-  const event = cersaiEvent("cersai.security_interest.registered", {
+  const creditor = input.creditor ?? context.regulatedEntities?.[si?.regulatedEntityId] ?? context.regulatedEntity ?? null;
+  const debtor = input.debtor ?? context.borrowerProfiles?.[si?.borrowerId] ?? null;
+  const asset = input.asset ?? si?.assetDetails ?? null;
+  if (!si) findings.push(createFinding("error", "SARFAESI", "Security interest is required.", "securityInterestId"));
+  if (!creditor?.legalName || !creditor?.registrationCode || !creditor?.registeredAddress) findings.push(createFinding("error", "SARFAESI", "CERSAI packet requires creditor legal name, registration code, and registered address.", "creditor"));
+  if (!debtor?.fullName && !debtor?.legalName) findings.push(createFinding("error", "SARFAESI", "CERSAI packet requires debtor legal name.", "debtor"));
+  if (!debtor?.identity?.type || !debtor?.identity?.value || !debtor?.address?.line1 || !debtor?.address?.pincode) findings.push(createFinding("error", "SARFAESI", "CERSAI packet requires debtor identity and address evidence.", "debtor"));
+  if (!asset?.assetIdentifier || !asset?.location || !asset?.state || !asset?.pincode) findings.push(createFinding("error", "SARFAESI", "CERSAI packet requires a stable asset identifier and location, state, and pincode.", "asset"));
+  if (!input.chargeCreatedAt || Number.isNaN(new Date(input.chargeCreatedAt).getTime())) findings.push(createFinding("error", "SARFAESI", "CERSAI packet requires the security-interest creation date.", "chargeCreatedAt"));
+  if (!input.authorisedBy || !input.authorisationRef) findings.push(createFinding("error", "SARFAESI", "CERSAI packet requires authorised submitter and authority reference.", "authorisation"));
+  const summary = summarizeFindings(findings); if (summary.status === "blocked") return { packet: null, findings, summary };
+  const payload = {
+    profile: CERSAI_SUBMISSION_PROFILE,
+    submissionType: "security_interest_registration",
     securityInterestId: si.securityInterestId,
-    cersaiRegistrationNumber: input.cersaiRegistrationNumber,
-    actor: input.actor
-  }, now);
-  const updated = {
-    ...si,
-    status: SECURITY_INTEREST_STATUSES.REGISTERED,
-    cersaiRegistrationNumber: input.cersaiRegistrationNumber,
-    registeredAt: now.toISOString(),
-    registeredBy: input.actor,
-    events: [...(si.events ?? []), event],
-    updatedAt: now.toISOString()
+    loanAccountId: si.loanAccountId,
+    creditor: { legalName: creditor.legalName, registrationCode: creditor.registrationCode, registeredAddress: creditor.registeredAddress },
+    debtor: { name: debtor.fullName ?? debtor.legalName, identity: debtor.identity, address: debtor.address },
+    asset: { assetType: si.assetType, assetIdentifier: asset.assetIdentifier, location: asset.location, state: asset.state, pincode: asset.pincode },
+    charge: { chargeType: si.chargeType, chargeAmountInr: si.chargeAmountInr.toFixed(2), createdAt: new Date(input.chargeCreatedAt).toISOString().slice(0, 10) },
+    authorisedBy: input.authorisedBy,
+    authorisationRef: input.authorisationRef,
+    generatedAt: now.toISOString()
   };
+  const canonicalJson = JSON.stringify(payload);
+  return { packet: { profile: CERSAI_SUBMISSION_PROFILE, contentType: "application/json", canonicalJson, checksumSha256: createHash("sha256").update(canonicalJson).digest("hex"), generatedAt: now.toISOString() }, findings, summary };
+}
 
+export function acknowledgeCersaiSubmission(si, input = {}, now = new Date()) {
+  const findings = [];
+  if (!si || si.status !== SECURITY_INTEREST_STATUSES.FILED) findings.push(createFinding("error", "SARFAESI", "Only a filed security interest can receive a CERSAI response.", "status"));
+  if (!input.responseRef || !input.receivedBy || !["registered", "rejected"].includes(input.outcome)) findings.push(createFinding("error", "SARFAESI", "CERSAI response reference, receiver, and registered/rejected outcome are required.", "response"));
+  if (input.checksumSha256 !== si?.cersaiSubmission?.checksumSha256) findings.push(createFinding("error", "SARFAESI", "CERSAI response checksum must exactly match the submitted packet.", "checksumSha256"));
+  if (!input.payment?.receiptRef || !Number.isFinite(input.payment?.amountInr) || input.payment.amountInr < 0 || !input.payment?.paidAt) findings.push(createFinding("error", "SARFAESI", "CERSAI payment receipt, non-negative amount, and payment time are required.", "payment"));
+  if (input.outcome === "registered" && (!input.cersaiRegistrationNumber || !input.certificate?.certificateRef || !input.certificate?.checksumSha256)) findings.push(createFinding("error", "SARFAESI", "Registered response requires CERSAI registration number and checksum-sealed certificate evidence.", "certificate"));
+  if (input.outcome === "rejected" && (!input.errorCode || !input.errorMessage)) findings.push(createFinding("error", "SARFAESI", "Rejected response requires error code and message.", "error"));
+  const summary = summarizeFindings(findings); if (summary.status === "blocked") return blockedResult(si, findings, now);
+  const registered = input.outcome === "registered";
+  const event = cersaiEvent(`cersai.security_interest.${registered ? "registered" : "rejected"}`, { securityInterestId: si.securityInterestId, responseRef: input.responseRef, actor: input.receivedBy }, now);
+  const updated = { ...si, status: registered ? SECURITY_INTEREST_STATUSES.REGISTERED : SECURITY_INTEREST_STATUSES.REJECTED, cersaiRegistrationNumber: registered ? input.cersaiRegistrationNumber : null, registeredAt: registered ? now.toISOString() : null, registeredBy: registered ? input.receivedBy : null, cersaiResponse: { outcome: input.outcome, responseRef: input.responseRef, checksumSha256: input.checksumSha256, receivedBy: input.receivedBy, payment: input.payment, certificate: registered ? input.certificate : null, errorCode: input.errorCode ?? null, errorMessage: input.errorMessage ?? null }, events: [...(si.events ?? []), event], updatedAt: now.toISOString() };
   return readyResult(updated, event, now);
+}
+
+export function repairCersaiSecurityInterest(registry = {}, rejectedSecurityInterestId, input = {}, context = {}, now = new Date()) {
+  const rejected = registry[rejectedSecurityInterestId]; const findings = [];
+  if (!rejected || rejected.status !== SECURITY_INTEREST_STATUSES.REJECTED) findings.push(createFinding("error", "SARFAESI", "A rejected CERSAI security interest is required for repair.", "rejectedSecurityInterestId"));
+  if (!input.proposedBy || !input.approvedBy || input.proposedBy === input.approvedBy || !input.approvalRef || !input.sourceCorrectionRef || !input.correctedSecurityInterest) findings.push(createFinding("error", "RBI-IT-GRC", "Independent repair approval, source-correction evidence, and corrected security-interest data are required.", "repair"));
+  const summary = summarizeFindings(findings); if (summary.status === "blocked") return { registry, securityInterest: null, findings, summary };
+  const result = createSecurityInterest(registry, { ...rejected, ...input.correctedSecurityInterest, securityInterestId: input.securityInterestId ?? createLoanId("cersai"), parentSecurityInterestId: rejectedSecurityInterestId, createdBy: input.proposedBy, repairApproval: { proposedBy: input.proposedBy, approvedBy: input.approvedBy, approvalRef: input.approvalRef, sourceCorrectionRef: input.sourceCorrectionRef } }, context, now);
+  return { ...result, securityInterest: result.securityInterest ? { ...result.securityInterest, parentSecurityInterestId: rejectedSecurityInterestId } : null };
 }
 
 export function modifySecurityInterest(si, input = {}, context = {}, now = new Date()) {
@@ -358,13 +379,20 @@ function normalizeSecurityInterest(input, existing = {}, now = new Date()) {
     ...existing,
     securityInterestId: input.securityInterestId ?? existing.securityInterestId ?? createLoanId("cersai"),
     loanAccountId: input.loanAccountId ?? existing.loanAccountId ?? null,
+    regulatedEntityId: input.regulatedEntityId ?? existing.regulatedEntityId ?? null,
+    borrowerId: input.borrowerId ?? existing.borrowerId ?? null,
     assetType: input.assetType ?? existing.assetType ?? null,
     assetDescription: input.assetDescription ?? existing.assetDescription ?? null,
     chargeType: input.chargeType ?? existing.chargeType ?? null,
     chargeAmountInr: input.chargeAmountInr ?? existing.chargeAmountInr ?? null,
+    assetDetails: input.assetDetails ?? existing.assetDetails ?? null,
     status: existing.status ?? SECURITY_INTEREST_STATUSES.DRAFT,
     cersaiTransactionId: existing.cersaiTransactionId ?? null,
     cersaiRegistrationNumber: existing.cersaiRegistrationNumber ?? null,
+    cersaiSubmission: existing.cersaiSubmission ?? null,
+    cersaiResponse: existing.cersaiResponse ?? null,
+    parentSecurityInterestId: input.parentSecurityInterestId ?? existing.parentSecurityInterestId ?? null,
+    repairApproval: input.repairApproval ?? existing.repairApproval ?? null,
     createdBy: input.createdBy ?? existing.createdBy ?? null,
     modificationHistory: existing.modificationHistory ?? [],
     events: Array.isArray(existing.events) ? existing.events : [],

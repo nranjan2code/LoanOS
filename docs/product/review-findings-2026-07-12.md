@@ -43,7 +43,7 @@ cite the ID in commits and PRs.
 | REV-60 | CIC submission in Uniform Credit Reporting Format, fortnightly cadence | G | P2 | PARTIAL |
 | REV-61 | CKYC real file format (14-digit CKYC number, CKYCRR download/upload) | G | P2 | PARTIAL |
 | REV-62 | FIU-IND FINnet 2.0 XML STR/CTR format | G | P2 | PARTIAL |
-| REV-63 | CERSAI real submission format | G | P2 | TODO |
+| REV-63 | CERSAI real submission format | G | P2 | PARTIAL |
 | REV-64 | Live integrations to replace mock providers (bureau, bank-verify, eSign, NACH, comms, V-CIP) | G | P2 | TODO |
 | REV-70 | Split `server.js` (20,415 lines / 212 handlers) into per-resource routers | H | P2 | TODO |
 | REV-71 | Storage scale: control-plane/sandbox off whole-state on Postgres; PG per-tenant encryption | H | P2 | TODO |
@@ -277,8 +277,8 @@ Direct mock upload no longer fabricates identifiers. LoanOS now builds checksum-
 ### REV-62 — FIU-IND FINnet 2.0 XML · P2 · PARTIAL
 STR, CTR, and CCR now produce checksum-sealed canonical FINnet XML with ARF/TRF/CRF selection, validated reporting-entity/reference/KYC/transaction/CCR fields, XML escaping, Principal Officer gates, India-resident provider submission evidence, exact accepted/rejected acknowledgement reconciliation, and independently approved rejected-report repair lineage. The remaining certification boundary is validation against FIU-IND's current XSD plus preliminary-rule/data-quality files and successful live FINGate submission. **Internal XML and lifecycle acceptance achieved; FIU-certified wire conformance remains under REV-64.**
 
-### REV-63 — CERSAI real submission format · P2 · TODO
-Real CERSAI security-interest submission format (lifecycle already exists). **Acceptance:** a registration emits the CERSAI-accepted payload.
+### REV-63 — CERSAI real submission format · P2 · PARTIAL
+Security-interest filing now builds a checksum-sealed canonical CERSAI packet from lender registration, debtor identity/address, stable asset/location, charge, and authorised-submitter evidence. The provider submission reference is retained; registered/rejected responses must bind to the exact packet checksum and retain a fee receipt plus either a checksum-sealed certificate or rejection error; rejected records can only be replaced through independently approved, source-corrected repair lineage. Workflow queues cover filing, response reconciliation, and rejection repair. **Internal lifecycle acceptance achieved; CERSAI-certified portal/gateway wire serialization and live credentials remain under REV-64.**
 
 ### REV-64 — Live integrations to replace mocks · P2 · TODO
 No live integrations exist: bureau, bank-account verification, eSign (+PDF envelopes), NACH file exchange

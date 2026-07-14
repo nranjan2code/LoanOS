@@ -186,11 +186,12 @@ import {
   signDocumentPacket,
   vaultDocumentPacket,
   createSecurityInterest,
+  acknowledgeCersaiSubmission,
   enrichSecurityInterest,
   fileSecurityInterest,
   listSecurityInterests,
   modifySecurityInterest,
-  registerSecurityInterest,
+  repairCersaiSecurityInterest,
   satisfySecurityInterest,
   searchCersaiCharges,
   validateCersaiForDisbursement,
@@ -6308,7 +6309,7 @@ async function route(req, res, dataDir, platformAdminKey) {
   }
 
   const securityInterestActionMatch = path.match(
-    /^\/loan-accounts\/([^/]+)\/security-interests\/([^/]+)\/(filing|registration|modification|satisfaction)$/
+    /^\/loan-accounts\/([^/]+)\/security-interests\/([^/]+)\/(filing|registration|modification|satisfaction|repairs)$/
   );
   if (method === "POST" && securityInterestActionMatch) {
     const body = await readJson(req);
@@ -6320,17 +6321,32 @@ async function route(req, res, dataDir, platformAdminKey) {
       sendJson(res, 404, { error: { code: "not_found", message: "Security interest not found." } });
       return;
     }
-    let externalResult = {};
+    const now = new Date();
+    let result = action === "filing"
+      ? fileSecurityInterest(si, body, state, now)
+      : action === "registration"
+        ? acknowledgeCersaiSubmission(si, body, now)
+        : action === "repairs"
+          ? repairCersaiSecurityInterest(state.securityInterests, siId, body, state, now)
+          : action === "modification"
+            ? modifySecurityInterest(si, body, state, now)
+            : satisfySecurityInterest(si, body, state, now);
+    if (result.summary.status === "blocked") {
+      sendJson(res, 422, { error: { code: "security_interest_action_blocked", message: "Security interest action is blocked." }, findings: result.findings });
+      return;
+    }
+    let stored = result.securityInterest;
     if (action === "filing") {
       const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox });
       try {
-        externalResult = await manager.fileCersaiSecurityInterest({
+        const externalResult = await manager.fileCersaiSecurityInterest({
           securityInterestId: si.securityInterestId,
-          loanAccountId: si.loanAccountId,
-          assetType: si.assetType,
-          chargeType: si.chargeType,
-          chargeAmountInr: si.chargeAmountInr
+          checksumSha256: stored.cersaiSubmission.checksumSha256,
+          contentType: stored.cersaiSubmission.contentType,
+          payload: stored.cersaiSubmission.canonicalJson
         });
+        if (externalResult.checksumSha256 && externalResult.checksumSha256 !== stored.cersaiSubmission.checksumSha256) throw new Error("CERSAI provider submission checksum did not match canonical packet.");
+        stored = { ...stored, cersaiTransactionId: externalResult.providerSubmissionRef ?? externalResult.providerReference ?? null, providerSubmittedAt: externalResult.filedAt ?? now.toISOString() };
       } catch (err) {
         sendJson(res, 422, {
           error: {
@@ -6341,26 +6357,9 @@ async function route(req, res, dataDir, platformAdminKey) {
         return;
       }
     }
-
-    const now = new Date();
-    const result =
-      action === "filing"
-        ? fileSecurityInterest(si, { ...body, cersaiTransactionId: externalResult.cersaiTransactionId }, state, now)
-        : action === "registration"
-          ? registerSecurityInterest(si, body, state, now)
-          : action === "modification"
-            ? modifySecurityInterest(si, body, state, now)
-            : satisfySecurityInterest(si, body, state, now);
-    if (result.summary.status === "blocked") {
-      sendJson(res, 422, {
-        error: { code: "security_interest_action_blocked", message: "Security interest action is blocked." },
-        findings: result.findings
-      });
-      return;
-    }
-    const stored = result.securityInterest;
+    const securityInterests = action === "repairs" ? result.registry : { ...state.securityInterests, [stored.securityInterestId]: stored };
     const nextState = appendEvent(
-      { ...state, securityInterests: { ...state.securityInterests, [stored.securityInterestId]: stored } },
+      { ...state, securityInterests },
       {
         type: result.event.type,
         securityInterestId: stored.securityInterestId,

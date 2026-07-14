@@ -67,7 +67,7 @@ npm run dev:api
 | `packages/core/src/ai-interaction.js` | Customer-facing AI disclosure generation (blocked for back-office/inactive/kill-switched models) and human-handoff request/resolution workflow. |
 | `packages/core/src/incident-notification.js` | Tenant-scoped incident tracking with CERT-In/RBI six-hour clocks plus immediate and detailed DPDP Board and affected-data-principal notice duties. |
 | `packages/core/src/workflow-tasks.js` | LWS task derivation from LOS/LMS state (including pending DPDP access/correction requests) plus task assignment, start, release, and comment lifecycle. |
-| `packages/core/src/cersai.js` | CERSAI security-interest lifecycle (draft → filed → registered → modified → satisfied): maker-checker modification, closure-gated satisfaction, prior-encumbrance search, and a `securedLoan` disbursement gate (SARFAESI Act). |
+| `packages/core/src/cersai.js` | CERSAI security-interest lifecycle with checksum-sealed canonical registration packets, India-resident provider submission evidence, payment/certificate-bound responses, rejection repair lineage, maker-checker modification, closure-gated satisfaction, prior-encumbrance search, and a `securedLoan` disbursement gate (SARFAESI Act). Certified gateway schema conformance remains an adapter/onboarding boundary. |
 | `packages/core/src/data-principal-rights.js` | DPDP data-principal access requests (portable data pack assembly) and correction requests (apply/reject with profile propagation), both under a 30-day SLA clock with overdue detection. |
 | `packages/core/src/fiu-str.js` | FIU-IND STR/CTR/CCR lifecycle with canonical FINnet XML (ARF/TRF/CRF) packets, Principal Officer review, ₹10 lakh CTR threshold, source-field validation, checksum-sealed filing, exact acknowledgement/reject handling, independent repair lineage, and a tipping-off guard (PMLA). Certified FIU XSD/rules validation remains the provider adapter boundary. |
 | `packages/core/src/external-services.js` | Switchable `ExternalServiceManager` for external integrations (SMS, email, WhatsApp, credit bureau, V-CIP, bank-account verification, NACH/UPI payment rails, eSign, CERSAI, FIU-IND) with mock/real providers selected per integration and India data-residency checks enforced across all external services. |
@@ -231,8 +231,9 @@ npm run dev:api
 | `POST /borrowers/:id/correction-requests/:reqId/review` | Applies or rejects a correction request; applied corrections propagate into the borrower profile. |
 | `GET /loan-accounts/:id/security-interests` | Lists CERSAI security interests for a loan account. |
 | `POST /loan-accounts/:id/security-interests` | Creates a draft CERSAI security interest. |
-| `POST /loan-accounts/:id/security-interests/:siId/filing` | Files the security interest with CERSAI. |
-| `POST /loan-accounts/:id/security-interests/:siId/registration` | Records CERSAI registration of a filed security interest. |
+| `POST /loan-accounts/:id/security-interests/:siId/filing` | Builds and submits a checksum-sealed canonical CERSAI security-interest packet. |
+| `POST /loan-accounts/:id/security-interests/:siId/registration` | Reconciles a CERSAI registered/rejected response with exact packet checksum, fee receipt, and certificate/error evidence. |
+| `POST /loan-accounts/:id/security-interests/:siId/repairs` | Creates an independently approved replacement for a rejected CERSAI submission. |
 | `POST /loan-accounts/:id/security-interests/:siId/modification` | Files a maker-checker modification to a registered charge. |
 | `POST /loan-accounts/:id/security-interests/:siId/satisfaction` | Files satisfaction/release of a charge on loan closure. |
 | `GET /cersai/search` | Searches existing CERSAI charges on an asset (prior-encumbrance check). |

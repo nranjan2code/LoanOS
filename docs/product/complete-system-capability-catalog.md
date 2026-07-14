@@ -69,7 +69,7 @@ LoanOS currently has a strong compliance-first domain foundation and executable 
 
 The principal gaps before bank production are live integrations, downstream GL certification, regulatory submission formats, product-specific lending depth, repossession/auction and legal-expense depth, enterprise IAM and key management, observability/DR/BCP, and bank-assurance evidence. Collections and legal recovery now have a controlled first slice, but dialer integration, route/capacity optimization, track-specific pleadings, court integration, possession, auction, and recovery accounting remain open. Public product positioning must remain narrower than this catalogue until each advertised journey reaches an agreed maturity level.
 
-The detailed register contains **436 individually identified capabilities**. At this snapshot, 84 are classified `Implemented`, 169 `Partial`, 155 `Missing`, and 28 are mock, partner, external, or composite-status obligations. These counts measure scope coverage, not delivery percentage: a single missing ledger, reconciliation, security, or recovery control can block production even if many smaller capabilities exist.
+The detailed register contains **436 individually identified capabilities**. At this snapshot, 84 are classified `Implemented`, 170 `Partial`, 154 `Missing`, and 28 are mock, partner, external, or composite-status obligations. These counts measure scope coverage, not delivery percentage: a single missing ledger, reconciliation, security, or recovery control can block production even if many smaller capabilities exist.
 
 ## Capability Index
 
@@ -549,7 +549,7 @@ The detailed register contains **436 individually identified capabilities**. At 
 | RPT-005 | CIC dispute/correction and borrower communication | Institution | Partial |
 | RPT-006 | CKYCRR production upload/download format and acknowledgement | Institution | Partial |
 | RPT-007 | FIU FINnet 2.0 STR/CTR/CCR XML and acknowledgement | Institution | Partial |
-| RPT-008 | CERSAI production payload, payment, response, and certificate | Product | Missing |
+| RPT-008 | CERSAI production payload, payment, response, and certificate | Product | Partial |
 | RPT-009 | CRILC/SMA and large-exposure reporting | Institution | Missing |
 | RPT-010 | XBRL/CIMS statutory returns | Institution | Missing |
 | RPT-011 | PSL classification and reporting | Institution | Missing |

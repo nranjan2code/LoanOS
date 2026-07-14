@@ -566,8 +566,8 @@ export class ExternalServiceManager {
       return {
         success: true,
         provider: "mock",
-        cersaiTransactionId: `CERSAI-MOCK-${Date.now()}`,
-        cersaiRegistrationNumber: `REG-MOCK-${Date.now()}`,
+        providerSubmissionRef: `CERSAI-SUB-MOCK-${Date.now()}`,
+        checksumSha256: securityInterestData.checksumSha256 ?? null,
         dataResidencyCountry: this.config.cersaiDataResidencyCountry,
         filedAt: new Date().toISOString()
       };

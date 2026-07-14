@@ -77,8 +77,8 @@ import {
   validateMarketplaceNeutrality,
   rankMarketplaceOffers,
   createSecurityInterest,
+  acknowledgeCersaiSubmission,
   fileSecurityInterest,
-  registerSecurityInterest,
   modifySecurityInterest,
   satisfySecurityInterest,
   searchCersaiCharges,
@@ -4147,8 +4147,8 @@ test("collections and legal recovery run field evidence, PTP, SARFAESI, and Sect
   const workflow = await (await apiFetch(`${base}/workflow/tasks?type=loan_account.broken_ptp_follow_up&asOf=${addDays(promiseDate, 1)}T00:00:00.000Z`)).json(); assert.equal(workflow.tasks.length, 1);
 
   const siCreate = await postJson(`${base}/loan-accounts/${account.loanAccountId}/security-interests`, { securityInterestId: "cersai_recovery_001", assetType: "immovable", assetDescription: "Flat 8A, Mumbai", chargeType: "mortgage", chargeAmountInr: account.principalAmount, createdBy: "legal-maker-1" }); assert.equal(siCreate.status, 201);
-  assert.equal((await postJson(`${base}/loan-accounts/${account.loanAccountId}/security-interests/cersai_recovery_001/filing`, { actor: "legal-maker-1" })).status, 200);
-  assert.equal((await postJson(`${base}/loan-accounts/${account.loanAccountId}/security-interests/cersai_recovery_001/registration`, { actor: "legal-maker-1", cersaiRegistrationNumber: "CERSAI-RECOVERY-001" })).status, 200);
+  const cersaiFiling = await postJson(`${base}/loan-accounts/${account.loanAccountId}/security-interests/cersai_recovery_001/filing`, { actor: "legal-maker-1", creditor: { legalName: "Example Bank Limited", registrationCode: "RE-001", registeredAddress: "1 Bank Street, Mumbai" }, debtor: { fullName: "Asha Shah", identity: { type: "PAN", value: "ABCDE1234F" }, address: { line1: "8A Marine Drive", pincode: "400001" } }, asset: { assetIdentifier: "MUM-FLAT-8A", location: "Mumbai", state: "Maharashtra", pincode: "400001" }, chargeCreatedAt: dueDate, authorisedBy: "legal-maker-1", authorisationRef: "CERSAI-AUTH-001" }); assert.equal(cersaiFiling.status, 200, JSON.stringify(cersaiFiling.body));
+  assert.equal((await postJson(`${base}/loan-accounts/${account.loanAccountId}/security-interests/cersai_recovery_001/registration`, { outcome: "registered", responseRef: "CERSAI-RESP-RECOVERY-001", receivedBy: "legal-maker-1", checksumSha256: cersaiFiling.body.securityInterest.cersaiSubmission.checksumSha256, cersaiRegistrationNumber: "CERSAI-RECOVERY-001", payment: { receiptRef: "CERSAI-PAY-RECOVERY-001", amountInr: 100, paidAt: `${dueDate}T00:00:00.000Z` }, certificate: { certificateRef: "CERSAI-CERT-RECOVERY-001", checksumSha256: "b".repeat(64) } })).status, 200);
 
   const npaDate = addDays(dueDate, 100); const sarfaesi = await postJson(`${base}/loan-accounts/${account.loanAccountId}/legal-recovery-cases`, { caseId: "legal_sarfaesi_001", track: "sarfaesi", reason: "Secured account remained NPA after collection treatment", openedAt: `${npaDate}T00:00:00.000Z`, proposedBy: "legal-maker-1", approvedBy: "legal-checker-1", approvalRef: "LEGAL-APR-001" }); assert.equal(sarfaesi.status, 201, JSON.stringify(sarfaesi.body)); assert.equal(sarfaesi.body.legalRecoveryCase.assetClassificationAtOpening.assetClass, "npa"); assert.deepEqual(sarfaesi.body.legalRecoveryCase.securityInterestIds, ["cersai_recovery_001"]);
   const noticeDate = addDays(npaDate, 1); const notice = await postJson(`${base}/legal-recovery-cases/legal_sarfaesi_001/notices`, { noticeId: "notice_13_2_001", demandAmount: account.summary.totalOutstanding, documentRef: "doc_13_2_001", deliveryRef: "speed_post_001", issuedAt: `${noticeDate}T00:00:00.000Z`, deliveredAt: `${addDays(noticeDate, 2)}T00:00:00.000Z`, issuedBy: "legal-maker-1", approvedBy: "legal-checker-1" }); assert.equal(notice.status, 201, JSON.stringify(notice.body)); assert.equal(notice.body.notice.statutoryResponseDays, 60); assert.equal(notice.body.notice.statutoryDeadline.slice(0, 10), addDays(noticeDate, 60)); assert.equal(notice.body.notice.document.statutoryBasis, "SARFAESI Act 2002 section 13(2)"); assert.equal(notice.body.notice.document.checksumSha256.length, 64);
@@ -7402,12 +7402,14 @@ function validApplication() {
 }
 
 test("CERSAI security interest runs create → file → register → modify → satisfy", () => {
-  const activeContext = { loanAccounts: { la_1: { loanAccountId: "la_1", status: "active" } } };
+  const activeContext = { loanAccounts: { la_1: { loanAccountId: "la_1", status: "active" } }, borrowerProfiles: { borrower_1: { fullName: "Asha Shah", identity: { type: "PAN", value: "ABCDE1234F" }, address: { line1: "4 MG Road", pincode: "560001" } } } };
+  const cersaiPacket = { creditor: { legalName: "Example Bank Limited", registrationCode: "RE-001", registeredAddress: "1 Bank Street, Mumbai" }, debtor: activeContext.borrowerProfiles.borrower_1, asset: { assetIdentifier: "KA-01-AB-1234", location: "Bengaluru", state: "Karnataka", pincode: "560001" }, chargeCreatedAt: "2026-07-14", authorisedBy: "cersai-maker-1", authorisationRef: "AUTH-001" };
 
   const created = createSecurityInterest(
     {},
     {
       loanAccountId: "la_1",
+      borrowerId: "borrower_1",
       assetType: "immovable",
       assetDescription: "Flat 4B, Prestige Towers, Bengaluru",
       chargeType: "mortgage",
@@ -7419,15 +7421,14 @@ test("CERSAI security interest runs create → file → register → modify → 
   assert.equal(created.summary.status, "ready");
   assert.equal(created.securityInterest.status, "draft");
 
-  const filed = fileSecurityInterest(created.securityInterest, { actor: "cersai-maker-1" }, activeContext);
+  const filed = fileSecurityInterest(created.securityInterest, { actor: "cersai-maker-1", ...cersaiPacket }, activeContext);
   assert.equal(filed.summary.status, "ready");
   assert.equal(filed.securityInterest.status, "filed");
-  assert.ok(filed.securityInterest.cersaiTransactionId);
+  assert.ok(filed.securityInterest.cersaiSubmission.checksumSha256);
 
-  const registered = registerSecurityInterest(
+  const registered = acknowledgeCersaiSubmission(
     filed.securityInterest,
-    { actor: "cersai-maker-1", cersaiRegistrationNumber: "REG-001" },
-    activeContext
+    { outcome: "registered", responseRef: "CERSAI-RESP-001", receivedBy: "cersai-maker-1", checksumSha256: filed.securityInterest.cersaiSubmission.checksumSha256, cersaiRegistrationNumber: "REG-001", payment: { receiptRef: "CERSAI-PAY-001", amountInr: 100, paidAt: "2026-07-14T00:00:00.000Z" }, certificate: { certificateRef: "CERSAI-CERT-001", checksumSha256: "a".repeat(64) } }
   );
   assert.equal(registered.securityInterest.status, "registered");
 
@@ -8964,7 +8965,7 @@ test("API CERSAI and FIU filing enforce residency checks", async (t) => {
   // Set non-compliant CERSAI data residency
   process.env.LOANOS_CERSAI_DATA_RESIDENCY_COUNTRY = "US";
   const fileSiFail = await postJson(`${base}/loan-accounts/${loanAccountId}/security-interests/${siId}/filing`, {
-    actor: "credit-officer-1"
+    actor: "credit-officer-1", creditor: { legalName: "Example Bank Limited", registrationCode: "RE-001", registeredAddress: "1 Bank Street, Mumbai" }, debtor: { fullName: "Asha Shah", identity: { type: "PAN", value: "ABCDE1234F" }, address: { line1: "4 MG Road", pincode: "560001" } }, asset: { assetIdentifier: "CAR-001", location: "Bengaluru", state: "Karnataka", pincode: "560001" }, chargeCreatedAt: "2026-07-14", authorisedBy: "credit-officer-1", authorisationRef: "CERSAI-AUTH-RESIDENCY-001"
   });
   assert.equal(fileSiFail.status, 422);
   assert.match(fileSiFail.body.error.message, /CERSAI provider data residency country must be IN/);

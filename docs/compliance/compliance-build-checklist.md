@@ -185,7 +185,7 @@ Legend:
 | SMA/NPA asset classification | Asset class maps DPD to standard, SMA-0, SMA-1, SMA-2, and NPA. | Done |
 | CIC-ready snapshots | Internal account-level and portfolio-level CIC reporting snapshots are generated from account lifecycle state. | Done |
 | External CIC submission | Provider-specific CIC file/API integration and acknowledgement handling. | Planned |
-| CERSAI security-interest registration (SARFAESI) | `cersai.js` runs the security-interest lifecycle (draft → filed → registered → modified → satisfied): create with asset/charge details, file and register with CERSAI (mock/real `cersaiProvider`), maker-checker modification, closure-gated satisfaction, and prior-encumbrance search. Disbursement of a `securedLoan` product is blocked until a registered charge exists on the account. External CERSAI submission format is mocked. | Partial |
+| CERSAI security-interest registration (SARFAESI) | `cersai.js` builds checksum-sealed canonical security-interest registration packets from creditor, debtor, asset, charge, and authority evidence; retains India-resident provider-submission evidence; reconciles exact registered/rejected responses with fee receipt and certificate/error evidence; and requires independently approved source-correction replacements. Maker-checker modification, closure-gated satisfaction, prior-encumbrance search, and the secured-loan disbursement gate remain enforced. Certified CERSAI portal/gateway schema and credential onboarding remain external adapter work. | Partial |
 
 ## SaaS Vendor Posture and Tenant Isolation
 
