@@ -9,7 +9,8 @@ This folder is the working documentation set for the LoanOS India build. It expl
 3. [India regulatory register](/Users/nisheethranjan/Projects/AIBank/docs/compliance/india-regulatory-register.md)
 4. [Current implementation map](/Users/nisheethranjan/Projects/AIBank/docs/architecture/current-implementation.md)
 5. [Complete-system capability catalogue](/Users/nisheethranjan/Projects/AIBank/docs/product/complete-system-capability-catalog.md)
-6. [Build backlog](/Users/nisheethranjan/Projects/AIBank/docs/product/build-backlog.md)
+6. [Platform module integration and API map](/Users/nisheethranjan/Projects/AIBank/docs/architecture/platform-module-integration-api-map.md)
+7. [Build backlog](/Users/nisheethranjan/Projects/AIBank/docs/product/build-backlog.md)
 
 ## Documentation Map
 
@@ -21,6 +22,8 @@ This folder is the working documentation set for the LoanOS India build. It expl
 | [Roadmap](/Users/nisheethranjan/Projects/AIBank/docs/product/roadmap.md) | Phased delivery plan from compliance foundation to AI governance hardening. |
 | [Build backlog](/Users/nisheethranjan/Projects/AIBank/docs/product/build-backlog.md) | Actionable engineering backlog grouped by epic. |
 | [Architecture blueprint](/Users/nisheethranjan/Projects/AIBank/docs/architecture/loanos-india-blueprint.md) | Target architecture across LOS, LMS, LWS, and compliance control plane. |
+| [Platform module integration and API map](/Users/nisheethranjan/Projects/AIBank/docs/architecture/platform-module-integration-api-map.md) | Complete external dependency map organised by channels, LOS, decision/risk, LWS, LMS, collections, collateral, finance, compliance, partners and platform, with stable IDs, lifecycle trigger, direction and current state. |
+| [Integration and Indian vendor procurement catalogue](/Users/nisheethranjan/Projects/AIBank/docs/architecture/integration-vendor-procurement-catalog.md) | Required API/event/file contracts, mock gaps, Indian vendor candidates, commercial units, dated public prices and RFQ requirements. |
 | [SaaS tenancy and operating model](/Users/nisheethranjan/Projects/AIBank/docs/architecture/saas-tenancy-and-operating-model.md) | Multi-tenant SaaS delivery: tenant isolation, audit spine, tenant lifecycle, and LoanOS's own vendor-compliance posture. |
 | [Decision engine design](/Users/nisheethranjan/Projects/AIBank/docs/architecture/decision-engine-design.md) | Pure-Rust decision engine: per-tenant isolated runtimes, decision contract, invariants, kill-switch enforcement, agent guardrails, security threat model, and phased delivery plan (PH-0..5 all implemented). Source of truth for engine implementation. |
 | [Decision engine operations](/Users/nisheethranjan/Projects/AIBank/rules/README.md) | Developer/operator guide: crate map, build and test, local fleet (sign/up/health/kill-switch), replay canary, API integration modes. |

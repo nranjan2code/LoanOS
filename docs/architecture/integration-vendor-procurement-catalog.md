@@ -2,6 +2,8 @@
 
 Status: procurement baseline, 15 July 2026. Prices are public list prices observed on that date, exclude GST unless explicitly stated, and are not vendor quotations. A blank public price is not zero: it means the supplier requires an RFQ. Reconfirm price, regulatory eligibility, data location and product scope before contracting.
 
+Use the [platform module integration and API map](platform-module-integration-api-map.md) to see exactly where each dependency is required across channels, LOS, decision/risk, LWS, LMS, collections, collateral, finance, compliance, partners and the enterprise platform.
+
 ## Executive finding
 
 LoanOS does **not** yet have production-grade mocks for the complete system. It has a reusable mock-or-real boundary for 15 families—SMS, email, WhatsApp, bureau, V-CIP, bank-account verification, payment rail, eSign, CERSAI, FIU-IND, CIC reporting, CKYCRR reporting, Account Aggregator, escrow and core banking—with India-residency and provider-certification gates. Internal accounting, reporting, settlement and exception workflows are often much deeper than the external simulators.
