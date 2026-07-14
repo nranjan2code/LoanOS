@@ -661,7 +661,7 @@ The detailed register contains **453 individually identified capabilities**. At 
 | INT-006 | Callback correlation, acknowledgement, and reconciliation | Core | Partial |
 | INT-007 | API catalogue, OpenAPI, examples, SDK, and sandbox | Core | Missing |
 | INT-008 | Core banking, GL, CRM, DMS, data warehouse, and identity connectors | Institution | Missing |
-| INT-009 | Bureau, AA, CKYC, V-CIP, eSign, bank verify, payment, comms, CERSAI, and FIU providers | Product | Mock |
+| INT-009 | Bureau, AA, CKYC, V-CIP, eSign, bank verify, payment, comms, CERSAI, and FIU providers | Product | Partial/Mock |
 | INT-010 | Event schema registry, lineage, backward compatibility, and deprecation | Core | Missing |
 | INT-011 | Operational and analytical data models separated by purpose | Core | Missing |
 | INT-012 | Data-quality rules, profiling, exception queue, and certification | Core | Missing |

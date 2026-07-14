@@ -1,5 +1,6 @@
 import { createFinding } from "./compliance-controls.js";
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { assessProviderCertification } from "./provider-governance.js";
 
 // Mock pre-seeded data for Credit Bureau (CIBIL equivalent)
 const MOCK_BUREAU_SCORES = {
@@ -92,6 +93,19 @@ export class ExternalServiceManager {
       fiuApiUrl: config.fiuApiUrl ?? (typeof process !== "undefined" ? process.env.LOANOS_FIU_API_URL : "") ?? "",
       fiuApiKey: config.fiuApiKey ?? (typeof process !== "undefined" ? process.env.LOANOS_FIU_API_KEY : "") ?? "",
       fiuDataResidencyCountry: config.fiuDataResidencyCountry ?? (typeof process !== "undefined" ? process.env.LOANOS_FIU_DATA_RESIDENCY_COUNTRY : "IN") ?? "IN",
+      cicProvider: config.cicProvider ?? (typeof process !== "undefined" ? process.env.LOANOS_CIC_PROVIDER : "mock") ?? "mock",
+      cicApiUrl: config.cicApiUrl ?? (typeof process !== "undefined" ? process.env.LOANOS_CIC_API_URL : "") ?? "",
+      cicApiKey: config.cicApiKey ?? (typeof process !== "undefined" ? process.env.LOANOS_CIC_API_KEY : "") ?? "",
+      cicDataResidencyCountry: config.cicDataResidencyCountry ?? (typeof process !== "undefined" ? process.env.LOANOS_CIC_DATA_RESIDENCY_COUNTRY : "IN") ?? "IN",
+      ckycrrProvider: config.ckycrrProvider ?? (typeof process !== "undefined" ? process.env.LOANOS_CKYCRR_PROVIDER : "mock") ?? "mock",
+      ckycrrApiUrl: config.ckycrrApiUrl ?? (typeof process !== "undefined" ? process.env.LOANOS_CKYCRR_API_URL : "") ?? "",
+      ckycrrApiKey: config.ckycrrApiKey ?? (typeof process !== "undefined" ? process.env.LOANOS_CKYCRR_API_KEY : "") ?? "",
+      ckycrrDataResidencyCountry: config.ckycrrDataResidencyCountry ?? (typeof process !== "undefined" ? process.env.LOANOS_CKYCRR_DATA_RESIDENCY_COUNTRY : "IN") ?? "IN",
+      accountAggregatorProvider: config.accountAggregatorProvider ?? (typeof process !== "undefined" ? process.env.LOANOS_ACCOUNT_AGGREGATOR_PROVIDER : "mock") ?? "mock",
+      accountAggregatorApiUrl: config.accountAggregatorApiUrl ?? (typeof process !== "undefined" ? process.env.LOANOS_ACCOUNT_AGGREGATOR_API_URL : "") ?? "",
+      accountAggregatorApiKey: config.accountAggregatorApiKey ?? (typeof process !== "undefined" ? process.env.LOANOS_ACCOUNT_AGGREGATOR_API_KEY : "") ?? "",
+      accountAggregatorDataResidencyCountry: config.accountAggregatorDataResidencyCountry ?? (typeof process !== "undefined" ? process.env.LOANOS_ACCOUNT_AGGREGATOR_DATA_RESIDENCY_COUNTRY : "IN") ?? "IN",
+      providerCertifications: config.providerCertifications ?? (typeof process !== "undefined" && process.env.LOANOS_PROVIDER_CERTIFICATIONS ? JSON.parse(process.env.LOANOS_PROVIDER_CERTIFICATIONS) : {}),
       providerCallbackSecrets: config.providerCallbackSecrets ?? (typeof process !== "undefined" && process.env.LOANOS_PROVIDER_CALLBACK_SECRETS ? JSON.parse(process.env.LOANOS_PROVIDER_CALLBACK_SECRETS) : {})
       ,providerTimeoutMs: Number(config.providerTimeoutMs ?? (typeof process !== "undefined" ? process.env.LOANOS_PROVIDER_TIMEOUT_MS : 5000) ?? 5000),
       providerMaxAttempts: Number(config.providerMaxAttempts ?? (typeof process !== "undefined" ? process.env.LOANOS_PROVIDER_MAX_ATTEMPTS : 2) ?? 2)
@@ -112,15 +126,25 @@ export class ExternalServiceManager {
       this.config.esignProvider = "mock";
       this.config.cersaiProvider = "mock";
       this.config.fiuProvider = "mock";
+      this.config.cicProvider = "mock";
+      this.config.ckycrrProvider = "mock";
+      this.config.accountAggregatorProvider = "mock";
     }
   }
 
   integrationReadiness() {
-    const integrations = [["sms", "SMS", "sms"], ["email", "Email", "email"], ["whatsapp", "WhatsApp", "whatsapp"], ["bureau", "Credit Bureau", "bureau"], ["vcip", "V-CIP", "vcip"], ["bank_account", "Bank account verification", "bankAccount"], ["payment_rail", "Payment rail", "paymentRail"], ["esign", "eSign", "esign"], ["cersai", "CERSAI", "cersai"], ["fiu", "FIU-IND", "fiu"], ["escrow", "Escrow", "escrow"], ["core_banking", "Core banking", "coreBanking"]];
+    const integrations = [["sms", "SMS", "sms"], ["email", "Email", "email"], ["whatsapp", "WhatsApp", "whatsapp"], ["bureau", "Credit Bureau", "bureau"], ["vcip", "V-CIP", "vcip"], ["bank_account", "Bank account verification", "bankAccount"], ["payment_rail", "Payment rail", "paymentRail"], ["esign", "eSign", "esign"], ["cersai", "CERSAI", "cersai"], ["fiu", "FIU-IND", "fiu"], ["cic", "Credit information company", "cic"], ["ckycrr", "CKYCRR", "ckycrr"], ["account_aggregator", "Account Aggregator", "accountAggregator"], ["escrow", "Escrow", "escrow"], ["core_banking", "Core banking", "coreBanking"]];
     return integrations.map(([integration, label, prefix]) => {
-      const provider = this.config[`${prefix}Provider`]; const dataResidencyCountry = this.config[`${prefix}DataResidencyCountry`]; const hasEndpoint = Boolean(this.config[`${prefix}ApiUrl`]); const hasCredential = Boolean(this.config[`${prefix}ApiKey`]); const residencyCompliant = dataResidencyCountry === "IN"; const configured = provider === "mock" || (hasEndpoint && hasCredential && residencyCompliant); const circuit = PROVIDER_CIRCUITS.get(label); const circuitOpenUntil = circuit?.openUntil && circuit.openUntil > Date.now() ? new Date(circuit.openUntil).toISOString() : null;
-      return { integration, label, provider, mode: provider === "mock" ? "mock" : "real", status: circuitOpenUntil ? "degraded" : configured ? (provider === "mock" ? "mock" : "ready") : "blocked", dataResidencyCountry, residencyCompliant, hasEndpoint, hasCredential, circuitOpenUntil, consecutiveFailures: circuit?.failures ?? 0, reason: circuitOpenUntil ? "provider_circuit_open" : configured ? null : !residencyCompliant ? "india_data_residency_required" : "endpoint_or_credential_missing" };
+      const provider = this.config[`${prefix}Provider`]; const dataResidencyCountry = this.config[`${prefix}DataResidencyCountry`]; const hasEndpoint = Boolean(this.config[`${prefix}ApiUrl`]); const hasCredential = Boolean(this.config[`${prefix}ApiKey`]); const residencyCompliant = dataResidencyCountry === "IN"; const certification = assessProviderCertification(this.config.providerCertifications, integration); const configured = provider === "mock" || (hasEndpoint && hasCredential && residencyCompliant && certification.certified); const circuit = PROVIDER_CIRCUITS.get(label); const circuitOpenUntil = circuit?.openUntil && circuit.openUntil > Date.now() ? new Date(circuit.openUntil).toISOString() : null;
+      const reason = circuitOpenUntil ? "provider_circuit_open" : configured ? null : !residencyCompliant ? "india_data_residency_required" : !hasEndpoint || !hasCredential ? "endpoint_or_credential_missing" : certification.reason;
+      return { integration, label, provider, mode: provider === "mock" ? "mock" : "real", status: circuitOpenUntil ? "degraded" : configured ? (provider === "mock" ? "mock" : "ready") : "blocked", dataResidencyCountry, residencyCompliant, hasEndpoint, hasCredential, certificationStatus: provider === "mock" ? "not_required" : certification.status, certificationExpiresAt: certification.certification?.expiresAt ?? null, circuitOpenUntil, consecutiveFailures: circuit?.failures ?? 0, reason };
     });
+  }
+
+  assertCertified(integration) {
+    const assessment = assessProviderCertification(this.config.providerCertifications, integration);
+    if (!assessment.certified) throw new Error(`${integration} live provider is blocked: ${assessment.reason}.`);
+    return assessment.certification;
   }
 
   verifyProviderCallback(provider, eventId, payload, signature) {
@@ -142,6 +166,7 @@ export class ExternalServiceManager {
       if (!this.config.smsApiUrl || !this.config.smsApiKey) {
         throw new Error("Real SMS provider configured but API URL or API key is missing.");
       }
+      this.assertCertified("sms");
       // Call actual REST API
       const res = await fetch(this.config.smsApiUrl, {
         method: "POST",
@@ -186,6 +211,7 @@ export class ExternalServiceManager {
       if (!this.config.emailApiUrl || !this.config.emailApiKey) {
         throw new Error("Real email provider configured but API URL or API key is missing.");
       }
+      this.assertCertified("email");
       const res = await fetch(this.config.emailApiUrl, {
         method: "POST",
         headers: {
@@ -225,6 +251,7 @@ export class ExternalServiceManager {
       if (!this.config.whatsappApiUrl || !this.config.whatsappApiKey) {
         throw new Error("Real WhatsApp provider configured but API URL or API key is missing.");
       }
+      this.assertCertified("whatsapp");
       const res = await fetch(this.config.whatsappApiUrl, {
         method: "POST",
         headers: {
@@ -277,6 +304,7 @@ export class ExternalServiceManager {
       if (!this.config.bureauApiUrl || !this.config.bureauApiKey) {
         throw new Error("Real Credit Bureau provider configured but API credentials missing.");
       }
+      this.assertCertified("bureau");
       const res = await fetch(`${this.config.bureauApiUrl}/scores?pan=${encodeURIComponent(panNumber)}`, {
         headers: {
           "Authorization": `Bearer ${this.config.bureauApiKey}`
@@ -312,6 +340,7 @@ export class ExternalServiceManager {
       if (!this.config.vcipApiUrl || !this.config.vcipApiKey) {
         throw new Error("Real V-CIP provider configured but credentials missing.");
       }
+      this.assertCertified("vcip");
       const res = await fetch(this.config.vcipApiUrl, {
         method: "POST",
         headers: {
@@ -359,6 +388,7 @@ export class ExternalServiceManager {
       if (!this.config.bankAccountApiUrl || !this.config.bankAccountApiKey) {
         throw new Error("Real bank account verification provider configured but credentials missing.");
       }
+      this.assertCertified("bank_account");
       const res = await fetch(this.config.bankAccountApiUrl, {
         method: "POST",
         headers: {
@@ -428,6 +458,7 @@ export class ExternalServiceManager {
       if (!this.config.paymentRailApiUrl || !this.config.paymentRailApiKey) {
         throw new Error("Real payment rail provider configured but API URL or API key is missing.");
       }
+      this.assertCertified("payment_rail");
       const res = await fetch(`${this.config.paymentRailApiUrl}/nach/mandates`, {
         method: "POST",
         headers: {
@@ -464,6 +495,7 @@ export class ExternalServiceManager {
       if (!this.config.paymentRailApiUrl || !this.config.paymentRailApiKey) {
         throw new Error("Real payment rail provider configured but API URL or API key is missing.");
       }
+      this.assertCertified("payment_rail");
       const res = await fetch(`${this.config.paymentRailApiUrl}/upi/collects`, {
         method: "POST",
         headers: {
@@ -503,6 +535,7 @@ export class ExternalServiceManager {
       if (!this.config.paymentRailApiUrl || !this.config.paymentRailApiKey) {
         throw new Error("Real payment rail provider configured but API URL or API key is missing.");
       }
+      this.assertCertified("payment_rail");
       const res = await fetch(`${this.config.paymentRailApiUrl}/nach/presentments`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${this.config.paymentRailApiKey}` },
@@ -534,6 +567,7 @@ export class ExternalServiceManager {
       if (!this.config.esignApiUrl || !this.config.esignApiKey) {
         throw new Error("Real eSign provider configured but credentials missing.");
       }
+      this.assertCertified("esign");
       const res = await fetch(this.config.esignApiUrl, {
         method: "POST",
         headers: {
@@ -574,6 +608,7 @@ export class ExternalServiceManager {
       if (!this.config.cersaiApiUrl || !this.config.cersaiApiKey) {
         throw new Error("Real CERSAI provider configured but credentials missing.");
       }
+      this.assertCertified("cersai");
       return postProviderJson(`${this.config.cersaiApiUrl}/security-interests`, securityInterestData, this.config.cersaiApiKey, securityInterestData.checksumSha256, "CERSAI", this.config);
     } else {
       // Mock provider
@@ -597,6 +632,7 @@ export class ExternalServiceManager {
       if (!this.config.cersaiApiUrl || !this.config.cersaiApiKey) {
         throw new Error("Real CERSAI provider configured but credentials missing.");
       }
+      this.assertCertified("cersai");
       const res = await fetch(`${this.config.cersaiApiUrl}/search?asset=${encodeURIComponent(assetDescription)}`, {
         headers: {
           "Authorization": `Bearer ${this.config.cersaiApiKey}`
@@ -628,6 +664,7 @@ export class ExternalServiceManager {
       if (!this.config.fiuApiUrl || !this.config.fiuApiKey) {
         throw new Error("Real FIU-IND provider configured but credentials missing.");
       }
+      this.assertCertified("fiu");
       return postProviderJson(`${this.config.fiuApiUrl}/reports`, reportData, this.config.fiuApiKey, reportData.checksumSha256, "FIU-IND", this.config);
     } else {
       // Mock provider
@@ -642,11 +679,45 @@ export class ExternalServiceManager {
     }
   }
 
+  async submitCicReportingBatch(batch = {}) {
+    ensureIndiaDataResidency("Credit information company", this.config.cicDataResidencyCountry);
+    if (!batch.batchId || !batch.checksumSha256 || !Number.isInteger(batch.recordCount)) throw new Error("CIC transport requires a checksum-bound reporting batch.");
+    if (this.config.cicProvider === "real") {
+      if (!this.config.cicApiUrl || !this.config.cicApiKey) throw new Error("Real CIC provider configured but credentials missing.");
+      this.assertCertified("cic");
+      return postProviderJson(`${this.config.cicApiUrl}/batches`, batch, this.config.cicApiKey, batch.checksumSha256, "Credit information company", this.config);
+    }
+    return { success: true, provider: "mock", providerSubmissionRef: `CIC-MOCK-${batch.batchId}`, transportEvidenceRef: `CIC-TRANSPORT-MOCK-${batch.checksumSha256}`, checksumSha256: batch.checksumSha256, submittedAt: new Date().toISOString(), dataResidencyCountry: "IN" };
+  }
+
+  async submitCkycrrPacket(submission = {}) {
+    ensureIndiaDataResidency("CKYCRR", this.config.ckycrrDataResidencyCountry);
+    if (!submission.submissionId || !submission.packet?.checksumSha256) throw new Error("CKYCRR transport requires a checksum-bound packet.");
+    if (this.config.ckycrrProvider === "real") {
+      if (!this.config.ckycrrApiUrl || !this.config.ckycrrApiKey) throw new Error("Real CKYCRR provider configured but credentials missing.");
+      this.assertCertified("ckycrr");
+      return postProviderJson(`${this.config.ckycrrApiUrl}/submissions`, submission, this.config.ckycrrApiKey, submission.packet.checksumSha256, "CKYCRR", this.config);
+    }
+    return { success: true, provider: "mock", providerSubmissionRef: `CKYCRR-MOCK-${submission.submissionId}`, transportRef: `CKYCRR-TRANSPORT-MOCK-${submission.packet.checksumSha256}`, digitalSignatureRef: `CKYCRR-DSC-MOCK-${submission.submissionId}`, fileName: `${submission.submissionId}.zip`, fileSizeBytes: Buffer.byteLength(submission.packet.canonicalContent ?? "{}"), submittedAt: new Date().toISOString(), dataResidencyCountry: "IN" };
+  }
+
+  async fetchAccountAggregatorData(consent = {}, request = {}) {
+    ensureIndiaDataResidency("Account Aggregator", this.config.accountAggregatorDataResidencyCountry);
+    if (!consent.consentId || !consent.aaConsentHandle) throw new Error("AA fetch requires an active provider consent handle.");
+    if (this.config.accountAggregatorProvider === "real") {
+      if (!this.config.accountAggregatorApiUrl || !this.config.accountAggregatorApiKey) throw new Error("Real Account Aggregator provider configured but credentials missing.");
+      this.assertCertified("account_aggregator");
+      return postProviderJson(`${this.config.accountAggregatorApiUrl}/fi/fetch`, { consentHandle: consent.aaConsentHandle, ...request }, this.config.accountAggregatorApiKey, request.fetchId ?? `${consent.consentId}:${(consent.fetches ?? []).length + 1}`, "Account Aggregator", this.config);
+    }
+    return { success: true, provider: "mock_aa", providerFetchRef: `AA-MOCK-${consent.consentId}-${(consent.fetches ?? []).length + 1}`, recordCount: request.recordCount ?? consent.fiTypes?.length ?? 0, payloadHash: request.payloadHash ?? null, dataResidencyCountry: "IN", fetchedAt: new Date().toISOString() };
+  }
+
   async submitEscrowInstruction(instruction = {}) {
     ensureIndiaDataResidency("Co-lending escrow", this.config.escrowDataResidencyCountry);
     if (!instruction.instructionId || !instruction.escrowAccountRef || !instruction.checksumSha256 || !Number.isFinite(instruction.amount) || instruction.amount < 0) throw new Error("Escrow instruction requires identifiers, checksum, and a non-negative amount.");
     if (this.config.escrowProvider === "real") {
       if (!this.config.escrowApiUrl || !this.config.escrowApiKey) throw new Error("Real escrow provider configured but API URL or API key is missing.");
+      this.assertCertified("escrow");
       const res = await fetch(`${this.config.escrowApiUrl}/instructions`, { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${this.config.escrowApiKey}` }, body: JSON.stringify(instruction) });
       if (!res.ok) throw new Error(`Real escrow provider returned status ${res.status}`);
       const result = await res.json();
@@ -661,6 +732,7 @@ export class ExternalServiceManager {
     if (!batch.batchId || !batch.checksumSha256 || !Number.isInteger(batch.lineCount) || batch.lineCount <= 0 || !Array.isArray(batch.lines) || batch.lines.length !== batch.lineCount) throw new Error("Core-banking batch requires an exact checksum-bound line payload.");
     if (this.config.coreBankingProvider === "real") {
       if (!this.config.coreBankingApiUrl || !this.config.coreBankingApiKey) throw new Error("Real core-banking provider configured but API URL or API key is missing.");
+      this.assertCertified("core_banking");
       const res = await fetch(`${this.config.coreBankingApiUrl}/journal-batches`, { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${this.config.coreBankingApiKey}` }, body: JSON.stringify(batch) });
       if (!res.ok) throw new Error(`Real core-banking provider returned status ${res.status}`);
       const result = await res.json();

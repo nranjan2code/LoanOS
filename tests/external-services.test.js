@@ -3,6 +3,10 @@ import assert from "node:assert";
 import { createHmac } from "node:crypto";
 import { ExternalServiceManager } from "../packages/core/src/index.js";
 
+const activeCertification = (integration) => ({
+  [integration]: { integration, status: "certified", environment: "production", dataResidencyCountry: "IN", expiresAt: "2099-01-01T00:00:00.000Z" }
+});
+
 test("ExternalServiceManager SMS provider defaults to mock and successfully logs messages", async () => {
   const manager = new ExternalServiceManager();
   const res = await manager.sendSms("+919876543210", "Hello Test SMS");
@@ -44,7 +48,7 @@ test("CERSAI real submission retries transient failures with a stable idempotenc
   const originalFetch = globalThis.fetch; let calls = 0; let idempotencyKey = null;
   globalThis.fetch = async (_url, options) => { calls++; idempotencyKey = options.headers["Idempotency-Key"]; return calls === 1 ? new Response("temporary", { status: 503 }) : new Response(JSON.stringify({ providerSubmissionRef: "SUB-001" }), { status: 200 }); };
   try {
-    const manager = new ExternalServiceManager({ cersaiProvider: "real", cersaiApiUrl: "https://cersai.example.in", cersaiApiKey: "key", providerMaxAttempts: 2, providerTimeoutMs: 500 });
+    const manager = new ExternalServiceManager({ cersaiProvider: "real", cersaiApiUrl: "https://cersai.example.in", cersaiApiKey: "key", providerCertifications: activeCertification("cersai"), providerMaxAttempts: 2, providerTimeoutMs: 500 });
     const result = await manager.fileCersaiSecurityInterest({ checksumSha256: "a".repeat(64) });
     assert.equal(calls, 2); assert.equal(idempotencyKey, "a".repeat(64)); assert.equal(result.providerSubmissionRef, "SUB-001");
   } finally { globalThis.fetch = originalFetch; }
@@ -54,7 +58,7 @@ test("CERSAI circuit opens after configured provider failure threshold", async (
   const originalFetch = globalThis.fetch; let calls = 0;
   globalThis.fetch = async () => { calls++; return new Response("down", { status: 503 }); };
   try {
-    const manager = new ExternalServiceManager({ cersaiProvider: "real", cersaiApiUrl: "https://cersai.example.in", cersaiApiKey: "key", providerMaxAttempts: 1, providerCircuitFailureThreshold: 1, providerCircuitCooldownMs: 1000 });
+    const manager = new ExternalServiceManager({ cersaiProvider: "real", cersaiApiUrl: "https://cersai.example.in", cersaiApiKey: "key", providerCertifications: activeCertification("cersai"), providerMaxAttempts: 1, providerCircuitFailureThreshold: 1, providerCircuitCooldownMs: 1000 });
     await assert.rejects(() => manager.fileCersaiSecurityInterest({ checksumSha256: "c".repeat(64) }), /unavailable after 1 attempt/);
     await assert.rejects(() => manager.fileCersaiSecurityInterest({ checksumSha256: "c".repeat(64) }), /circuit is open/);
     assert.equal(calls, 1);

@@ -23,7 +23,7 @@ The current implementation is intentionally small:
 - Internal staff workspace in `apps/dashboard/`.
 - Borrower customer portal in `apps/customer/`: a responsive, white-labelled journey home with prioritised next actions, visual application milestones, repayment schedules, a document centre, guided media, grievance tracking, and DPDP access/correction/erasure controls.
 - Shared design system tokens in `apps/shared/`.
-- Automated tests in `tests/`: 248 file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
+- Automated tests in `tests/`: 253 file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
 
 Run it:
 
@@ -64,6 +64,7 @@ npm run dev:api
 | `packages/core/src/co-lending.js` | RBI CLA agreement validation, partner funding/interest/fee and servicing GST/TDS economics, originating-RE retention, escrow evidence, exposure, and paise-exact loan allocation. |
 | `packages/core/src/co-lending-finance.js` | Partner transfer pricing, entity-level ECL/provision attribution, GST/TDS-adjusted statements, checksum-sealed tax exchange, exact settlement reconciliation, and balanced partner/servicing journals. |
 | `packages/core/src/external-services.js` | India-resident mock-or-real external provider boundary, including fail-closed checksum-bound co-lending escrow instructions and core-banking journal batches. |
+| `packages/core/src/provider-governance.js` | Fifteen-family provider certification registry: production/India/time/evidence scope, four-eyes approval, suspension, expiry assessment, and live-readiness authority. |
 | `packages/core/src/loan-policy.js` | India-only loan validation, KFS validation (including prepayment/foreclosure checks), sanction readiness, disbursement checks. |
 | `packages/core/src/model-governance.js` | AI/model inventory (including generative model class), model status, governed lifecycle transitions with a validation gate (fairness/explainability/monitoring for high-risk, adversarial/hallucination testing for generative), drift monitoring with auto kill-switch, global/model kill switch, kill-switch incident and post-incident review workflow, runtime model-use evaluation. |
 | `packages/core/src/ai-interaction.js` | Customer-facing AI disclosure generation (blocked for back-office/inactive/kill-switched models) and human-handoff request/resolution workflow. |
@@ -78,7 +79,7 @@ npm run dev:api
 | `packages/core/src/cersai.js` | CERSAI security-interest lifecycle with checksum-sealed canonical registration packets, India-resident provider submission evidence, payment/certificate-bound responses, rejection repair lineage, maker-checker modification, closure-gated satisfaction, prior-encumbrance search, and a `securedLoan` disbursement gate (SARFAESI Act). Certified gateway schema conformance remains an adapter/onboarding boundary. |
 | `packages/core/src/data-principal-rights.js` | DPDP data-principal access requests (portable data pack assembly) and correction requests (apply/reject with profile propagation), both under a 30-day SLA clock with overdue detection. |
 | `packages/core/src/fiu-str.js` | FIU-IND STR/CTR/CCR lifecycle with canonical FINnet XML (ARF/TRF/CRF) packets, Principal Officer review, ₹10 lakh CTR threshold, source-field validation, checksum-sealed filing, exact acknowledgement/reject handling, independent repair lineage, and a tipping-off guard (PMLA). Certified FIU XSD/rules validation remains the provider adapter boundary. |
-| `packages/core/src/external-services.js` | Switchable `ExternalServiceManager` for external integrations (SMS, email, WhatsApp, credit bureau, V-CIP, bank-account verification, NACH/UPI payment rails, eSign, CERSAI, FIU-IND) with mock/real providers selected per integration and India data-residency checks enforced across all external services. CERSAI/FIU real submissions use bounded timeout/retry, checksum-derived idempotency keys, and a fail-closed circuit breaker. |
+| `packages/core/src/external-services.js` | Switchable `ExternalServiceManager` for 15 external families, including CIC, CKYCRR and AA transports. Real readiness requires endpoint, credential, India residency and active production certification; transports use stable idempotency, bounded timeout/retry and circuit controls where applicable. |
 | `packages/core/src/audit.js` | Tenant-scoped, append-only audit hash chain: tenant-bound genesis, canonical hashing, `sealAuditChain`/`verifyAuditChain`/`buildAuditEvidencePack`, plus uniform `stampAuditEvents`/`classifyAuditDataClass` actor/data-class provenance. |
 | `packages/core/src/index.js` | Public exports for core domain modules. |
 | `apps/shared/design-tokens.css` | Shared CSS variables and styling presets (typography, neobrutalist buttons, forms, status tags, alerts, toasts). |
@@ -114,6 +115,7 @@ npm run dev:api
 | `tests/control-assurance.test.js` | Known-control plan approval, sample/deficiency/issue lifecycle, certification sign-off, audit/RBI requests and closure, governance-pack derivation/checksum, authenticated APIs, and audit projection tests. |
 | `tests/capability-tracking.test.js` | Exhaustive 453-capability/33-category parser invariant, 17-entry `UX-*` coverage, unique IDs, trace/dashboard artifact parity, and conservative status normalization. |
 | `tests/origination-journey.test.js` | Digital declaration/language gates, product checklist, malware quarantine, independent document review, conditions precedent, sanction expiry, non-English KFS acceptance, and authenticated borrower API isolation. |
+| `tests/provider-governance.test.js` | Provider certification/suspension/expiry, credential-safe readiness, CIC/CKYCRR/AA transport, live-mode fail-closed behavior, and tenant API persistence tests. |
 
 ## Implemented API Endpoints
 
@@ -333,7 +335,9 @@ npm run dev:api
 | `POST /loan-accounts/:id/security-interests/:siId/satisfaction` | Files satisfaction/release of a charge on loan closure. |
 | `GET /cersai/search` | Searches existing CERSAI charges on an asset (prior-encumbrance check). |
 | `GET /integrations/readiness` | Returns credential-safe, tenant/sandbox-aware readiness for every external-provider boundary; real mode is blocked until endpoint, credential, and India-residency configuration are present, and a live circuit outage is surfaced as `degraded` with recovery time. |
-| `POST /integrations/:provider/callbacks` | Accepts a tenant-authenticated, HMAC-verified provider callback once, stores only its event identity and keyed payload hash, seals an audit event, and reconciles checksum-valid CERSAI/FIU acknowledgement callbacks into their governed lifecycle. |
+| `GET/POST /integrations/certifications` | Lists or records tenant-local, evidence-checksummed production-provider certifications under maker-checker approval. |
+| `POST /integrations/certifications/:provider/suspension` | Independently suspends a live certification and immediately makes that provider fail readiness. |
+| `POST /integrations/:provider/callbacks` | Accepts a tenant-authenticated, HMAC-verified provider callback once, stores only event identity and keyed payload hash, seals an audit event, and reconciles CERSAI, FIU, CIC, or CKYCRR responses into their governed lifecycle. |
 | `GET /fiu/reports` | Lists FIU-IND STR/CTR reports (filterable by type, subject, status). |
 | `POST /fiu/reports` | Creates an STR or CTR (CTR enforces the ₹10 lakh threshold). |
 | `GET /fiu/reports/:id` | Reads one FIU-IND report. |
@@ -591,7 +595,7 @@ npm run dev:api
 - Tenant service credentials are hashed at rest, named, scoped by module, optionally expiring, independently rotatable/revocable, and returned in plaintext only at creation or rotation.
 - Credential-leak containment is fail closed: the compromise endpoint revokes selected or all active service credentials before persisting the linked incident/audit evidence, invalidates the default credential without a legacy-key fallback, stores no secret material in the incident, and starts the existing CERT-In/RBI notification clocks. External secret-vault/KMS integration and automated repository/runtime secret detection remain production gaps.
 - The platform admin key remains as a bootstrap/emergency secret; individual platform users and roles are implemented for normal platform administration.
-- No certified live KYC, CKYC, bureau, bank-account, payment settlement/reconciliation, eSign, SMS, email, WhatsApp, CERSAI, escrow, or core-banking provider onboarding yet; mock-or-real fail-closed adapter contracts exist for the latter two.
+- No repository can supply the adopting RE's live vendor contracts, regulator/provider certification, allow-listing, mTLS material, or production credentials. LoanOS now records and enforces that evidence for 15 provider families and adds governed CIC/CKYCRR/AA transport plus signed CIC/CKYCRR reconciliation, but each deployment remains blocked until its external onboarding is completed. See [provider integration governance](provider-integration-governance.md).
 - Registries are file-backed; tenant user administration and access reviews exist, but external IAM sync and maker-checker approval for admin changes are still planned.
 - Borrower/consent/KYC records are file-backed, but support CKYC registry and V-CIP evidence vault validation boundaries.
 - Governed digital origination connects borrower self-service capture, policy document requirements, malware/quarantine evidence, independent review/waiver, conditions precedent, sanction validity and KFS language confirmation to LOS gates. Production still needs India-resident binary object upload, authenticated scanner/DLP/OCR callbacks, translated legally approved templates, save-and-resume/duplicate-lead handling, live bank verification and a dedicated staff document/condition desktop. See [governed digital origination journey](origination-journey.md).

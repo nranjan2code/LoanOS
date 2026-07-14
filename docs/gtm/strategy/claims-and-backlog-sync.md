@@ -69,12 +69,13 @@ node docs/gtm/automation/gtm-backlog-sync.mjs
 | C-36 | Bank-account verification blocks disbursement without verified active-account proof | Built | roadmap.md Phase 4 bank-account verification |
 | C-37 | eSign success creates a tenant-scoped document-vault receipt with checksums and retention policy | Partial | roadmap.md Phase 4; certified eSign envelope onboarding roadmap |
 | C-38 | NACH/UPI payment rail initiation stores masked/hash-only evidence with India residency | Partial | roadmap.md Phase 4; live settlement/reconciliation roadmap |
-| C-39 | Credit bureau / CIC live integration | Roadmap | roadmap.md Phase 4 credit bureaus/CICs |
+| C-39 | CIC reporting crosses a checksum/idempotency-bound provider adapter and reconciles signed callbacks | Partial | roadmap.md Phase 4; proprietary CIC certification remains external |
 | C-40 | Enterprise IAM/SSO, admin maker-checker, deeper key management | Roadmap | what-we-are-building.md next build Epic 11 S5/S6 |
 | C-41 | SOC 2 / ISO 27001 certification | Roadmap | roadmap.md S6 certification roadmap |
 | C-42 | Sandbox environments enforce synthetic-only borrowers with mock integration overrides | Built | roadmap.md S5 sandbox environments |
 | C-43 | Revolving credit / overdraft accounts with daily utilised-balance interest | Built | roadmap.md Phase 2 revolving/OD slice |
 | C-44 | DLA registry exports active records in RBI CIMS-ready shape with compliance attestation | Built | what-we-are-building.md DLA registry |
+| C-45 | Real provider readiness fails closed without current production certification, India residency, endpoint, and credential evidence | Built | architecture/provider-integration-governance.md; GET /integrations/readiness |
 
 ## Change process
 

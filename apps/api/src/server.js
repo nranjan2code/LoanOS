@@ -1109,7 +1109,7 @@ async function route(req, res, dataDir, platformAdminKey, observability) {
       return;
     }
     const state = await store.load();
-    const providerReadiness = new ExternalServiceManager({ isSandbox: tenant.isSandbox }).integrationReadiness();
+    const providerReadiness = new ExternalServiceManager({ isSandbox: tenant.isSandbox, providerCertifications: state.providerCertifications }).integrationReadiness();
     const health = buildTenantOperationalHealth(state, { providerReadiness, runtime });
     if (path === "/operations/alerts") {
       sendJson(res, 200, { tenantId: tenant.tenantId, generatedAt: health.generatedAt, status: health.status, alerts: health.alerts, work: health.work });
@@ -1208,7 +1208,7 @@ async function route(req, res, dataDir, platformAdminKey, observability) {
     return;
   }
 
-  if (await routeIntegrationControls({ method, path, req, res, tenant, store, readJson, sendJson, appendEvent, acknowledgeCersaiSubmission, acknowledgeFiuReport })) return;
+  if (await routeIntegrationControls({ method, path, req, res, tenant, store, readJson, sendJson, appendEvent, acknowledgeCersaiSubmission, acknowledgeFiuReport, acknowledgeCicBatch, recordCkycrrResponse })) return;
   if (await routeCersaiSearch({ method, path, url, res, store, sendJson })) return;
 
   if (method === "POST" && path === "/integrations/communications") {
@@ -1226,7 +1226,7 @@ async function route(req, res, dataDir, platformAdminKey, observability) {
       return;
     }
 
-    const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox });
+    const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox, providerCertifications: (await store.load()).providerCertifications });
     let dispatch = null;
     try {
       dispatch = await manager.sendCommunication(payload);
@@ -1496,7 +1496,7 @@ async function route(req, res, dataDir, platformAdminKey, observability) {
 
   if (method === "POST" && path === "/integrations/payment-rails/nach-mandates") {
     const body = await readJson(req);
-    const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox });
+    const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox, providerCertifications: (await store.load()).providerCertifications });
     let providerResult = null;
     try {
       providerResult = await manager.createNachMandate(body);
@@ -1548,7 +1548,7 @@ async function route(req, res, dataDir, platformAdminKey, observability) {
       sendJson(res, 422, { error: { code: "nach_mandate_unavailable", message: "An active registered NACH mandate is required for presentment." } });
       return;
     }
-    const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox });
+    const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox, providerCertifications: state.providerCertifications });
     let providerResult;
     try {
       providerResult = await manager.createNachPresentment({ ...body, mandateRef: mandate.providerRef });
@@ -1569,7 +1569,7 @@ async function route(req, res, dataDir, platformAdminKey, observability) {
   if (method === "POST" && path === "/integrations/payment-rails/nach-due-presentments") {
     const body = await readJson(req); const state = await store.load(); const asOf = body.asOf ? new Date(body.asOf) : new Date();
     if (Number.isNaN(asOf.getTime()) || !body.batchId) { sendJson(res, 422, { error: { code: "nach_due_batch_blocked", message: "batchId and a valid asOf are required." } }); return; }
-    const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox }); let workingRails = { ...(state.paymentRails ?? {}) }; const created = []; const skipped = [];
+    const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox, providerCertifications: state.providerCertifications }); let workingRails = { ...(state.paymentRails ?? {}) }; const created = []; const skipped = [];
     for (const account of Object.values(state.loanAccounts ?? {})) {
       if (Array.isArray(body.loanAccountIds) && !body.loanAccountIds.includes(account.loanAccountId)) continue;
       const delinquency = computeDelinquency(account, asOf); const mandate = Object.values(workingRails).find((record) => record.type === "nach_mandate" && record.loanAccountId === account.loanAccountId && record.status === "registered");
@@ -1587,7 +1587,7 @@ async function route(req, res, dataDir, platformAdminKey, observability) {
 
   if (method === "POST" && path === "/integrations/payment-rails/upi-collects") {
     const body = await readJson(req);
-    const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox });
+    const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox, providerCertifications: (await store.load()).providerCertifications });
     let providerResult = null;
     try {
       providerResult = await manager.createUpiCollect(body);
@@ -1631,7 +1631,7 @@ async function route(req, res, dataDir, platformAdminKey, observability) {
 
   if (method === "POST" && path === "/integrations/bank-account-verification") {
     const body = await readJson(req);
-    const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox });
+    const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox, providerCertifications: (await store.load()).providerCertifications });
     let verification = null;
     try {
       verification = await manager.verifyBankAccount(body);
@@ -1669,7 +1669,7 @@ async function route(req, res, dataDir, platformAdminKey, observability) {
       sendJson(res, 400, { error: { code: "bad_request", message: "pan is required." } });
       return;
     }
-    const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox });
+    const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox, providerCertifications: (await store.load()).providerCertifications });
     let report = null;
     try {
       report = await manager.queryCreditBureau(pan);
@@ -1707,7 +1707,7 @@ async function route(req, res, dataDir, platformAdminKey, observability) {
       sendJson(res, 400, { error: { code: "bad_request", message: "borrowerId and videoHash are required." } });
       return;
     }
-    const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox });
+    const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox, providerCertifications: (await store.load()).providerCertifications });
     let analysis = null;
     try {
       analysis = await manager.analyzeVcipVideo(borrowerId, videoHash);
@@ -2661,7 +2661,7 @@ async function route(req, res, dataDir, platformAdminKey, observability) {
     if (!body.instructionId || !statement || !leg || leg.settlementStatus !== "pending" || !body.initiatedBy || !body.approvedBy || body.initiatedBy === body.approvedBy || !body.approvalRef) { sendJson(res, 422, { error: { code: "co_lending_escrow_instruction_blocked", message: "Pending partner leg, instructionId, and independent approval are required." } }); return; }
     const existing = state.coLendingEscrowInstructions?.[body.instructionId]; if (existing) { sendJson(res, 200, { instruction: existing, idempotent: true }); return; }
     const immutable = { instructionId: body.instructionId, statementId, coLendingArrangementId: statement.coLendingArrangementId, escrowAccountRef: statement.escrowAccountRef, regulatedEntityId: leg.regulatedEntityId, amount: leg.netPayable, currency: "INR", beneficiaryAccountRef: body.beneficiaryAccountRef, initiatedBy: body.initiatedBy, approvedBy: body.approvedBy, approvalRef: body.approvalRef }; if (!immutable.beneficiaryAccountRef) { sendJson(res, 422, { error: { code: "co_lending_escrow_instruction_blocked", message: "beneficiaryAccountRef is required." } }); return; }
-    const checksumSha256 = createHash("sha256").update(JSON.stringify(immutable)).digest("hex"); const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox });
+    const checksumSha256 = createHash("sha256").update(JSON.stringify(immutable)).digest("hex"); const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox, providerCertifications: state.providerCertifications });
     try { const providerAcknowledgement = await manager.submitEscrowInstruction({ ...immutable, checksumSha256 }); const instruction = { ...immutable, checksumSha256, status: "accepted", providerAcknowledgement, submittedAt: new Date().toISOString() }; await store.save(appendEvent({ ...state, coLendingEscrowInstructions: { ...(state.coLendingEscrowInstructions ?? {}), [instruction.instructionId]: instruction } }, { type: "co_lending.escrow_instruction.accepted", instructionId: instruction.instructionId, statementId, regulatedEntityId: instruction.regulatedEntityId, providerReference: providerAcknowledgement.providerReference })); sendJson(res, 201, { instruction, idempotent: false }); } catch (err) { sendJson(res, 502, { error: { code: "co_lending_escrow_provider_failed", message: err.message } }); } return;
   }
 
@@ -2758,7 +2758,19 @@ async function route(req, res, dataDir, platformAdminKey, observability) {
       result = approveAccountAggregatorConsent(consent, body);
       eventType = "account_aggregator.consent_activated";
     } else if (action === "fetch") {
-      result = fetchAccountAggregatorData(consent, body);
+      const preflight = fetchAccountAggregatorData(consent, body);
+      if (preflight.summary.status === "blocked") {
+        sendJson(res, 422, { error: { code: "aa_consent_action_blocked", message: "AA consent action is blocked." }, findings: preflight.findings });
+        return;
+      }
+      try {
+        const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox, providerCertifications: state.providerCertifications });
+        const providerEvidence = await manager.fetchAccountAggregatorData(consent, { fetchId: preflight.fetch.fetchId, recordCount: body.recordCount, payloadHash: body.payloadHash });
+        result = fetchAccountAggregatorData(consent, { ...body, providerEvidence });
+      } catch (error) {
+        sendJson(res, 503, { error: { code: "aa_provider_unavailable", message: "Account Aggregator data fetch failed closed." } });
+        return;
+      }
       eventType = "account_aggregator.data_fetched";
     } else {
       result = revokeAccountAggregatorConsent(consent, body);
@@ -3110,7 +3122,7 @@ async function route(req, res, dataDir, platformAdminKey, observability) {
     const body = await readJson(req); const state = await store.load(); const postingRun = state.accountingPostingRuns?.[body.postingRunId];
     if (!body.batchId || !postingRun || !body.initiatedBy || !body.approvedBy || body.initiatedBy === body.approvedBy || !body.approvalRef) { sendJson(res, 422, { error: { code: "core_banking_delivery_blocked", message: "batchId, posted run, and independent approval are required." } }); return; }
     const existing = state.coreBankingDeliveries?.[body.batchId]; if (existing) { sendJson(res, 200, { delivery: existing, idempotent: true }); return; }
-    const glExport = buildGlExportPackage([postingRun]); const batch = { batchId: body.batchId, postingRunId: postingRun.postingRunId, businessDate: postingRun.throughDate, checksumSha256: glExport.checksum, lineCount: glExport.lineCount, debitTotal: glExport.debitTotal, creditTotal: glExport.creditTotal, lines: glExport.lines, initiatedBy: body.initiatedBy, approvedBy: body.approvedBy, approvalRef: body.approvalRef }; const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox });
+    const glExport = buildGlExportPackage([postingRun]); const batch = { batchId: body.batchId, postingRunId: postingRun.postingRunId, businessDate: postingRun.throughDate, checksumSha256: glExport.checksum, lineCount: glExport.lineCount, debitTotal: glExport.debitTotal, creditTotal: glExport.creditTotal, lines: glExport.lines, initiatedBy: body.initiatedBy, approvedBy: body.approvedBy, approvalRef: body.approvalRef }; const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox, providerCertifications: state.providerCertifications });
     try { const providerAcknowledgement = await manager.postCoreBankingBatch(batch); const delivery = { ...batch, lines: undefined, status: "accepted", providerAcknowledgement, deliveredAt: new Date().toISOString() }; await store.save(appendEvent({ ...state, coreBankingDeliveries: { ...(state.coreBankingDeliveries ?? {}), [delivery.batchId]: delivery } }, { type: "accounting.core_banking_delivery.accepted", batchId: delivery.batchId, postingRunId: delivery.postingRunId, checksumSha256: delivery.checksumSha256, providerReference: providerAcknowledgement.providerReference })); sendJson(res, 201, { delivery, idempotent: false }); } catch (err) { sendJson(res, 502, { error: { code: "core_banking_provider_failed", message: err.message } }); } return;
   }
 
@@ -3919,7 +3931,7 @@ async function route(req, res, dataDir, platformAdminKey, observability) {
       if (result.summary.status !== "blocked" && isPending) {
         const borrower = state.borrowerProfiles[borrowerId];
         const phone = borrower?.contact?.mobile || "+919999999999";
-        const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox });
+        const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox, providerCertifications: state.providerCertifications });
         try {
           await manager.sendSms(phone, `Your LoanOS Consent Verification OTP is ${otp}`);
         } catch (err) {
@@ -4447,7 +4459,7 @@ async function route(req, res, dataDir, platformAdminKey, observability) {
     const state = await store.load();
     const borrower = state.borrowerProfiles?.[body.borrowerId];
     const pan = borrower?.pan || "ABCDE1234F";
-    const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox });
+    const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox, providerCertifications: state.providerCertifications });
     let bureauReport = null;
     try {
       bureauReport = await manager.queryCreditBureau(pan);
@@ -4765,7 +4777,7 @@ async function route(req, res, dataDir, platformAdminKey, observability) {
     }
     const borrower = state.borrowerProfiles?.[application.borrowerId];
     const pan = borrower?.pan || "ABCDE1234F";
-    const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox });
+    const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox, providerCertifications: state.providerCertifications });
     let bureauReport = null;
     try {
       bureauReport = await manager.queryCreditBureau(pan);
@@ -4854,7 +4866,7 @@ async function route(req, res, dataDir, platformAdminKey, observability) {
       return;
     }
     const recipient = application.borrower?.contact?.email ?? application.borrower?.email;
-    const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox });
+    const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox, providerCertifications: state.providerCertifications });
     if (process.env.NODE_ENV === "production" && manager.config.emailProvider !== "real") {
       sendJson(res, 503, { error: { code: "kfs_delivery_provider_unavailable", message: "A production email provider is required before KFS issuance." } });
       return;
@@ -5323,7 +5335,7 @@ async function route(req, res, dataDir, platformAdminKey, observability) {
       return;
     }
 
-    const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox });
+    const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox, providerCertifications: state.providerCertifications });
     let esignResult = null;
     try {
       const payloadHash = (application.documentPacket?.documents ?? []).map(d => d.checksumSha256).join(",");
@@ -5451,7 +5463,16 @@ async function route(req, res, dataDir, platformAdminKey, observability) {
   const ckycrrActionMatch = path.match(/^\/reporting\/ckycrr\/submissions\/([^/]+)\/(submit|response|probable-match-resolution)$/);
   if (method === "POST" && ckycrrActionMatch) {
     const body = await readJson(req); const state = await store.load(); const submissionId = decodeURIComponent(ckycrrActionMatch[1]); const action = ckycrrActionMatch[2];
-    const result = action === "submit" ? submitCkycrrSubmission(state.ckycrrSubmissions, submissionId, body, new Date()) : action === "response" ? recordCkycrrResponse(state.ckycrrSubmissions, submissionId, body, new Date()) : resolveCkycrrProbableMatch(state.ckycrrSubmissions, submissionId, body, new Date());
+    let actionInput = body;
+    if (action === "submit") {
+      const preflight = submitCkycrrSubmission(state.ckycrrSubmissions, submissionId, { ...body, transport: body.transport ?? "sftp", transportRef: body.transportRef ?? "preflight", digitalSignatureRef: body.digitalSignatureRef ?? "preflight", fileName: body.fileName ?? `${submissionId}.zip`, fileSizeBytes: body.fileSizeBytes ?? 1 }, new Date());
+      if (preflight.summary.status === "blocked") { sendJson(res, 422, { error: { code: "ckycrr_submit_blocked", message: "CKYCRR action failed closed.", findings: preflight.findings } }); return; }
+      try {
+        const transport = await new ExternalServiceManager({ isSandbox: tenant.isSandbox, providerCertifications: state.providerCertifications }).submitCkycrrPacket(state.ckycrrSubmissions[submissionId]);
+        actionInput = { ...body, transport: transport.provider === "mock" ? "sftp" : body.transport, transportRef: transport.transportRef ?? transport.providerSubmissionRef, digitalSignatureRef: transport.digitalSignatureRef ?? body.digitalSignatureRef, fileName: transport.fileName ?? body.fileName, fileSizeBytes: transport.fileSizeBytes ?? body.fileSizeBytes };
+      } catch (error) { sendJson(res, 503, { error: { code: "ckycrr_provider_unavailable", message: "CKYCRR transport failed closed." } }); return; }
+    }
+    const result = action === "submit" ? submitCkycrrSubmission(state.ckycrrSubmissions, submissionId, actionInput, new Date()) : action === "response" ? recordCkycrrResponse(state.ckycrrSubmissions, submissionId, body, new Date()) : resolveCkycrrProbableMatch(state.ckycrrSubmissions, submissionId, body, new Date());
     if (result.summary.status === "blocked") { sendJson(res, 422, { error: { code: `ckycrr_${action}_blocked`, message: "CKYCRR action failed closed.", findings: result.findings } }); return; }
     let kycRecords = state.kycRecords;
     if (result.submission.status === "accepted" && result.submission.ckycIdentifier) {
@@ -5489,7 +5510,17 @@ async function route(req, res, dataDir, platformAdminKey, observability) {
   const cicSubmissionActionMatch = path.match(/^\/reporting\/cic\/submissions\/([^/]+)\/(submit|acknowledgement|resubmissions)$/);
   if (method === "POST" && cicSubmissionActionMatch) {
     const body = await readJson(req); const state = await store.load(); const batchId = decodeURIComponent(cicSubmissionActionMatch[1]); const action = cicSubmissionActionMatch[2];
-    const result = action === "submit" ? submitCicBatch(state.cicSubmissionBatches, batchId, body, new Date()) : action === "acknowledgement" ? acknowledgeCicBatch(state.cicSubmissionBatches, batchId, body, new Date()) : createCicResubmission(state.cicSubmissionBatches, batchId, body, new Date());
+    let actionInput = body;
+    if (action === "submit") {
+      const preflight = submitCicBatch(state.cicSubmissionBatches, batchId, { ...body, providerSubmissionRef: "preflight", transportEvidenceRef: "preflight" }, new Date());
+      if (preflight.summary.status === "blocked") { sendJson(res, 422, { error: { code: "cic_submit_blocked", message: "CIC reporting action failed closed.", findings: preflight.findings } }); return; }
+      try {
+        const transport = await new ExternalServiceManager({ isSandbox: tenant.isSandbox, providerCertifications: state.providerCertifications }).submitCicReportingBatch(state.cicSubmissionBatches[batchId]);
+        if (transport.checksumSha256 && transport.checksumSha256 !== state.cicSubmissionBatches[batchId].checksumSha256) throw new Error("CIC checksum mismatch.");
+        actionInput = { ...body, providerSubmissionRef: transport.providerSubmissionRef, transportEvidenceRef: transport.transportEvidenceRef ?? transport.providerSubmissionRef };
+      } catch (error) { sendJson(res, 503, { error: { code: "cic_provider_unavailable", message: "CIC transport failed closed." } }); return; }
+    }
+    const result = action === "submit" ? submitCicBatch(state.cicSubmissionBatches, batchId, actionInput, new Date()) : action === "acknowledgement" ? acknowledgeCicBatch(state.cicSubmissionBatches, batchId, body, new Date()) : createCicResubmission(state.cicSubmissionBatches, batchId, body, new Date());
     if (result.summary.status === "blocked") { sendJson(res, 422, { error: { code: `cic_${action}_blocked`, message: "CIC reporting action failed closed.", findings: result.findings } }); return; }
     const eventType = action === "submit" ? "cic.batch.submitted" : action === "acknowledgement" ? "cic.batch.acknowledged" : "cic.batch.resubmission_created";
     await store.save(appendEvent({ ...state, cicSubmissionBatches: result.registry }, { type: eventType, batchId: result.batch.batchId, sourceBatchId: action === "resubmissions" ? batchId : null, status: result.batch.status, actor: body.transmittedBy ?? body.receivedBy ?? body.approvedBy }));
@@ -6691,7 +6722,7 @@ async function route(req, res, dataDir, platformAdminKey, observability) {
     }
     let stored = result.securityInterest;
     if (action === "filing") {
-      const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox });
+      const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox, providerCertifications: state.providerCertifications });
       try {
         const externalResult = await manager.fileCersaiSecurityInterest({
           securityInterestId: si.securityInterestId,
@@ -6981,7 +7012,7 @@ async function route(req, res, dataDir, platformAdminKey, observability) {
     }
     let stored = result.report;
     if (action === "filing") {
-      const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox });
+      const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox, providerCertifications: state.providerCertifications });
       try {
         const externalResult = await manager.fileFiuReport({
           reportId: report.reportId,
@@ -7643,7 +7674,7 @@ async function routeAuth(req, res, { dataDir, method, path }) {
       ttlMs: 10 * 60 * 1000
     }, now);
     const challenge = { ...baseChallenge, challengePurpose: "borrower_login" };
-    const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox });
+    const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox, providerCertifications: tenantData.providerCertifications });
     if (process.env.NODE_ENV === "production" && manager.config.emailProvider !== "real") {
       sendJson(res, 503, {
         error: { code: "borrower_auth_provider_unavailable", message: "Borrower login is unavailable until a production email provider is configured." }
@@ -9212,7 +9243,7 @@ async function routePlatform(req, res, { dataDir, platformAdminKey, method, path
     const state = await loadWholeState(dataDir);
     const tenants = Object.values(state.controlPlane.tenants ?? {}).map((tenant) => {
       const tenantRuntime = observability.snapshot({ tenantId: tenant.tenantId });
-      const providerReadiness = new ExternalServiceManager({ isSandbox: tenant.isSandbox }).integrationReadiness();
+      const providerReadiness = new ExternalServiceManager({ isSandbox: tenant.isSandbox, providerCertifications: state.tenants?.[tenant.tenantId]?.providerCertifications }).integrationReadiness();
       const health = buildTenantOperationalHealth(state.tenants?.[tenant.tenantId] ?? {}, { providerReadiness, runtime: tenantRuntime });
       return { tenantId: tenant.tenantId, name: tenant.name, isSandbox: tenant.isSandbox, ...health };
     });

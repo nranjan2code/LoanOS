@@ -233,22 +233,24 @@ export function fetchAccountAggregatorData(consent, input = {}, now = new Date()
     return { consent, findings, summary };
   }
 
-  // Mocked FIP payload — never persisted raw; only a hashed reference is kept.
+  // Raw FIP payload is never persisted; only provider evidence and a hash are kept.
   const mockPayload = JSON.stringify({
     consentId: consent.consentId,
     fiTypes: consent.fiTypes,
     fetchedAt: asOf.toISOString(),
     nonce: input.nonce ?? `${asOf.getTime()}`
   });
-  const dataHash = createHash("sha256").update(mockPayload).digest("hex");
+  const providerEvidence = input.providerEvidence ?? null;
+  const dataHash = providerEvidence?.payloadHash ?? createHash("sha256").update(mockPayload).digest("hex");
   const fetch = {
     fetchId: input.fetchId ?? `aafetch_${priorFetches.length + 1}`,
     fetchedAt: asOf.toISOString(),
     fiTypes: consent.fiTypes,
     dataResidency: consent.dataResidency,
     dataHash,
-    recordCount: input.recordCount ?? consent.fiTypes.length,
-    provider: input.provider ?? "mock_aa"
+    recordCount: providerEvidence?.recordCount ?? input.recordCount ?? consent.fiTypes.length,
+    provider: providerEvidence?.provider ?? input.provider ?? "mock_aa",
+    providerFetchRef: providerEvidence?.providerFetchRef ?? null
   };
   const fetches = [...priorFetches, fetch];
   const next = { ...consent, fetches, updatedAt: asOf.toISOString() };

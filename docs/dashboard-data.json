@@ -1,16 +1,16 @@
 {
-  "generated": "2026-07-14T16:05:51.959Z",
+  "generated": "2026-07-14T16:18:55.129Z",
   "git": {
     "branch": "main",
-    "count": 148,
+    "count": 149,
     "commits": []
   },
   "overall": {
     "counts": {
       "Implemented": 87,
       "Partial": 210,
-      "Partial/Mock": 10,
-      "Mock": 8,
+      "Partial/Mock": 11,
+      "Mock": 7,
       "Missing": 129,
       "Partner": 3,
       "External": 6
@@ -350,8 +350,8 @@
       "counts": {
         "Implemented": 1,
         "Partial": 4,
-        "Partial/Mock": 0,
-        "Mock": 1,
+        "Partial/Mock": 1,
+        "Mock": 0,
         "Missing": 8,
         "Partner": 0,
         "External": 0
@@ -6285,8 +6285,8 @@
           "id": "INT-009",
           "name": "Bureau, AA, CKYC, V-CIP, eSign, bank verify, payment, comms, CERSAI, and FIU providers",
           "applicability": "Product",
-          "status": "Mock",
-          "raw": "Mock",
+          "status": "Partial/Mock",
+          "raw": "Partial/Mock",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -6363,8 +6363,8 @@
       "counts": {
         "Implemented": 1,
         "Partial": 4,
-        "Partial/Mock": 0,
-        "Mock": 1,
+        "Partial/Mock": 1,
+        "Mock": 0,
         "Missing": 8,
         "Partner": 0,
         "External": 0
@@ -7059,9 +7059,9 @@
     }
   ],
   "tests": {
-    "pass": 248,
+    "pass": 253,
     "fail": 0,
-    "total": 253,
+    "total": 258,
     "ran": true
   }
 }

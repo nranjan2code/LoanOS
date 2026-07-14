@@ -101,7 +101,7 @@ test("operations APIs expose tenant and platform health while metrics scrape is 
   assert.equal(tenantHealthResponse.status, 200);
   const tenantHealth = await tenantHealthResponse.json();
   assert.equal(tenantHealth.tenantId, tenant.tenantId);
-  assert.equal(tenantHealth.providers.total, 12);
+  assert.equal(tenantHealth.providers.total, 15);
   assert.equal(tenantHealth.runtime.routes.some((route) => route.route === "/platform/operations/health"), false);
 
   assert.equal((await fetch(`${base}/metrics`)).status, 401);
