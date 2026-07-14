@@ -237,7 +237,7 @@ npm run dev:api
 | `POST /loan-accounts/:id/security-interests/:siId/modification` | Files a maker-checker modification to a registered charge. |
 | `POST /loan-accounts/:id/security-interests/:siId/satisfaction` | Files satisfaction/release of a charge on loan closure. |
 | `GET /cersai/search` | Searches existing CERSAI charges on an asset (prior-encumbrance check). |
-| `GET /integrations/readiness` | Returns credential-safe, tenant/sandbox-aware readiness for every external-provider boundary; real mode is blocked until endpoint, credential, and India-residency configuration are present. |
+| `GET /integrations/readiness` | Returns credential-safe, tenant/sandbox-aware readiness for every external-provider boundary; real mode is blocked until endpoint, credential, and India-residency configuration are present, and a live circuit outage is surfaced as `degraded` with recovery time. |
 | `POST /integrations/:provider/callbacks` | Accepts a tenant-authenticated, HMAC-verified provider callback once, stores only its event identity and keyed payload hash, and seals an audit event. |
 | `GET /fiu/reports` | Lists FIU-IND STR/CTR reports (filterable by type, subject, status). |
 | `POST /fiu/reports` | Creates an STR or CTR (CTR enforces the ₹10 lakh threshold). |

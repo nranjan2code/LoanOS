@@ -58,6 +58,8 @@ test("CERSAI circuit opens after configured provider failure threshold", async (
     await assert.rejects(() => manager.fileCersaiSecurityInterest({ checksumSha256: "c".repeat(64) }), /unavailable after 1 attempt/);
     await assert.rejects(() => manager.fileCersaiSecurityInterest({ checksumSha256: "c".repeat(64) }), /circuit is open/);
     assert.equal(calls, 1);
+    const readiness = manager.integrationReadiness().find((item) => item.integration === "cersai");
+    assert.equal(readiness.status, "degraded"); assert.equal(readiness.reason, "provider_circuit_open"); assert.ok(readiness.circuitOpenUntil);
   } finally { globalThis.fetch = originalFetch; }
 });
 
