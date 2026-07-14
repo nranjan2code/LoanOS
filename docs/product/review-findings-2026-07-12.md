@@ -40,7 +40,7 @@ cite the ID in commits and PRs.
 | REV-43 | Credit-insurance product modeling and disclosure | E | P3 | DECIDE |
 | REV-50 | Legal-recovery workflow: SARFAESI notices, Sec-138, Lok Adalat/arbitration/DRT | F | P2 | DONE |
 | REV-51 | Field-collections / telecalling operational layer (dialer, feet-on-street, PTP) | F | P2 | DONE |
-| REV-60 | CIC submission in Uniform Credit Reporting Format, fortnightly cadence | G | P2 | TODO |
+| REV-60 | CIC submission in Uniform Credit Reporting Format, fortnightly cadence | G | P2 | PARTIAL |
 | REV-61 | CKYC real file format (14-digit CKYC number, CKYCRR download/upload) | G | P2 | TODO |
 | REV-62 | FIU-IND FINnet 2.0 XML STR/CTR format | G | P2 | TODO |
 | REV-63 | CERSAI real submission format | G | P2 | TODO |
@@ -268,9 +268,8 @@ sync, route/capacity optimization, media capture, and agency performance/settlem
 
 All of these are correct *lifecycles* today with mock providers; the gap is the actual regulator wire format.
 
-### REV-60 — CIC Uniform Credit Reporting Format, fortnightly · P2 · TODO
-"CIC-ready snapshot" is not a submission. Emit the URCF (consumer/commercial) files on the RBI-mandated
-15-day cadence. **Acceptance:** a valid URCF file is generated from ledger/borrower state.
+### REV-60 — CIC Uniform Credit Reporting Format, fortnightly · P2 · PARTIAL
+The platform now emits versioned consumer/commercial canonical UCRF JSONL from ledger and structured borrower state, on exact 15th/month-end cycles. It seals files with SHA-256, enforces maker-checker approval, seven-day submission/reject-repair clocks, customer default-alert evidence, complete bureau acknowledgements, rejected-row repair/resubmission lineage, and 21/30-day borrower correction SLAs with compensation. The remaining production boundary is a certified adapter for each CIC's proprietary wire layout, credentials, transport, and conformance acknowledgement; the canonical interchange deliberately does not claim provider certification. **Acceptance achieved for the internal reporting control plane; provider wire certification remains under REV-64.**
 
 ### REV-61 — CKYC real file format · P2 · TODO
 14-digit CKYC number, CKYCRR download/upload spec. **Acceptance:** a CKYC download parses into the borrower KYC record; an upload emits a spec-valid packet.

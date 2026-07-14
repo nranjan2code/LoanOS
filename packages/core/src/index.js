@@ -200,6 +200,22 @@ export { buildFinanceJournalEntries, buildGstReturnData, buildTdsReturnData, cal
 export { buildAlmReport, buildManagementFinanceJournals, buildProfitabilityReport } from "./finance-management.js";
 
 export {
+  CIC_BATCH_STATUSES,
+  CIC_CORRECTION_STATUSES,
+  CIC_REPORTING_PROFILE,
+  CIC_SEGMENTS,
+  acknowledgeCicBatch,
+  buildCicUcrfRecord,
+  createCicCorrectionRequest,
+  createCicResubmission,
+  createCicSubmissionBatch,
+  deriveCicReportingPeriod,
+  enrichCicCorrection,
+  resolveCicCorrectionRequest,
+  submitCicBatch
+} from "./cic-reporting.js";
+
+export {
   normalizeRecoveryAgent,
   upsertRecoveryAgent,
   validateRecoveryAgent

@@ -54,6 +54,7 @@ npm run dev:api
 | `packages/core/src/application-workflow.js` | LOS application state machine, KFS workflow, human review, decision proposal, manual underwriting override gate for referred applications, coded decline-reason taxonomy, maker-checker approval, disbursement transition. |
 | `packages/core/src/repayment-schedule.js` | Shared KFS/LMS paise-exact schedule engine for weekly, fortnightly, monthly, and quarterly amortising, bullet, moratorium, and step-up structures. |
 | `packages/core/src/loan-account.js` | LMS term and revolving account creation, ledger reconstruction, scheduled/daily-utilisation interest, bounded drawdowns, facility reviews, payment posting, part-prepayment, foreclosure, statements, charges, recovery controls, restructure/reset, resolution, classification, and CIC snapshots. |
+| `packages/core/src/cic-reporting.js` | Versioned consumer/commercial canonical UCRF records, 15th/month-end reporting calendar, checksum-sealed maker-checker batches, default-reporting alert evidence, bureau acknowledgement reconciliation, rejected-row repair/resubmission, and 21/30-day CIC correction controls. Provider-specific proprietary files and transport are adapter responsibilities. |
 | `packages/core/src/finance-accounting.js` | Governed ECL assessment and allowance movements, including co-lender entity allocation, finance-only journal projection, IRAC income-reversal journals, TDS journals/return extracts, and GST invoice/credit-note return aggregation. |
 | `packages/core/src/payment-operations.js` | Suspense-receipt creation, partial loan allocation, and independently approved residual write-off; all amounts remain exact to paise and resolutions post through the canonical loan-payment function. |
 | `packages/core/src/finance-management.js` | EIR fee-amortisation journals, funding-cost attribution, ALM maturity buckets, profitability, economic-capital, and RAROC reporting. |
@@ -336,6 +337,13 @@ npm run dev:api
 | `POST /loan-accounts/:id/ecl-provisions` | Records maker-checker ECL allowance and movement journals without changing borrower dues. |
 | `GET /loan-accounts/:id/cic-snapshot` | Generates a CIC-ready internal reporting snapshot for one account. |
 | `GET /reporting/cic/snapshots` | Generates CIC-ready internal reporting snapshots for the portfolio. |
+| `GET/POST /reporting/cic/submissions` | Lists filtered reporting batches or creates a fail-closed, maker-checker, checksum-sealed canonical UCRF batch for one CIC and reporting cycle. |
+| `GET /reporting/cic/submissions/:id` | Reads the immutable record set, canonical JSONL file, checksum, reporting deadline, alerts, and lifecycle evidence for a batch. |
+| `POST /reporting/cic/submissions/:id/submit` | Records transport evidence and provider reference; any DPD/default record must first carry SMS/email delivery evidence. |
+| `POST /reporting/cic/submissions/:id/acknowledgement` | Reconciles exactly one accepted/rejected outcome per submitted record and opens the seven-day reject-repair clock. |
+| `POST /reporting/cic/submissions/:id/resubmissions` | Creates an independently approved, source-evidenced batch containing every rejected record exactly once. |
+| `GET/POST /borrowers/:id/cic-corrections` | Lists SLA-enriched correction requests or opens a source-report-linked disputed-field request. |
+| `POST /borrowers/:id/cic-corrections/:correctionId/resolution` | Independently approves acceptance/rejection; acceptance requires source correction evidence and a valid next reporting cycle. |
 | `POST /loan-accounts/:id/recovery-assignments` | Assigns a recovery agent only with borrower notice evidence. |
 | `GET/POST /loan-accounts/:id/collection-contacts` | Lists or records assigned-agent call/IVR/field dispositions; field visits require geo/time/evidence and all contacts enforce conduct hours. |
 | `GET/POST /loan-accounts/:id/promises-to-pay` | Lists evaluated pending/kept/broken PTPs or records a paise-exact promise linked to an evidenced contact. |
@@ -437,7 +445,7 @@ npm run dev:api
 | Floating-rate reset | Resets the interest rate on a floating loan under four-eyes approval, offering choice-based re-amortization (extend tenor, increase EMI, switch to fixed with fee). |
 | Settlement and write-off | `settleLoanAccount` closes a loan for less than outstanding under four-eyes approval via principal/interest waiver credits (`closureType: "settled"`); `writeOffLoanAccount` marks `written_off` as a book loss while retaining ledger dues; both surface in the CIC snapshot. |
 | Asset classification | Maps DPD to standard, SMA-0, SMA-1, SMA-2, and NPA classes. |
-| CIC snapshots | Produces account and portfolio reporting snapshots from schedule, ledger, borrower, RE, product, and asset-classification state. |
+| CIC reporting | Produces account snapshots plus consumer/commercial canonical UCRF batches from ledger and structured borrower-reporting state; enforces fortnight dates, seven-day submission/reject clocks, four-eyes approval, content checksum, complete acknowledgements, default alerts, source repair, resubmission lineage, and correction compensation clocks. |
 | Recovery-agent registry | An active recovery agent must reference an active regulated entity and carry due-diligence/police-verification, training-certification, code-of-conduct, and authorization-letter/ID-card evidence. |
 | Recovery-agent notice | Recovery assignment requires delinquent account, an empanelled active recovery agent, borrower notice timestamp, and delivery reference. |
 | Cash recovery posting | Cash recovery requires active noticed assignment, same-India-day posting to borrower account, a coded exception reason (cash is treated as an exception, not the default channel), and an approver checked against the active `collections_manager` staff-actor role. |
@@ -561,7 +569,7 @@ Current tests prove:
 - API controls disclosed charges, waivers, and reversals.
 - API computes delinquency buckets and enforces recovery-agent notice plus same-day cash recovery posting.
 - API classifies assets across standard, SMA, and NPA bands.
-- API generates account-level and portfolio-level CIC-ready reporting snapshots.
+- API generates account/portfolio snapshots and governed CIC reporting batches, acknowledgements, reject repair/resubmission, borrower alert evidence, and correction workflows. A live provider adapter must still map the canonical UCRF interchange to each CIC's certified proprietary wire layout and transport.
 - API exposes collections workflow tasks until recovery-agent notice assignment is recorded.
 - API manages complaint lifecycle, 30-day grievance SLA, and RBI CMS escalation tasks.
 - API generates rendered document packets and transitions LWS from document delivery to disbursement readiness.

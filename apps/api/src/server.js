@@ -27,6 +27,7 @@ import {
   buildManagementFinanceJournals,
   buildProfitabilityReport,
   calculateEclAssessment,
+  acknowledgeCicBatch,
   classifyLoanAsset,
   clearGlobalKillSwitch,
   commentOnWorkflowTask,
@@ -38,6 +39,9 @@ import {
   createLoanId,
   computeDelinquency,
   createComplaint,
+  createCicCorrectionRequest,
+  createCicResubmission,
+  createCicSubmissionBatch,
   createErasureRequest,
   createFraudCase,
   createIncident,
@@ -49,6 +53,7 @@ import {
   enrichComplaint,
   enrichFraudCase,
   enrichIncident,
+  enrichCicCorrection,
   enrichLegalRecoveryCase,
   evaluatePromisesToPay,
   fulfillErasureRequest,
@@ -91,10 +96,12 @@ import {
   releaseWorkflowTask,
   renderLoanStatementDocument,
   resolveComplaint,
+  resolveCicCorrectionRequest,
   selectProductPolicyVersion,
   resolveBorrowerApplicationReferences,
   resolveLoanApplicationReferences,
   summarizeFindings,
+  submitCicBatch,
   markDisbursed,
   postCashRecoveryToLoanAccount,
   postPaymentToLoanAccount,
@@ -5055,6 +5062,65 @@ async function route(req, res, dataDir, platformAdminKey) {
       snapshots: Object.values(state.loanAccounts).map((loanAccount) => generateCicSnapshot(loanAccount, asOf))
     });
     return;
+  }
+
+  if (method === "GET" && path === "/reporting/cic/submissions") {
+    const state = await store.load();
+    const batches = Object.values(state.cicSubmissionBatches ?? {}).filter((batch) => {
+      const cic = url.searchParams.get("cic"); const status = url.searchParams.get("status"); const cycleDate = url.searchParams.get("cycleDate");
+      return (!cic || batch.cic === cic) && (!status || batch.status === status) && (!cycleDate || batch.cycleDate === cycleDate);
+    });
+    sendJson(res, 200, { batches }); return;
+  }
+
+  if (method === "POST" && path === "/reporting/cic/submissions") {
+    const body = await readJson(req); const state = await store.load();
+    const result = createCicSubmissionBatch(state.cicSubmissionBatches, { loanAccounts: state.loanAccounts, borrowerProfiles: state.borrowerProfiles }, body, new Date());
+    if (result.summary.status === "blocked") { sendJson(res, 422, { error: { code: "cic_batch_blocked", message: "CIC batch creation failed closed.", findings: result.findings } }); return; }
+    if (!result.idempotent) await store.save(appendEvent({ ...state, cicSubmissionBatches: result.registry }, { type: "cic.batch.created", batchId: result.batch.batchId, cic: result.batch.cic, cycleDate: result.batch.cycleDate, checksumSha256: result.batch.checksumSha256, actor: result.batch.approvedBy }));
+    sendJson(res, result.idempotent ? 200 : 201, { batch: result.batch, idempotent: result.idempotent }); return;
+  }
+
+  const cicSubmissionMatch = path.match(/^\/reporting\/cic\/submissions\/([^/]+)$/);
+  if (method === "GET" && cicSubmissionMatch) {
+    const state = await store.load(); const batch = state.cicSubmissionBatches?.[decodeURIComponent(cicSubmissionMatch[1])];
+    if (!batch) { sendJson(res, 404, { error: { code: "not_found", message: "CIC submission batch not found." } }); return; }
+    sendJson(res, 200, batch); return;
+  }
+
+  const cicSubmissionActionMatch = path.match(/^\/reporting\/cic\/submissions\/([^/]+)\/(submit|acknowledgement|resubmissions)$/);
+  if (method === "POST" && cicSubmissionActionMatch) {
+    const body = await readJson(req); const state = await store.load(); const batchId = decodeURIComponent(cicSubmissionActionMatch[1]); const action = cicSubmissionActionMatch[2];
+    const result = action === "submit" ? submitCicBatch(state.cicSubmissionBatches, batchId, body, new Date()) : action === "acknowledgement" ? acknowledgeCicBatch(state.cicSubmissionBatches, batchId, body, new Date()) : createCicResubmission(state.cicSubmissionBatches, batchId, body, new Date());
+    if (result.summary.status === "blocked") { sendJson(res, 422, { error: { code: `cic_${action}_blocked`, message: "CIC reporting action failed closed.", findings: result.findings } }); return; }
+    const eventType = action === "submit" ? "cic.batch.submitted" : action === "acknowledgement" ? "cic.batch.acknowledged" : "cic.batch.resubmission_created";
+    await store.save(appendEvent({ ...state, cicSubmissionBatches: result.registry }, { type: eventType, batchId: result.batch.batchId, sourceBatchId: action === "resubmissions" ? batchId : null, status: result.batch.status, actor: body.transmittedBy ?? body.receivedBy ?? body.approvedBy }));
+    sendJson(res, action === "resubmissions" && !result.idempotent ? 201 : 200, { batch: result.batch, idempotent: result.idempotent ?? false }); return;
+  }
+
+  const borrowerCicCorrectionsMatch = path.match(/^\/borrowers\/([^/]+)\/cic-corrections$/);
+  if (borrowerCicCorrectionsMatch && method === "GET") {
+    const state = await store.load(); const borrowerId = decodeURIComponent(borrowerCicCorrectionsMatch[1]);
+    if (!state.borrowerProfiles?.[borrowerId]) { sendJson(res, 404, { error: { code: "not_found", message: "Borrower not found." } }); return; }
+    const asOf = url.searchParams.get("asOf") ? new Date(url.searchParams.get("asOf")) : new Date();
+    sendJson(res, 200, { corrections: Object.values(state.cicCorrectionRequests ?? {}).filter((item) => item.borrowerId === borrowerId).map((item) => enrichCicCorrection(item, asOf)) }); return;
+  }
+  if (borrowerCicCorrectionsMatch && method === "POST") {
+    const body = await readJson(req); const state = await store.load(); const borrowerId = decodeURIComponent(borrowerCicCorrectionsMatch[1]);
+    const result = createCicCorrectionRequest(state.cicCorrectionRequests, { borrowerProfiles: state.borrowerProfiles, loanAccounts: state.loanAccounts }, { ...body, borrowerId }, new Date());
+    if (result.summary.status === "blocked") { sendJson(res, 422, { error: { code: "cic_correction_blocked", message: "CIC correction request failed closed.", findings: result.findings } }); return; }
+    if (!result.idempotent) await store.save(appendEvent({ ...state, cicCorrectionRequests: result.registry }, { type: "cic.correction.opened", correctionId: result.correction.correctionId, borrowerId, loanAccountId: result.correction.loanAccountId, actor: result.correction.submittedBy }));
+    sendJson(res, result.idempotent ? 200 : 201, { correction: result.correction, idempotent: result.idempotent }); return;
+  }
+
+  const borrowerCicCorrectionResolutionMatch = path.match(/^\/borrowers\/([^/]+)\/cic-corrections\/([^/]+)\/resolution$/);
+  if (method === "POST" && borrowerCicCorrectionResolutionMatch) {
+    const body = await readJson(req); const state = await store.load(); const borrowerId = decodeURIComponent(borrowerCicCorrectionResolutionMatch[1]); const correctionId = decodeURIComponent(borrowerCicCorrectionResolutionMatch[2]);
+    if (state.cicCorrectionRequests?.[correctionId]?.borrowerId !== borrowerId) { sendJson(res, 404, { error: { code: "not_found", message: "CIC correction request not found." } }); return; }
+    const result = resolveCicCorrectionRequest(state.cicCorrectionRequests, correctionId, body, new Date());
+    if (result.summary.status === "blocked") { sendJson(res, 422, { error: { code: "cic_correction_resolution_blocked", message: "CIC correction resolution failed closed.", findings: result.findings } }); return; }
+    await store.save(appendEvent({ ...state, cicCorrectionRequests: result.registry }, { type: `cic.correction.${result.correction.status}`, correctionId, borrowerId, sourceCorrectionRef: result.correction.sourceCorrectionRef, actor: result.correction.approvedBy }));
+    sendJson(res, 200, result.correction); return;
   }
 
   const loanAccountScheduleMatch = path.match(/^\/loan-accounts\/([^/]+)\/schedule$/);

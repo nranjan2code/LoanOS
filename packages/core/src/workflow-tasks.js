@@ -4,6 +4,7 @@ import { COMPLAINT_STATUSES, computeComplaintSla, enrichComplaint } from "./grie
 import { classifyLoanAsset, computeDelinquency } from "./loan-account.js";
 import { createLoanId } from "./loan-policy.js";
 import { enrichLegalRecoveryCase, evaluatePromisesToPay } from "./collections-recovery.js";
+import { enrichCicCorrection } from "./cic-reporting.js";
 
 export const WORKFLOW_TASK_STATUSES = {
   OPEN: "open",
@@ -32,7 +33,10 @@ const TASK_SLA_HOURS = {
   "complaint.resolution": 720,
   "complaint.rbi_cms_escalation": 24,
   "data_principal.access_request": 720,
-  "data_principal.correction_request": 720
+  "data_principal.correction_request": 720,
+  "cic.submission": 168,
+  "cic.rejected_record_repair": 168,
+  "cic.correction_review": 504
 };
 
 export function normalizeWorkflowTaskStore(store = {}) {
@@ -50,12 +54,53 @@ export function deriveWorkflowTasks(state, options = {}) {
     ...deriveLoanAccountTasks(Object.values(state?.loanAccounts ?? {}), asOf),
     ...deriveLegalRecoveryTasks(Object.values(state?.legalRecoveryCases ?? {}), asOf),
     ...deriveComplaintTasks(Object.values(state?.complaints ?? {}), asOf),
-    ...deriveDataPrincipalTasks(state, asOf)
+    ...deriveDataPrincipalTasks(state, asOf),
+    ...deriveCicTasks(state, asOf)
   ]
     .map((task) => applyTaskRecord(task, taskStore.records[task.taskId]))
     .map((task) => withTaskSla(task, asOf));
 
   return tasks.filter((task) => matchesTaskFilters(task, options.filters ?? {}));
+}
+
+function deriveCicTasks(state, asOf) {
+  const batchTasks = Object.values(state?.cicSubmissionBatches ?? {}).flatMap((batch) => {
+    if (!batch?.batchId) return [];
+    if (batch.status === "ready") return [{
+      taskId: `task_cic_submission_${batch.batchId}`,
+      type: "cic.submission", entityType: "cic_submission_batch", entityId: batch.batchId,
+      title: batch.parentBatchId ? "Submit repaired CIC records" : "Submit fortnightly CIC batch",
+      description: "Transmit the checksum-sealed UCRF batch and retain provider and borrower-alert evidence.",
+      queue: "regulatory_reporting", role: "reporting_officer", priority: "high",
+      openedAt: batch.createdAt, dueAt: `${batch.repairDueDate ?? batch.submissionDueDate}T23:59:59.999Z`,
+      regulatoryRefs: ["RBI-CIR-2025"],
+      action: { method: "POST", path: `/reporting/cic/submissions/${batch.batchId}/submit`, description: "Record CIC transmission evidence." },
+      context: { cic: batch.cic, cycleDate: batch.cycleDate, recordCount: batch.recordCount, checksumSha256: batch.checksumSha256 }
+    }];
+    if (["rejected", "partially_rejected"].includes(batch.status)) return [{
+      taskId: `task_cic_repair_${batch.batchId}`,
+      type: "cic.rejected_record_repair", entityType: "cic_submission_batch", entityId: batch.batchId,
+      title: "Repair and resubmit rejected CIC records", description: "Correct every bureau-rejected record at source and create an approved resubmission within seven days.",
+      queue: "data_quality", role: "reporting_officer", priority: "critical", openedAt: batch.acknowledgedAt,
+      dueAt: `${batch.repairDueDate}T23:59:59.999Z`, regulatoryRefs: ["RBI-CIR-2025"],
+      action: { method: "POST", path: `/reporting/cic/submissions/${batch.batchId}/resubmissions`, description: "Create a corrected resubmission batch." },
+      context: { rejectedRecords: batch.recordResults.filter((item) => item.status === "rejected") }
+    }];
+    return [];
+  });
+  const correctionTasks = Object.values(state?.cicCorrectionRequests ?? {}).filter((item) => item.status === "open").map((correction) => {
+    const enriched = enrichCicCorrection(correction, asOf);
+    return {
+      taskId: `task_cic_correction_${correction.correctionId}`,
+      type: "cic.correction_review", entityType: "cic_correction", entityId: correction.correctionId,
+      title: "Investigate CIC data correction", description: "Verify the disputed value against source records, correct at source where accepted, and schedule the corrected reporting cycle.",
+      queue: "data_quality", role: "grievance_officer", priority: enriched.institutionSlaBreached ? "critical" : "high",
+      openedAt: correction.openedAt, dueAt: `${correction.institutionDueDate}T23:59:59.999Z`, regulatoryRefs: ["RBI-CIR-2025"],
+      action: { method: "POST", path: `/borrowers/${correction.borrowerId}/cic-corrections/${correction.correctionId}/resolution`, description: "Resolve the CIC correction request." },
+      context: { fieldPath: correction.fieldPath, overallDueDate: correction.overallDueDate, accruedCompensationRupees: enriched.accruedCompensationRupees }
+    };
+  });
+  return [...batchTasks, ...correctionTasks];
 }
 
 export function assignWorkflowTask(taskStore, taskId, input, activeTasks, now = new Date()) {

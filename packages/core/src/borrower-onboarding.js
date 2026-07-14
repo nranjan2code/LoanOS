@@ -115,6 +115,19 @@ export function normalizeBorrowerProfile(input, now = new Date(), options = {}) 
       employerName: input.economicProfile?.employerName ?? null,
       incomeEvidenceRef: input.economicProfile?.incomeEvidenceRef ?? null
     },
+    // Structured CIC/UCRF identity and address attributes are kept separate
+    // from operational KYC fields so reporting exports never infer or scrape
+    // regulated identifiers from evidence documents.
+    creditReporting: input.creditReporting
+      ? {
+          ...input.creditReporting,
+          identity: input.creditReporting.identity ? { ...input.creditReporting.identity } : null,
+          address: input.creditReporting.address ? { ...input.creditReporting.address } : null,
+          securities: Array.isArray(input.creditReporting.securities) ? [...input.creditReporting.securities] : [],
+          guarantors: Array.isArray(input.creditReporting.guarantors) ? [...input.creditReporting.guarantors] : [],
+          relatedParties: Array.isArray(input.creditReporting.relatedParties) ? [...input.creditReporting.relatedParties] : []
+        }
+      : null,
     beneficialOwnershipDeclaration: input.beneficialOwnershipDeclaration
       ? {
           complete: input.beneficialOwnershipDeclaration.complete === true,

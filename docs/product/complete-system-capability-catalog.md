@@ -544,9 +544,9 @@ The detailed register contains **453 individually identified capabilities**. At 
 | --- | --- | --- | --- |
 | RPT-001 | Reporting data lineage from source transaction to submitted field | Core | Partial |
 | RPT-002 | DLA CIMS export and CCO certification | Channel | Partial |
-| RPT-003 | CIC consumer/commercial Uniform Credit Reporting Format | Institution | Missing |
-| RPT-004 | Fortnightly CIC schedule, acknowledgement, rejects, repair, and resubmission | Institution | Missing |
-| RPT-005 | CIC dispute/correction and borrower communication | Institution | Missing |
+| RPT-003 | CIC consumer/commercial Uniform Credit Reporting Format | Institution | Partial |
+| RPT-004 | Fortnightly CIC schedule, acknowledgement, rejects, repair, and resubmission | Institution | Implemented |
+| RPT-005 | CIC dispute/correction and borrower communication | Institution | Partial |
 | RPT-006 | CKYCRR production upload/download format and acknowledgement | Institution | Missing |
 | RPT-007 | FIU FINnet 2.0 STR/CTR/CCR XML and acknowledgement | Institution | Missing |
 | RPT-008 | CERSAI production payload, payment, response, and certificate | Product | Missing |
