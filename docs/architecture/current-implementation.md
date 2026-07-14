@@ -23,7 +23,7 @@ The current implementation is intentionally small:
 - Internal staff workspace in `apps/dashboard/`.
 - Borrower customer portal in `apps/customer/`: a responsive, white-labelled journey home with prioritised next actions, visual application milestones, repayment schedules, a document centre, guided media, grievance tracking, and DPDP access/correction/erasure controls.
 - Shared design system tokens in `apps/shared/`.
-- Automated tests in `tests/`: 265 file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
+- Automated tests in `tests/`: 271 file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
 
 Run it:
 
@@ -99,6 +99,8 @@ npm run dev:api
 | `apps/api/src/storage.js` | Storage-driver façade: re-exports every pure, in-memory function from `file-store.js` unchanged, and selects the file- or Postgres-backed I/O functions (`loadState`/`saveState`/`withStateLock`/`ensureBootstrapTenants`/`peekControlPlaneState`/the four per-tenant accessors) based on `LOANOS_STORAGE_DRIVER`. `server.js` imports from here, not `file-store.js` directly. |
 | `db/schema.sql` | Postgres schema for the optional storage driver: `tenant_data` (one JSONB row per tenant, Row-Level Security), the control-plane tables (tenant registry, sessions, platform users, append-only audit events, sub-processors, break-glass grants), and the two-role model (`loanos_control_plane`, `BYPASSRLS`, what the app authenticates as; `loanos_app`, `NOBYPASSRLS`, reached only via `SET ROLE`, RLS-enforced for the per-tenant hot path). |
 | `apps/api/src/server.js` | HTTP API with tenant isolation, borrower one-time-code sessions and resource ownership authorization, security headers, server-grounded KFS issuance and separate borrower acceptance, centralized audit stamping, bounded request bodies, admin/platform routes, and LOS/LMS/LWS/compliance endpoints. Production startup requires Postgres, evidenced database encryption, active per-tenant rules routing, and a real email provider. |
+| `packages/core/src/risk-aml-governance.js` | Pure risk control functions for current-list CDD/rescreening, transaction monitoring, fraud scoring, portfolio limits/stress, RCSA, recurring model monitoring, and risk-committee evidence packs. |
+| `apps/api/src/routes/risk-aml-controls.js` | Tenant-authenticated persistence and audit projection for the risk, AML, fraud, and recurring model-monitoring control plane. |
 | `apps/api/src/observability.js` | Bounded process-local HTTP telemetry registry: normalized route/status aggregates, availability and latency SLIs, configurable SLO/error-budget state, in-flight/capacity signals, tenant-scoped snapshots, and Prometheus text output without tenant labels. |
 | `apps/api/src/recovery.js` | Encrypted platform recovery-package format and fail-closed validator: domain-separated AES-256-GCM encryption, authenticated India-resident manifest, package/content checksums, state/audit-chain verification, RTO/RPO evaluation, and governed exercise evidence. |
 | `apps/api/src/resilience-probe.js` | Dependency-free bounded concurrent HTTP probe with per-request timeout, status/error counts, p50/p95/p99 latency, throughput, duration, and concurrency evidence. |
@@ -121,12 +123,19 @@ npm run dev:api
 | `tests/provider-governance.test.js` | Provider certification/suspension/expiry, credential-safe readiness, CIC/CKYCRR/AA transport, live-mode fail-closed behavior, and tenant API persistence tests. |
 | `tests/data-governance.test.js` | WORM anchor matching, audit completeness, evidence custody/holds/deletion, lineage, DQ failure/certification, and tenant API persistence tests. |
 | `tests/enterprise-platform.test.js` | Federation/SCIM, managed keys/log custody, PostgreSQL HA/PITR/capacity, deployment readiness, API/event compatibility, webhooks, and HTTP persistence. |
+| `tests/risk-aml-governance.test.js` | Current-list CDD, exact-paise transaction alerts, deterministic fraud scoring, exposure/stress controls, RCSA/model reports, evidence packs, and tenant API persistence. |
 
 ## Implemented API Endpoints
 
 | Endpoint | Purpose |
 | --- | --- |
 | `GET /health` | Service and bounded runtime SLI health. Open route, no tenant context. |
+| `GET /risk/controls` | Role-gated tenant projection of screening/CDD/TM, fraud, portfolio/stress, RCSA, model-report and risk-pack records. |
+| `POST /aml/screening-lists`, `/aml/cdd-reviews` | Registers approved current list evidence and performs complete ongoing CDD/rescreening. |
+| `POST /aml/transaction-monitoring/rules`, `/aml/transaction-monitoring/assessments` | Approves deterministic scenarios and evaluates exact-paise transaction facts into restricted alerts. |
+| `POST /fraud/risk-policies`, `/fraud/signal-assessments` | Approves versioned fraud weights and produces deterministic clear/refer/block assessments. |
+| `POST /risk/portfolio/snapshots`, `/risk/portfolio/stress-tests` | Aggregates exposure/limits and evaluates stress losses against declared capital buffers. |
+| `POST /risk/rcsa-assessments`, `/model-governance/monitoring-reports`, `/risk/committee-packs` | Persists RCSA, active-model cohort reports, and checksum-sealed committee evidence packs. |
 | `GET /metrics` | Prometheus-format process metrics; enabled only when `LOANOS_METRICS_TOKEN` is configured and protected by bearer or `x-metrics-token` authentication. Never emits tenant labels. |
 | `GET /compliance/controls` | Returns regulatory control catalog. Open route. |
 | `GET /reference/decline-reasons` | Returns the coded decline-reason taxonomy. Open route. |

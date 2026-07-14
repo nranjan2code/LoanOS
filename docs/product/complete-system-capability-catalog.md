@@ -69,7 +69,7 @@ LoanOS currently has a strong compliance-first domain foundation and executable 
 
 The principal gaps before bank production are live integrations, downstream GL certification, regulatory submission formats, product-specific lending depth, repossession/auction and legal-expense depth, live IdP/KMS/SIEM/database/deployment infrastructure, and independent bank-assurance evidence. The product now governs federation/SCIM state, purpose-attested keys, security-log custody, PostgreSQL HA/PITR/capacity dependencies, API/event/webhook contracts and deployment readiness alongside bounded observability, encrypted recovery, governed release, security assurance, SOC investigation and compliance evidence. Actual token/signature validation, KMS grants, SIEM/WORM/NTP/collectors, managed replication/WAL/PITR, queue/dispatch/replay workers, cloud rollout controllers, institutional control methodology, pen tests, ITSM/paging, 24x7 staffing, production-scale soak/chaos, contract enforcement, real failover/failback and exercised continuity remain open. Collections/legal recovery also retains partner depth for dialers, route/capacity optimization, court integration, possession, auction and recovery accounting. Public positioning must remain narrower than this catalogue until each advertised journey reaches agreed maturity.
 
-The detailed register contains **453 individually identified capabilities**. At this snapshot, 87 are classified `Implemented`, 219 `Partial`, 120 `Missing`, and 27 are mock, partner, external, or composite-status obligations. These counts measure scope coverage, not delivery percentage: a single missing ledger, reconciliation, security, or recovery control can block production even if many smaller capabilities exist.
+The detailed register contains **453 individually identified capabilities**. At this snapshot, 87 are classified `Implemented`, 239 `Partial`, 100 `Missing`, and 27 are mock, partner, external, or composite-status obligations. These counts measure scope coverage, not delivery percentage: a single missing ledger, reconciliation, security, or recovery control can block production even if many smaller capabilities exist.
 
 ## Capability Index
 
@@ -99,7 +99,7 @@ The detailed register contains **453 individually identified capabilities**. At 
 | Grievance and conduct | End-to-end complaint resolution and escalation | Partial |
 | Regulatory reporting | Source-to-submission regulatory reporting | Partial/Mock |
 | Finance, tax and treasury | GL, tax, ECL, ALM and profitability | Partial; governed accounting, tax, treasury, profitability, and co-lender attribution slices exist |
-| Portfolio and enterprise risk | Concentration, vintage, EWS and risk appetite | Mostly missing |
+| Portfolio and enterprise risk | Concentration, vintage, EWS and risk appetite | Partial |
 | AI and model governance | Inventoried, validated and interruptible model use | Partial, strong first slice |
 | Audit and compliance assurance | Reproducible evidence and obligation oversight | Partial |
 | Security and IAM | Enterprise identity, secrets and cyber controls | Partial |
@@ -231,9 +231,9 @@ The detailed register contains **453 individually identified capabilities**. At 
 | KYC-009 | BC-assisted KYC update and acknowledgement | Channel | Missing |
 | KYC-010 | Beneficial-owner threshold and control declarations | Product | Implemented |
 | KYC-011 | PEP, UAPA, UN sanctions, and internal negative-list screening | Core | Partial |
-| KYC-012 | Screening-list refresh, rescreening, and match disposition | Core | Missing |
-| KYC-013 | Ongoing customer due diligence and risk refresh | Core | Missing |
-| KYC-014 | Transaction monitoring and AML alert investigation | Institution | Missing |
+| KYC-012 | Screening-list refresh, rescreening, and match disposition | Core | Partial |
+| KYC-013 | Ongoing customer due diligence and risk refresh | Core | Partial |
+| KYC-014 | Transaction monitoring and AML alert investigation | Institution | Partial |
 | KYC-015 | STR/CTR/CCR case preparation, review, filing, and acknowledgement | Institution | Partial/Mock |
 | KYC-016 | Tipping-off controls and restricted case access | Institution | Partial |
 | KYC-017 | Record retention and regulator/auditor retrieval | Core | Partial |
@@ -243,17 +243,17 @@ The detailed register contains **453 individually identified capabilities**. At 
 | ID | Capability | Applicability | Status |
 | --- | --- | --- | --- |
 | FRD-001 | Application fraud flags and investigation case | Core | Partial |
-| FRD-002 | Device, IP, velocity, location, and behavioral signals | Channel | Missing |
-| FRD-003 | Synthetic identity and identity-link analysis | Core | Missing |
+| FRD-002 | Device, IP, velocity, location, and behavioral signals | Channel | Partial |
+| FRD-003 | Synthetic identity and identity-link analysis | Core | Partial |
 | FRD-004 | Document tamper and face/document consistency checks | Channel | Partner |
-| FRD-005 | Internal/external negative lists and mule indicators | Core | Missing |
-| FRD-006 | Duplicate customer, bank account, address, device, and employer detection | Core | Missing |
-| FRD-007 | Fraud scorecard and policy decision | Core | Missing |
+| FRD-005 | Internal/external negative lists and mule indicators | Core | Partial |
+| FRD-006 | Duplicate customer, bank account, address, device, and employer detection | Core | Partial |
+| FRD-007 | Fraud scorecard and policy decision | Core | Partial |
 | FRD-008 | Natural-justice show-cause and response workflow | Institution | Implemented |
 | FRD-009 | Four-eyes fraud classification and committee pack | Institution | Implemented |
 | FRD-010 | LEA, fraud registry, and regulator reporting evidence | Institution | Partial |
-| FRD-011 | Early-warning signals after disbursement | Core | Missing |
-| FRD-012 | Fraud losses, recoveries, root cause, and control remediation | Institution | Missing |
+| FRD-011 | Early-warning signals after disbursement | Core | Partial |
+| FRD-012 | Fraud losses, recoveries, root cause, and control remediation | Institution | Partial |
 
 ### 9. Documents, OCR, and Verification
 
@@ -578,17 +578,17 @@ The detailed register contains **453 individually identified capabilities**. At 
 
 | ID | Capability | Applicability | Status |
 | --- | --- | --- | --- |
-| RSK-001 | Portfolio exposure by product, segment, geography, channel, and partner | Core | Missing |
-| RSK-002 | Vintage, roll-rate, cure, loss, and recovery analysis | Core | Missing |
-| RSK-003 | Concentration limits and risk-appetite thresholds | Institution | Missing |
-| RSK-004 | Connected-counterparty and aggregate borrower exposure | Institution | Missing |
-| RSK-005 | Early-warning signals and watchlist | Core | Missing |
-| RSK-006 | Stress testing and scenario analysis | Institution | Missing |
+| RSK-001 | Portfolio exposure by product, segment, geography, channel, and partner | Core | Partial |
+| RSK-002 | Vintage, roll-rate, cure, loss, and recovery analysis | Core | Partial |
+| RSK-003 | Concentration limits and risk-appetite thresholds | Institution | Partial |
+| RSK-004 | Connected-counterparty and aggregate borrower exposure | Institution | Partial |
+| RSK-005 | Early-warning signals and watchlist | Core | Partial |
+| RSK-006 | Stress testing and scenario analysis | Institution | Partial |
 | RSK-007 | Credit policy monitoring and override/deviation trends | Core | Partial |
 | RSK-008 | Fraud, operational, conduct, vendor, and cyber risk events | Institution | Partial |
-| RSK-009 | RCSA, controls, KRIs, issues, actions, and loss events | Institution | Missing |
-| RSK-010 | Portfolio limits, breach workflow, approval, and remediation | Institution | Missing |
-| RSK-011 | Board/risk committee dashboard and evidence pack | Institution | Missing |
+| RSK-009 | RCSA, controls, KRIs, issues, actions, and loss events | Institution | Partial |
+| RSK-010 | Portfolio limits, breach workflow, approval, and remediation | Institution | Partial |
+| RSK-011 | Board/risk committee dashboard and evidence pack | Institution | Partial |
 
 ### 27. AI, Model Risk, and Decision Governance
 
@@ -605,7 +605,7 @@ The detailed register contains **453 individually identified capabilities**. At 
 | AIG-009 | Runtime model-use gate with purpose and borrower-impact evidence | Core | Implemented |
 | AIG-010 | Human review, customer disclosure, and human handoff | Product | Implemented |
 | AIG-011 | Incident, affected decisions, containment, and post-incident review | Core | Partial |
-| AIG-012 | Recurring fairness/performance reports and cohort monitoring | Core | Missing |
+| AIG-012 | Recurring fairness/performance reports and cohort monitoring | Core | Partial |
 | AIG-013 | Model change, rollback, challenger, and clean-shadow window | Core | Partial |
 | AIG-014 | Decision reason lineage from the actual deciding authority | Core | Partial |
 | AIG-015 | Deterministic replay and audit reproduction | Core | Partial |

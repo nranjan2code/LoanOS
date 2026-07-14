@@ -1,22 +1,22 @@
 {
-  "generated": "2026-07-14T16:49:16.251Z",
+  "generated": "2026-07-14T17:07:15.330Z",
   "git": {
     "branch": "main",
-    "count": 153,
+    "count": 154,
     "commits": []
   },
   "overall": {
     "counts": {
       "Implemented": 87,
-      "Partial": 219,
+      "Partial": 239,
       "Partial/Mock": 11,
       "Mock": 7,
-      "Missing": 120,
+      "Missing": 100,
       "Partner": 3,
       "External": 6
     },
     "total": 453,
-    "pct": 41
+    "pct": 43
   },
   "planes": [
     {
@@ -37,7 +37,7 @@
         {
           "n": 7,
           "name": "KYC, CDD, AML, and Screening",
-          "pct": 32,
+          "pct": 39,
           "total": 17
         },
         {
@@ -73,15 +73,15 @@
       ],
       "counts": {
         "Implemented": 14,
-        "Partial": 49,
+        "Partial": 52,
         "Partial/Mock": 5,
         "Mock": 7,
-        "Missing": 35,
+        "Missing": 32,
         "Partner": 1,
         "External": 0
       },
       "total": 111,
-      "pct": 34
+      "pct": 35
     },
     {
       "name": "LMS",
@@ -147,7 +147,7 @@
         {
           "n": 8,
           "name": "Fraud, Identity, and Application Risk",
-          "pct": 25,
+          "pct": 51,
           "total": 12
         },
         {
@@ -171,15 +171,15 @@
       ],
       "counts": {
         "Implemented": 14,
-        "Partial": 13,
+        "Partial": 20,
         "Partial/Mock": 1,
         "Mock": 0,
-        "Missing": 21,
+        "Missing": 14,
         "Partner": 1,
         "External": 0
       },
       "total": 50,
-      "pct": 40
+      "pct": 46
     },
     {
       "name": "Compliance OS",
@@ -255,21 +255,21 @@
         {
           "n": 27,
           "name": "AI, Model Risk, and Decision Governance",
-          "pct": 61,
+          "pct": 64,
           "total": 15
         }
       ],
       "counts": {
         "Implemented": 6,
-        "Partial": 8,
+        "Partial": 9,
         "Partial/Mock": 0,
         "Mock": 0,
-        "Missing": 1,
+        "Missing": 0,
         "Partner": 0,
         "External": 0
       },
       "total": 15,
-      "pct": 61
+      "pct": 64
     },
     {
       "name": "Risk & Portfolio",
@@ -277,21 +277,21 @@
         {
           "n": 26,
           "name": "Portfolio, Credit, Market, and Operational Risk",
-          "pct": 7,
+          "pct": 40,
           "total": 11
         }
       ],
       "counts": {
         "Implemented": 0,
-        "Partial": 2,
+        "Partial": 11,
         "Partial/Mock": 0,
         "Mock": 0,
-        "Missing": 9,
+        "Missing": 0,
         "Partner": 0,
         "External": 0
       },
       "total": 11,
-      "pct": 7
+      "pct": 40
     },
     {
       "name": "Finance & Treasury",
@@ -1712,8 +1712,8 @@
           "id": "KYC-012",
           "name": "Screening-list refresh, rescreening, and match disposition",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -1725,8 +1725,8 @@
           "id": "KYC-013",
           "name": "Ongoing customer due diligence and risk refresh",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -1738,8 +1738,8 @@
           "id": "KYC-014",
           "name": "Transaction monitoring and AML alert investigation",
           "applicability": "Institution",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -1789,15 +1789,15 @@
       ],
       "counts": {
         "Implemented": 2,
-        "Partial": 5,
+        "Partial": 8,
         "Partial/Mock": 3,
         "Mock": 1,
-        "Missing": 6,
+        "Missing": 3,
         "Partner": 0,
         "External": 0
       },
       "total": 17,
-      "pct": 32
+      "pct": 39
     },
     {
       "n": 8,
@@ -1821,8 +1821,8 @@
           "id": "FRD-002",
           "name": "Device, IP, velocity, location, and behavioral signals",
           "applicability": "Channel",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -1834,8 +1834,8 @@
           "id": "FRD-003",
           "name": "Synthetic identity and identity-link analysis",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -1860,8 +1860,8 @@
           "id": "FRD-005",
           "name": "Internal/external negative lists and mule indicators",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -1873,8 +1873,8 @@
           "id": "FRD-006",
           "name": "Duplicate customer, bank account, address, device, and employer detection",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -1886,8 +1886,8 @@
           "id": "FRD-007",
           "name": "Fraud scorecard and policy decision",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -1938,8 +1938,8 @@
           "id": "FRD-011",
           "name": "Early-warning signals after disbursement",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -1951,8 +1951,8 @@
           "id": "FRD-012",
           "name": "Fraud losses, recoveries, root cause, and control remediation",
           "applicability": "Institution",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -1963,15 +1963,15 @@
       ],
       "counts": {
         "Implemented": 2,
-        "Partial": 2,
+        "Partial": 9,
         "Partial/Mock": 0,
         "Mock": 0,
-        "Missing": 7,
+        "Missing": 0,
         "Partner": 1,
         "External": 0
       },
       "total": 12,
-      "pct": 25
+      "pct": 51
     },
     {
       "n": 9,
@@ -5373,8 +5373,8 @@
           "id": "RSK-001",
           "name": "Portfolio exposure by product, segment, geography, channel, and partner",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -5386,8 +5386,8 @@
           "id": "RSK-002",
           "name": "Vintage, roll-rate, cure, loss, and recovery analysis",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -5399,8 +5399,8 @@
           "id": "RSK-003",
           "name": "Concentration limits and risk-appetite thresholds",
           "applicability": "Institution",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -5412,8 +5412,8 @@
           "id": "RSK-004",
           "name": "Connected-counterparty and aggregate borrower exposure",
           "applicability": "Institution",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -5425,8 +5425,8 @@
           "id": "RSK-005",
           "name": "Early-warning signals and watchlist",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -5438,8 +5438,8 @@
           "id": "RSK-006",
           "name": "Stress testing and scenario analysis",
           "applicability": "Institution",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -5477,8 +5477,8 @@
           "id": "RSK-009",
           "name": "RCSA, controls, KRIs, issues, actions, and loss events",
           "applicability": "Institution",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -5490,8 +5490,8 @@
           "id": "RSK-010",
           "name": "Portfolio limits, breach workflow, approval, and remediation",
           "applicability": "Institution",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -5503,8 +5503,8 @@
           "id": "RSK-011",
           "name": "Board/risk committee dashboard and evidence pack",
           "applicability": "Institution",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -5515,15 +5515,15 @@
       ],
       "counts": {
         "Implemented": 0,
-        "Partial": 2,
+        "Partial": 11,
         "Partial/Mock": 0,
         "Mock": 0,
-        "Missing": 9,
+        "Missing": 0,
         "Partner": 0,
         "External": 0
       },
       "total": 11,
-      "pct": 7
+      "pct": 40
     },
     {
       "n": 27,
@@ -5698,8 +5698,8 @@
           "id": "AIG-012",
           "name": "Recurring fairness/performance reports and cohort monitoring",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -5749,15 +5749,15 @@
       ],
       "counts": {
         "Implemented": 6,
-        "Partial": 8,
+        "Partial": 9,
         "Partial/Mock": 0,
         "Mock": 0,
-        "Missing": 1,
+        "Missing": 0,
         "Partner": 0,
         "External": 0
       },
       "total": 15,
-      "pct": 61
+      "pct": 64
     },
     {
       "n": 28,
@@ -7059,9 +7059,9 @@
     }
   ],
   "tests": {
-    "pass": 265,
+    "pass": 271,
     "fail": 0,
-    "total": 270,
+    "total": 276,
     "ran": true
   }
 }

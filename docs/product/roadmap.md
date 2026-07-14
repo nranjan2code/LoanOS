@@ -31,6 +31,8 @@ Bundle D status: audit/data-governance product controls are complete for verifie
 
 Bundle E status: enterprise-security/scale product controls are complete for certified federation and SCIM identity state, purpose-attested managed keys, security-log custody, PostgreSQL HA/PITR/capacity dependencies, OpenAPI/event/webhook governance, and deployment-automation readiness. Live IdP, KMS/HSM, SIEM/WORM/NTP, managed database/queue, and cloud rollout controllers remain external deployment work.
 
+Bundle F status: risk/AML/fraud governance control-plane first slice is complete for current-list ongoing CDD, exact-paise transaction monitoring, deterministic multi-signal fraud policy, portfolio/connected exposure limits, stress testing, RCSA/KRI/loss actions, recurring cohort model reports, and checksum-sealed risk-committee packs. Live intelligence and transaction feeds, matching/case operations, institutional risk methodology, independent validation and committee operation remain external or deployment work.
+
 ## Cross-Cutting Workstream: SaaS Tenancy and Vendor Posture
 
 Status: S1–S9 first slice complete for every task (tenant partitioning, tenant-scoped service auth, tenant/platform human sessions, tenant user admin, access reviews, service-key rotation, isolation suite, hash-chained audit spine + evidence export, tenant portability export + evidenced offboarding, disclosed sub-processor register, 6-hour incident-notification workflow, audited platform-staff break-glass access, uniform audit provenance stamping, artifact-bound security assurance, governed SOC investigation records, and compliance-control assurance/audit evidence).

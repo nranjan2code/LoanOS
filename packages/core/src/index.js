@@ -242,6 +242,19 @@ export {
   registerSecurityLogCustody
 } from "./enterprise-platform.js";
 export {
+  assessFraudSignals,
+  buildPortfolioRiskSnapshot,
+  buildRiskCommitteePack,
+  conductOngoingCddReview,
+  createRcsaAssessment,
+  createRecurringModelReport,
+  createTransactionMonitoringRule,
+  evaluateTransactions,
+  registerFraudRiskPolicy,
+  registerScreeningList,
+  stressPortfolio
+} from "./risk-aml-governance.js";
+export {
   PROVIDER_INTEGRATIONS,
   assessProviderCertification,
   certifyProvider,

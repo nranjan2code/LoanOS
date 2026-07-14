@@ -85,6 +85,13 @@ node docs/gtm/automation/gtm-backlog-sync.mjs
 | C-52 | PostgreSQL HA and PITR readiness requires multi-AZ synchronous topology, WAL, immutable custody, RPO/RTO and restore evidence | Partial | architecture/enterprise-security-and-scale.md; managed database operation remains deployment-specific |
 | C-53 | Published APIs, events and webhooks are checksum, schema, tenancy, ordering, idempotency, retry and dead-letter governed | Partial | architecture/enterprise-security-and-scale.md; dispatch/queue runtime remains deployment-specific |
 | C-54 | Production automation readiness fails closed without supply-chain, migration, rollback, drift, HA/PITR and capacity dependencies | Partial | architecture/enterprise-security-and-scale.md; cloud rollout execution remains deployment-specific |
+| C-55 | Ongoing CDD requires current UN, UAPA, PEP and internal-negative lists and complete rescreening | Partial | architecture/risk-aml-fraud-governance.md; production list feeds and matching operations remain external |
+| C-56 | Exact-paise transaction-monitoring rules emit checksum-bound, tipping-off-restricted AML alerts | Partial | architecture/risk-aml-fraud-governance.md; live ingestion and investigation operations remain deployment-specific |
+| C-57 | Versioned fraud policy deterministically scores device, identity, duplicate, negative-list, mule and early-warning facts | Partial | architecture/risk-aml-fraud-governance.md; intelligence providers and investigation tooling remain external |
+| C-58 | Portfolio snapshots enforce connected exposure and concentration limits and run exact-paise stress scenarios | Partial | architecture/risk-aml-fraud-governance.md; bank data feeds and approved methodology remain institutional |
+| C-59 | RCSA evidence connects controls, KRIs, loss events, root causes and mandatory high-risk actions | Partial | architecture/risk-aml-fraud-governance.md; institution-wide operation remains deployment-specific |
+| C-60 | Recurring model reports bind cohort fairness, bad rate and drift to an active model version | Partial | architecture/risk-aml-fraud-governance.md; independent validation and source certification remain institutional |
+| C-61 | Risk-committee packs validate source records and seal their evidence references | Partial | architecture/risk-aml-fraud-governance.md; board/committee operation remains institutional |
 
 ## Change process
 

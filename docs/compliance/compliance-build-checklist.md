@@ -82,6 +82,8 @@ Legend:
 | KYC periodic-review refresh | A verified KYC record past its RBI risk-based review cycle (high 2y / medium 8y / low 10y) reads as `refresh_required` and blocks new sanction. | Done |
 | CKYC search/download/upload | Consent/authentication-gated download plus governed individual/legal-entity canonical packets, scan/photo constraints, maker-checker, signed transport, provider response, provider-only identifier assignment, customer notice, and seven-day probable-match resolution. Certified CKYCRR bulk/API wire serialization and a live CERSAI connection remain external integration work. | Partial |
 | V-CIP evidence | V-CIP evidence vault validates video hash, liveness, face match score (>=0.8), India GPS coordinates, official actor role (kyc_officer/credit_officer), and digital signature. | Done |
+| Screening-list refresh and ongoing CDD | Current, checksum-bound UN, UAPA, PEP and internal-negative lists plus complete rescreening are mandatory for a maker-checker CDD review. Purpose/nature, source of funds, beneficial ownership, exact-paise transaction-profile deviation, geography risk and the next review date are retained; production feeds, matching and disposition operations remain external. | Partial |
+| Transaction monitoring | Approved deterministic amount, velocity, structuring, geography and watchlist rules consume exact-paise transaction facts and emit restricted, checksum-bound AML alerts. Streaming transaction ingestion, scenario calibration and investigation operations remain deployment/institution work. | Partial |
 | FIU-IND reporting support | STR/CTR/CCR records emit checksum-sealed canonical FINnet XML (TRF/ARF/CRF), block incomplete KYC/transaction/CCR data, require Principal Officer STR review, retain India-resident provider submission evidence, reconcile exact accepted/rejected responses, and create independently approved source-repair replacements. The FIU-published XSD/rule-set validation and live FINGate certification remain external adapter work. | Partial |
 | Beneficial-owner checks for legal entities | Verified declaration evidence is mandatory. Ownership thresholds are >10% for companies/partnerships/LLPs, >15% for unincorporated associations, and ≥10% for trusts; trust authors, trustees and beneficiaries/controllers are verified, with senior-management fallback only after declaring no natural owner. | Done |
 
@@ -134,6 +136,7 @@ Legend:
 | LEA reporting for threshold frauds | Fraud reporting pack. | Planned |
 | Natural justice workflow | An adverse classification is blocked until a show-cause notice (with delivery proof) and either a borrower response or the RBI FRM-2024 21-day window elapsed; classifier must be independent of investigator (four-eyes). Committee pack seals case facts, natural-justice trail, and verdict. | Done |
 | Fraud monitoring return support | FMR export. | Planned |
+| Preventive and detective fraud scoring | Versioned maker-checker policy weights device, IP, velocity, location, identity-link, duplicate entity, negative-list, mule and early-warning facts into deterministic clear/refer/block outcomes. Signal providers, link graph and investigation operations remain external. | Partial |
 
 ## AI, FREE-AI, and Model Risk
 
@@ -151,6 +154,7 @@ Legend:
 | Bias/fairness and explainability evidence | High-risk models require `fairnessAssessmentRef` and `explainabilityRef` (plus `monitoringPlanRef`) along with valid file hashes (`fairnessAssessmentHash`/`explainabilityHash`) and structured reports (`fairnessReport`/`explainabilityReport`) to approve validation. | Done |
 | Red-teaming, adversarial, and hallucination tests for generative models | A `modelClass: "generative"` model requires `redTeamRef` and `hallucinationTestRef` to approve validation. | Done |
 | Drift monitoring | `recordDriftObservation` records a metric against an active model; a threshold breach auto-trips a model-scoped kill switch and opens an incident. | Done |
+| Recurring model monitoring | Maker-checker reports bind an active model/version to cohort approval spread, bad rate and drift thresholds; a breach cannot be recorded without remediation evidence. Independent model-risk operation and source-data certification remain institutional. | Partial |
 | AI incident reporting | Kill-switch incident record and post-incident review first slice implemented; sectoral incident pack planned. | Partial |
 
 ## Maker-Checker and Workflow
