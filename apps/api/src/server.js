@@ -2813,10 +2813,78 @@ async function route(req, res, dataDir, platformAdminKey) {
     const requestedRunId = url.searchParams.get("postingRunId");
     const postingRuns = Object.values(state.accountingPostingRuns ?? {}).filter((run) => !requestedRunId || run.postingRunId === requestedRunId);
     if (requestedRunId && !postingRuns.length) { sendJson(res, 404, { error: { code: "not_found", message: "Posting run not found." } }); return; }
-    const lines = postingRuns.flatMap((run) => run.journals.flatMap((journal) => journal.lines.map((line, lineNumber) => ({ postingRunId: run.postingRunId, businessDate: run.throughDate, journalId: journal.journalId, eventId: journal.eventId, eventDate: journal.eventDate, loanAccountId: journal.loanAccountId, currency: journal.currency, lineNumber: lineNumber + 1, glAccount: line.account, debit: line.side === "debit" ? line.amount : 0, credit: line.side === "credit" ? line.amount : 0 }))));
-    const checksum = createHash("sha256").update(JSON.stringify(lines)).digest("hex");
-    sendJson(res, 200, { exportFormat: "loanos.gl.v1", generatedAt: new Date().toISOString(), postingRunIds: postingRuns.map((run) => run.postingRunId), lineCount: lines.length, checksum, lines });
+    sendJson(res, 200, buildGlExportPackage(postingRuns));
     return;
+  }
+
+  if (method === "GET" && path === "/accounting/gl-deliveries") {
+    const state = await store.load(); const status = url.searchParams.get("status"); const deliveries = Object.values(state.glDeliveries ?? {}).filter((record) => !status || record.status === status).sort((left, right) => right.deliveredAt.localeCompare(left.deliveredAt));
+    sendJson(res, 200, { count: deliveries.length, deliveries }); return;
+  }
+
+  if (method === "POST" && path === "/accounting/gl-deliveries") {
+    const body = await readJson(req); const state = await store.load(); const postingRun = state.accountingPostingRuns?.[body.postingRunId];
+    if (!body.deliveryId || !postingRun || !body.targetSystem || !["api", "sftp", "file"].includes(body.interfaceType) || !body.deliveredBy) { sendJson(res, 422, { error: { code: "gl_delivery_blocked", message: "deliveryId, posted run, targetSystem, api/sftp/file interfaceType, and deliveredBy are required." } }); return; }
+    const existing = state.glDeliveries?.[body.deliveryId];
+    if (existing && (existing.postingRunId !== body.postingRunId || existing.targetSystem !== body.targetSystem)) { sendJson(res, 409, { error: { code: "gl_delivery_conflict", message: "deliveryId already exists with different immutable delivery data." } }); return; }
+    if (existing) { sendJson(res, 200, { delivery: existing, idempotent: true }); return; }
+    const delivery = buildGlDeliveryRecord(body, postingRun); await store.save(appendEvent({ ...state, glDeliveries: { ...(state.glDeliveries ?? {}), [delivery.deliveryId]: delivery } }, { type: "accounting.gl.delivery_created", deliveryId: delivery.deliveryId, postingRunId: delivery.postingRunId, targetSystem: delivery.targetSystem, checksumSha256: delivery.checksumSha256, lineCount: delivery.lineCount }));
+    sendJson(res, 201, { delivery, idempotent: false }); return;
+  }
+
+  const glDeliveryAckMatch = path.match(/^\/accounting\/gl-deliveries\/([^/]+)\/acknowledgement$/);
+  if (method === "POST" && glDeliveryAckMatch) {
+    const body = await readJson(req); const state = await store.load(); const deliveryId = decodeURIComponent(glDeliveryAckMatch[1]); const delivery = state.glDeliveries?.[deliveryId];
+    if (!delivery) { sendJson(res, 404, { error: { code: "not_found", message: "GL delivery not found." } }); return; }
+    if (!["accepted", "rejected"].includes(body.status) || !body.acknowledgementRef || !body.recordedBy) { sendJson(res, 422, { error: { code: "gl_acknowledgement_blocked", message: "accepted/rejected status, acknowledgementRef, and recordedBy are required." } }); return; }
+    if (delivery.acknowledgement?.acknowledgementRef === body.acknowledgementRef) { sendJson(res, 200, { delivery, idempotent: true }); return; }
+    if (delivery.acknowledgement) { sendJson(res, 409, { error: { code: "gl_acknowledgement_conflict", message: "A recorded GL delivery acknowledgement is immutable; create a new delivery attempt." } }); return; }
+    const exact = body.status === "accepted" && body.checksumSha256 === delivery.checksumSha256 && body.lineCount === delivery.lineCount;
+    const status = exact ? "accepted" : "rejected"; const acknowledgement = { acknowledgementRef: body.acknowledgementRef, providerStatus: body.status, status, checksumSha256: body.checksumSha256 ?? null, lineCount: body.lineCount ?? null, reason: body.reason ?? null, recordedBy: body.recordedBy, acknowledgedAt: body.acknowledgedAt ?? new Date().toISOString() };
+    const updated = { ...delivery, status, acknowledgement }; let financeExceptions = state.financeExceptions ?? {}; let exception = null;
+    if (status === "rejected") { exception = createFinanceExceptionRecord({ sourceType: "gl_delivery", sourceId: deliveryId, postingRunId: delivery.postingRunId, businessDate: delivery.businessDate, exceptionCode: body.status === "accepted" ? "gl_acknowledgement_mismatch" : "gl_delivery_rejected", description: body.reason ?? "Downstream GL delivery acknowledgement was rejected or did not match the exported checksum and line count.", checksumMismatch: body.checksumSha256 !== delivery.checksumSha256, lineCountDifference: Number(body.lineCount ?? 0) - delivery.lineCount }); financeExceptions = { ...financeExceptions, [exception.exceptionId]: exception }; }
+    await store.save(appendEvent({ ...state, glDeliveries: { ...state.glDeliveries, [deliveryId]: updated }, financeExceptions }, { type: `accounting.gl.delivery_${status}`, deliveryId, postingRunId: delivery.postingRunId, acknowledgementRef: body.acknowledgementRef, exceptionId: exception?.exceptionId ?? null }));
+    sendJson(res, status === "accepted" ? 200 : 202, { delivery: updated, exception }); return;
+  }
+
+  if (method === "GET" && path === "/accounting/gl-reconciliations") {
+    const state = await store.load(); const outcome = url.searchParams.get("outcome"); const reconciliations = Object.values(state.glReconciliations ?? {}).filter((record) => !outcome || record.outcome === outcome).sort((left, right) => right.reconciledAt.localeCompare(left.reconciledAt));
+    sendJson(res, 200, { count: reconciliations.length, reconciliations }); return;
+  }
+
+  if (method === "POST" && path === "/accounting/gl-reconciliations") {
+    const body = await readJson(req); const state = await store.load(); const delivery = state.glDeliveries?.[body.deliveryId];
+    if (!body.reconciliationId || !delivery || delivery.status !== "accepted" || !body.reconciledBy || !body.approvedBy || body.reconciledBy === body.approvedBy || !body.approvalRef || !Number.isInteger(body.externalLineCount) || !Number.isFinite(body.externalDebitTotal) || !Number.isFinite(body.externalCreditTotal) || !body.externalChecksumSha256) { sendJson(res, 422, { error: { code: "gl_reconciliation_blocked", message: "An accepted delivery, external totals/checksum/line count, and independent reconciliation approval are required." } }); return; }
+    const existing = state.glReconciliations?.[body.reconciliationId]; if (existing) { sendJson(res, 200, { reconciliation: existing, idempotent: true }); return; }
+    const differences = { lineCount: body.externalLineCount - delivery.lineCount, debit: Math.round((body.externalDebitTotal - delivery.debitTotal) * 100) / 100, credit: Math.round((body.externalCreditTotal - delivery.creditTotal) * 100) / 100, checksumMismatch: body.externalChecksumSha256 !== delivery.checksumSha256 };
+    const matched = differences.lineCount === 0 && differences.debit === 0 && differences.credit === 0 && !differences.checksumMismatch;
+    const reconciliation = { reconciliationId: body.reconciliationId, deliveryId: delivery.deliveryId, postingRunId: delivery.postingRunId, businessDate: delivery.businessDate, outcome: matched ? "matched" : "exception", expected: { checksumSha256: delivery.checksumSha256, lineCount: delivery.lineCount, debitTotal: delivery.debitTotal, creditTotal: delivery.creditTotal }, external: { checksumSha256: body.externalChecksumSha256, lineCount: body.externalLineCount, debitTotal: body.externalDebitTotal, creditTotal: body.externalCreditTotal }, differences, reconciledBy: body.reconciledBy, approvedBy: body.approvedBy, approvalRef: body.approvalRef, reconciledAt: new Date().toISOString() };
+    let financeExceptions = state.financeExceptions ?? {}; let exception = null;
+    if (!matched) { exception = createFinanceExceptionRecord({ sourceType: "gl_reconciliation", sourceId: reconciliation.reconciliationId, postingRunId: delivery.postingRunId, businessDate: delivery.businessDate, exceptionCode: "gl_subledger_mismatch", description: "Downstream GL totals, line count, or checksum do not match the posted subledger export.", amountDifference: Math.round((differences.debit - differences.credit) * 100) / 100, lineCountDifference: differences.lineCount, checksumMismatch: differences.checksumMismatch }); financeExceptions = { ...financeExceptions, [exception.exceptionId]: exception }; }
+    await store.save(appendEvent({ ...state, glReconciliations: { ...(state.glReconciliations ?? {}), [reconciliation.reconciliationId]: reconciliation }, financeExceptions }, { type: "accounting.gl.reconciled", reconciliationId: reconciliation.reconciliationId, postingRunId: reconciliation.postingRunId, outcome: reconciliation.outcome, exceptionId: exception?.exceptionId ?? null }));
+    sendJson(res, matched ? 201 : 202, { reconciliation, exception, idempotent: false }); return;
+  }
+
+  if (method === "GET" && path === "/accounting/finance-exceptions") {
+    const state = await store.load(); const status = url.searchParams.get("status"); const now = Date.now(); const exceptions = Object.values(state.financeExceptions ?? {}).filter((record) => !status || record.status === status).map((record) => ({ ...record, ageDays: Math.max(0, Math.floor((now - new Date(record.createdAt).getTime()) / 86400000)), operationalStatus: record.status === "resolved" ? "resolved" : record.assignment && new Date(record.assignment.dueAt).getTime() < now ? "overdue" : record.assignment ? "assigned" : "unassigned" })).sort((left, right) => right.createdAt.localeCompare(left.createdAt)); sendJson(res, 200, { count: exceptions.length, exceptions }); return;
+  }
+
+  const financeExceptionAssignmentMatch = path.match(/^\/accounting\/finance-exceptions\/([^/]+)\/assignment$/);
+  if (method === "POST" && financeExceptionAssignmentMatch) {
+    const body = await readJson(req); const state = await store.load(); const exceptionId = decodeURIComponent(financeExceptionAssignmentMatch[1]); const record = state.financeExceptions?.[exceptionId];
+    if (!record || record.status !== "open") { sendJson(res, 404, { error: { code: "not_found", message: "Open finance exception not found." } }); return; }
+    if (!body.assignedTo || !body.assignedBy || !body.dueAt || Number.isNaN(new Date(body.dueAt).getTime())) { sendJson(res, 422, { error: { code: "finance_exception_assignment_blocked", message: "assignedTo, assignedBy, and valid dueAt are required." } }); return; }
+    const assignment = { assignedTo: body.assignedTo, assignedBy: body.assignedBy, dueAt: body.dueAt, note: body.note ?? null, assignedAt: new Date().toISOString() }; const updated = { ...record, assignment };
+    await store.save(appendEvent({ ...state, financeExceptions: { ...state.financeExceptions, [exceptionId]: updated } }, { type: "accounting.finance_exception.assigned", exceptionId, assignedTo: assignment.assignedTo, dueAt: assignment.dueAt })); sendJson(res, 200, { exception: updated }); return;
+  }
+
+  const financeExceptionResolutionMatch = path.match(/^\/accounting\/finance-exceptions\/([^/]+)\/resolution$/);
+  if (method === "POST" && financeExceptionResolutionMatch) {
+    const body = await readJson(req); const state = await store.load(); const exceptionId = decodeURIComponent(financeExceptionResolutionMatch[1]); const record = state.financeExceptions?.[exceptionId];
+    if (!record || record.status !== "open") { sendJson(res, 404, { error: { code: "not_found", message: "Open finance exception not found." } }); return; }
+    if (!body.proposedBy || !body.approvedBy || body.proposedBy === body.approvedBy || !body.approvalRef || !body.reason || !body.remediationRef) { sendJson(res, 422, { error: { code: "finance_exception_resolution_blocked", message: "Reason, remediationRef, and independent approval evidence are required." } }); return; }
+    const resolution = { reason: body.reason, remediationRef: body.remediationRef, proposedBy: body.proposedBy, approvedBy: body.approvedBy, approvalRef: body.approvalRef, resolvedAt: new Date().toISOString() }; const updated = { ...record, status: "resolved", resolution };
+    await store.save(appendEvent({ ...state, financeExceptions: { ...state.financeExceptions, [exceptionId]: updated } }, { type: "accounting.finance_exception.resolved", exceptionId, approvedBy: body.approvedBy, remediationRef: body.remediationRef })); sendJson(res, 200, { exception: updated }); return;
   }
 
   if (method === "GET" && path === "/accounting/ecl-parameter-sets") {
@@ -3029,6 +3097,76 @@ async function route(req, res, dataDir, platformAdminKey) {
     sendJson(res, 201, { adjustment, idempotent: false }); return;
   }
 
+  if (method === "GET" && path === "/accounting/close-schedules") {
+    const state = await store.load(); const schedules = Object.values(state.financeCloseSchedules ?? {}).sort((left, right) => left.scheduleId.localeCompare(right.scheduleId)); sendJson(res, 200, { count: schedules.length, schedules }); return;
+  }
+
+  if (method === "POST" && path === "/accounting/close-schedules") {
+    const body = await readJson(req); const state = await store.load();
+    if (!body.scheduleId || !["daily", "month_end"].includes(body.scheduleType) || body.timezone !== "Asia/Kolkata" || !/^([01]\d|2[0-3]):[0-5]\d$/.test(body.eodCutoffTime ?? "") || (body.scheduleType === "daily" && !/^([01]\d|2[0-3]):[0-5]\d$/.test(body.bodStartTime ?? "")) || !isValidBusinessDate(body.effectiveFrom) || !body.holidayCalendarRef || !body.proposedBy || !body.approvedBy || body.proposedBy === body.approvedBy || !body.approvalRef) { sendJson(res, 422, { error: { code: "close_schedule_blocked", message: "A daily/month_end India schedule, valid times/effective date, holiday calendar, and independent approval are required." } }); return; }
+    const existing = state.financeCloseSchedules?.[body.scheduleId];
+    if (existing && (existing.scheduleType !== body.scheduleType || existing.effectiveFrom !== body.effectiveFrom || existing.holidayCalendarRef !== body.holidayCalendarRef)) { sendJson(res, 409, { error: { code: "close_schedule_conflict", message: "scheduleId already exists with different immutable schedule data." } }); return; }
+    if (existing) { sendJson(res, 200, { schedule: existing, idempotent: true }); return; }
+    const schedule = { scheduleId: body.scheduleId, scheduleType: body.scheduleType, timezone: body.timezone, eodCutoffTime: body.eodCutoffTime, bodStartTime: body.bodStartTime ?? null, effectiveFrom: body.effectiveFrom, holidayCalendarRef: body.holidayCalendarRef, targetSystem: body.targetSystem ?? null, interfaceType: body.interfaceType ?? "file", status: "active", proposedBy: body.proposedBy, approvedBy: body.approvedBy, approvalRef: body.approvalRef, approvedAt: new Date().toISOString() };
+    await store.save(appendEvent({ ...state, financeCloseSchedules: { ...(state.financeCloseSchedules ?? {}), [schedule.scheduleId]: schedule } }, { type: "accounting.close_schedule.approved", scheduleId: schedule.scheduleId, scheduleType: schedule.scheduleType, effectiveFrom: schedule.effectiveFrom, approvedBy: schedule.approvedBy })); sendJson(res, 201, { schedule, idempotent: false }); return;
+  }
+
+  if (method === "GET" && path === "/accounting/operational-runs") {
+    const state = await store.load(); const runType = url.searchParams.get("runType"); const runs = Object.values(state.financeOperationalRuns ?? {}).filter((record) => !runType || record.runType === runType).sort((left, right) => right.createdAt.localeCompare(left.createdAt)); sendJson(res, 200, { count: runs.length, runs }); return;
+  }
+
+  if (method === "POST" && path === "/accounting/eod-runs") {
+    const body = await readJson(req); const state = await store.load(); const schedule = state.financeCloseSchedules?.[body.scheduleId]; const businessDate = String(body.businessDate ?? "");
+    if (!body.runId || !isValidBusinessDate(businessDate) || !schedule || schedule.status !== "active" || schedule.scheduleType !== "daily" || schedule.effectiveFrom > businessDate || !body.initiatedBy || !body.approvedBy || body.initiatedBy === body.approvedBy || !body.approvalRef) { sendJson(res, 422, { error: { code: "eod_run_blocked", message: "runId, active daily schedule, business date, and independent initiation approval are required." } }); return; }
+    const existing = state.financeOperationalRuns?.[body.runId]; if (existing) { sendJson(res, 200, { run: existing, idempotent: true }); return; }
+    if (Object.values(state.financeOperationalRuns ?? {}).some((record) => record.runType === "eod" && record.businessDate === businessDate)) { sendJson(res, 409, { error: { code: "eod_run_conflict", message: "An EOD run already exists for this business date." } }); return; }
+    if (isAccountingDateClosed(state, businessDate)) { sendJson(res, 422, { error: { code: "eod_run_closed_period", message: "EOD cannot run for an already closed period." } }); return; }
+    const cutoff = new Date(`${businessDate}T23:59:59.999Z`).getTime(); let accountingPostingRuns = { ...(state.accountingPostingRuns ?? {}) };
+    const postedJournalIds = new Set(Object.values(accountingPostingRuns).flatMap((run) => run.journals.map((journal) => journal.journalId))); const journals = allAccountingJournals(state).filter((journal) => new Date(journal.eventDate).getTime() <= cutoff && !postedJournalIds.has(journal.journalId));
+    let automatedPostingRun = null;
+    if (journals.length) { const debitTotal = journals.reduce((total, journal) => total + Math.round(journal.debitTotal * 100), 0) / 100; const creditTotal = journals.reduce((total, journal) => total + Math.round(journal.creditTotal * 100), 0) / 100; if (Math.round(debitTotal * 100) !== Math.round(creditTotal * 100)) { sendJson(res, 422, { error: { code: "eod_run_unbalanced", message: "EOD journal inventory is not balanced." } }); return; } automatedPostingRun = { postingRunId: `${body.runId}:posting`, throughDate: businessDate, approvedBy: body.approvedBy, approvalRef: body.approvalRef, postedAt: new Date().toISOString(), journals, debitTotal, creditTotal, status: "posted", sourceRunId: body.runId }; accountingPostingRuns[automatedPostingRun.postingRunId] = automatedPostingRun; }
+    const relevantRuns = Object.values(accountingPostingRuns).filter((run) => run.throughDate <= businessDate); let glDeliveries = { ...(state.glDeliveries ?? {}) }; const deliveryIds = [];
+    for (const postingRun of relevantRuns) { const accepted = Object.values(glDeliveries).some((delivery) => delivery.postingRunId === postingRun.postingRunId && delivery.status === "accepted"); const pending = Object.values(glDeliveries).find((delivery) => delivery.postingRunId === postingRun.postingRunId && delivery.status === "pending_acknowledgement"); if (accepted || pending) { if (pending) deliveryIds.push(pending.deliveryId); continue; } const targetSystem = body.targetSystem ?? schedule.targetSystem; const interfaceType = body.interfaceType ?? schedule.interfaceType; if (!targetSystem || !["api", "sftp", "file"].includes(interfaceType)) { sendJson(res, 422, { error: { code: "eod_run_delivery_blocked", message: "Every posted run requires a configured GL targetSystem and interfaceType." } }); return; } const deliveryId = `${body.runId}:delivery:${postingRun.postingRunId}`; const delivery = buildGlDeliveryRecord({ deliveryId, targetSystem, interfaceType, deliveredBy: body.initiatedBy }, postingRun); glDeliveries[deliveryId] = delivery; deliveryIds.push(deliveryId); }
+    const pendingAcknowledgement = relevantRuns.some((postingRun) => !Object.values(glDeliveries).some((delivery) => delivery.postingRunId === postingRun.postingRunId && delivery.status === "accepted")); const pendingReconciliation = relevantRuns.some((postingRun) => !Object.values(state.glReconciliations ?? {}).some((record) => record.postingRunId === postingRun.postingRunId && record.outcome === "matched")); const runStatus = pendingAcknowledgement ? "awaiting_gl_acknowledgement" : pendingReconciliation ? "awaiting_gl_reconciliation" : "ready_for_certification";
+    const run = { runId: body.runId, runType: "eod", scheduleId: schedule.scheduleId, businessDate, status: runStatus, initiatedBy: body.initiatedBy, approvedBy: body.approvedBy, approvalRef: body.approvalRef, postingRunIds: relevantRuns.map((record) => record.postingRunId), automatedPostingRunId: automatedPostingRun?.postingRunId ?? null, deliveryIds, checkpoints: { journalsPosted: true, deliveryPackagesCreated: true, glAcknowledged: !pendingAcknowledgement, glReconciled: !pendingReconciliation, certified: false, closed: false }, createdAt: new Date().toISOString(), completedAt: null };
+    await store.save(appendEvent({ ...state, accountingPostingRuns, glDeliveries, financeOperationalRuns: { ...(state.financeOperationalRuns ?? {}), [run.runId]: run } }, { type: "accounting.eod.started", runId: run.runId, businessDate, postingRunIds: run.postingRunIds, deliveryIds, initiatedBy: run.initiatedBy })); sendJson(res, 201, { run, postingRun: automatedPostingRun, deliveries: deliveryIds.map((id) => glDeliveries[id]), idempotent: false }); return;
+  }
+
+  const eodCompleteMatch = path.match(/^\/accounting\/eod-runs\/([^/]+)\/complete$/);
+  if (method === "POST" && eodCompleteMatch) {
+    const body = await readJson(req); const state = await store.load(); const runId = decodeURIComponent(eodCompleteMatch[1]); const run = state.financeOperationalRuns?.[runId];
+    if (!run || run.runType !== "eod") { sendJson(res, 404, { error: { code: "not_found", message: "EOD run not found." } }); return; }
+    if (run.status === "completed") { sendJson(res, 200, { run, certification: state.reconciliationCertifications?.[run.businessDate], closure: state.businessDateClosures?.[run.businessDate], idempotent: true }); return; }
+    if (!body.certifiedBy || !body.closedBy || body.certifiedBy === body.closedBy || body.certifiedBy === run.initiatedBy || !body.certificationApprovalRef || !body.closeApprovalRef) { sendJson(res, 422, { error: { code: "eod_completion_blocked", message: "Independent certifier/closer and both approval references are required." } }); return; }
+    const blockers = buildFinanceCloseBlockers(state, run.businessDate); if (hasFinanceCloseBlockers(blockers)) { sendJson(res, 422, { error: { code: "eod_completion_blocked", message: "EOD is blocked by unresolved accounting, GL, payment, suspense, tax, or finance exceptions." }, blockers: financeBlockerCounts(blockers) }); return; }
+    const certification = { businessDate: run.businessDate, certifiedBy: body.certifiedBy, approvalRef: body.certificationApprovalRef, certifiedAt: new Date().toISOString(), status: "certified", postingRunIds: Object.values(state.accountingPostingRuns ?? {}).filter((record) => record.throughDate <= run.businessDate).map((record) => record.postingRunId), paymentExceptionCount: 0, bankExceptionCount: 0, glExceptionCount: 0 };
+    const closure = { businessDate: run.businessDate, status: "closed", closedBy: body.closedBy, approvalRef: body.closeApprovalRef, closedAt: new Date().toISOString(), reopenedAt: null, reopenedBy: null, reopenApprovalRef: null, reopenReason: null, reopenHistory: [], sourceRunId: runId }; const completed = { ...run, status: "completed", checkpoints: { ...run.checkpoints, glAcknowledged: true, glReconciled: true, certified: true, closed: true }, completedAt: new Date().toISOString() };
+    await store.save(appendEvent({ ...state, reconciliationCertifications: { ...(state.reconciliationCertifications ?? {}), [run.businessDate]: certification }, businessDateClosures: { ...(state.businessDateClosures ?? {}), [run.businessDate]: closure }, financeOperationalRuns: { ...state.financeOperationalRuns, [runId]: completed } }, { type: "accounting.eod.completed", runId, businessDate: run.businessDate, certifiedBy: body.certifiedBy, closedBy: body.closedBy })); sendJson(res, 200, { run: completed, certification, closure, idempotent: false }); return;
+  }
+
+  if (method === "POST" && path === "/accounting/bod-runs") {
+    const body = await readJson(req); const state = await store.load(); const schedule = state.financeCloseSchedules?.[body.scheduleId];
+    if (!body.runId || !isValidBusinessDate(body.businessDate) || !isValidBusinessDate(body.previousBusinessDate) || body.businessDate <= body.previousBusinessDate || !schedule || schedule.scheduleType !== "daily" || schedule.status !== "active" || !body.startedBy || !body.approvalRef) { sendJson(res, 422, { error: { code: "bod_run_blocked", message: "runId, sequential dates, active daily schedule, starter, and approvalRef are required." } }); return; }
+    const existing = state.financeOperationalRuns?.[body.runId]; if (existing) { sendJson(res, 200, { run: existing, idempotent: true }); return; }
+    if (Object.values(state.financeOperationalRuns ?? {}).some((record) => record.runType === "bod" && record.businessDate === body.businessDate)) { sendJson(res, 409, { error: { code: "bod_run_conflict", message: "A BOD run already exists for this business date." } }); return; }
+    const priorEod = Object.values(state.financeOperationalRuns ?? {}).find((record) => record.runType === "eod" && record.businessDate === body.previousBusinessDate && record.status === "completed"); if (!priorEod || state.businessDateClosures?.[body.previousBusinessDate]?.status !== "closed") { sendJson(res, 422, { error: { code: "bod_run_blocked", message: "The previous business date requires a completed EOD and closed date." } }); return; }
+    const run = { runId: body.runId, runType: "bod", scheduleId: schedule.scheduleId, businessDate: body.businessDate, previousBusinessDate: body.previousBusinessDate, status: "opened", startedBy: body.startedBy, approvalRef: body.approvalRef, checkpoints: { priorDateClosed: true, operationalDateOpened: true }, createdAt: new Date().toISOString(), completedAt: new Date().toISOString() };
+    await store.save(appendEvent({ ...state, financeOperationalRuns: { ...(state.financeOperationalRuns ?? {}), [run.runId]: run } }, { type: "accounting.bod.opened", runId: run.runId, businessDate: run.businessDate, previousBusinessDate: run.previousBusinessDate, startedBy: run.startedBy })); sendJson(res, 201, { run, idempotent: false }); return;
+  }
+
+  if (method === "GET" && path === "/accounting/period-closures") { const state = await store.load(); const closures = Object.values(state.financePeriodClosures ?? {}).sort((left, right) => right.periodEnd.localeCompare(left.periodEnd)); sendJson(res, 200, { count: closures.length, closures }); return; }
+
+  if (method === "POST" && path === "/accounting/period-closures") {
+    const body = await readJson(req); const state = await store.load(); const schedule = state.financeCloseSchedules?.[body.scheduleId];
+    if (!body.periodClosureId || !isValidBusinessDate(body.periodStart) || !isValidBusinessDate(body.periodEnd) || body.periodStart > body.periodEnd || !schedule || schedule.scheduleType !== "month_end" || schedule.status !== "active" || schedule.effectiveFrom > body.periodEnd || !body.proposedBy || !body.approvedBy || body.proposedBy === body.approvedBy || !body.approvalRef) { sendJson(res, 422, { error: { code: "period_close_blocked", message: "Valid period, effective active month-end schedule, and independent approval are required." } }); return; }
+    const existing = state.financePeriodClosures?.[body.periodClosureId]; if (existing) { sendJson(res, 200, { periodClosure: existing, idempotent: true }); return; }
+    if (Object.values(state.financePeriodClosures ?? {}).some((record) => record.status === "closed" && record.periodStart <= body.periodEnd && record.periodEnd >= body.periodStart)) { sendJson(res, 409, { error: { code: "period_close_conflict", message: "The requested period overlaps an existing closed finance period." } }); return; }
+    if (state.businessDateClosures?.[body.periodEnd]?.status !== "closed") { sendJson(res, 422, { error: { code: "period_close_blocked", message: "Period end business date must be closed before period close." } }); return; }
+    const blockers = buildFinanceCloseBlockers(state, body.periodEnd); if (hasFinanceCloseBlockers(blockers)) { sendJson(res, 422, { error: { code: "period_close_blocked", message: "Period close has unresolved finance blockers." }, blockers: financeBlockerCounts(blockers) }); return; }
+    const periodClosure = { periodClosureId: body.periodClosureId, scheduleId: schedule.scheduleId, periodStart: body.periodStart, periodEnd: body.periodEnd, status: "closed", proposedBy: body.proposedBy, approvedBy: body.approvedBy, approvalRef: body.approvalRef, auditScheduleRef: body.auditScheduleRef ?? null, closedAt: new Date().toISOString() };
+    await store.save(appendEvent({ ...state, financePeriodClosures: { ...(state.financePeriodClosures ?? {}), [periodClosure.periodClosureId]: periodClosure } }, { type: "accounting.period.closed", periodClosureId: periodClosure.periodClosureId, periodStart: periodClosure.periodStart, periodEnd: periodClosure.periodEnd, approvedBy: periodClosure.approvedBy })); sendJson(res, 201, { periodClosure, idempotent: false }); return;
+  }
+
   if (method === "POST" && path === "/accounting/posting-runs") {
     const body = await readJson(req);
     if (!body.approvedBy || !body.throughDate || Number.isNaN(new Date(body.throughDate).getTime())) {
@@ -3071,19 +3209,13 @@ async function route(req, res, dataDir, platformAdminKey) {
     }
     const state = await store.load();
     const existing = state.reconciliationCertifications?.[businessDate];
-    if (existing) { sendJson(res, 200, { certification: existing, idempotent: true }); return; }
-    const cutoff = new Date(`${businessDate}T23:59:59.999Z`).getTime();
-    const postedJournalIds = new Set(Object.values(state.accountingPostingRuns ?? {}).flatMap((run) => run.journals.map((journal) => journal.journalId)));
-    const unpostedJournals = Object.values(state.loanAccounts).flatMap(buildLoanJournalEntries).concat(buildFinanceJournalEntries(state), buildManagementFinanceJournals(state)).filter((journal) => new Date(journal.eventDate).getTime() <= cutoff && !postedJournalIds.has(journal.journalId));
-    const paymentExceptions = Object.values(state.paymentReconciliations ?? {}).filter((record) => record.outcome === "exception" && new Date(record.settledAt ?? record.receivedAt).getTime() <= cutoff);
-    const bankExceptions = Object.values(state.bankReconciliations ?? {}).filter((record) => record.outcome === "exception" && new Date(record.valueDate ?? record.receivedAt).getTime() <= cutoff);
-    const openSuspenseReceipts = Object.values(state.paymentSuspenseReceipts ?? {}).filter((record) => ["open", "partially_resolved"].includes(record.status) && new Date(record.valueDate ?? record.receivedAt).getTime() <= cutoff);
-    const unacknowledgedTaxFilings = Object.values(state.taxFilings ?? {}).filter((filing) => filing.periodTo <= businessDate && filing.status !== "accepted");
-    if (unpostedJournals.length || paymentExceptions.length || bankExceptions.length || openSuspenseReceipts.length || unacknowledgedTaxFilings.length) {
-      sendJson(res, 422, { error: { code: "reconciliation_certification_blocked", message: "Finance close is blocked by unposted journals, reconciliation exceptions, open suspense, or unacknowledged tax filings." }, blockers: { unpostedJournalCount: unpostedJournals.length, paymentExceptionCount: paymentExceptions.length, bankExceptionCount: bankExceptions.length, openSuspenseReceiptCount: openSuspenseReceipts.length, unacknowledgedTaxFilingCount: unacknowledgedTaxFilings.length } });
+    if (existing?.status === "certified") { sendJson(res, 200, { certification: existing, idempotent: true }); return; }
+    const blockers = buildFinanceCloseBlockers(state, businessDate);
+    if (hasFinanceCloseBlockers(blockers)) {
+      sendJson(res, 422, { error: { code: "reconciliation_certification_blocked", message: "Finance close is blocked by unposted journals, downstream GL delivery/reconciliation, payment/suspense/tax, or finance exceptions." }, blockers: financeBlockerCounts(blockers) });
       return;
     }
-    const certification = { businessDate, certifiedBy: body.certifiedBy, approvalRef: body.approvalRef, certifiedAt: new Date().toISOString(), status: "certified", postingRunIds: Object.values(state.accountingPostingRuns ?? {}).filter((run) => run.throughDate <= businessDate).map((run) => run.postingRunId), paymentExceptionCount: 0, bankExceptionCount: 0 };
+    const certification = { businessDate, certifiedBy: body.certifiedBy, approvalRef: body.approvalRef, certifiedAt: new Date().toISOString(), status: "certified", postingRunIds: Object.values(state.accountingPostingRuns ?? {}).filter((run) => run.throughDate <= businessDate).map((run) => run.postingRunId), paymentExceptionCount: 0, bankExceptionCount: 0, glExceptionCount: 0 };
     await store.save(appendEvent({ ...state, reconciliationCertifications: { ...(state.reconciliationCertifications ?? {}), [businessDate]: certification } }, { type: "accounting.reconciliation.certified", businessDate, certifiedBy: certification.certifiedBy, approvalRef: certification.approvalRef }));
     sendJson(res, 201, { certification, idempotent: false });
     return;
@@ -3095,10 +3227,10 @@ async function route(req, res, dataDir, platformAdminKey) {
     const state = await store.load();
     const businessDate = businessDateCloseMatch[1];
     if (!body.closedBy || !body.approvalRef) { sendJson(res, 422, { error: { code: "business_date_close_blocked", message: "closedBy and approvalRef are required." } }); return; }
-    if (!state.reconciliationCertifications?.[businessDate]) { sendJson(res, 422, { error: { code: "business_date_close_blocked", message: "A reconciliation certification is required before close." } }); return; }
+    if (state.reconciliationCertifications?.[businessDate]?.status !== "certified") { sendJson(res, 422, { error: { code: "business_date_close_blocked", message: "A current reconciliation certification is required before close." } }); return; }
     const existing = state.businessDateClosures?.[businessDate];
     if (existing?.status === "closed") { sendJson(res, 200, { closure: existing, idempotent: true }); return; }
-    const closure = { businessDate, status: "closed", closedBy: body.closedBy, approvalRef: body.approvalRef, closedAt: new Date().toISOString(), reopenedAt: null, reopenedBy: null, reopenApprovalRef: null, reopenReason: null };
+    const closure = { ...(existing ?? {}), businessDate, status: "closed", closedBy: body.closedBy, approvalRef: body.approvalRef, closedAt: new Date().toISOString(), reopenedAt: existing?.reopenedAt ?? null, reopenedBy: existing?.reopenedBy ?? null, reopenApprovalRef: existing?.reopenApprovalRef ?? null, reopenReason: existing?.reopenReason ?? null, reopenHistory: existing?.reopenHistory ?? [] };
     await store.save(appendEvent({ ...state, businessDateClosures: { ...(state.businessDateClosures ?? {}), [businessDate]: closure } }, { type: "accounting.business_date.closed", businessDate, closedBy: body.closedBy, approvalRef: body.approvalRef }));
     sendJson(res, 201, { closure, idempotent: false });
     return;
@@ -3111,9 +3243,10 @@ async function route(req, res, dataDir, platformAdminKey) {
     const businessDate = businessDateReopenMatch[1];
     const existing = state.businessDateClosures?.[businessDate];
     if (!existing || existing.status !== "closed") { sendJson(res, 422, { error: { code: "business_date_reopen_blocked", message: "Only a closed business date can be reopened." } }); return; }
+    if (Object.values(state.financePeriodClosures ?? {}).some((record) => record.status === "closed" && record.periodStart <= businessDate && record.periodEnd >= businessDate)) { sendJson(res, 422, { error: { code: "business_date_reopen_blocked", message: "A business date inside a closed finance period cannot be reopened until the period is governed through a future period-reopen workflow." } }); return; }
     if (!body.reopenedBy || !body.approvalRef || !body.reason || body.reopenedBy === existing.closedBy) { sendJson(res, 422, { error: { code: "business_date_reopen_blocked", message: "Independent reopenedBy, approvalRef, and reason are required." } }); return; }
-    const closure = { ...existing, status: "reopened", reopenedBy: body.reopenedBy, reopenApprovalRef: body.approvalRef, reopenReason: body.reason, reopenedAt: new Date().toISOString() };
-    await store.save(appendEvent({ ...state, businessDateClosures: { ...state.businessDateClosures, [businessDate]: closure } }, { type: "accounting.business_date.reopened", businessDate, reopenedBy: body.reopenedBy, approvalRef: body.approvalRef }));
+    const reopenedAt = new Date().toISOString(); const reopenRecord = { reopenedAt, reopenedBy: body.reopenedBy, approvalRef: body.approvalRef, reason: body.reason, priorClosedAt: existing.closedAt, priorClosedBy: existing.closedBy }; const closure = { ...existing, status: "reopened", reopenedBy: body.reopenedBy, reopenApprovalRef: body.approvalRef, reopenReason: body.reason, reopenedAt, reopenHistory: [...(existing.reopenHistory ?? []), reopenRecord] }; const priorCertification = state.reconciliationCertifications?.[businessDate]; const reconciliationCertifications = priorCertification ? { ...state.reconciliationCertifications, [businessDate]: { ...priorCertification, status: "invalidated", invalidatedAt: reopenedAt, invalidatedBy: body.reopenedBy, invalidationReason: body.reason } } : state.reconciliationCertifications;
+    await store.save(appendEvent({ ...state, businessDateClosures: { ...state.businessDateClosures, [businessDate]: closure }, reconciliationCertifications }, { type: "accounting.business_date.reopened", businessDate, reopenedBy: body.reopenedBy, approvalRef: body.approvalRef }));
     sendJson(res, 200, { closure });
     return;
   }
@@ -8057,6 +8190,50 @@ function isValidBusinessDate(value) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value ?? ""))) return false;
   const parsed = new Date(`${value}T00:00:00.000Z`);
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
+
+function buildGlExportPackage(postingRuns, generatedAt = new Date()) {
+  const lines = postingRuns.flatMap((run) => run.journals.flatMap((journal) => journal.lines.map((line, lineNumber) => ({ postingRunId: run.postingRunId, businessDate: run.throughDate, journalId: journal.journalId, eventId: journal.eventId, eventDate: journal.eventDate, loanAccountId: journal.loanAccountId ?? null, currency: journal.currency, lineNumber: lineNumber + 1, glAccount: line.account, debit: line.side === "debit" ? line.amount : 0, credit: line.side === "credit" ? line.amount : 0 }))));
+  const checksum = createHash("sha256").update(JSON.stringify(lines)).digest("hex");
+  const debitTotal = lines.reduce((sum, line) => sum + Math.round(line.debit * 100), 0) / 100;
+  const creditTotal = lines.reduce((sum, line) => sum + Math.round(line.credit * 100), 0) / 100;
+  return { exportFormat: "loanos.gl.v1", generatedAt: generatedAt.toISOString(), postingRunIds: postingRuns.map((run) => run.postingRunId), lineCount: lines.length, debitTotal, creditTotal, checksum, lines };
+}
+
+function buildGlDeliveryRecord(input, postingRun, now = new Date()) {
+  const glExport = buildGlExportPackage([postingRun], now);
+  return { deliveryId: input.deliveryId, postingRunId: postingRun.postingRunId, businessDate: postingRun.throughDate, targetSystem: input.targetSystem, interfaceType: input.interfaceType, deliveryRef: input.deliveryRef ?? null, exportFormat: glExport.exportFormat, checksumSha256: glExport.checksum, lineCount: glExport.lineCount, debitTotal: glExport.debitTotal, creditTotal: glExport.creditTotal, status: "pending_acknowledgement", attempt: input.attempt ?? 1, deliveredBy: input.deliveredBy, deliveredAt: now.toISOString(), acknowledgement: null };
+}
+
+function allAccountingJournals(state) {
+  return Object.values(state.loanAccounts ?? {}).flatMap(buildLoanJournalEntries).concat(buildFinanceJournalEntries(state), buildManagementFinanceJournals(state));
+}
+
+function buildFinanceCloseBlockers(state, businessDate) {
+  const cutoff = new Date(`${businessDate}T23:59:59.999Z`).getTime();
+  const postingRuns = Object.values(state.accountingPostingRuns ?? {}).filter((run) => run.throughDate <= businessDate);
+  const postedJournalIds = new Set(postingRuns.flatMap((run) => run.journals.map((journal) => journal.journalId)));
+  const unpostedJournals = allAccountingJournals(state).filter((journal) => new Date(journal.eventDate).getTime() <= cutoff && !postedJournalIds.has(journal.journalId));
+  const paymentExceptions = Object.values(state.paymentReconciliations ?? {}).filter((record) => record.outcome === "exception" && new Date(record.settledAt ?? record.receivedAt).getTime() <= cutoff);
+  const bankExceptions = Object.values(state.bankReconciliations ?? {}).filter((record) => record.outcome === "exception" && new Date(record.valueDate ?? record.receivedAt).getTime() <= cutoff);
+  const openSuspenseReceipts = Object.values(state.paymentSuspenseReceipts ?? {}).filter((record) => ["open", "partially_resolved"].includes(record.status) && new Date(record.valueDate ?? record.receivedAt).getTime() <= cutoff);
+  const unacknowledgedTaxFilings = Object.values(state.taxFilings ?? {}).filter((filing) => filing.periodTo <= businessDate && filing.status !== "accepted");
+  const undeliveredPostingRuns = postingRuns.filter((run) => !Object.values(state.glDeliveries ?? {}).some((delivery) => delivery.postingRunId === run.postingRunId && delivery.status === "accepted"));
+  const unreconciledPostingRuns = postingRuns.filter((run) => !Object.values(state.glReconciliations ?? {}).some((record) => record.postingRunId === run.postingRunId && record.outcome === "matched"));
+  const openFinanceExceptions = Object.values(state.financeExceptions ?? {}).filter((record) => record.status === "open" && (!record.businessDate || record.businessDate <= businessDate));
+  return { unpostedJournals, paymentExceptions, bankExceptions, openSuspenseReceipts, unacknowledgedTaxFilings, undeliveredPostingRuns, unreconciledPostingRuns, openFinanceExceptions };
+}
+
+function financeBlockerCounts(blockers) {
+  return { unpostedJournalCount: blockers.unpostedJournals.length, paymentExceptionCount: blockers.paymentExceptions.length, bankExceptionCount: blockers.bankExceptions.length, openSuspenseReceiptCount: blockers.openSuspenseReceipts.length, unacknowledgedTaxFilingCount: blockers.unacknowledgedTaxFilings.length, undeliveredPostingRunCount: blockers.undeliveredPostingRuns.length, unreconciledPostingRunCount: blockers.unreconciledPostingRuns.length, openFinanceExceptionCount: blockers.openFinanceExceptions.length };
+}
+
+function hasFinanceCloseBlockers(blockers) {
+  return Object.values(financeBlockerCounts(blockers)).some((count) => count > 0);
+}
+
+function createFinanceExceptionRecord(input, now = new Date()) {
+  return { exceptionId: input.exceptionId ?? createLoanId("finex"), sourceType: input.sourceType, sourceId: input.sourceId, postingRunId: input.postingRunId ?? null, businessDate: input.businessDate ?? null, exceptionCode: input.exceptionCode, description: input.description, status: "open", amountDifference: input.amountDifference ?? 0, lineCountDifference: input.lineCountDifference ?? 0, checksumMismatch: Boolean(input.checksumMismatch), createdAt: now.toISOString(), assignment: null, resolution: null };
 }
 
 function buildReconciliationBreakQueue(state, now = new Date()) {

@@ -22,7 +22,7 @@ The current implementation is intentionally small:
 - Internal staff workspace in `apps/dashboard/`.
 - Borrower customer portal in `apps/customer/`: a responsive, white-labelled journey home with prioritised next actions, visual application milestones, repayment schedules, a document centre, guided media, grievance tracking, and DPDP access/correction/erasure controls.
 - Shared design system tokens in `apps/shared/`.
-- Automated tests in `tests/`: 175 file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
+- Automated tests in `tests/`: 176 file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
 
 Run it:
 
@@ -151,6 +151,18 @@ npm run dev:api
 | `GET /accounting/trial-balance` | Returns a tenant-scoped derived trial balance from journal projections, optionally for one loan account. |
 | `GET /accounting/posting-runs` | Lists immutable, approval-evidenced tenant GL posting-run snapshots. |
 | `GET /accounting/gl-export` | Exports posted journals in a versioned GL-line schema with a SHA-256 checksum; may filter by `postingRunId`. |
+| `GET/POST /accounting/gl-deliveries` | Lists or creates an immutable API/SFTP/file delivery attempt for one posting run, retaining target, exact totals, line count, and export checksum. |
+| `POST /accounting/gl-deliveries/:id/acknowledgement` | Records one immutable downstream acknowledgement; acceptance requires the exact exported checksum and line count, otherwise a finance exception is opened. |
+| `GET/POST /accounting/gl-reconciliations` | Lists or independently certifies downstream GL versus posted subledger checksum, debit/credit totals, and line count; variances fail closed into the exception queue. |
+| `GET /accounting/finance-exceptions` | Lists downstream delivery/reconciliation exceptions, optionally filtered by open/resolved status. |
+| `POST /accounting/finance-exceptions/:id/assignment` | Assigns an open finance exception to a named owner with a due date. |
+| `POST /accounting/finance-exceptions/:id/resolution` | Records maker-checker remediation evidence without bypassing the underlying GL acceptance/reconciliation close gates. |
+| `GET/POST /accounting/close-schedules` | Lists or approves India-timezone daily/month-end close schedules with EOD/BOD times, effective date, and holiday-calendar reference. |
+| `GET /accounting/operational-runs` | Lists EOD and BOD runs with posting, delivery, reconciliation, certification, and closure checkpoints. |
+| `POST /accounting/eod-runs` | Posts the remaining balanced journal inventory and packages every outstanding posting run for GL delivery, pausing at downstream acknowledgement. |
+| `POST /accounting/eod-runs/:id/complete` | Completes EOD only after every close blocker is clear, using independent certification and close approvals. |
+| `POST /accounting/bod-runs` | Opens a business date only after the previous date has a completed EOD and closed business date. |
+| `GET/POST /accounting/period-closures` | Lists or closes non-overlapping finance periods under a month-end schedule after the period-end date and downstream GL are closed and reconciled. |
 | `GET/POST /accounting/ecl-parameter-sets` | Lists or approves versioned PD/LGD parameter sets under maker-checker control. |
 | `GET /accounting/ecl-provisions` | Lists approved ECL provision snapshots and allowance movements. |
 | `GET/POST /accounting/eir-amortizations` | Lists or records maker-checker EIR period amortisation and balanced journals. |
@@ -171,9 +183,9 @@ npm run dev:api
 | `POST /accounting/irac-recovery-recognitions` | Links cash-basis recovery recognition to an earlier reversal and an actual interest-bearing payment. |
 | `POST /accounting/posting-runs` | Posts all unposted balanced journals through a date into an immutable tenant batch; run ID retries are idempotent. |
 | `GET /accounting/reconciliation-certifications` | Lists dated finance reconciliation certifications for the tenant. |
-| `POST /accounting/reconciliation-certifications` | Certifies a business date only after all journals are posted, provider/bank exceptions and suspense are clear, and tax filings are acknowledged, retaining named approval evidence. |
+| `POST /accounting/reconciliation-certifications` | Certifies a business date only after journals are posted, downstream GL is accepted and exactly reconciled, and provider/bank/suspense/tax/finance exceptions are clear. |
 | `POST /accounting/business-dates/:date/close` | Closes a reconciliation-certified business date, blocking later posting through that date. |
-| `POST /accounting/business-dates/:date/reopen` | Reopens a closed date only with independent actor, approval evidence, and reason. |
+| `POST /accounting/business-dates/:date/reopen` | Reopens a closed date only with independent actor, approval evidence, and reason, invalidating the prior certification; dates inside a closed finance period cannot reopen. |
 | `POST /loan-accounts/:id/refunds` | Issues an approved, idempotent refund only against the unapplied portion of an existing payment; principal and interest corrections remain ledger reversals. |
 | `POST /loan-accounts/:id/disbursement-return` | Cancels a failed outward disbursement before any repayment or servicing activity, reversing the original principal debit with approval evidence. |
 | `GET /loan-accounts/:id/cooling-off-quote` | Quotes principal plus proportionate interest within the KFS cooling-off period; execution/payout remains the next workflow step. |

@@ -2861,6 +2861,13 @@ test("API opens loan account on disbursement and posts ledger payment", async (t
   assert(glExport.lines.some((line) => line.glAccount === "tds_payable"));
   assert(glExport.lines.some((line) => line.glAccount === "deferred_origination_fee"));
 
+  const deliveryResponse = await postJson(`${base}/accounting/gl-deliveries`, { deliveryId: "gl_delivery_001", postingRunId: "gl_posting_001", targetSystem: "BANK_GL", interfaceType: "api", deliveredBy: "finance_ops_001" });
+  assert.equal(deliveryResponse.status, 201); assert.equal(deliveryResponse.body.delivery.checksumSha256, glExport.checksum);
+  const acknowledgementResponse = await postJson(`${base}/accounting/gl-deliveries/gl_delivery_001/acknowledgement`, { status: "accepted", acknowledgementRef: "GL-ACK-001", checksumSha256: glExport.checksum, lineCount: glExport.lineCount, recordedBy: "finance_ops_001" });
+  assert.equal(acknowledgementResponse.status, 200); assert.equal(acknowledgementResponse.body.delivery.status, "accepted");
+  const glReconciliationResponse = await postJson(`${base}/accounting/gl-reconciliations`, { reconciliationId: "gl_recon_001", deliveryId: "gl_delivery_001", externalChecksumSha256: glExport.checksum, externalLineCount: glExport.lineCount, externalDebitTotal: glExport.debitTotal, externalCreditTotal: glExport.creditTotal, reconciledBy: "finance_recon_001", approvedBy: "finance_controller_001", approvalRef: "GL-RECON-APR-001" });
+  assert.equal(glReconciliationResponse.status, 201); assert.equal(glReconciliationResponse.body.reconciliation.outcome, "matched");
+
   const postingRetry = await postJson(`${base}/accounting/posting-runs`, {
     postingRunId: "gl_posting_001",
     throughDate: firstInstallment.dueDate,
@@ -2903,6 +2910,46 @@ test("API opens loan account on disbursement and posts ledger payment", async (t
     accountAfterDuplicate.ledger.filter((event) => event.paymentRef === "nach_payment_001").length,
     1
   );
+});
+
+test("EOD/BOD orchestration pauses at GL acknowledgement and closes only after exact reconciliation", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-api-finance-close-"));
+  t.after(async () => { await rm(dataDir, { recursive: true, force: true }); });
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] }); await listen(server);
+  t.after(async () => { await close(server); });
+  const base = `http://127.0.0.1:${server.address().port}`; const application = await approveAndDisburseApplication(base);
+  const account = await (await apiFetch(`${base}/loan-accounts/${application.loanAccountId}`)).json(); const businessDate = account.schedule[0].dueDate;
+  const dailySchedule = await postJson(`${base}/accounting/close-schedules`, { scheduleId: "daily_close_001", scheduleType: "daily", timezone: "Asia/Kolkata", eodCutoffTime: "21:00", bodStartTime: "06:00", effectiveFrom: account.disbursedAt.slice(0, 10), holidayCalendarRef: "RBI-HOLIDAY-2026", targetSystem: "BANK_GL", interfaceType: "sftp", proposedBy: "finance_maker", approvedBy: "finance_controller", approvalRef: "CLOSE-SCHED-APR-001" });
+  assert.equal(dailySchedule.status, 201);
+  const monthlySchedule = await postJson(`${base}/accounting/close-schedules`, { scheduleId: "month_close_001", scheduleType: "month_end", timezone: "Asia/Kolkata", eodCutoffTime: "22:00", effectiveFrom: account.disbursedAt.slice(0, 10), holidayCalendarRef: "RBI-HOLIDAY-2026", proposedBy: "finance_maker", approvedBy: "finance_controller", approvalRef: "MONTH-SCHED-APR-001" });
+  assert.equal(monthlySchedule.status, 201);
+
+  const eod = await postJson(`${base}/accounting/eod-runs`, { runId: "eod_001", scheduleId: "daily_close_001", businessDate, initiatedBy: "finance_ops", approvedBy: "finance_controller", approvalRef: "EOD-APR-001" });
+  assert.equal(eod.status, 201); assert.equal(eod.body.run.status, "awaiting_gl_acknowledgement"); assert.equal(eod.body.run.postingRunIds.length, 1); assert.equal(eod.body.deliveries.length, 1);
+  const initialDelivery = eod.body.deliveries[0];
+  const blocked = await postJson(`${base}/accounting/eod-runs/eod_001/complete`, { certifiedBy: "finance_certifier", closedBy: "finance_closer", certificationApprovalRef: "CERT-001", closeApprovalRef: "CLOSE-001" });
+  assert.equal(blocked.status, 422); assert.equal(blocked.body.blockers.undeliveredPostingRunCount, 1);
+
+  const badAck = await postJson(`${base}/accounting/gl-deliveries/${encodeURIComponent(initialDelivery.deliveryId)}/acknowledgement`, { status: "accepted", acknowledgementRef: "GL-ACK-BAD", checksumSha256: "0".repeat(64), lineCount: initialDelivery.lineCount, recordedBy: "finance_ops" });
+  assert.equal(badAck.status, 202); assert.equal(badAck.body.delivery.status, "rejected"); assert.equal(badAck.body.exception.exceptionCode, "gl_acknowledgement_mismatch");
+  const exceptionId = badAck.body.exception.exceptionId;
+  const assignment = await postJson(`${base}/accounting/finance-exceptions/${exceptionId}/assignment`, { assignedTo: "gl_recon_team", assignedBy: "finance_controller", dueAt: "2099-01-01T00:00:00.000Z" }); assert.equal(assignment.status, 200);
+  const resolution = await postJson(`${base}/accounting/finance-exceptions/${exceptionId}/resolution`, { proposedBy: "gl_recon_team", approvedBy: "finance_controller", approvalRef: "FINEX-APR-001", reason: "Rejected corrupt acknowledgement and requested replay", remediationRef: "GL-REPLAY-001" }); assert.equal(resolution.status, 200);
+
+  const retryDelivery = await postJson(`${base}/accounting/gl-deliveries`, { deliveryId: "gl_delivery_retry_001", postingRunId: eod.body.run.postingRunIds[0], targetSystem: "BANK_GL", interfaceType: "sftp", deliveredBy: "finance_ops", deliveryRef: "GL-REPLAY-001" }); assert.equal(retryDelivery.status, 201);
+  const delivery = retryDelivery.body.delivery;
+  const goodAck = await postJson(`${base}/accounting/gl-deliveries/gl_delivery_retry_001/acknowledgement`, { status: "accepted", acknowledgementRef: "GL-ACK-GOOD", checksumSha256: delivery.checksumSha256, lineCount: delivery.lineCount, recordedBy: "finance_ops" }); assert.equal(goodAck.status, 200);
+  const reconciliation = await postJson(`${base}/accounting/gl-reconciliations`, { reconciliationId: "gl_recon_eod_001", deliveryId: "gl_delivery_retry_001", externalChecksumSha256: delivery.checksumSha256, externalLineCount: delivery.lineCount, externalDebitTotal: delivery.debitTotal, externalCreditTotal: delivery.creditTotal, reconciledBy: "gl_recon_team", approvedBy: "finance_controller", approvalRef: "GL-RECON-EOD-001" }); assert.equal(reconciliation.status, 201); assert.equal(reconciliation.body.reconciliation.outcome, "matched");
+  const completed = await postJson(`${base}/accounting/eod-runs/eod_001/complete`, { certifiedBy: "finance_certifier", closedBy: "finance_closer", certificationApprovalRef: "CERT-001", closeApprovalRef: "CLOSE-001" }); assert.equal(completed.status, 200); assert.equal(completed.body.run.status, "completed"); assert.equal(completed.body.closure.status, "closed");
+
+  const reopened = await postJson(`${base}/accounting/business-dates/${businessDate}/reopen`, { reopenedBy: "finance_controller", approvalRef: "REOPEN-APR-001", reason: "Controlled late adjustment window" }); assert.equal(reopened.status, 200);
+  const closeWithoutRecertification = await postJson(`${base}/accounting/business-dates/${businessDate}/close`, { closedBy: "finance_closer", approvalRef: "CLOSE-RETRY-BLOCKED" }); assert.equal(closeWithoutRecertification.status, 422);
+  const recertified = await postJson(`${base}/accounting/reconciliation-certifications`, { businessDate, certifiedBy: "finance_certifier", approvalRef: "RECERT-001" }); assert.equal(recertified.status, 201);
+  const reclosed = await postJson(`${base}/accounting/business-dates/${businessDate}/close`, { closedBy: "finance_closer", approvalRef: "RECLOSE-001" }); assert.equal(reclosed.status, 201);
+
+  const nextBusinessDate = addDays(businessDate, 1); const bod = await postJson(`${base}/accounting/bod-runs`, { runId: "bod_001", scheduleId: "daily_close_001", businessDate: nextBusinessDate, previousBusinessDate: businessDate, startedBy: "finance_ops", approvalRef: "BOD-APR-001" }); assert.equal(bod.status, 201); assert.equal(bod.body.run.status, "opened");
+  const periodClose = await postJson(`${base}/accounting/period-closures`, { periodClosureId: "period_close_001", scheduleId: "month_close_001", periodStart: account.disbursedAt.slice(0, 10), periodEnd: businessDate, proposedBy: "finance_maker", approvedBy: "finance_controller", approvalRef: "PERIOD-APR-001", auditScheduleRef: "AUDIT-SCHED-001" }); assert.equal(periodClose.status, 201); assert.equal(periodClose.body.periodClosure.status, "closed");
+  const reopenClosedPeriodDate = await postJson(`${base}/accounting/business-dates/${businessDate}/reopen`, { reopenedBy: "finance_controller", approvalRef: "REOPEN-APR-002", reason: "Should be blocked by period close" }); assert.equal(reopenClosedPeriodDate.status, 422);
 });
 
 test("summarizeLoanAccount sums thousands of ledger events exactly (integer-paise arithmetic)", () => {

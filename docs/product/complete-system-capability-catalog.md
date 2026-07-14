@@ -69,7 +69,7 @@ LoanOS currently has a strong compliance-first domain foundation and a credible 
 
 The principal gaps before bank production are live integrations, downstream GL certification, regulatory submission formats, product-specific lending depth, full collections/legal recovery, enterprise IAM and key management, observability/DR/BCP, and bank-assurance evidence. Payment operations now have a controlled internal first slice, but live rail/file transport and operating-scale automation remain open. Public product positioning must remain narrower than this catalogue until each advertised journey reaches an agreed maturity level.
 
-The detailed register contains **453 individually identified capabilities**. At this snapshot, 78 are classified `Implemented`, 158 `Partial`, 189 `Missing`, and 28 are mock, partner, external, or composite-status obligations. These counts measure scope coverage, not delivery percentage: a single missing ledger, reconciliation, security, or recovery control can block production even if many smaller capabilities exist.
+The detailed register contains **453 individually identified capabilities**. At this snapshot, 78 are classified `Implemented`, 159 `Partial`, 188 `Missing`, and 28 are mock, partner, external, or composite-status obligations. These counts measure scope coverage, not delivery percentage: a single missing ledger, reconciliation, security, or recovery control can block production even if many smaller capabilities exist.
 
 ## Capability Index
 
@@ -673,7 +673,7 @@ The detailed register contains **453 individually identified capabilities**. At 
 | ID | Capability | Applicability | Status |
 | --- | --- | --- | --- |
 | OPS-001 | Production deployment topology and India hosting | Core | Partial |
-| OPS-002 | Horizontal scale, stateless API, background workers, and schedulers | Core | Missing |
+| OPS-002 | Horizontal scale, stateless API, background workers, and schedulers | Core | Partial |
 | OPS-003 | Database HA, backup, PITR, restore, and corruption drills | Core | Missing |
 | OPS-004 | Multi-AZ/region DR, RTO/RPO, failover, and failback | Core | Missing |
 | OPS-005 | BCP runbook and business/technology recovery exercises | Core | External |
