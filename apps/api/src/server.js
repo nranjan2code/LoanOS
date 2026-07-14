@@ -218,6 +218,7 @@ import {
   stampAuditEvents
 } from "../../../packages/core/src/index.js";
 import { assessEligibilityGated } from "./rules-engine.js";
+import { getActiveMasterKey, getMasterKeyRing } from "./encryption.js";
 import {
   appendEvent,
   appendPlatformEvent,
@@ -8249,6 +8250,78 @@ async function routePlatform(req, res, { dataDir, platformAdminKey, method, path
     }
     const state = await loadWholeState(dataDir);
     sendJson(res, 200, buildPlatformAuditEvidencePack(state));
+    return;
+  }
+
+  if (method === "GET" && path === "/platform/encryption/rotations") {
+    if (!hasPlatformRole(authContext, ["platform_admin", "security_admin", "auditor"])) {
+      sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } });
+      return;
+    }
+    const state = await loadWholeState(dataDir);
+    const rotations = (state.controlPlane.platformEvents ?? [])
+      .filter((event) => event.type === "platform.encryption.reencrypted")
+      .map(({ hash, previousHash, ...event }) => event);
+    sendJson(res, 200, { rotations });
+    return;
+  }
+
+  if (method === "POST" && path === "/platform/encryption/rekey") {
+    if (!hasPlatformRole(authContext, ["platform_admin", "security_admin"])) {
+      sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } });
+      return;
+    }
+    const body = await readJson(req);
+    const ring = getMasterKeyRing();
+    const activeKey = getActiveMasterKey();
+    if (!ring || !activeKey) {
+      sendJson(res, 409, { error: { code: "key_provider_unavailable", message: "A master-key provider must be configured before re-encryption." } });
+      return;
+    }
+    const sourceKeyIds = [...new Set(Array.isArray(body.sourceKeyIds) ? body.sourceKeyIds.map(String) : [])];
+    if (!body.reason || String(body.reason).trim().length < 8 || !body.changeTicket || !body.targetKeyId || sourceKeyIds.length === 0) {
+      sendJson(res, 422, { error: { code: "encryption_rekey_invalid", message: "sourceKeyIds, targetKeyId, changeTicket, and a specific reason are required." } });
+      return;
+    }
+    if (body.targetKeyId !== activeKey.keyId) {
+      sendJson(res, 409, { error: { code: "encryption_key_not_active", message: "targetKeyId must equal the provider's active key id." } });
+      return;
+    }
+    const unavailable = sourceKeyIds.filter((keyId) => keyId === activeKey.keyId || !ring.keys.has(keyId));
+    if (unavailable.length > 0) {
+      sendJson(res, 422, { error: { code: "encryption_source_key_invalid", message: `Source keys must be available, decrypt-only versions: ${unavailable.join(", ")}.` } });
+      return;
+    }
+
+    const state = await loadWholeState(dataDir);
+    const priorRotation = [...(state.controlPlane.platformEvents ?? [])]
+      .reverse()
+      .find((event) => event.type === "platform.encryption.reencrypted");
+    if (priorRotation?.targetKeyId === activeKey.keyId) {
+      sendJson(res, 409, { error: { code: "encryption_key_already_active", message: "Tenant data has already been re-encrypted under this active key." } });
+      return;
+    }
+    const rotation = {
+      rotationId: `keyrot_${randomBytes(8).toString("hex")}`,
+      sourceKeyIds,
+      targetKeyId: activeKey.keyId,
+      provider: activeKey.provider,
+      tenantCount: Object.keys(state.tenants ?? {}).length,
+      changeTicket: body.changeTicket,
+      reason: body.reason,
+      status: "completed",
+      completedAt: new Date().toISOString(),
+      completedBy: authActor(authContext)
+    };
+    const nextState = appendPlatformEvent(
+      state,
+      { type: "platform.encryption.reencrypted", ...rotation },
+      { actor: authActor(authContext) }
+    );
+    // saveWholeState decrypts with any available source version and writes
+    // every tenant partition under only the active target version.
+    await saveWholeState(nextState, dataDir);
+    sendJson(res, 200, { rotation });
     return;
   }
 

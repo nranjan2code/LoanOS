@@ -126,19 +126,23 @@ the added risk of migrating for this pass).
 
 ### v4 — tenant-bound application envelope encryption
 
-When `LOANOS_MASTER_KEY` is configured, every `tenant_data.data` JSONB value
+When the versioned master-key provider is configured, every `tenant_data.data` JSONB value
 is now an AES-256-GCM ciphertext envelope rather than readable domain JSON.
 HKDF-SHA256 derives a distinct key from the root for each tenant id, so an
 envelope copied to another tenant row fails authentication. The envelope also
-records `LOANOS_MASTER_KEY_ID` (`kid`) and decryption fails closed when the
-active key id does not match, making key-version drift visible instead of
-silently attempting the wrong key. Both the whole-state control-plane path
+records a `kid`; tenant id and key id are authenticated as associated data.
+Decryption resolves that exact version from the provider and fails closed if
+it is unavailable. Both the whole-state control-plane path
 and the RLS-scoped single-tenant hot path use the same encode/decode boundary.
 
 This application envelope complements managed Postgres volume, WAL, replica,
 and backup encryption; it does not replace those infrastructure controls.
-Production KMS/HSM custody, a previous-key ring, online re-encryption, rotation
-ceremonies, and destruction evidence remain open. With no master key in local
+The local provider supports an active version plus decrypt-only previous
+versions. `POST /platform/encryption/rekey` loads all tenants using the
+available source versions, writes them under only the active version, and
+records source/target ids, tenant count, actor, reason, and change ticket in
+the hash-chained platform audit spine. Production KMS/HSM custody, rotation
+ceremonies, and destruction evidence remain open. With no key ring in local
 development, the driver retains plaintext JSONB behavior for inspectability.
 
 ## What has and has not been verified
@@ -173,7 +177,7 @@ provisioned locally, via `tests/postgres-store.test.js`:
 - v4 has a database-independent storage-boundary test proving ciphertext-only
   persistence, tenant binding, key-id metadata, exact round-trip, and
   fail-closed behavior for missing or mismatched keys. Run the live Postgres
-  suite with `LOANOS_MASTER_KEY` and `LOANOS_MASTER_KEY_ID` set to verify the
+  suite with `LOANOS_MASTER_KEYS` and `LOANOS_ACTIVE_MASTER_KEY_ID` set to verify the
   encrypted row path against the target database environment.
 
 Real bugs were caught and fixed by this live verification that a
@@ -214,8 +218,8 @@ differently around session-scoped variables, advisory locks, and `SET ROLE`).
    ```
    LOANOS_STORAGE_DRIVER=postgres
    DATABASE_URL=postgres://loanos_control_plane:...@host:5432/dbname
-   LOANOS_MASTER_KEY=<64 hex chars or base64 of 32 bytes>
-   LOANOS_MASTER_KEY_ID=<KMS key/version identifier>
+   LOANOS_MASTER_KEYS='{"kms-key-v1":"<64 hex chars or base64 of 32 bytes>"}'
+   LOANOS_ACTIVE_MASTER_KEY_ID=kms-key-v1
    ```
 5. Run `tests/postgres-store.test.js` against a scratch database first:
    ```

@@ -254,8 +254,8 @@ Tasks:
 - Maker-checker authorization policies.
 - Secrets management. First containment slice done: named credentials can be declared compromised through `POST /admin/service-credential-compromises`; selected or all active credentials are revoked fail-closed, each revocation is linked to a high/critical tenant incident, and CERT-In/RBI clocks plus audit evidence start immediately. External secret-vault/KMS custody, workload identity, and automated leak detection/rotation remain planned.
 - Audit log hardening.
-- Encryption at rest and in transit. Application-envelope first slice done for both file and Postgres drivers: tenant-bound HKDF/AES-256-GCM encryption, ciphertext-only tenant JSON, key-version metadata, and fail-closed missing/mismatched-key behavior. Production KMS/HSM custody, online rotation/re-encryption, managed database/WAL/replica/backup evidence, field/object encryption, and transport-certificate operations remain planned.
-- Key management.
+- Encryption at rest and in transit. Application-envelope first slice done for both file and Postgres drivers: tenant-bound HKDF/AES-256-GCM encryption, ciphertext-only tenant JSON, authenticated key-version metadata, and fail-closed unavailable-key behavior. Production managed database/WAL/replica/backup evidence, field/object encryption, and transport-certificate operations remain planned.
+- Key management. Governed rotation slice done: a versioned provider exposes one active encrypt key plus decrypt-only prior versions; `POST /platform/encryption/rekey` validates source/target versions, requires reason/change ticket, rewrites all tenant data, and seals rotation evidence into the platform audit chain. Production KMS/HSM provider integration, dual-control ceremony, scheduled rotation, destruction/cryptographic-erasure attestation, and recovery drills remain planned.
 - Vulnerability scanning.
 - Observability and alerting.
 - Backup and restore.

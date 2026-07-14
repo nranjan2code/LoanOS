@@ -68,7 +68,8 @@ import {
 import {
   decryptTenantData,
   encryptTenantData,
-  getMasterKey,
+  getActiveMasterKey,
+  getMasterKeyById,
   isEncryptedEnvelope
 } from "./encryption.js";
 
@@ -509,22 +510,20 @@ export async function saveTenantDataOnly(_dataDirIgnored, tenantId, tenantData) 
 
 // Application-layer envelope encryption complements, rather than replaces,
 // the managed database/storage encryption attested at deployment. JSONB rows
-// contain only an authenticated ciphertext envelope when LOANOS_MASTER_KEY is
+// contain only an authenticated ciphertext envelope when a master-key ring is
 // configured; tenant identity is bound into HKDF key derivation, so copying an
 // envelope to another tenant row cannot make it decrypt there.
 export function encodePostgresTenantData(tenantId, tenantData, env = process.env) {
-  const masterKey = getMasterKey(env);
-  if (!masterKey) return tenantData;
-  return encryptTenantData(masterKey, tenantId, tenantData, env.LOANOS_MASTER_KEY_ID);
+  const activeKey = getActiveMasterKey(env);
+  if (!activeKey) return tenantData;
+  return encryptTenantData(activeKey.key, tenantId, tenantData, activeKey.keyId);
 }
 
 export function decodePostgresTenantData(tenantId, storedData, env = process.env) {
   if (!isEncryptedEnvelope(storedData)) return storedData;
-  const masterKey = getMasterKey(env);
-  if (!masterKey) {
-    throw new Error(`Postgres tenant ${tenantId} is encrypted but LOANOS_MASTER_KEY is not set.`);
-  }
-  return decryptTenantData(masterKey, tenantId, storedData, env.LOANOS_MASTER_KEY_ID);
+  const key = getMasterKeyById(storedData.kid, env);
+  if (!key) throw new Error(`Postgres tenant ${tenantId} is encrypted but no master-key provider is configured.`);
+  return decryptTenantData(key.key, tenantId, storedData);
 }
 
 export async function saveControlPlaneOnly(_dataDirIgnored, controlPlaneState) {

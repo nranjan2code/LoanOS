@@ -178,11 +178,15 @@ test("valid India-only loan application passes preflight", () => {
 
 test("per-tenant encryption at rest writes ciphertext and round-trips under a master key", async (t) => {
   const dataDir = await mkdtemp(join(tmpdir(), "loanos-enc-"));
-  const priorKey = process.env.LOANOS_MASTER_KEY;
-  process.env.LOANOS_MASTER_KEY = "a".repeat(64); // 32 bytes in hex
+  const priorKeys = process.env.LOANOS_MASTER_KEYS;
+  const priorActiveKeyId = process.env.LOANOS_ACTIVE_MASTER_KEY_ID;
+  process.env.LOANOS_MASTER_KEYS = JSON.stringify({ "kms-test-v1": "a".repeat(64) });
+  process.env.LOANOS_ACTIVE_MASTER_KEY_ID = "kms-test-v1";
   t.after(() => {
-    if (priorKey === undefined) delete process.env.LOANOS_MASTER_KEY;
-    else process.env.LOANOS_MASTER_KEY = priorKey;
+    if (priorKeys === undefined) delete process.env.LOANOS_MASTER_KEYS;
+    else process.env.LOANOS_MASTER_KEYS = priorKeys;
+    if (priorActiveKeyId === undefined) delete process.env.LOANOS_ACTIVE_MASTER_KEY_ID;
+    else process.env.LOANOS_ACTIVE_MASTER_KEY_ID = priorActiveKeyId;
   });
 
   const state = await loadState(dataDir);
@@ -200,8 +204,52 @@ test("per-tenant encryption at rest writes ciphertext and round-trips under a ma
   assert.equal(reloaded.tenants.tnt_enc.borrowerProfiles.b1.secretField, "PLAINTEXT_MARKER_9F3A");
 
   // Without the key, encrypted state cannot be silently read as empty.
-  delete process.env.LOANOS_MASTER_KEY;
-  await assert.rejects(() => loadState(dataDir), /encrypted but LOANOS_MASTER_KEY is not set/);
+  delete process.env.LOANOS_MASTER_KEYS;
+  delete process.env.LOANOS_ACTIVE_MASTER_KEY_ID;
+  await assert.rejects(() => loadState(dataDir), /no master-key provider is configured/);
+});
+
+test("platform rekey decrypts with a prior key and rewrites every tenant under the active version", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-rekey-"));
+  const priorKeys = process.env.LOANOS_MASTER_KEYS;
+  const priorActiveKeyId = process.env.LOANOS_ACTIVE_MASTER_KEY_ID;
+  t.after(async () => {
+    if (priorKeys === undefined) delete process.env.LOANOS_MASTER_KEYS;
+    else process.env.LOANOS_MASTER_KEYS = priorKeys;
+    if (priorActiveKeyId === undefined) delete process.env.LOANOS_ACTIVE_MASTER_KEY_ID;
+    else process.env.LOANOS_ACTIVE_MASTER_KEY_ID = priorActiveKeyId;
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  process.env.LOANOS_MASTER_KEYS = JSON.stringify({ "kms-old-v1": "1".repeat(64) });
+  process.env.LOANOS_ACTIVE_MASTER_KEY_ID = "kms-old-v1";
+  const state = await loadState(dataDir);
+  state.tenants.tnt_rekey = createEmptyTenantData();
+  state.tenants.tnt_rekey.borrowerProfiles = { b1: { borrowerId: "b1", secretField: "ROTATE_ME" } };
+  await saveState(state, dataDir);
+  assert.equal(JSON.parse(await readFile(join(dataDir, "state.json"), "utf8")).tenants.tnt_rekey.kid, "kms-old-v1");
+
+  process.env.LOANOS_MASTER_KEYS = JSON.stringify({ "kms-old-v1": "1".repeat(64), "kms-new-v2": "2".repeat(64) });
+  process.env.LOANOS_ACTIVE_MASTER_KEY_ID = "kms-new-v2";
+  const adminKey = "platform-rekey-admin";
+  const server = createLoanOsServer({ dataDir, platformAdminKey: adminKey });
+  await listen(server);
+  t.after(() => close(server));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const rekey = await rawFetch(`${base}/platform/encryption/rekey`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-platform-admin-key": adminKey },
+    body: JSON.stringify({ sourceKeyIds: ["kms-old-v1"], targetKeyId: "kms-new-v2", changeTicket: "CHG-2026-0714", reason: "Scheduled annual root-key rotation" })
+  });
+  assert.equal(rekey.status, 200, await rekey.text());
+  const persisted = JSON.parse(await readFile(join(dataDir, "state.json"), "utf8"));
+  assert.equal(persisted.tenants.tnt_rekey.kid, "kms-new-v2");
+  assert.equal(JSON.stringify(persisted).includes("ROTATE_ME"), false);
+  const reloaded = await loadState(dataDir);
+  assert.equal(reloaded.tenants.tnt_rekey.borrowerProfiles.b1.secretField, "ROTATE_ME");
+  const rotations = await rawFetch(`${base}/platform/encryption/rotations`, { headers: { "x-platform-admin-key": adminKey } });
+  assert.equal(rotations.status, 200);
+  assert.equal((await rotations.json()).rotations[0].targetKeyId, "kms-new-v2");
 });
 
 test("non-India borrower and currency are blocked", () => {

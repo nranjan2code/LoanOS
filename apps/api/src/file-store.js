@@ -14,7 +14,8 @@ import {
 import {
   encryptTenantData,
   decryptTenantData,
-  getMasterKey,
+  getActiveMasterKey,
+  getMasterKeyById,
   isEncryptedEnvelope
 } from "./encryption.js";
 import {
@@ -379,11 +380,13 @@ export async function saveState(state, dataDir = resolveDataDir()) {
 // plaintext because it is cross-tenant by construction (tenant registry,
 // sessions) and cannot be scoped to a single tenant key.
 function encryptStateTenants(state) {
-  const masterKey = getMasterKey();
-  if (!masterKey) return state;
+  const activeKey = getActiveMasterKey();
+  if (!activeKey) return state;
   const tenants = {};
   for (const [tenantId, data] of Object.entries(state.tenants ?? {})) {
-    tenants[tenantId] = isEncryptedEnvelope(data) ? data : encryptTenantData(masterKey, tenantId, data);
+    tenants[tenantId] = isEncryptedEnvelope(data)
+      ? data
+      : encryptTenantData(activeKey.key, tenantId, data, activeKey.keyId);
   }
   return { ...state, tenants };
 }
@@ -391,14 +394,16 @@ function encryptStateTenants(state) {
 function decryptStateTenants(parsed) {
   const tenants = parsed?.tenants ?? {};
   const hasEnvelope = Object.values(tenants).some(isEncryptedEnvelope);
-  const masterKey = getMasterKey();
   if (!hasEnvelope) return parsed;
-  if (!masterKey) {
-    throw new Error("State on disk is encrypted but LOANOS_MASTER_KEY is not set — cannot decrypt tenant data.");
-  }
   const decrypted = {};
   for (const [tenantId, data] of Object.entries(tenants)) {
-    decrypted[tenantId] = isEncryptedEnvelope(data) ? decryptTenantData(masterKey, tenantId, data) : data;
+    if (!isEncryptedEnvelope(data)) {
+      decrypted[tenantId] = data;
+      continue;
+    }
+    const key = getMasterKeyById(data.kid);
+    if (!key) throw new Error("State on disk is encrypted but no master-key provider is configured.");
+    decrypted[tenantId] = decryptTenantData(key.key, tenantId, data);
   }
   return { ...parsed, tenants: decrypted };
 }
