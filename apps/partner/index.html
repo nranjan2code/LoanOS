@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Channel Workspace · LoanOS</title>
+  <meta name="description" content="Secure branch and authorised partner workspace for governed loan lead intake and follow-up.">
+  <meta name="theme-color" content="#123e32">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/shared/design-tokens.css">
+  <link rel="stylesheet" href="./assets/partner.css?v=1">
+  <script src="./assets/partner.js?v=1" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+  <p class="offline-banner" id="offline-banner" role="status" style="position:sticky;z-index:30;top:0;margin:0;padding:.65rem 1rem;color:#fff;background:#8a3b12;text-align:center;font-weight:700" hidden>Offline: the secure shell is available, but customer and lead data are never cached. Reconnect to continue.</p>
+  <section class="login-view" id="login-view" aria-labelledby="login-title">
+    <div class="login-story">
+      <a class="wordmark" href="/" aria-label="LoanOS home"><span>▲</span> LoanOS</a>
+      <div class="story-copy">
+        <p class="eyebrow light">Authorised channel workspace</p>
+        <h1 id="login-title">Every lead begins with consent, context and a clear owner.</h1>
+        <p>For branch teams and approved DSA, BC, dealer, merchant, connector and LSP users. Intake, matching, routing and follow-up remain visible to the regulated entity.</p>
+      </div>
+      <ol class="control-list" aria-label="Built-in controls">
+        <li><b>01</b><span><strong>Serviceability first</strong><small>Programme and branch routing before acceptance</small></span></li>
+        <li><b>02</b><span><strong>Duplicate-aware</strong><small>Open leads and existing customers are surfaced</small></span></li>
+        <li><b>03</b><span><strong>Attributable</strong><small>Consent, disclosure, conduct and actor evidence stay attached</small></span></li>
+      </ol>
+    </div>
+    <div class="login-form-wrap">
+      <form class="login-card" id="login-form">
+        <p class="eyebrow">Secure sign in</p>
+        <h2>Open channel operations</h2>
+        <p class="muted">Use your institution-issued workspace account. Service credentials are never accepted here.</p>
+        <label>Tenant ID<input id="login-tenant" autocomplete="organization" required></label>
+        <label>Email<input id="login-email" type="email" autocomplete="username" required></label>
+        <label>Password<input id="login-password" type="password" autocomplete="current-password" required></label>
+        <p class="form-error" id="login-error" role="alert" hidden></p>
+        <button class="button primary" type="submit">Sign in securely <span>→</span></button>
+        <a class="back-link" id="lender-home" href="/">← Institution home</a>
+      </form>
+    </div>
+  </section>
+
+  <div class="workspace" id="workspace" hidden>
+    <header class="topbar">
+      <a class="wordmark dark" id="workspace-home" href="/"><span>▲</span> <strong id="brand-name">LoanOS</strong></a>
+      <div class="topbar-meta"><span class="live-pill"><i></i> Tenant-isolated</span><span id="actor-name">Channel user</span><button id="sign-out" type="button">Sign out</button></div>
+    </header>
+    <div class="workspace-grid">
+      <aside class="rail" aria-label="Workspace navigation">
+        <div><p class="rail-label">Channel operations</p><h2>Lead desk</h2><p>Governed intake and follow-up for every authorised source.</p></div>
+        <nav>
+          <button class="rail-item active" data-view="overview" aria-current="page"><span>⌂</span> Overview</button>
+          <button class="rail-item" data-view="new-lead"><span>＋</span> New lead</button>
+          <button class="rail-item" data-view="pipeline"><span>≋</span> Pipeline <b id="rail-lead-count">0</b></button>
+          <button class="rail-item" data-view="controls"><span>◇</span> Channel controls</button>
+        </nav>
+        <div class="rail-note"><strong>Customer promise</strong><p>Never promise approval, pricing or disbursement. The regulated entity owns the credit decision.</p></div>
+      </aside>
+
+      <main id="main" class="main">
+        <section class="view active" id="view-overview">
+          <div class="page-head"><div><p class="eyebrow">Today’s operating view</p><h1>Channel overview</h1><p>See what needs attention before a customer is asked to wait.</p></div><button class="button primary" data-open-view="new-lead">Capture a lead <span>＋</span></button></div>
+          <div class="metric-grid">
+            <article class="metric dark"><span>Open pipeline</span><strong id="metric-open">—</strong><small>Active, non-converted leads</small></article>
+            <article class="metric"><span>Needs matching review</span><strong id="metric-duplicates">—</strong><small>Possible duplicate or known customer</small></article>
+            <article class="metric"><span>Follow-ups due</span><strong id="metric-followups">—</strong><small>Scheduled on or before today</small></article>
+            <article class="metric lime"><span>Converted</span><strong id="metric-converted">—</strong><small>Application created with lineage</small></article>
+          </div>
+          <section class="panel"><div class="panel-head"><div><p class="eyebrow">Priority queue</p><h2>What needs attention</h2></div><button class="text-link" data-open-view="pipeline">View full pipeline →</button></div><div id="priority-list" class="priority-list"><p class="empty">Loading channel records…</p></div></section>
+        </section>
+
+        <section class="view" id="view-new-lead" hidden>
+          <div class="page-head compact"><div><p class="eyebrow">Consent-led intake</p><h1>Capture a new lead</h1><p>The form validates partner authority, programme channel, serviceability and possible customer matches before it creates work.</p></div></div>
+          <form class="lead-form" id="lead-form">
+            <section class="form-section"><div class="form-step"><b>01</b><span><strong>Source and routing</strong><small>Who introduced this customer and where should the case go?</small></span></div><div class="field-grid">
+              <label>Channel<select id="lead-channel" required><option value="">Select channel</option><option value="branch">Branch assisted</option><option value="dsa">DSA</option><option value="bc">Business correspondent</option><option value="connector">Connector</option><option value="dealer">Dealer</option><option value="merchant">Merchant</option><option value="lsp">LSP</option><option value="digital">Digital</option><option value="api">Embedded/API</option></select></label>
+              <label>Programme<select id="lead-programme" required><option value="">No programme loaded</option></select></label>
+              <label>Authorised partner<select id="lead-partner"><option value="">Not partner sourced</option></select></label>
+              <label>Postal code<input id="lead-postal" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" required></label>
+            </div></section>
+            <section class="form-section"><div class="form-step"><b>02</b><span><strong>Customer and need</strong><small>Only the minimum details needed for contact and matching.</small></span></div><div class="field-grid">
+              <label>Customer name<input id="lead-name" autocomplete="name" required></label><label>Email<input id="lead-email" type="email" autocomplete="email"></label><label>Mobile<input id="lead-mobile" inputmode="tel" autocomplete="tel"></label><label>Requested amount (₹)<input id="lead-amount" type="number" min="1" step="1" required></label><label>Product<select id="lead-product" required><option value="">Select a programme first</option></select></label><label>Campaign / source<input id="lead-source" required></label>
+            </div></section>
+            <section class="form-section"><div class="form-step"><b>03</b><span><strong>Customer protection evidence</strong><small>Reference the consent, disclosures and channel-conduct record already given.</small></span></div><div class="field-grid">
+              <label>Consent reference<input id="lead-consent" required></label><label>Disclosure reference<input id="lead-disclosure" required></label><label>Conduct attestation<input id="lead-conduct"></label><label>Owner / branch<input id="lead-owner" required></label>
+            </div><label class="confirmation"><input id="lead-confirm" type="checkbox" required><span>I confirm the customer has not been promised approval, a rate, or disbursement, and that these references identify evidence held by the institution.</span></label></section>
+            <div class="form-actions"><p class="form-status" id="lead-status" role="status"></p><button class="button primary" type="submit">Validate and create lead <span>→</span></button></div>
+          </form>
+        </section>
+
+        <section class="view" id="view-pipeline" hidden>
+          <div class="page-head"><div><p class="eyebrow">Attributable pipeline</p><h1>Lead pipeline</h1><p>Every status change requires a reason and evidence reference.</p></div><label class="search">Search<input id="lead-search" type="search" placeholder="Name, lead, channel or status"></label></div>
+          <div class="pipeline" id="pipeline"><p class="empty">Loading leads…</p></div>
+        </section>
+
+        <section class="view" id="view-controls" hidden>
+          <div class="page-head compact"><div><p class="eyebrow">Operating boundary</p><h1>Channel controls</h1><p>Read-only visibility into the authority behind this workspace.</p></div></div>
+          <div class="control-grid"><article><span>Active partners</span><strong id="control-partners">—</strong><p>Agreement, due diligence, conduct and consent training evidenced.</p></article><article><span>Commission policies</span><strong id="control-commissions">—</strong><p>Exact payout basis, caps, eligibility event, tax and clawback policy.</p></article><article><span>Customer relationships</span><strong id="control-relationships">—</strong><p>Approved household, guarantor, nominee and connected-party links.</p></article></div>
+          <section class="panel"><div class="panel-head"><div><p class="eyebrow">Authorised network</p><h2>Partner register</h2></div></div><div id="partner-list" class="partner-list"></div></section>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <dialog id="lead-action-dialog"><form method="dialog" id="lead-action-form"><div class="dialog-head"><div><p class="eyebrow">Update with evidence</p><h2 id="dialog-title">Lead action</h2></div><button value="cancel" aria-label="Close">×</button></div><input id="action-lead-id" type="hidden"><label>Action<select id="action-type"><option value="contact">Record contact</option><option value="qualify">Qualify</option><option value="schedule_follow_up">Schedule follow-up</option><option value="abandon">Abandon</option></select></label><label id="disposition-wrap" hidden>Matching outcome<select id="action-disposition"><option value="continue">Continue as a distinct lead</option><option value="duplicate">Close as duplicate</option></select></label><label>Reason<textarea id="action-reason" required></textarea></label><label>Evidence reference<input id="action-evidence" required></label><label id="followup-wrap" hidden>Follow-up date and time<input id="action-followup" type="datetime-local"></label><p class="form-error" id="action-error" hidden></p><div class="dialog-actions"><button class="button ghost" value="cancel">Cancel</button><button class="button primary" id="action-submit" value="default">Save action</button></div></form></dialog>
+</body>
+</html>

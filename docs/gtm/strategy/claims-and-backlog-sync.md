@@ -106,6 +106,11 @@ node docs/gtm/automation/gtm-backlog-sync.mjs
 | C-73 | Workforce policy retains capacity, leave substitution, queue escalation and balancing rules | Partial | architecture/institutional-operations.md; HR feeds and runtime routing remain deployment-specific |
 | C-74 | Bulk task plans are idempotent, checksum-bound, capped at 100 and require separate approval above 25 | Partial | architecture/institutional-operations.md; transactional task execution remains planned |
 | C-75 | India business-calendar pause policy and versioned exception taxonomy retain root cause, ownership and remediation SLA | Partial | architecture/institutional-operations.md; runtime timer application and analytics remain planned |
+| C-76 | Branch and approved channel intake fails closed on partner authority, programme/product eligibility, territory and PIN serviceability | Partial | architecture/customer-channel-experiences.md; external partner-user scope enforcement remains mandatory before rollout |
+| C-77 | Lead contact matching surfaces open leads and known customers without silently merging or converting them | Partial | architecture/customer-channel-experiences.md; probabilistic identity resolution and downstream reconciliation remain planned |
+| C-78 | Every lead action retains actor, reason and evidence while channel users remain outside credit approval and fund flow | Partial | architecture/customer-channel-experiences.md; end-to-end application conversion orchestration remains planned |
+| C-79 | Customer party relationships, accessibility/contact intent, succession restrictions and exact related exposure join into customer-360 | Partial | architecture/customer-channel-experiences.md; transactional merge and full servicing actions remain planned |
+| C-80 | Tenant-branded channel workspace is accessible, installable and caches only its static shell—not customer or lead API data | Partial | architecture/customer-channel-experiences.md; production assistive/device certification and encrypted field-offline queues remain planned |
 
 ## Change process
 

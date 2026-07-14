@@ -6,6 +6,7 @@ import { routeEnterprisePlatformControls, routeEnterpriseTenantControls } from "
 import { routeRiskAmlControls } from "./routes/risk-aml-controls.js";
 import { routeImplementationControls } from "./routes/implementation-controls.js";
 import { routeInstitutionalOperations } from "./routes/institutional-operations.js";
+import { routeCustomerChannelControls } from "./routes/customer-channel-controls.js";
 import { routeCersaiSearch } from "./routes/cersai-search.js";
 import { createObservabilityRegistry } from "./observability.js";
 import { readFile } from "node:fs/promises";
@@ -701,6 +702,7 @@ async function route(req, res, dataDir, platformAdminKey, observability) {
   //   /t/{tenantId}/             → Tenant-branded landing (apps/tenant/)
   //   /t/{tenantId}/staff/       → Tenant staff workspace (apps/dashboard/)
   //   /t/{tenantId}/portal/      → White-labeled borrower portal (apps/customer/)
+  //   /t/{tenantId}/partners/    → Branch and authorised-partner workspace (apps/partner/)
   //   /shared/                   → Shared design tokens (apps/shared/)
   // ──────────────────────────────────────────────────────────────────────
 
@@ -809,6 +811,15 @@ async function route(req, res, dataDir, platformAdminKey, observability) {
     if (subPath.startsWith("/portal/")) {
       const assetPath = subPath.slice("/portal".length);
       return serveStaticFile(res, appsRoot, "customer", assetPath, "/");
+    }
+
+    // GET /t/{tenantId}/partners/ → Branch and authorised-channel workspace
+    if (subPath === "/partners" || subPath === "/partners/") {
+      return serveStaticFile(res, appsRoot, "partner", "/index.html", "/");
+    }
+    if (subPath.startsWith("/partners/")) {
+      const assetPath = subPath.slice("/partners".length);
+      return serveStaticFile(res, appsRoot, "partner", assetPath, "/");
     }
 
     // Fallback: unknown sub-route under /t/{tenantId}/
@@ -1091,6 +1102,7 @@ async function route(req, res, dataDir, platformAdminKey, observability) {
   if (await routeRiskAmlControls({ method, path, req, res, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
   if (await routeImplementationControls({ method, path, req, res, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
   if (await routeInstitutionalOperations({ method, path, req, res, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
+  if (await routeCustomerChannelControls({ method, path, req, res, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
 
   // Standing sub-processor disclosure: every authenticated tenant RE can read
   // the platform-wide register of LoanOS sub-processors that apply to it.
@@ -9954,6 +9966,7 @@ async function serveStaticFile(res, appsRoot, appDir, urlPath, urlPrefix, req = 
     if (fileSubpath.endsWith(".html")) contentType = "text/html; charset=utf-8";
     else if (fileSubpath.endsWith(".css")) contentType = "text/css; charset=utf-8";
     else if (fileSubpath.endsWith(".js")) contentType = "application/javascript; charset=utf-8";
+    else if (fileSubpath.endsWith(".webmanifest")) contentType = "application/manifest+json; charset=utf-8";
     else if (fileSubpath.endsWith(".svg")) contentType = "image/svg+xml";
     else if (fileSubpath.endsWith(".png")) contentType = "image/png";
     else if (fileSubpath.endsWith(".jpg") || fileSubpath.endsWith(".jpeg")) contentType = "image/jpeg";
@@ -9985,6 +9998,7 @@ async function serveStaticFile(res, appsRoot, appDir, urlPath, urlPrefix, req = 
     res.writeHead(200, {
       "Content-Type": contentType,
       "Content-Length": content.length,
+      ...(fileSubpath === "sw.js" ? { "Cache-Control": "no-cache", "Service-Worker-Allowed": "./" } : {}),
       ...(contentType === "video/mp4" ? { "Accept-Ranges": "bytes" } : {})
     });
     res.end(content);

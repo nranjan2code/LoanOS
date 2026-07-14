@@ -23,7 +23,7 @@ The current implementation is intentionally small:
 - Internal staff workspace in `apps/dashboard/`.
 - Borrower customer portal in `apps/customer/`: a responsive, white-labelled journey home with prioritised next actions, visual application milestones, repayment schedules, a document centre, guided media, grievance tracking, and DPDP access/correction/erasure controls.
 - Shared design system tokens in `apps/shared/`.
-- Automated tests in `tests/`: 284 file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
+- Automated tests in `tests/`: 291 file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
 
 Run it:
 
@@ -105,6 +105,9 @@ npm run dev:api
 | `apps/api/src/routes/implementation-controls.js` | Tenant-authenticated persistence and audit projection for implementation, migration, go-live and hypercare records. |
 | `packages/core/src/institutional-operations.js` | Pure institutional controls for RE programme/hierarchy, applicability/obligations, business calendars, configurable workflows and approvals, workforce/delegation, bulk plans, and exception taxonomy. |
 | `apps/api/src/routes/institutional-operations.js` | Tenant-authenticated persistence and audit projection for institutional governance and configured operations. |
+| `packages/core/src/customer-channel-operations.js` | Pure customer/channel controls for partner and commission authority, serviceable lead intake/matching/lifecycle, party graph, merge plans, preferences, succession and exact-paise customer-360 exposure. |
+| `apps/api/src/routes/customer-channel-controls.js` | Tenant-authenticated persistence, role gates and audit projection for customer/channel operations. |
+| `apps/partner/` | Tenant-branded responsive branch/channel lead workspace with consent-led intake, matching review, evidence-bound actions, accessible/reduced-motion UI, and a static-shell-only PWA that never caches business API data. |
 | `apps/api/src/observability.js` | Bounded process-local HTTP telemetry registry: normalized route/status aggregates, availability and latency SLIs, configurable SLO/error-budget state, in-flight/capacity signals, tenant-scoped snapshots, and Prometheus text output without tenant labels. |
 | `apps/api/src/recovery.js` | Encrypted platform recovery-package format and fail-closed validator: domain-separated AES-256-GCM encryption, authenticated India-resident manifest, package/content checksums, state/audit-chain verification, RTO/RPO evaluation, and governed exercise evidence. |
 | `apps/api/src/resilience-probe.js` | Dependency-free bounded concurrent HTTP probe with per-request timeout, status/error counts, p50/p95/p99 latency, throughput, duration, and concurrency evidence. |
@@ -130,6 +133,7 @@ npm run dev:api
 | `tests/risk-aml-governance.test.js` | Current-list CDD, exact-paise transaction alerts, deterministic fraud scoring, exposure/stress controls, RCSA/model reports, evidence packs, and tenant API persistence. |
 | `tests/implementation-governance.test.js` | Configuration/mapping lineage, exact-paise migration/balance failures, parallel/UAT/training readiness, rollback/hypercare gates, and tenant API persistence. |
 | `tests/institutional-operations.test.js` | RE hierarchy/programme lineage, applicability obligations, configured transitions, exact-paise approval rules, workforce/bulk controls, exception taxonomy, and tenant API persistence. |
+| `tests/customer-channel-operations.test.js` | Partner/commission authority, programme/product/PIN rejection, multi-channel lead matching/lifecycle, party/merge/preferences, succession, exact related exposure, API persistence, customer-360, and partner/PWA static delivery. |
 
 ## Implemented API Endpoints
 
@@ -139,6 +143,12 @@ npm run dev:api
 | `GET /risk/controls` | Role-gated tenant projection of screening/CDD/TM, fraud, portfolio/stress, RCSA, model-report and risk-pack records. |
 | `GET /implementation/controls` | Role-gated tenant projection of implementation projects through hypercare reviews. |
 | `GET /institution/operations` | Role-gated projection of institutional hierarchy/programmes, applicability/obligations, workflow/approval, workforce/bulk, calendar and exception records. |
+| `GET /channels/operations` | Role-gated projection of active programme choices, approved partners/commission policies, leads, relationships, merge plans, preferences and succession cases. |
+| `POST /channels/partners`, `/channels/commission-policies` | Registers independently approved channel authority and exact-paise/basis-point commission policy with evidence, caps, tax and clawback controls. |
+| `POST /channels/leads`, `/channels/leads/:id/transitions` | Creates serviceable, consent/disclosure/conduct-grounded leads and controls matching, contact, qualification, follow-up, conversion linkage and abandonment with evidence. |
+| `POST /customers/relationships`, `/customers/merge-plans`, `/customers/preferences` | Governs the customer party graph, non-destructive approved merge plans, and language/vulnerability/accessibility/contact intent. |
+| `POST /customers/succession-cases`, `/customers/succession-cases/:id/transitions` | Keeps deceased-borrower claims manually restricted through evidence verification and independent approval. |
+| `GET /customers/:id/360` | Joins tenant-local profile, preferences, parties, lifecycle records and exact-paise related exposure. |
 | `POST /institution/operations/units`, `/programmes`, `/applicability-profiles`, `/obligation-calendars` | Governs same-RE operating structure/programmes and canonical applicability-driven compliance schedules. |
 | `POST /institution/operations/business-calendars`, `/workflow-definitions`, `/workflow-cases`, `/workflow-cases/:id/transitions` | Governs India calendar policy and executable pinned state/role/evidence/condition/four-eyes workflows. |
 | `POST /institution/operations/approval-matrices`, `/approval-resolutions` | Approves and resolves exact-paise product/risk/deviation delegated-authority policy. |

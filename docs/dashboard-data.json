@@ -1,22 +1,22 @@
 {
-  "generated": "2026-07-14T17:27:21.208Z",
+  "generated": "2026-07-14T17:49:52.816Z",
   "git": {
     "branch": "main",
-    "count": 156,
+    "count": 157,
     "commits": []
   },
   "overall": {
     "counts": {
       "Implemented": 87,
-      "Partial": 257,
+      "Partial": 271,
       "Partial/Mock": 11,
       "Mock": 7,
-      "Missing": 82,
+      "Missing": 68,
       "Partner": 3,
       "External": 6
     },
     "total": 453,
-    "pct": 44
+    "pct": 45
   },
   "planes": [
     {
@@ -25,13 +25,13 @@
         {
           "n": 4,
           "name": "Acquisition Channels, Leads, and CRM",
-          "pct": 16,
+          "pct": 40,
           "total": 10
         },
         {
           "n": 5,
           "name": "Customer, Parties, and Relationship Management",
-          "pct": 25,
+          "pct": 45,
           "total": 12
         },
         {
@@ -73,15 +73,15 @@
       ],
       "counts": {
         "Implemented": 14,
-        "Partial": 52,
+        "Partial": 64,
         "Partial/Mock": 5,
         "Mock": 7,
-        "Missing": 32,
+        "Missing": 20,
         "Partner": 1,
         "External": 0
       },
       "total": 111,
-      "pct": 35
+      "pct": 40
     },
     {
       "name": "LMS",
@@ -387,7 +387,7 @@
         {
           "n": 32,
           "name": "Borrower, Staff, Branch, Partner, and Field Experiences",
-          "pct": 33,
+          "pct": 38,
           "total": 17
         },
         {
@@ -399,15 +399,15 @@
       ],
       "counts": {
         "Implemented": 2,
-        "Partial": 19,
+        "Partial": 21,
         "Partial/Mock": 0,
         "Mock": 0,
-        "Missing": 6,
+        "Missing": 4,
         "Partner": 0,
         "External": 3
       },
       "total": 30,
-      "pct": 36
+      "pct": 39
     }
   ],
   "categories": [
@@ -1028,27 +1028,59 @@
           "id": "CHN-002",
           "name": "Branch-assisted application capture",
           "applicability": "Channel",
-          "status": "Missing",
-          "raw": "Missing",
-          "evidence": [],
+          "status": "Partial",
+          "raw": "Partial",
+          "evidence": [
+            {
+              "type": "code",
+              "ref": "packages/core/src/customer-channel-operations.js",
+              "note": "branch intake and serviceable-unit routing"
+            },
+            {
+              "type": "endpoint",
+              "ref": "POST /channels/leads",
+              "note": "governed channel intake"
+            },
+            {
+              "type": "test",
+              "ref": "tests/customer-channel-operations.test.js",
+              "note": "multi-channel routing and rejection"
+            }
+          ],
           "owner": "",
           "acceptance": "",
           "dependencies": [],
           "notes": "",
-          "lastReviewed": ""
+          "lastReviewed": "2026-07-14"
         },
         {
           "id": "CHN-003",
           "name": "DSA, BC, connector, dealer, merchant, and LSP lead intake",
           "applicability": "Channel",
-          "status": "Missing",
-          "raw": "Missing",
-          "evidence": [],
+          "status": "Partial",
+          "raw": "Partial",
+          "evidence": [
+            {
+              "type": "code",
+              "ref": "packages/core/src/customer-channel-operations.js",
+              "note": "approved partner authority and lead intake"
+            },
+            {
+              "type": "endpoint",
+              "ref": "POST /channels/partners",
+              "note": "partner registry"
+            },
+            {
+              "type": "doc",
+              "ref": "docs/architecture/customer-channel-experiences.md",
+              "note": "channel boundary and remaining entitlements"
+            }
+          ],
           "owner": "",
           "acceptance": "",
           "dependencies": [],
           "notes": "",
-          "lastReviewed": ""
+          "lastReviewed": "2026-07-14"
         },
         {
           "id": "CHN-004",
@@ -1080,53 +1112,117 @@
           "id": "CHN-006",
           "name": "Lead qualification, follow-up, conversion, and abandonment",
           "applicability": "Channel",
-          "status": "Missing",
-          "raw": "Missing",
-          "evidence": [],
+          "status": "Partial",
+          "raw": "Partial",
+          "evidence": [
+            {
+              "type": "code",
+              "ref": "packages/core/src/customer-channel-operations.js",
+              "note": "state-specific evidence-bound lifecycle"
+            },
+            {
+              "type": "endpoint",
+              "ref": "POST /channels/leads/:id/transitions",
+              "note": "lead transition API"
+            },
+            {
+              "type": "test",
+              "ref": "tests/customer-channel-operations.test.js",
+              "note": "qualification and conversion lifecycle"
+            }
+          ],
           "owner": "",
           "acceptance": "",
           "dependencies": [],
           "notes": "",
-          "lastReviewed": ""
+          "lastReviewed": "2026-07-14"
         },
         {
           "id": "CHN-007",
           "name": "Duplicate-lead and existing-customer matching",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
-          "evidence": [],
+          "status": "Partial",
+          "raw": "Partial",
+          "evidence": [
+            {
+              "type": "code",
+              "ref": "packages/core/src/customer-channel-operations.js",
+              "note": "contact-hash lead and borrower matching"
+            },
+            {
+              "type": "endpoint",
+              "ref": "POST /channels/leads/:id/transitions",
+              "note": "explicit duplicate disposition"
+            },
+            {
+              "type": "test",
+              "ref": "tests/customer-channel-operations.test.js",
+              "note": "open-lead and existing-customer matches"
+            }
+          ],
           "owner": "",
           "acceptance": "",
           "dependencies": [],
           "notes": "",
-          "lastReviewed": ""
+          "lastReviewed": "2026-07-14"
         },
         {
           "id": "CHN-008",
           "name": "Channel eligibility, geographic serviceability, and branch routing",
           "applicability": "Channel",
-          "status": "Missing",
-          "raw": "Missing",
-          "evidence": [],
+          "status": "Partial",
+          "raw": "Partial",
+          "evidence": [
+            {
+              "type": "code",
+              "ref": "packages/core/src/customer-channel-operations.js",
+              "note": "programme/product/partner/PIN/unit fail-closed routing"
+            },
+            {
+              "type": "endpoint",
+              "ref": "GET /channels/operations",
+              "note": "active programme projection"
+            },
+            {
+              "type": "test",
+              "ref": "tests/customer-channel-operations.test.js",
+              "note": "territory and product rejection"
+            }
+          ],
           "owner": "",
           "acceptance": "",
           "dependencies": [],
           "notes": "",
-          "lastReviewed": ""
+          "lastReviewed": "2026-07-14"
         },
         {
           "id": "CHN-009",
           "name": "Partner commission and payout basis",
           "applicability": "Channel",
-          "status": "Missing",
-          "raw": "Missing",
-          "evidence": [],
+          "status": "Partial",
+          "raw": "Partial",
+          "evidence": [
+            {
+              "type": "code",
+              "ref": "packages/core/src/customer-channel-operations.js",
+              "note": "approved exact payout basis, cap and clawback policy"
+            },
+            {
+              "type": "endpoint",
+              "ref": "POST /channels/commission-policies",
+              "note": "commission governance"
+            },
+            {
+              "type": "doc",
+              "ref": "docs/architecture/customer-channel-experiences.md",
+              "note": "finance execution boundary"
+            }
+          ],
           "owner": "",
           "acceptance": "",
           "dependencies": [],
           "notes": "",
-          "lastReviewed": ""
+          "lastReviewed": "2026-07-14"
         },
         {
           "id": "CHN-010",
@@ -1144,15 +1240,15 @@
       ],
       "counts": {
         "Implemented": 0,
-        "Partial": 4,
+        "Partial": 10,
         "Partial/Mock": 0,
         "Mock": 0,
-        "Missing": 6,
+        "Missing": 0,
         "Partner": 0,
         "External": 0
       },
       "total": 10,
-      "pct": 16
+      "pct": 40
     },
     {
       "n": 5,
@@ -1189,14 +1285,30 @@
           "id": "CUS-003",
           "name": "Customer deduplication and merge governance",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
-          "evidence": [],
+          "status": "Partial",
+          "raw": "Partial",
+          "evidence": [
+            {
+              "type": "code",
+              "ref": "packages/core/src/customer-channel-operations.js",
+              "note": "four-eyes non-destructive merge plan"
+            },
+            {
+              "type": "endpoint",
+              "ref": "POST /customers/merge-plans",
+              "note": "approved merge planning"
+            },
+            {
+              "type": "doc",
+              "ref": "docs/architecture/customer-channel-experiences.md",
+              "note": "transactional execution remains"
+            }
+          ],
           "owner": "",
           "acceptance": "",
           "dependencies": [],
           "notes": "",
-          "lastReviewed": ""
+          "lastReviewed": "2026-07-14"
         },
         {
           "id": "CUS-004",
@@ -1215,27 +1327,59 @@
           "id": "CUS-005",
           "name": "Co-applicant, co-borrower, and guarantor relationships",
           "applicability": "Product",
-          "status": "Missing",
-          "raw": "Missing",
-          "evidence": [],
+          "status": "Partial",
+          "raw": "Partial",
+          "evidence": [
+            {
+              "type": "code",
+              "ref": "packages/core/src/customer-channel-operations.js",
+              "note": "typed borrower relationships and liabilities"
+            },
+            {
+              "type": "endpoint",
+              "ref": "POST /customers/relationships",
+              "note": "party graph registry"
+            },
+            {
+              "type": "test",
+              "ref": "tests/customer-channel-operations.test.js",
+              "note": "guarantor relationship evidence"
+            }
+          ],
           "owner": "",
           "acceptance": "",
           "dependencies": [],
           "notes": "",
-          "lastReviewed": ""
+          "lastReviewed": "2026-07-14"
         },
         {
           "id": "CUS-006",
           "name": "Household, group, JLG, and connected-party relationships",
           "applicability": "Product",
-          "status": "Missing",
-          "raw": "Missing",
-          "evidence": [],
+          "status": "Partial",
+          "raw": "Partial",
+          "evidence": [
+            {
+              "type": "code",
+              "ref": "packages/core/src/customer-channel-operations.js",
+              "note": "household, group, JLG and connected-party edges"
+            },
+            {
+              "type": "endpoint",
+              "ref": "POST /customers/relationships",
+              "note": "approved relationship registration"
+            },
+            {
+              "type": "doc",
+              "ref": "docs/architecture/customer-channel-experiences.md",
+              "note": "party-graph controls"
+            }
+          ],
           "owner": "",
           "acceptance": "",
           "dependencies": [],
           "notes": "",
-          "lastReviewed": ""
+          "lastReviewed": "2026-07-14"
         },
         {
           "id": "CUS-007",
@@ -1254,14 +1398,30 @@
           "id": "CUS-008",
           "name": "Nominee, legal heir, deceased borrower, and succession workflow",
           "applicability": "Product",
-          "status": "Missing",
-          "raw": "Missing",
-          "evidence": [],
+          "status": "Partial",
+          "raw": "Partial",
+          "evidence": [
+            {
+              "type": "code",
+              "ref": "packages/core/src/customer-channel-operations.js",
+              "note": "manual-restriction succession workflow"
+            },
+            {
+              "type": "endpoint",
+              "ref": "POST /customers/succession-cases",
+              "note": "claim evidence intake"
+            },
+            {
+              "type": "test",
+              "ref": "tests/customer-channel-operations.test.js",
+              "note": "nominee and independent approval"
+            }
+          ],
           "owner": "",
           "acceptance": "",
           "dependencies": [],
           "notes": "",
-          "lastReviewed": ""
+          "lastReviewed": "2026-07-14"
         },
         {
           "id": "CUS-009",
@@ -1280,14 +1440,30 @@
           "id": "CUS-010",
           "name": "Customer risk, vulnerability, language, and accessibility preferences",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
-          "evidence": [],
+          "status": "Partial",
+          "raw": "Partial",
+          "evidence": [
+            {
+              "type": "code",
+              "ref": "packages/core/src/customer-channel-operations.js",
+              "note": "language, vulnerability, accessibility and assisted journey intent"
+            },
+            {
+              "type": "endpoint",
+              "ref": "POST /customers/preferences",
+              "note": "customer preference source of truth"
+            },
+            {
+              "type": "test",
+              "ref": "tests/customer-channel-operations.test.js",
+              "note": "preference persistence"
+            }
+          ],
           "owner": "",
           "acceptance": "",
           "dependencies": [],
           "notes": "",
-          "lastReviewed": ""
+          "lastReviewed": "2026-07-14"
         },
         {
           "id": "CUS-011",
@@ -1306,27 +1482,43 @@
           "id": "CUS-012",
           "name": "Exposure aggregation across all facilities and related parties",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
-          "evidence": [],
+          "status": "Partial",
+          "raw": "Partial",
+          "evidence": [
+            {
+              "type": "code",
+              "ref": "packages/core/src/customer-channel-operations.js",
+              "note": "joined related-party account exposure in integer paise"
+            },
+            {
+              "type": "endpoint",
+              "ref": "GET /customers/:id/360",
+              "note": "customer-360 projection"
+            },
+            {
+              "type": "test",
+              "ref": "tests/customer-channel-operations.test.js",
+              "note": "exact related exposure aggregation"
+            }
+          ],
           "owner": "",
           "acceptance": "",
           "dependencies": [],
           "notes": "",
-          "lastReviewed": ""
+          "lastReviewed": "2026-07-14"
         }
       ],
       "counts": {
         "Implemented": 1,
-        "Partial": 5,
+        "Partial": 11,
         "Partial/Mock": 0,
         "Mock": 0,
-        "Missing": 6,
+        "Missing": 0,
         "Partner": 0,
         "External": 0
       },
       "total": 12,
-      "pct": 25
+      "pct": 45
     },
     {
       "n": 6,
@@ -6763,14 +6955,30 @@
           "id": "UX-014",
           "name": "Branch, DSA, BC, dealer, merchant, LSP, and partner portals",
           "applicability": "Channel",
-          "status": "Missing",
-          "raw": "Missing",
-          "evidence": [],
+          "status": "Partial",
+          "raw": "Partial",
+          "evidence": [
+            {
+              "type": "code",
+              "ref": "apps/partner/index.html",
+              "note": "tenant-branded channel workspace"
+            },
+            {
+              "type": "code",
+              "ref": "apps/partner/assets/partner.js",
+              "note": "consent-led intake and evidence-bound actions"
+            },
+            {
+              "type": "doc",
+              "ref": "docs/architecture/customer-channel-experiences.md",
+              "note": "production partner-entitlement boundary"
+            }
+          ],
           "owner": "",
           "acceptance": "",
           "dependencies": [],
           "notes": "",
-          "lastReviewed": ""
+          "lastReviewed": "2026-07-14"
         },
         {
           "id": "UX-015",
@@ -6802,27 +7010,43 @@
           "id": "UX-017",
           "name": "Mobile/PWA/offline capability",
           "applicability": "Channel",
-          "status": "Missing",
-          "raw": "Missing",
-          "evidence": [],
+          "status": "Partial",
+          "raw": "Partial",
+          "evidence": [
+            {
+              "type": "code",
+              "ref": "apps/partner/manifest.webmanifest",
+              "note": "installable channel workspace"
+            },
+            {
+              "type": "code",
+              "ref": "apps/partner/sw.js",
+              "note": "static-shell-only offline cache"
+            },
+            {
+              "type": "test",
+              "ref": "tests/customer-channel-operations.test.js",
+              "note": "manifest and service-worker delivery"
+            }
+          ],
           "owner": "",
           "acceptance": "",
           "dependencies": [],
           "notes": "",
-          "lastReviewed": ""
+          "lastReviewed": "2026-07-14"
         }
       ],
       "counts": {
         "Implemented": 2,
-        "Partial": 9,
+        "Partial": 11,
         "Partial/Mock": 0,
         "Mock": 0,
-        "Missing": 6,
+        "Missing": 4,
         "Partner": 0,
         "External": 0
       },
       "total": 17,
-      "pct": 33
+      "pct": 38
     },
     {
       "n": 33,
@@ -7060,12 +7284,16 @@
     {
       "name": "Epic 12: SaaS Tenancy and Platform Isolation",
       "status": "S1–S6 first slice complete for every task (tenant partitioning, tenant-scoped service auth, tenant/platform human sessions, tenant user admin, access reviews, service-key rotation, isolation suite, hash-chained audit spine + evidence export, tenant portability export + evidenced offboarding, disclosed sub-processor register, 6-hour incident-notification workflow, audited platform-staff break-glass access, uniform audit provenance stamping)."
+    },
+    {
+      "name": "Epic 13: Customer and Channel Operations",
+      "status": "first executable slice complete."
     }
   ],
   "tests": {
-    "pass": 284,
+    "pass": 291,
     "fail": 0,
-    "total": 289,
+    "total": 296,
     "ran": true
   }
 }

@@ -1,0 +1,10 @@
+{
+  "name": "LoanOS Channel Workspace",
+  "short_name": "Channel Desk",
+  "description": "Tenant-isolated branch and authorised-partner lead operations.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f5f1e8",
+  "theme_color": "#123e32"
+}

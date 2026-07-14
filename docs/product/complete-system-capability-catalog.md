@@ -69,7 +69,7 @@ LoanOS currently has a strong compliance-first domain foundation and executable 
 
 The principal gaps before bank production are live integrations, downstream GL certification, regulatory submission formats, product-specific lending depth, repossession/auction and legal-expense depth, live IdP/KMS/SIEM/database/deployment infrastructure, and independent bank-assurance evidence. The product now governs federation/SCIM state, purpose-attested keys, security-log custody, PostgreSQL HA/PITR/capacity dependencies, API/event/webhook contracts and deployment readiness alongside bounded observability, encrypted recovery, governed release, security assurance, SOC investigation and compliance evidence. Actual token/signature validation, KMS grants, SIEM/WORM/NTP/collectors, managed replication/WAL/PITR, queue/dispatch/replay workers, cloud rollout controllers, institutional control methodology, pen tests, ITSM/paging, 24x7 staffing, production-scale soak/chaos, contract enforcement, real failover/failback and exercised continuity remain open. Collections/legal recovery also retains partner depth for dialers, route/capacity optimization, court integration, possession, auction and recovery accounting. Public positioning must remain narrower than this catalogue until each advertised journey reaches agreed maturity.
 
-The detailed register contains **453 individually identified capabilities**. At this snapshot, 87 are classified `Implemented`, 257 `Partial`, 82 `Missing`, and 27 are mock, partner, external, or composite-status obligations. These counts measure scope coverage, not delivery percentage: a single missing ledger, reconciliation, security, or recovery control can block production even if many smaller capabilities exist.
+The detailed register contains **453 individually identified capabilities**. At this snapshot, 87 are classified `Implemented`, 271 `Partial`, 68 `Missing`, and 27 are mock, partner, external, or composite-status obligations. These counts measure scope coverage, not delivery percentage: a single missing ledger, reconciliation, security, or recovery control can block production even if many smaller capabilities exist.
 
 ## Capability Index
 
@@ -78,7 +78,7 @@ The detailed register contains **453 individually identified capabilities**. At 
 | Platform and tenancy | Each RE operates inside an isolated, governed tenant | Partial, strong first slice |
 | RE and programme governance | Every programme has accountable RE, policy, DLA and partner boundaries | Partial |
 | Product and policy | Versioned product, pricing and control configuration | Partial |
-| Channels and leads | Traceable acquisition across branch, DSA, BC, digital and partner channels | Missing |
+| Channels and leads | Traceable acquisition across branch, DSA, BC, digital and partner channels | Partial |
 | Customer and parties | Reusable customer-360 with all obligated parties | Partial |
 | Consent and privacy | Purpose-bound processing and exercisable data rights | Partial |
 | KYC, AML and screening | Compliant onboarding plus ongoing monitoring | Partial/Mock |
@@ -170,14 +170,14 @@ The detailed register contains **453 individually identified capabilities**. At 
 | ID | Capability | Applicability | Status |
 | --- | --- | --- | --- |
 | CHN-001 | Digital self-serve application capture | Channel | Partial |
-| CHN-002 | Branch-assisted application capture | Channel | Missing |
-| CHN-003 | DSA, BC, connector, dealer, merchant, and LSP lead intake | Channel | Missing |
+| CHN-002 | Branch-assisted application capture | Channel | Partial |
+| CHN-003 | DSA, BC, connector, dealer, merchant, and LSP lead intake | Channel | Partial |
 | CHN-004 | API/embedded-finance application intake | Channel | Partial |
 | CHN-005 | Lead source, campaign, referral, and attribution | Optional | Partial |
-| CHN-006 | Lead qualification, follow-up, conversion, and abandonment | Channel | Missing |
-| CHN-007 | Duplicate-lead and existing-customer matching | Core | Missing |
-| CHN-008 | Channel eligibility, geographic serviceability, and branch routing | Channel | Missing |
-| CHN-009 | Partner commission and payout basis | Channel | Missing |
+| CHN-006 | Lead qualification, follow-up, conversion, and abandonment | Channel | Partial |
+| CHN-007 | Duplicate-lead and existing-customer matching | Core | Partial |
+| CHN-008 | Channel eligibility, geographic serviceability, and branch routing | Channel | Partial |
+| CHN-009 | Partner commission and payout basis | Channel | Partial |
 | CHN-010 | Channel conduct, consent, and disclosure monitoring | Channel | Partial |
 
 ### 5. Customer, Parties, and Relationship Management
@@ -186,16 +186,16 @@ The detailed register contains **453 individually identified capabilities**. At 
 | --- | --- | --- | --- |
 | CUS-001 | Individual and legal-entity customer profile | Core | Implemented |
 | CUS-002 | Stable customer ID and relationship across applications/accounts | Core | Partial |
-| CUS-003 | Customer deduplication and merge governance | Core | Missing |
+| CUS-003 | Customer deduplication and merge governance | Core | Partial |
 | CUS-004 | Customer-360 across loans, complaints, documents, and consents | Core | Partial |
-| CUS-005 | Co-applicant, co-borrower, and guarantor relationships | Product | Missing |
-| CUS-006 | Household, group, JLG, and connected-party relationships | Product | Missing |
+| CUS-005 | Co-applicant, co-borrower, and guarantor relationships | Product | Partial |
+| CUS-006 | Household, group, JLG, and connected-party relationships | Product | Partial |
 | CUS-007 | Beneficial owner, controller, and authorised signatory | Product | Partial |
-| CUS-008 | Nominee, legal heir, deceased borrower, and succession workflow | Product | Missing |
+| CUS-008 | Nominee, legal heir, deceased borrower, and succession workflow | Product | Partial |
 | CUS-009 | Address, contact, employment, and business history | Core | Partial |
-| CUS-010 | Customer risk, vulnerability, language, and accessibility preferences | Core | Missing |
+| CUS-010 | Customer risk, vulnerability, language, and accessibility preferences | Core | Partial |
 | CUS-011 | Communication preferences and do-not-contact controls | Core | Partial |
-| CUS-012 | Exposure aggregation across all facilities and related parties | Core | Missing |
+| CUS-012 | Exposure aggregation across all facilities and related parties | Core | Partial |
 
 ### 6. Consent, Privacy, and Data-Principal Rights
 
@@ -705,10 +705,10 @@ The detailed register contains **453 individually identified capabilities**. At 
 | UX-011 | Collections/telecalling desktop and field mobile app | Channel | Missing |
 | UX-012 | Compliance, CCO, risk, finance, and audit dashboards | Institution | Missing |
 | UX-013 | Platform/tenant administration | Core | Partial |
-| UX-014 | Branch, DSA, BC, dealer, merchant, LSP, and partner portals | Channel | Missing |
+| UX-014 | Branch, DSA, BC, dealer, merchant, LSP, and partner portals | Channel | Partial |
 | UX-015 | Multilingual Indian-language content and templates | Core | Missing |
 | UX-016 | Accessibility testing, assisted journeys, and reduced-motion support | Core | Partial |
-| UX-017 | Mobile/PWA/offline capability | Channel | Missing |
+| UX-017 | Mobile/PWA/offline capability | Channel | Partial |
 
 ### 33. Implementation, Migration, and Customer Adoption
 

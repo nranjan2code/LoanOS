@@ -18,6 +18,7 @@ capability rows remain the source of truth for individual features.
 | F | Risk, AML, and fraud depth: ongoing CDD, transaction monitoring, fraud signals, portfolio analytics, limits, stress, RCSA, and recurring model monitoring | Product control plane complete — current-list CDD, exact-paise monitoring, deterministic fraud policy, exposure/limit/stress, RCSA, recurring model reports and sealed committee evidence are executable; live feeds and institutional operations remain external. |
 | G | Migration and go-live: mapping, conversion, balance validation, parallel run, UAT, training, readiness, cutover, and hypercare | Product control plane complete — approved configuration/mapping, exact count/paise conversion reconciliation, account balance/schedule validation, parallel/UAT/training gates, joined readiness, cutover rollback and hypercare exit are executable; source ETL and production command execution remain external. |
 | H | Institutional operating model and configurable workflow: programmes, organisation, applicability, obligation calendars, state machines, approval matrices, delegation, bulk action, exception taxonomy, and business calendars | Product control plane complete — tenant-scoped policy records and executable configured-case/approval resolution are audit-sealed and fail closed; enterprise feeds, timer/routing workers, transactional bulk execution and institution-wide operating methodology remain deployment depth. |
+| I | Customer and channel operations: branch/partner lead desk, authority and serviceability, matching/lifecycle, party graph, preferences, succession, customer-360, and privacy-safe PWA shell | Product first slice complete — exact and evidence-bound domain/API controls plus an accessible tenant-branded workspace are executable; partner-user scoping, commission accounting/settlement, transactional merge, translated content and encrypted field-offline queues remain. |
 
 ## Epic 1: Tenant and Regulated Entity Setup
 
@@ -363,3 +364,31 @@ Done when:
 - No API call executes without an authenticated tenant context. Done.
 - The isolation suite proves two provisioned tenants cannot touch each other's data. Done.
 - A full tenant export is reproducible from source-of-truth records. Done.
+
+## Epic 13: Customer and Channel Operations
+
+Status: first executable slice complete.
+
+Goal: acquire and service customer relationships across branch and authorised partner channels without weakening RE ownership, consent, traceability, customer protection, or tenant isolation.
+
+Tasks:
+
+- Govern partner authority by type, active programme/unit, serviceable PIN, agreement, due diligence, conduct policy, consent training, and maker-checker approval. First slice done.
+- Capture branch, DSA, BC, connector, dealer, merchant, LSP, digital and API leads with minimum contact, exact-paise need, attribution, consent/disclosure and conduct evidence. First slice done.
+- Fail closed on unsupported channel/programme/product, partner territory, and branch serviceability; route to an active programme unit. Done.
+- Detect open-lead and existing-customer matches without automatic merge. Done: contact hashes and existing profiles send matches to an evidence-bound review state.
+- Control contact, qualification, follow-up, duplicate disposition, conversion linkage and abandonment. First slice done; end-to-end borrower/application creation orchestration remains.
+- Register commission basis, caps, eligibility event, tax reference and clawback policy. Governance done; calculation, accrual, invoice/TDS/GST, payable, settlement/dispute and clawback execution remain.
+- Govern co-applicant/co-borrower/guarantor, household/group/JLG/connected-party, nominee/legal-heir/representative links. First slice done.
+- Create independently approved, rollback-evidenced customer merge plans. Planning done; cross-object transactional execution and downstream reconciliation remain.
+- Record customer language, communication, vulnerability, accessibility, assisted-journey, do-not-contact and contact-window intent. Done at the source-of-truth layer; translated content packs remain.
+- Govern deceased-borrower succession under manual restriction and independent approval. First slice done; operational servicing/authority changes remain.
+- Join profile, relationships, preferences, applications/accounts, complaints, consents, documents and succession into customer-360 with exact related exposure. First slice done.
+- Deliver an accessible tenant-branded channel workspace and privacy-safe PWA. First slice done: the static shell is installable/cacheable, while API/customer/lead data are never cached and offline mutation is blocked.
+- Bind external channel users to partner/branch scopes and apply row-level entitlement to every projection/mutation. Planned and mandatory before external-partner production rollout.
+
+Done when:
+
+- No partner/branch lead can bypass programme, product, territory, serviceability, consent, disclosure, conduct, attribution, duplicate review, or evidence-bound lifecycle gates. First slice done.
+- Customer merges, succession changes and commission settlement cannot mutate financial/customer state without reconciliation, approval, rollback and audit proof. Planned beyond the current planning/governance records.
+- External partner users can see and act only within their explicitly assigned partner/branch scope. Planned; until then the workspace is restricted to institution-managed tenant users authorised for the channel desk.

@@ -284,6 +284,19 @@ export {
   resolveApprovalRequirement,
   transitionConfiguredWorkflowCase
 } from "./institutional-operations.js";
+
+export {
+  buildCustomer360,
+  createChannelLead,
+  createCustomerMergePlan,
+  createSuccessionCase,
+  recordCustomerPreferences,
+  registerChannelPartner,
+  registerCustomerRelationship,
+  registerPartnerCommissionPolicy,
+  transitionChannelLead,
+  transitionSuccessionCase
+} from "./customer-channel-operations.js";
 export {
   PROVIDER_INTEGRATIONS,
   assessProviderCertification,

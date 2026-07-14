@@ -600,26 +600,58 @@
     "category": "4. Acquisition Channels, Leads, and CRM",
     "plane": "LOS",
     "applicability": "Channel",
-    "status": "Missing",
+    "status": "Partial",
     "owner": "",
-    "evidence": [],
+    "evidence": [
+      {
+        "type": "code",
+        "ref": "packages/core/src/customer-channel-operations.js",
+        "note": "branch intake and serviceable-unit routing"
+      },
+      {
+        "type": "endpoint",
+        "ref": "POST /channels/leads",
+        "note": "governed channel intake"
+      },
+      {
+        "type": "test",
+        "ref": "tests/customer-channel-operations.test.js",
+        "note": "multi-channel routing and rejection"
+      }
+    ],
     "acceptance": "",
     "dependencies": [],
     "notes": "",
-    "lastReviewed": ""
+    "lastReviewed": "2026-07-14"
   },
   "CHN-003": {
     "capability": "DSA, BC, connector, dealer, merchant, and LSP lead intake",
     "category": "4. Acquisition Channels, Leads, and CRM",
     "plane": "LOS",
     "applicability": "Channel",
-    "status": "Missing",
+    "status": "Partial",
     "owner": "",
-    "evidence": [],
+    "evidence": [
+      {
+        "type": "code",
+        "ref": "packages/core/src/customer-channel-operations.js",
+        "note": "approved partner authority and lead intake"
+      },
+      {
+        "type": "endpoint",
+        "ref": "POST /channels/partners",
+        "note": "partner registry"
+      },
+      {
+        "type": "doc",
+        "ref": "docs/architecture/customer-channel-experiences.md",
+        "note": "channel boundary and remaining entitlements"
+      }
+    ],
     "acceptance": "",
     "dependencies": [],
     "notes": "",
-    "lastReviewed": ""
+    "lastReviewed": "2026-07-14"
   },
   "CHN-004": {
     "capability": "API/embedded-finance application intake",
@@ -652,52 +684,116 @@
     "category": "4. Acquisition Channels, Leads, and CRM",
     "plane": "LOS",
     "applicability": "Channel",
-    "status": "Missing",
+    "status": "Partial",
     "owner": "",
-    "evidence": [],
+    "evidence": [
+      {
+        "type": "code",
+        "ref": "packages/core/src/customer-channel-operations.js",
+        "note": "state-specific evidence-bound lifecycle"
+      },
+      {
+        "type": "endpoint",
+        "ref": "POST /channels/leads/:id/transitions",
+        "note": "lead transition API"
+      },
+      {
+        "type": "test",
+        "ref": "tests/customer-channel-operations.test.js",
+        "note": "qualification and conversion lifecycle"
+      }
+    ],
     "acceptance": "",
     "dependencies": [],
     "notes": "",
-    "lastReviewed": ""
+    "lastReviewed": "2026-07-14"
   },
   "CHN-007": {
     "capability": "Duplicate-lead and existing-customer matching",
     "category": "4. Acquisition Channels, Leads, and CRM",
     "plane": "LOS",
     "applicability": "Core",
-    "status": "Missing",
+    "status": "Partial",
     "owner": "",
-    "evidence": [],
+    "evidence": [
+      {
+        "type": "code",
+        "ref": "packages/core/src/customer-channel-operations.js",
+        "note": "contact-hash lead and borrower matching"
+      },
+      {
+        "type": "endpoint",
+        "ref": "POST /channels/leads/:id/transitions",
+        "note": "explicit duplicate disposition"
+      },
+      {
+        "type": "test",
+        "ref": "tests/customer-channel-operations.test.js",
+        "note": "open-lead and existing-customer matches"
+      }
+    ],
     "acceptance": "",
     "dependencies": [],
     "notes": "",
-    "lastReviewed": ""
+    "lastReviewed": "2026-07-14"
   },
   "CHN-008": {
     "capability": "Channel eligibility, geographic serviceability, and branch routing",
     "category": "4. Acquisition Channels, Leads, and CRM",
     "plane": "LOS",
     "applicability": "Channel",
-    "status": "Missing",
+    "status": "Partial",
     "owner": "",
-    "evidence": [],
+    "evidence": [
+      {
+        "type": "code",
+        "ref": "packages/core/src/customer-channel-operations.js",
+        "note": "programme/product/partner/PIN/unit fail-closed routing"
+      },
+      {
+        "type": "endpoint",
+        "ref": "GET /channels/operations",
+        "note": "active programme projection"
+      },
+      {
+        "type": "test",
+        "ref": "tests/customer-channel-operations.test.js",
+        "note": "territory and product rejection"
+      }
+    ],
     "acceptance": "",
     "dependencies": [],
     "notes": "",
-    "lastReviewed": ""
+    "lastReviewed": "2026-07-14"
   },
   "CHN-009": {
     "capability": "Partner commission and payout basis",
     "category": "4. Acquisition Channels, Leads, and CRM",
     "plane": "LOS",
     "applicability": "Channel",
-    "status": "Missing",
+    "status": "Partial",
     "owner": "",
-    "evidence": [],
+    "evidence": [
+      {
+        "type": "code",
+        "ref": "packages/core/src/customer-channel-operations.js",
+        "note": "approved exact payout basis, cap and clawback policy"
+      },
+      {
+        "type": "endpoint",
+        "ref": "POST /channels/commission-policies",
+        "note": "commission governance"
+      },
+      {
+        "type": "doc",
+        "ref": "docs/architecture/customer-channel-experiences.md",
+        "note": "finance execution boundary"
+      }
+    ],
     "acceptance": "",
     "dependencies": [],
     "notes": "",
-    "lastReviewed": ""
+    "lastReviewed": "2026-07-14"
   },
   "CHN-010": {
     "capability": "Channel conduct, consent, and disclosure monitoring",
@@ -1461,13 +1557,29 @@
     "category": "5. Customer, Parties, and Relationship Management",
     "plane": "LOS",
     "applicability": "Core",
-    "status": "Missing",
+    "status": "Partial",
     "owner": "",
-    "evidence": [],
+    "evidence": [
+      {
+        "type": "code",
+        "ref": "packages/core/src/customer-channel-operations.js",
+        "note": "four-eyes non-destructive merge plan"
+      },
+      {
+        "type": "endpoint",
+        "ref": "POST /customers/merge-plans",
+        "note": "approved merge planning"
+      },
+      {
+        "type": "doc",
+        "ref": "docs/architecture/customer-channel-experiences.md",
+        "note": "transactional execution remains"
+      }
+    ],
     "acceptance": "",
     "dependencies": [],
     "notes": "",
-    "lastReviewed": ""
+    "lastReviewed": "2026-07-14"
   },
   "CUS-004": {
     "capability": "Customer-360 across loans, complaints, documents, and consents",
@@ -1487,26 +1599,58 @@
     "category": "5. Customer, Parties, and Relationship Management",
     "plane": "LOS",
     "applicability": "Product",
-    "status": "Missing",
+    "status": "Partial",
     "owner": "",
-    "evidence": [],
+    "evidence": [
+      {
+        "type": "code",
+        "ref": "packages/core/src/customer-channel-operations.js",
+        "note": "typed borrower relationships and liabilities"
+      },
+      {
+        "type": "endpoint",
+        "ref": "POST /customers/relationships",
+        "note": "party graph registry"
+      },
+      {
+        "type": "test",
+        "ref": "tests/customer-channel-operations.test.js",
+        "note": "guarantor relationship evidence"
+      }
+    ],
     "acceptance": "",
     "dependencies": [],
     "notes": "",
-    "lastReviewed": ""
+    "lastReviewed": "2026-07-14"
   },
   "CUS-006": {
     "capability": "Household, group, JLG, and connected-party relationships",
     "category": "5. Customer, Parties, and Relationship Management",
     "plane": "LOS",
     "applicability": "Product",
-    "status": "Missing",
+    "status": "Partial",
     "owner": "",
-    "evidence": [],
+    "evidence": [
+      {
+        "type": "code",
+        "ref": "packages/core/src/customer-channel-operations.js",
+        "note": "household, group, JLG and connected-party edges"
+      },
+      {
+        "type": "endpoint",
+        "ref": "POST /customers/relationships",
+        "note": "approved relationship registration"
+      },
+      {
+        "type": "doc",
+        "ref": "docs/architecture/customer-channel-experiences.md",
+        "note": "party-graph controls"
+      }
+    ],
     "acceptance": "",
     "dependencies": [],
     "notes": "",
-    "lastReviewed": ""
+    "lastReviewed": "2026-07-14"
   },
   "CUS-007": {
     "capability": "Beneficial owner, controller, and authorised signatory",
@@ -1526,13 +1670,29 @@
     "category": "5. Customer, Parties, and Relationship Management",
     "plane": "LOS",
     "applicability": "Product",
-    "status": "Missing",
+    "status": "Partial",
     "owner": "",
-    "evidence": [],
+    "evidence": [
+      {
+        "type": "code",
+        "ref": "packages/core/src/customer-channel-operations.js",
+        "note": "manual-restriction succession workflow"
+      },
+      {
+        "type": "endpoint",
+        "ref": "POST /customers/succession-cases",
+        "note": "claim evidence intake"
+      },
+      {
+        "type": "test",
+        "ref": "tests/customer-channel-operations.test.js",
+        "note": "nominee and independent approval"
+      }
+    ],
     "acceptance": "",
     "dependencies": [],
     "notes": "",
-    "lastReviewed": ""
+    "lastReviewed": "2026-07-14"
   },
   "CUS-009": {
     "capability": "Address, contact, employment, and business history",
@@ -1552,13 +1712,29 @@
     "category": "5. Customer, Parties, and Relationship Management",
     "plane": "LOS",
     "applicability": "Core",
-    "status": "Missing",
+    "status": "Partial",
     "owner": "",
-    "evidence": [],
+    "evidence": [
+      {
+        "type": "code",
+        "ref": "packages/core/src/customer-channel-operations.js",
+        "note": "language, vulnerability, accessibility and assisted journey intent"
+      },
+      {
+        "type": "endpoint",
+        "ref": "POST /customers/preferences",
+        "note": "customer preference source of truth"
+      },
+      {
+        "type": "test",
+        "ref": "tests/customer-channel-operations.test.js",
+        "note": "preference persistence"
+      }
+    ],
     "acceptance": "",
     "dependencies": [],
     "notes": "",
-    "lastReviewed": ""
+    "lastReviewed": "2026-07-14"
   },
   "CUS-011": {
     "capability": "Communication preferences and do-not-contact controls",
@@ -1578,13 +1754,29 @@
     "category": "5. Customer, Parties, and Relationship Management",
     "plane": "LOS",
     "applicability": "Core",
-    "status": "Missing",
+    "status": "Partial",
     "owner": "",
-    "evidence": [],
+    "evidence": [
+      {
+        "type": "code",
+        "ref": "packages/core/src/customer-channel-operations.js",
+        "note": "joined related-party account exposure in integer paise"
+      },
+      {
+        "type": "endpoint",
+        "ref": "GET /customers/:id/360",
+        "note": "customer-360 projection"
+      },
+      {
+        "type": "test",
+        "ref": "tests/customer-channel-operations.test.js",
+        "note": "exact related exposure aggregation"
+      }
+    ],
     "acceptance": "",
     "dependencies": [],
     "notes": "",
-    "lastReviewed": ""
+    "lastReviewed": "2026-07-14"
   },
   "DOC-001": {
     "capability": "Product- and stage-specific document checklist",
@@ -5958,13 +6150,29 @@
     "category": "32. Borrower, Staff, Branch, Partner, and Field Experiences",
     "plane": "Experience & Adoption",
     "applicability": "Channel",
-    "status": "Missing",
+    "status": "Partial",
     "owner": "",
-    "evidence": [],
+    "evidence": [
+      {
+        "type": "code",
+        "ref": "apps/partner/index.html",
+        "note": "tenant-branded channel workspace"
+      },
+      {
+        "type": "code",
+        "ref": "apps/partner/assets/partner.js",
+        "note": "consent-led intake and evidence-bound actions"
+      },
+      {
+        "type": "doc",
+        "ref": "docs/architecture/customer-channel-experiences.md",
+        "note": "production partner-entitlement boundary"
+      }
+    ],
     "acceptance": "",
     "dependencies": [],
     "notes": "",
-    "lastReviewed": ""
+    "lastReviewed": "2026-07-14"
   },
   "UX-015": {
     "capability": "Multilingual Indian-language content and templates",
@@ -5997,12 +6205,28 @@
     "category": "32. Borrower, Staff, Branch, Partner, and Field Experiences",
     "plane": "Experience & Adoption",
     "applicability": "Channel",
-    "status": "Missing",
+    "status": "Partial",
     "owner": "",
-    "evidence": [],
+    "evidence": [
+      {
+        "type": "code",
+        "ref": "apps/partner/manifest.webmanifest",
+        "note": "installable channel workspace"
+      },
+      {
+        "type": "code",
+        "ref": "apps/partner/sw.js",
+        "note": "static-shell-only offline cache"
+      },
+      {
+        "type": "test",
+        "ref": "tests/customer-channel-operations.test.js",
+        "note": "manifest and service-worker delivery"
+      }
+    ],
     "acceptance": "",
     "dependencies": [],
     "notes": "",
-    "lastReviewed": ""
+    "lastReviewed": "2026-07-14"
   }
 }
