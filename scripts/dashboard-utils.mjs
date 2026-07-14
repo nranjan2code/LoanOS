@@ -11,12 +11,20 @@ export function rollupCapabilities(features) {
     if (weight !== null) { weighted += weight; scored += 1; }
   }
   const evidenceCount = features.filter((feature) => Array.isArray(feature.evidence) && feature.evidence.length > 0).length;
+  const evidenceQualifiedCount = features.filter((feature) => {
+    const metadata = ['owner', 'acceptance', 'notes', 'lastReviewed'].every((field) => typeof feature[field] === 'string' && feature[field].trim());
+    const evidence = Array.isArray(feature.evidence) ? feature.evidence : [];
+    if (!metadata || evidence.length === 0) return false;
+    return feature.status !== 'Implemented' || (evidence.some((item) => item.type === 'test') && evidence.some((item) => item.type === 'code' || item.type === 'endpoint'));
+  }).length;
   return {
     counts, total: features.length, scored,
     excluded: features.length - scored,
     maturityPct: scored ? Math.round((weighted / scored) * 100) : 0,
     evidenceCount,
     evidencePct: features.length ? Math.round((evidenceCount / features.length) * 100) : 0,
+    evidenceQualifiedCount,
+    evidenceQualifiedPct: features.length ? Math.round((evidenceQualifiedCount / features.length) * 100) : 0,
   };
 }
 

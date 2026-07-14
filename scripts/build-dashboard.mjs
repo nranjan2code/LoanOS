@@ -151,7 +151,7 @@ summary::-webkit-details-marker{display:none}summary:hover{background:#1a1e26}
   <div class="card"><div class="kpi">${overall.counts.Implemented}<small> / ${allFeatures.length}</small></div><div class="muted">implemented</div></div>
   <div class="card"><div class="kpi">${overall.counts.Partial + overall.counts['Partial/Mock'] + overall.counts.Mock}</div><div class="muted">partial / mock</div></div>
   <div class="card"><div class="kpi">${overall.counts.Missing}</div><div class="muted">missing</div></div>
-  <div class="card"><div class="kpi">${overall.evidencePct}%<small> · ${overall.evidenceCount}/${allFeatures.length}</small></div><div class="muted">evidence coverage (not completion)</div></div>
+  <div class="card"><div class="kpi">${overall.evidenceQualifiedPct}%<small> · ${overall.evidenceQualifiedCount}/${allFeatures.length}</small></div><div class="muted">integrity-checked evidence coverage (not completion)</div></div>
   <div class="card"><div class="kpi" style="font-size:14px;padding-top:7px">${testBadge}</div><div class="muted">test suite</div></div>
 </div>
 
@@ -253,4 +253,4 @@ render();
 </body></html>`;
 
 writeFileSync(join(ROOT, 'docs/dashboard.html'), html);
-console.log(`dashboard.html · ${allFeatures.length} caps / ${categories.length} categories · ${overall.pct}% catalogue maturity · evidence=${overall.evidenceCount}/${overall.total} · impl=${overall.counts.Implemented} missing=${overall.counts.Missing} · tests=${t.ran ? `${t.pass}/${t.total}(${t.fail}f,${t.skipped ?? 0}s)` : 'skip'}`);
+console.log(`dashboard.html · ${allFeatures.length} caps / ${categories.length} categories · ${overall.pct}% catalogue maturity · evidence=${overall.evidenceQualifiedCount}/${overall.total} qualified · impl=${overall.counts.Implemented} missing=${overall.counts.Missing} · tests=${t.ran ? `${t.pass}/${t.total}(${t.fail}f,${t.skipped ?? 0}s)` : 'skip'}`);

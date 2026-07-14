@@ -15,6 +15,7 @@ automatically on every `./loanos.sh build`.
 | `./loanos.sh dashboard` | Syncs the trace register and regenerates the dashboard, running the test suite live. |
 | `npm run dashboard` | Same as above, without the shell wrapper. |
 | `npm run trace:sync` | Syncs `docs/product/capability-trace.json` only (no dashboard). |
+| `npm run trace:validate` | Validates evidence files, metadata, status-specific proof, and non-decreasing coverage floors. |
 | `node scripts/build-dashboard.mjs` | Direct invocation. Set `DASHBOARD_TEST_LOG=<file>` to parse an existing test log instead of running tests. |
 
 Outputs written on each run:
@@ -64,15 +65,15 @@ Each entry:
   "plane": "LOS",
   "applicability": "Core",
   "status": "Implemented",
-  "owner": "",
+  "owner": "Lending Product & Compliance",
   "evidence": [
     { "type": "endpoint", "ref": "POST /kfs", "note": "KFS generation" },
     { "type": "test", "ref": "tests/compliance.test.js:216", "note": "KFS must include RBI-required lending disclosures" }
   ],
-  "acceptance": "",
+  "acceptance": "A checksum-bound KFS is generated and its regulatory fields are executable-test covered.",
   "dependencies": [],
-  "notes": "",
-  "lastReviewed": "2026-07-14"
+  "notes": "Implemented scope is evidenced; provider delivery remains separately governed.",
+  "lastReviewed": "2026-07-15"
 }
 ```
 
@@ -90,23 +91,26 @@ dashboard; `endpoint` refs render as a method+path badge.
 
 **To trace a capability**, open `capability-trace.json`, find its ID, and add
 evidence rows pointing at the tests, endpoints, code, and docs that implement it.
-Run `npm run trace:sync` (or any build) to refresh — your entries are kept and
-the dashboard's "traced" coverage KPI updates.
+Run `npm run trace:validate` before regeneration. CI requires all 453 entries to
+retain linked evidence and all 87 `Implemented` entries to retain both executable
+test evidence and code or endpoint evidence. The dashboard calls this
+integrity-checked evidence coverage; it is not the same as product completion.
 
-## Completion score
+## Catalogue maturity score
 
 Each capability's status is normalised to one of:
 `Implemented`, `Partial`, `Partial/Mock`, `Mock`, `Missing`, `Partner`,
-`External`. The weighted completion percentage for a category or plane is:
+`External`. The weighted catalogue-maturity percentage for a category or plane is:
 
 ```
-completion = sum(weight[status]) / count(scored capabilities)
+maturity = sum(weight[status]) / count(scored capabilities)
 ```
 
 with weights `Implemented=1.0`, `Partial=0.4`, `Partial/Mock=0.4`, `Mock=0.3`,
 `Missing=0`. `Partner` and `External` capabilities are excluded from the
 denominator (they are provider/policy obligations, not internal build work).
-Adjust the weights in `scripts/build-dashboard.mjs` if the scoring model changes.
+This is a planning indicator based on curated statuses, not an independent claim
+of production readiness. Weights live in `scripts/dashboard-utils.mjs`.
 
 ## Product-plane mapping
 
@@ -145,10 +149,13 @@ update the table above:
 
 ## Maintenance
 
-The dashboard has no separate maintenance step: it regenerates from source on
-`./loanos.sh build`. Two things keep it correct:
+The dashboard regenerates from source on `./loanos.sh build`. Three things keep
+it correct:
 
 1. Update a capability's `Status` in the capability catalogue when its real state
    changes (this is already required by the catalogue's Definition of Done).
 2. When adding or renaming a catalogue category, add its number to the `PLANE`
    map in the generator and to the mapping table above.
+3. Add owner, acceptance, dependencies, remaining-gap notes and real evidence
+   for every new capability, then raise—never lower—the floors in
+   `capability-evidence-policy.json` when the catalogue grows.

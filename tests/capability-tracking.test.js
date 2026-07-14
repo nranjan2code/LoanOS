@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
 
 import { normalizeStatus, parseRegister } from '../scripts/planes.mjs';
 import { parseBacklogEpics, parseTapSummary, rollupCapabilities } from '../scripts/dashboard-utils.mjs';
@@ -65,4 +66,11 @@ test('dashboard helpers parse distant epic statuses and final TAP summary', () =
 test('catalogue maturity discloses exclusions and evidence coverage', () => {
   const result = rollupCapabilities([{ status: 'Implemented', evidence: [{ type: 'test' }] }, { status: 'Partial', evidence: [] }, { status: 'External', evidence: [] }]);
   assert.equal(result.maturityPct, 70); assert.equal(result.scored, 2); assert.equal(result.excluded, 1); assert.equal(result.evidencePct, 33);
+  assert.equal(result.evidenceQualifiedCount, 0);
+});
+
+test('capability evidence validator enforces repository and status integrity', () => {
+  const result = spawnSync(process.execPath, ['scripts/validate-capability-evidence.mjs'], { cwd: new URL('..', import.meta.url), encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /errors=0/);
 });
