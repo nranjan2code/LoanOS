@@ -206,6 +206,17 @@ export {
 } from "./recovery-agent.js";
 
 export {
+  LEGAL_RECOVERY_TRACKS,
+  createLegalRecoveryCase,
+  createPromiseToPay,
+  enrichLegalRecoveryCase,
+  evaluatePromisesToPay,
+  issueLegalRecoveryNotice,
+  recordCollectionContact,
+  recordLegalRecoveryEvent
+} from "./collections-recovery.js";
+
+export {
   DLG_CAP_PERCENT,
   DLG_FORMS,
   DLG_INVOCATION_WINDOW_DAYS,

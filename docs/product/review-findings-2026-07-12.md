@@ -38,8 +38,8 @@ cite the ID in commits and PRs.
 | REV-41 | Revolving / credit line / overdraft product type (MSME/BNPL) | E | P2 | DONE |
 | REV-42 | GST (18%) on charges/fees in KFS, charge assessment, statements | E | P1 | DONE |
 | REV-43 | Credit-insurance product modeling and disclosure | E | P3 | DECIDE |
-| REV-50 | Legal-recovery workflow: SARFAESI notices, Sec-138, Lok Adalat/arbitration/DRT | F | P2 | TODO |
-| REV-51 | Field-collections / telecalling operational layer (dialer, feet-on-street, PTP) | F | P2 | DECIDE |
+| REV-50 | Legal-recovery workflow: SARFAESI notices, Sec-138, Lok Adalat/arbitration/DRT | F | P2 | DONE |
+| REV-51 | Field-collections / telecalling operational layer (dialer, feet-on-street, PTP) | F | P2 | DONE |
 | REV-60 | CIC submission in Uniform Credit Reporting Format, fortnightly cadence | G | P2 | TODO |
 | REV-61 | CKYC real file format (14-digit CKYC number, CKYCRR download/upload) | G | P2 | TODO |
 | REV-62 | FIU-IND FINnet 2.0 XML STR/CTR format | G | P2 | TODO |
@@ -244,15 +244,23 @@ it as a product add-on with KFS disclosure. **Decide scope.**
 
 ## WS-F — LWS recovery depth
 
-### REV-50 — Legal-recovery workflow · P2 · TODO
-CERSAI charges are tracked, but there is no demand/possession-notice lifecycle for secured recovery
-(SARFAESI), no Sec-138 cheque-bounce workflow, and no Lok Adalat/arbitration/DRT track. **Acceptance:** a
-secured NPA can generate a SARFAESI demand notice with the statutory clock and evidence trail.
+### REV-50 — Legal-recovery workflow · P2 · DONE
+`collections-recovery.js` now provides maker-checker legal strategy selection across SARFAESI, Section 138,
+Lok Adalat, arbitration, DRT, civil suit, and insolvency tracks. SARFAESI creation fails closed unless the
+account is NPA and has a registered unsatisfied CERSAI charge; the generated Section 13(2) demand notice is
+checksum-sealed with issue/delivery evidence and a 60-day clock, and enforcement authorization is blocked
+before expiry. Section 138 cases retain cheque/bank-return evidence, enforce the 30-day notice issue limit,
+and compute the 15-day payment clock from delivery. Generic filing, hearing, order, settlement, withdrawal,
+and closure events feed audit and LWS tasks. Track-specific pleadings, representation SLA, possession, sale,
+court e-filing, limitation rules, advocate billing, and recovery accounting remain later depth.
 
-### REV-51 — Field-collections / telecalling operational layer · P2 · DECIDE
-No dialer/telecalling integration, feet-on-street mobile workflow, or promise-to-pay (PTP) tracking. The
-FPC contact-hours gate and recovery-agent empanelment exist; the operational execution layer does not.
-**Decide scope** (may be partner/integration rather than core).
+### REV-51 — Field-collections / telecalling operational layer · P2 · DONE
+The core operational layer now records assigned-agent calls/IVR/field visits with contact disposition,
+evidence reference, delinquency snapshot, and the 08:00–19:00 IST conduct gate. Field visits additionally
+require valid geo coordinates and geo-evidence. Promise-to-pay records must link to an evidenced contact;
+payment events are allocated deterministically to promises and expose pending/kept/broken status, received
+amount, and shortfall. Broken PTPs generate LWS follow-up tasks. Dialer campaign integration, offline mobile
+sync, route/capacity optimization, media capture, and agency performance/settlement remain partner depth.
 
 ---
 

@@ -32,6 +32,8 @@ import {
   commentOnWorkflowTask,
   completeWorkflowTask,
   createLoanAccountFromApplication,
+  createLegalRecoveryCase,
+  createPromiseToPay,
   drawRevolvingCredit,
   createLoanId,
   computeDelinquency,
@@ -47,6 +49,8 @@ import {
   enrichComplaint,
   enrichFraudCase,
   enrichIncident,
+  enrichLegalRecoveryCase,
+  evaluatePromisesToPay,
   fulfillErasureRequest,
   generateFraudCommitteePack,
   issueShowCauseNotice,
@@ -94,6 +98,7 @@ import {
   markDisbursed,
   postCashRecoveryToLoanAccount,
   postPaymentToLoanAccount,
+  issueLegalRecoveryNotice,
   reconcileBankStatementEntry,
   reconcilePaymentRailSettlement,
   createSuspenseReceipt,
@@ -102,6 +107,8 @@ import {
   prepayLoanAccount,
   proposeDecision,
   recordCollectionsReminder,
+  recordCollectionContact,
+  recordLegalRecoveryEvent,
   reviewRevolvingFacility,
   restructureLoanAccount,
   resetFloatingRate,
@@ -5325,6 +5332,68 @@ async function route(req, res, dataDir, platformAdminKey) {
     return;
   }
 
+  const collectionContactMatch = path.match(/^\/loan-accounts\/([^/]+)\/collection-contacts$/);
+  if (collectionContactMatch && method === "GET") {
+    const state = await store.load(); const loanAccount = state.loanAccounts[decodeURIComponent(collectionContactMatch[1])];
+    if (!loanAccount) { sendJson(res, 404, { error: { code: "not_found", message: "Loan account not found." } }); return; }
+    sendJson(res, 200, { collectionContacts: loanAccount.collectionContacts ?? [] }); return;
+  }
+  if (collectionContactMatch && method === "POST") {
+    const body = await readJson(req); const state = await store.load(); const loanAccountId = decodeURIComponent(collectionContactMatch[1]); const loanAccount = state.loanAccounts[loanAccountId];
+    if (!loanAccount) { sendJson(res, 404, { error: { code: "not_found", message: "Loan account not found." } }); return; }
+    const prior = (loanAccount.collectionContacts ?? []).find((contact) => contact.contactId === body.contactId); if (prior) { sendJson(res, 200, { loanAccount, contact: prior, idempotent: true }); return; }
+    const result = recordCollectionContact(loanAccount, body); if (result.summary.status === "blocked") { sendJson(res, 422, { error: { code: "collection_contact_blocked", message: "Collection contact is blocked." }, findings: result.findings }); return; }
+    await store.save(appendEvent({ ...state, loanAccounts: { ...state.loanAccounts, [loanAccountId]: result.loanAccount } }, { type: "loan_account.collection_contact.recorded", loanAccountId, contactId: result.contact.contactId, channel: result.contact.channel, disposition: result.contact.disposition }));
+    sendJson(res, 201, { loanAccount: result.loanAccount, contact: result.contact, idempotent: false }); return;
+  }
+
+  const promiseToPayMatch = path.match(/^\/loan-accounts\/([^/]+)\/promises-to-pay$/);
+  if (promiseToPayMatch && method === "GET") {
+    const state = await store.load(); const loanAccount = state.loanAccounts[decodeURIComponent(promiseToPayMatch[1])];
+    if (!loanAccount) { sendJson(res, 404, { error: { code: "not_found", message: "Loan account not found." } }); return; }
+    const asOf = url.searchParams.get("asOf") ? new Date(url.searchParams.get("asOf")) : new Date(); sendJson(res, 200, { promisesToPay: evaluatePromisesToPay(loanAccount, asOf) }); return;
+  }
+  if (promiseToPayMatch && method === "POST") {
+    const body = await readJson(req); const state = await store.load(); const loanAccountId = decodeURIComponent(promiseToPayMatch[1]); const loanAccount = state.loanAccounts[loanAccountId];
+    if (!loanAccount) { sendJson(res, 404, { error: { code: "not_found", message: "Loan account not found." } }); return; }
+    const prior = (loanAccount.promisesToPay ?? []).find((promise) => promise.promiseId === body.promiseId); if (prior) { sendJson(res, 200, { loanAccount, promise: evaluatePromisesToPay({ ...loanAccount, promisesToPay: [prior] }, new Date())[0], idempotent: true }); return; }
+    const result = createPromiseToPay(loanAccount, body); if (result.summary.status === "blocked") { sendJson(res, 422, { error: { code: "promise_to_pay_blocked", message: "Promise-to-pay is blocked." }, findings: result.findings }); return; }
+    await store.save(appendEvent({ ...state, loanAccounts: { ...state.loanAccounts, [loanAccountId]: result.loanAccount } }, { type: "loan_account.promise_to_pay.created", loanAccountId, promiseId: result.promise.promiseId, amount: result.promise.amount, promisedDate: result.promise.promisedDate }));
+    sendJson(res, 201, { loanAccount: result.loanAccount, promise: result.promise, idempotent: false }); return;
+  }
+
+  const loanLegalCasesMatch = path.match(/^\/loan-accounts\/([^/]+)\/legal-recovery-cases$/);
+  if (loanLegalCasesMatch && method === "GET") {
+    const state = await store.load(); const loanAccountId = decodeURIComponent(loanLegalCasesMatch[1]); if (!state.loanAccounts[loanAccountId]) { sendJson(res, 404, { error: { code: "not_found", message: "Loan account not found." } }); return; }
+    const asOf = url.searchParams.get("asOf") ? new Date(url.searchParams.get("asOf")) : new Date(); const cases = Object.values(state.legalRecoveryCases ?? {}).filter((item) => item.loanAccountId === loanAccountId).map((item) => enrichLegalRecoveryCase(item, asOf)); sendJson(res, 200, { legalRecoveryCases: cases }); return;
+  }
+  if (loanLegalCasesMatch && method === "POST") {
+    const body = await readJson(req); const state = await store.load(); const loanAccountId = decodeURIComponent(loanLegalCasesMatch[1]); const loanAccount = state.loanAccounts[loanAccountId];
+    if (!loanAccount) { sendJson(res, 404, { error: { code: "not_found", message: "Loan account not found." } }); return; }
+    const prior = state.legalRecoveryCases?.[body.caseId]; if (prior) { sendJson(res, 200, { legalRecoveryCase: enrichLegalRecoveryCase(prior), idempotent: true }); return; }
+    const result = createLegalRecoveryCase(state.legalRecoveryCases, loanAccount, state.securityInterests, body); if (result.summary.status === "blocked") { sendJson(res, 422, { error: { code: "legal_recovery_case_blocked", message: "Legal recovery case is blocked." }, findings: result.findings }); return; }
+    await store.save(appendEvent({ ...state, legalRecoveryCases: result.registry }, { type: "legal_recovery.case.opened", caseId: result.legalCase.caseId, loanAccountId, track: result.legalCase.track, approvedBy: result.legalCase.approvedBy })); sendJson(res, 201, { legalRecoveryCase: result.legalCase, idempotent: false }); return;
+  }
+
+  const legalCaseMatch = path.match(/^\/legal-recovery-cases\/([^/]+)$/);
+  if (legalCaseMatch && method === "GET") { const state = await store.load(); const legalCase = state.legalRecoveryCases?.[decodeURIComponent(legalCaseMatch[1])]; if (!legalCase) { sendJson(res, 404, { error: { code: "not_found", message: "Legal recovery case not found." } }); return; } const asOf = url.searchParams.get("asOf") ? new Date(url.searchParams.get("asOf")) : new Date(); sendJson(res, 200, enrichLegalRecoveryCase(legalCase, asOf)); return; }
+
+  const legalNoticeMatch = path.match(/^\/legal-recovery-cases\/([^/]+)\/notices$/);
+  if (legalNoticeMatch && method === "POST") {
+    const body = await readJson(req); const state = await store.load(); const caseId = decodeURIComponent(legalNoticeMatch[1]); const legalCase = state.legalRecoveryCases?.[caseId]; if (!legalCase) { sendJson(res, 404, { error: { code: "not_found", message: "Legal recovery case not found." } }); return; }
+    const prior = legalCase.notices?.find((notice) => notice.noticeId === body.noticeId); if (prior) { sendJson(res, 200, { legalRecoveryCase: enrichLegalRecoveryCase(legalCase), notice: prior, idempotent: true }); return; }
+    const result = issueLegalRecoveryNotice(legalCase, body); if (result.summary.status === "blocked") { sendJson(res, 422, { error: { code: "legal_notice_blocked", message: "Legal notice is blocked." }, findings: result.findings }); return; }
+    await store.save(appendEvent({ ...state, legalRecoveryCases: { ...state.legalRecoveryCases, [caseId]: result.legalCase } }, { type: "legal_recovery.notice.issued", caseId, loanAccountId: legalCase.loanAccountId, noticeId: result.notice.noticeId, statutoryDeadline: result.notice.statutoryDeadline })); sendJson(res, 201, { legalRecoveryCase: result.legalCase, notice: result.notice, idempotent: false }); return;
+  }
+
+  const legalEventMatch = path.match(/^\/legal-recovery-cases\/([^/]+)\/events$/);
+  if (legalEventMatch && method === "POST") {
+    const body = await readJson(req); const state = await store.load(); const caseId = decodeURIComponent(legalEventMatch[1]); const legalCase = state.legalRecoveryCases?.[caseId]; if (!legalCase) { sendJson(res, 404, { error: { code: "not_found", message: "Legal recovery case not found." } }); return; }
+    const prior = legalCase.events?.find((event) => event.eventId === body.eventId); if (prior) { sendJson(res, 200, { legalRecoveryCase: enrichLegalRecoveryCase(legalCase), event: prior, idempotent: true }); return; }
+    const result = recordLegalRecoveryEvent(legalCase, body); if (result.summary.status === "blocked") { sendJson(res, 422, { error: { code: "legal_recovery_event_blocked", message: "Legal recovery event is blocked." }, findings: result.findings }); return; }
+    await store.save(appendEvent({ ...state, legalRecoveryCases: { ...state.legalRecoveryCases, [caseId]: result.legalCase } }, { type: `legal_recovery.${result.event.type}`, caseId, loanAccountId: legalCase.loanAccountId, eventId: result.event.eventId, evidenceRef: result.event.evidenceRef })); sendJson(res, 201, { legalRecoveryCase: result.legalCase, event: result.event, idempotent: false }); return;
+  }
+
   const loanAccountChargeMatch = path.match(/^\/loan-accounts\/([^/]+)\/charges$/);
   if (method === "POST" && loanAccountChargeMatch) {
     const body = await readJson(req);
@@ -6674,6 +6743,7 @@ function requiredModuleForPath(path) {
   if (path.startsWith("/ai/")) return "ai_governance";
   if (path.startsWith("/integrations/")) return "integrations";
   if (path === "/recovery-agents" || path.startsWith("/recovery-agents/")) return "collections";
+  if (path === "/legal-recovery-cases" || path.startsWith("/legal-recovery-cases/")) return "collections";
   if (path === "/loans/marketplace-offers" || path.startsWith("/loans/marketplace-offers/")) return "marketplace";
   if (path === "/dlg-arrangements" || path.startsWith("/dlg-arrangements/")) return "dlg";
   if (path === "/co-lending-arrangements" || path.startsWith("/co-lending-arrangements/")) return "co_lending";

@@ -67,9 +67,9 @@ Composite labels such as `Partial/Mock` identify a mixed capability: some intern
 
 LoanOS currently has a strong compliance-first domain foundation and executable slices for amortising, bullet, moratorium, step-up, and revolving facilities. Its best-developed capabilities are tenant isolation, KFS and fund-flow gates, policy/evidence lineage, maker-checker, audit integrity, borrower privacy rights, model governance, deterministic decision-engine infrastructure, and finance controls.
 
-The principal gaps before bank production are live integrations, downstream GL certification, regulatory submission formats, product-specific lending depth, full collections/legal recovery, enterprise IAM and key management, observability/DR/BCP, and bank-assurance evidence. Payment operations now have a controlled internal first slice, but live rail/file transport and operating-scale automation remain open. Public product positioning must remain narrower than this catalogue until each advertised journey reaches an agreed maturity level.
+The principal gaps before bank production are live integrations, downstream GL certification, regulatory submission formats, product-specific lending depth, repossession/auction and legal-expense depth, enterprise IAM and key management, observability/DR/BCP, and bank-assurance evidence. Collections and legal recovery now have a controlled first slice, but dialer integration, route/capacity optimization, track-specific pleadings, court integration, possession, auction, and recovery accounting remain open. Public product positioning must remain narrower than this catalogue until each advertised journey reaches an agreed maturity level.
 
-The detailed register contains **453 individually identified capabilities**. At this snapshot, 80 are classified `Implemented`, 167 `Partial`, 178 `Missing`, and 28 are mock, partner, external, or composite-status obligations. These counts measure scope coverage, not delivery percentage: a single missing ledger, reconciliation, security, or recovery control can block production even if many smaller capabilities exist.
+The detailed register contains **453 individually identified capabilities**. At this snapshot, 85 are classified `Implemented`, 173 `Partial`, 167 `Missing`, and 28 are mock, partner, external, or composite-status obligations. These counts measure scope coverage, not delivery percentage: a single missing ledger, reconciliation, security, or recovery control can block production even if many smaller capabilities exist.
 
 ## Capability Index
 
@@ -92,7 +92,7 @@ The detailed register contains **453 individually identified capabilities**. At 
 | Payments and reconciliation | Complete collection-to-ledger control | Partial/Mock; controlled operations core with mock provider boundary |
 | Servicing | Customer and operations servicing over the full loan life | Partial |
 | Delinquency and collections | Strategy, contact, field and agency operations | Partial |
-| Legal recovery and repossession | Evidence-led statutory recovery | Missing |
+| Legal recovery and repossession | Evidence-led statutory recovery | Partial; statutory case/notice/clock first slice |
 | Restructure, settlement and closure | Governed resolution and security release | Partial |
 | Co-lending, DLG and partners | Contract, economics and servicing by partner leg | Partial |
 | Workflow and operations | Role-aware queues, approvals and SLAs | Partial |
@@ -438,12 +438,12 @@ The detailed register contains **453 individually identified capabilities**. At 
 | CLL-002 | Collection strategy by product, risk, bucket, and customer | Core | Missing |
 | CLL-003 | Treatment plans, next-best action, and channel sequencing | Core | Missing |
 | CLL-004 | Reminder and notice logging with contact-hours guard | Core | Partial |
-| CLL-005 | Telecalling/dialer campaign and call disposition | Channel | Missing |
-| CLL-006 | Promise-to-pay, kept/broken PTP, and follow-up | Core | Missing |
+| CLL-005 | Telecalling/dialer campaign and call disposition | Channel | Partial |
+| CLL-006 | Promise-to-pay, kept/broken PTP, and follow-up | Core | Implemented |
 | CLL-007 | Recovery-agent registry, due diligence, and authorization | Core | Implemented |
 | CLL-008 | Borrower notice before agent assignment/contact | Core | Implemented |
 | CLL-009 | Agency, portfolio, geography, capacity, and performance allocation | Channel | Missing |
-| CLL-010 | Field mobile app, visit, geo/time evidence, and receipt | Channel | Missing |
+| CLL-010 | Field mobile app, visit, geo/time evidence, and receipt | Channel | Partial |
 | CLL-011 | Cash exception approval and same-day account posting | Channel | Implemented |
 | CLL-012 | Conduct complaints, call recording, QA, and agent suspension | Core | Partial |
 | CLL-013 | Collection fees and LSP/agency settlement controls | Channel | Missing |
@@ -454,17 +454,17 @@ The detailed register contains **453 individually identified capabilities**. At 
 
 | ID | Capability | Applicability | Status |
 | --- | --- | --- | --- |
-| REC-001 | Legal-recovery case and strategy selection | Product | Missing |
-| REC-002 | SARFAESI demand notice and statutory clock | Product | Missing |
+| REC-001 | Legal-recovery case and strategy selection | Product | Implemented |
+| REC-002 | SARFAESI demand notice and statutory clock | Product | Implemented |
 | REC-003 | Possession, publication, valuation, and sale process | Product | Missing |
-| REC-004 | Section 138 cheque-bounce notice and case | Product | Missing |
-| REC-005 | Arbitration, Lok Adalat, DRT, civil suit, and insolvency tracks | Product | Missing |
-| REC-006 | Advocate panel, assignment, hearing, order, and expense | Product | Missing |
+| REC-004 | Section 138 cheque-bounce notice and case | Product | Implemented |
+| REC-005 | Arbitration, Lok Adalat, DRT, civil suit, and insolvency tracks | Product | Partial |
+| REC-006 | Advocate panel, assignment, hearing, order, and expense | Product | Partial |
 | REC-007 | Repossession authorization, inventory, yard, and release | Product | Missing |
 | REC-008 | Auction reserve, bids, sale, proceeds, and shortfall | Product | Missing |
-| REC-009 | Legal notice/document generation and delivery evidence | Product | Missing |
-| REC-010 | Settlement during legal action and case withdrawal | Product | Missing |
-| REC-011 | Limitation dates, next hearing, SLA, and escalation | Product | Missing |
+| REC-009 | Legal notice/document generation and delivery evidence | Product | Implemented |
+| REC-010 | Settlement during legal action and case withdrawal | Product | Partial |
+| REC-011 | Limitation dates, next hearing, SLA, and escalation | Product | Partial |
 | REC-012 | Recovery proceeds and legal expense accounting | Product | Missing |
 
 ### 20. Restructuring, Settlement, Write-off, and Closure

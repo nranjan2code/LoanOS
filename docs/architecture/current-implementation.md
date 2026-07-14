@@ -22,7 +22,7 @@ The current implementation is intentionally small:
 - Internal staff workspace in `apps/dashboard/`.
 - Borrower customer portal in `apps/customer/`: a responsive, white-labelled journey home with prioritised next actions, visual application milestones, repayment schedules, a document centre, guided media, grievance tracking, and DPDP access/correction/erasure controls.
 - Shared design system tokens in `apps/shared/`.
-- Automated tests in `tests/`: 181 file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
+- Automated tests in `tests/`: 182 file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
 
 Run it:
 
@@ -50,6 +50,7 @@ npm run dev:api
 | `packages/core/src/data-retention.js` | DPDP right-to-erasure workflow: `assessErasureEligibility` holds erasure while a statutory retention window (active loan, or a closed account inside the 5-year RBI/PMLA window) applies; fulfilment and automated data-retention cleanup redact the borrower profile, KYC records, and beneficial owners in place. |
 | `packages/core/src/fraud-case.js` | Fraud case module: natural-justice gate (show-cause notice + response or 21-day RBI FRM-2024 window) and four-eyes classification, plus a checksum-sealed committee pack generator. |
 | `packages/core/src/recovery-agent.js` | Recovery-agent empanelment registry: an active agent requires due-diligence/police-verification, training certification, code-of-conduct acknowledgment, and authorization-letter/ID-card evidence, referencing an active regulated entity. |
+| `packages/core/src/collections-recovery.js` | Assigned-agent call/field evidence, deterministic PTP evaluation, and maker-checker legal recovery across SARFAESI, Section 138, Lok Adalat, arbitration, DRT, civil suit, and insolvency, including checksum-sealed statutory notices and fail-closed clocks. |
 | `packages/core/src/application-workflow.js` | LOS application state machine, KFS workflow, human review, decision proposal, manual underwriting override gate for referred applications, coded decline-reason taxonomy, maker-checker approval, disbursement transition. |
 | `packages/core/src/repayment-schedule.js` | Shared KFS/LMS paise-exact schedule engine for weekly, fortnightly, monthly, and quarterly amortising, bullet, moratorium, and step-up structures. |
 | `packages/core/src/loan-account.js` | LMS term and revolving account creation, ledger reconstruction, scheduled/daily-utilisation interest, bounded drawdowns, facility reviews, payment posting, part-prepayment, foreclosure, statements, charges, recovery controls, restructure/reset, resolution, classification, and CIC snapshots. |
@@ -336,6 +337,12 @@ npm run dev:api
 | `GET /loan-accounts/:id/cic-snapshot` | Generates a CIC-ready internal reporting snapshot for one account. |
 | `GET /reporting/cic/snapshots` | Generates CIC-ready internal reporting snapshots for the portfolio. |
 | `POST /loan-accounts/:id/recovery-assignments` | Assigns a recovery agent only with borrower notice evidence. |
+| `GET/POST /loan-accounts/:id/collection-contacts` | Lists or records assigned-agent call/IVR/field dispositions; field visits require geo/time/evidence and all contacts enforce conduct hours. |
+| `GET/POST /loan-accounts/:id/promises-to-pay` | Lists evaluated pending/kept/broken PTPs or records a paise-exact promise linked to an evidenced contact. |
+| `GET/POST /loan-accounts/:id/legal-recovery-cases` | Lists legal cases or opens an independently approved recovery strategy; SARFAESI requires NPA plus registered CERSAI security. |
+| `GET /legal-recovery-cases/:id` | Reads an enriched legal case with statutory-clock and hearing status. |
+| `POST /legal-recovery-cases/:id/notices` | Generates and records an independently approved, checksum-sealed statutory notice with delivery evidence and track-specific deadline. |
+| `POST /legal-recovery-cases/:id/events` | Records idempotent representation, filing, hearing, order, enforcement, settlement, withdrawal, or closure evidence. |
 | `POST /loan-accounts/:id/reminders` | Logs a collections reminder/notice, blocking voice-channel contact outside the RBI FPC 08:00-19:00 IST window. |
 | `POST /loan-accounts/:id/restructure` | Restructures a stressed loan under four-eyes approval (tenure extension and/or rate concession, re-amortized). |
 | `POST /loan-accounts/:id/rate-resets` | Resets interest rate on a floating-rate loan under four-eyes approval (options: extend tenor, increase EMI, switch to fixed). |
@@ -403,7 +410,7 @@ npm run dev:api
 | 30-day grievance clock | Computes due date, breach status, and escalation-due state from complaint received time. |
 | Execution document packet | Renders borrower-facing HTML/text KFS, sanction letter, agreement summary, and privacy notice with SHA-256 checksums, delivery evidence, eSign evidence, and document-vault receipt indexing. |
 | Document vault | Successful eSign stores a tenant-scoped receipt with signed-packet signature evidence, India storage country, retention policy, per-document checksum manifest, and manifest checksum; the receipt is readable without duplicating full HTML bodies. |
-| LWS task queues | Derives active tasks for blocked compliance, KFS acceptance, credit decision, manual underwriting review for eligibility-referred applications, AI human review, checker approval (surfacing any manual underwriting override for the checker to review), document packet delivery, disbursement, recovery assignment, NPA review, complaint assignment, complaint resolution, and RBI CMS escalation. Each task includes SLA target, due time, and breach status. |
+| LWS task queues | Derives active tasks for blocked compliance, KFS acceptance, credit decision, manual underwriting review for eligibility-referred applications, AI human review, checker approval, document delivery, disbursement, recovery assignment, broken PTP follow-up, NPA review, legal notice/statutory/hearing action, complaint handling, and RBI CMS escalation. Each task includes SLA target, due time, and breach status. |
 | LWS task audit | Persists assignment, start, release, and comment events while the domain state remains the source of truth for task resolution. |
 | Fraud case module | Runs a tenant-scoped fraud case (`reported → under_investigation → show_cause_issued → classified_fraud/classified_not_fraud`). |
 | Natural justice and four-eyes fraud classification | An adverse (fraud) classification is blocked until a show-cause notice was issued (with delivery proof) and the borrower responded or the RBI FRM-2024 21-day window elapsed, and the classifier must be independent of the investigator. |
@@ -424,6 +431,8 @@ npm run dev:api
 | Waivers and reversals | Requires approval evidence for waivers and reversals, and prevents duplicate reversal of the same event. |
 | Delinquency buckets | Computes DPD bucket, earliest unpaid installment, and overdue amounts from schedule plus ledger. |
 | Collections reminder workflow | Logs each borrower reminder/notice (channel, stage, delinquency snapshot); voice-channel (call/IVR) contact outside the RBI FPC 08:00-19:00 IST window is blocked. |
+| Field collection and PTP | Requires active noticed assignment, assigned-agent identity, evidence and 08:00-19:00 IST contact time; field visits additionally require valid geo evidence. PTPs link to contacts and allocate subsequent payments once across promises to derive pending, kept, or broken status and follow-up tasks. |
+| Statutory legal recovery | Strategy selection is maker-checker. SARFAESI requires NPA plus registered CERSAI security, creates a checksum-sealed Section 13(2) demand record and blocks enforcement before its 60-day clock. Section 138 retains cheque/return memo evidence, enforces notice within 30 days and computes 15 days after delivery. Filing/hearing/order/settlement/withdrawal evidence and LWS clocks are retained. |
 | Hardship restructure | Modifies a stressed active loan under four-eyes approval, extending tenure and/or conceding rate, and re-amortizes the remaining principal (past installments untouched); flags the account `restructured`. |
 | Floating-rate reset | Resets the interest rate on a floating loan under four-eyes approval, offering choice-based re-amortization (extend tenor, increase EMI, switch to fixed with fee). |
 | Settlement and write-off | `settleLoanAccount` closes a loan for less than outstanding under four-eyes approval via principal/interest waiver credits (`closureType: "settled"`); `writeOffLoanAccount` marks `written_off` as a book loss while retaining ledger dues; both surface in the CIC snapshot. |
@@ -464,7 +473,7 @@ npm run dev:api
 - Registries are file-backed; tenant user administration and access reviews exist, but external IAM sync and maker-checker approval for admin changes are still planned.
 - Borrower/consent/KYC records are file-backed, but support CKYC registry and V-CIP evidence vault validation boundaries.
 - Workflow is file-backed; the local dashboard is not a production workflow UI and outbound RBI CMS API integration is still planned.
-- LMS restructure/settlement/write-off, cooling-off cancellation, refunds, and collections reminders have first slices. UPI/NACH and bank matching provide provider-to-bank-to-ledger controls. Balanced journals, trial balance, governed posting/GL delivery/reconciliation, EOD/BOD and period close cover the finance path. Co-lent loans split into regulated-entity books with transfer pricing, entity ECL, GST/TDS exchange, escrow-gated settlement, and inter-company certification. Certified vendor payloads, secure transport/credentials, external CIC submission, recovery-sale economics, and full multi-channel recovery operations remain planned.
+- LMS restructure/settlement/write-off, cooling-off cancellation, refunds, field collections/PTP, and statutory legal case control have first slices. UPI/NACH and bank matching provide provider-to-bank-to-ledger controls. Balanced journals, trial balance, governed posting/GL delivery/reconciliation, EOD/BOD and period close cover the finance path. Co-lent loans split into regulated-entity books with transfer pricing, entity ECL, GST/TDS exchange, escrow-gated settlement, and inter-company certification. Certified vendor payloads, secure transport/credentials, external CIC submission, possession/auction economics, court integrations, and partner-scale dialer/mobile operations remain planned.
 - Document packet renders HTML/text and stores document-vault receipts, but does not yet create PDFs or external eSign envelopes.
 - UI is limited to the local operations/admin dashboard; there is no production borrower application yet.
 - AI governance has first slices for lifecycle, validation gates (fairness/explainability/monitoring for high-risk, adversarial/hallucination for generative), drift-triggered kill switch, disclosure, and human handoff; recurring fairness reports and a sectoral incident-intelligence pack are still planned.
@@ -507,7 +516,8 @@ Current tests prove:
 - A DPDP erasure request is held by an active loan and by the 5-year statutory retention window, then redacts the borrower profile in place once eligible.
 - A fraud case's adverse classification is gated on natural justice (show-cause notice + response/21-day window) and four-eyes separation; the committee pack seals the case and states classification readiness.
 - A security/data incident's CERT-In/RBI reporting clock breaches after 6 hours undetected, and the API tracks the incident through report and notification.
-- Collections reminders enforce the RBI FPC contact-hours window; a hardship restructure re-amortizes under four-eyes approval; settlement and write-off both close a loan under four-eyes approval and surface on the CIC snapshot.
+- Collections reminders and assigned-agent field contacts enforce the RBI FPC contact-hours window; geo evidence and PTP kept/broken outcomes are retained. A hardship restructure re-amortizes under four-eyes approval; settlement and write-off both close a loan under four-eyes approval and surface on the CIC snapshot.
+- SARFAESI strategy is blocked without NPA plus registered security, early enforcement is blocked until the 60-day demand clock expires, and Section 138 notices enforce the official 30-day issue and 15-day payment windows.
 - The platform can export a tenant (reproducible portability pack) and offboard it with evidenced deletion; break-glass access is time-boxed, tenant-visible, and seals an audit event on every use; the sub-processor register is disclosed to every tenant.
 - Every sealed audit event carries a uniform actor/actorType/dataClass provenance envelope, attributed to the tenant or to platform staff under break-glass.
 - Recovery-agent empanelment requires training, authorization, and code-of-conduct evidence for an active agent (and blocks an unknown regulated entity); a recovery assignment is blocked unless it names a registered, active recovery agent.

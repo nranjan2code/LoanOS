@@ -3,6 +3,7 @@ import { createFinding, summarizeFindings } from "./compliance-controls.js";
 import { COMPLAINT_STATUSES, computeComplaintSla, enrichComplaint } from "./grievance.js";
 import { classifyLoanAsset, computeDelinquency } from "./loan-account.js";
 import { createLoanId } from "./loan-policy.js";
+import { enrichLegalRecoveryCase, evaluatePromisesToPay } from "./collections-recovery.js";
 
 export const WORKFLOW_TASK_STATUSES = {
   OPEN: "open",
@@ -22,7 +23,11 @@ const TASK_SLA_HOURS = {
   "application.document_packet_delivery": 4,
   "application.disbursement": 4,
   "loan_account.recovery_assignment": 24,
+  "loan_account.broken_ptp_follow_up": 4,
   "loan_account.npa_review": 24,
+  "legal_recovery.notice_issue": 24,
+  "legal_recovery.statutory_action": 24,
+  "legal_recovery.hearing_follow_up": 24,
   "complaint.assignment": 24,
   "complaint.resolution": 720,
   "complaint.rbi_cms_escalation": 24,
@@ -43,6 +48,7 @@ export function deriveWorkflowTasks(state, options = {}) {
   const tasks = [
     ...deriveApplicationTasks(Object.values(state?.loanApplications ?? {}), asOf),
     ...deriveLoanAccountTasks(Object.values(state?.loanAccounts ?? {}), asOf),
+    ...deriveLegalRecoveryTasks(Object.values(state?.legalRecoveryCases ?? {}), asOf),
     ...deriveComplaintTasks(Object.values(state?.complaints ?? {}), asOf),
     ...deriveDataPrincipalTasks(state, asOf)
   ]
@@ -435,6 +441,32 @@ function deriveLoanAccountTasks(loanAccounts, asOf) {
       }));
     }
 
+    const brokenPromises = evaluatePromisesToPay(account, asOf).filter((promise) => promise.status === "broken");
+    if (brokenPromises.length > 0) {
+      tasks.push(loanAccountTask(account, {
+        type: "loan_account.broken_ptp_follow_up",
+        title: "Follow up broken promise-to-pay",
+        description: "One or more borrower payment promises matured with a shortfall and require a recorded follow-up treatment.",
+        queue: "collections_ops",
+        role: "collections_manager",
+        priority: "high",
+        openedAt: `${brokenPromises[0].promisedDate}T23:59:59.999Z`,
+        action: { method: "POST", path: `/loan-accounts/${account.loanAccountId}/collection-contacts`, description: "Record the follow-up contact and disposition." },
+        context: { brokenPromises }
+      }));
+    }
+
+    return tasks;
+  });
+}
+
+function deriveLegalRecoveryTasks(cases, asOf) {
+  return cases.flatMap((legalCase) => {
+    if (!legalCase?.caseId || ["closed", "withdrawn"].includes(legalCase.status)) return [];
+    const enriched = enrichLegalRecoveryCase(legalCase, asOf); const tasks = [];
+    if (legalCase.status === "strategy_approved") tasks.push(legalRecoveryTask(legalCase, { type: "legal_recovery.notice_issue", title: "Issue approved legal notice", description: "Generate, independently approve, deliver, and evidence the track-specific legal notice.", queue: "collections_ops", role: "collections_manager", priority: "critical", openedAt: legalCase.openedAt, dueAt: legalCase.chequeDetails?.noticeIssueDeadline ?? null, action: { method: "POST", path: `/legal-recovery-cases/${legalCase.caseId}/notices`, description: "Issue and evidence the legal notice." }, context: { track: legalCase.track, chequeDetails: legalCase.chequeDetails } }));
+    if (legalCase.status === "notice_issued" && enriched.statutoryClock?.expired) tasks.push(legalRecoveryTask(legalCase, { type: "legal_recovery.statutory_action", title: "Review expired statutory recovery clock", description: "The notice response period expired; record payment, settlement, filing, or approved enforcement action.", queue: "collections_ops", role: "collections_manager", priority: "critical", openedAt: enriched.statutoryClock.deadline, action: { method: "POST", path: `/legal-recovery-cases/${legalCase.caseId}/events`, description: "Record the governed next legal action." }, context: { track: legalCase.track, statutoryClock: enriched.statutoryClock } }));
+    if (enriched.hearingOverdue) tasks.push(legalRecoveryTask(legalCase, { type: "legal_recovery.hearing_follow_up", title: "Update overdue legal hearing", description: "The recorded hearing date has passed without a subsequent case event.", queue: "collections_ops", role: "collections_manager", priority: "high", openedAt: `${legalCase.nextHearingDate}T23:59:59.999Z`, action: { method: "POST", path: `/legal-recovery-cases/${legalCase.caseId}/events`, description: "Record hearing outcome or next hearing." }, context: { nextHearingDate: legalCase.nextHearingDate, courtCaseNumber: legalCase.courtCaseNumber } }));
     return tasks;
   });
 }
@@ -608,6 +640,10 @@ function loanAccountTask(account, task) {
     regulatedEntityId: account.regulatedEntityId ?? null,
     productId: account.productId ?? null
   });
+}
+
+function legalRecoveryTask(legalCase, task) {
+  return baseTask({ ...task, entity: { type: "legal_recovery_case", id: legalCase.caseId }, sourceStatus: legalCase.status, borrowerId: legalCase.borrowerId ?? null, regulatedEntityId: null, productId: null });
 }
 
 function complaintTask(complaint, task) {

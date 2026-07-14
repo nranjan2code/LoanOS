@@ -148,7 +148,7 @@ Done when:
 
 ## Epic 6: Collections, Recovery, and Delinquency
 
-Status: first executable slice complete; hardship restructure, settlement/write-off, recovery-agent registry, and cash-recovery exception workflow first slices complete.
+Status: controlled collections and statutory legal-recovery first slices complete; partner integrations and enforcement depth remain.
 
 Goal: manage overdue accounts without violating borrower protection and recovery rules.
 
@@ -160,9 +160,12 @@ Tasks:
 - Recovery-agent assignment notice before contact. Done.
 - Cash recovery exception workflow. Done: cash is treated as an exception channel, not the default — `postCashRecoveryToLoanAccount` (`loan-account.js`) requires a coded `exceptionReason` (`CASH_RECOVERY_EXCEPTION_REASONS`; `other` requires a narrative) plus `approvedBy`/`approvalRef`, and the API additionally role-checks `approvedBy` against a registered, active `collections_manager` staff actor (`validateCashRecoveryApprovalAccess`) before the domain gate runs.
 - Same-day cash recovery posting. Done.
+- Telecalling and field execution. First slice done (REV-51): assigned-agent call, IVR, and field-visit contacts retain disposition, delinquency snapshot, timestamp, evidence reference, and conduct-hour validation; field visits require valid latitude/longitude plus geo-evidence. Live dialer campaigns, route planning, offline mobile sync, and media transport remain partner/planned.
+- Promise-to-pay. Done for the core ledger slice (REV-51): each PTP links to an evidenced contact, carries paise-exact amount/date/actor lineage, and is deterministically evaluated as pending, kept, or broken from subsequent payment events without double-allocating the same payment across promises. Broken promises derive a high-priority collections task.
+- Legal recovery. First slice done (REV-50): maker-checker strategy cases support SARFAESI, Section 138, Lok Adalat, arbitration, DRT, civil suit, and insolvency. SARFAESI requires NPA plus registered CERSAI security, issues a checksum-sealed Section 13(2) demand record with delivery evidence and a 60-day clock, and blocks early enforcement. Section 138 preserves cheque/memo evidence, enforces the 30-day notice limit and 15-day payment clock. Generic filing, hearing, order, settlement, withdrawal, and closure events are audit-sealed and task-driven. Possession/auction, track-specific pleadings, legal-expense accounting, advocate panels, court integration, and limitation engines remain planned.
 - Hardship and restructure workflow. First slice done: `restructureLoanAccount` (`packages/core/src/loan-account.js`) modifies a stressed but active loan under maker-checker approval (four-eyes) — extending the remaining tenure and/or conceding the rate and re-amortizing the remaining principal over the new term (past installments untouched). The account is flagged `restructured`, which surfaces in `classifyLoanAsset` and the CIC snapshot. `POST /loan-accounts/{id}/restructure` drives it and seals the event into the audit spine.
 - Settlement and write-off approval. First slice done: `settleLoanAccount` closes an active loan for less than the full outstanding under maker-checker approval (four-eyes) — the borrower pays the agreed amount and the RE waives (sacrifices) the shortfall via principal/interest waiver ledger credits, closing the account as `settled`; `writeOffLoanAccount` marks an account `written_off` as a book loss while retaining the borrower's legal dues on the ledger. Both are reported to the CIC snapshot (`settled`/`closureType`, `writtenOff`/`writeOffAmount`). `POST /loan-accounts/{id}/settlement` and `POST /loan-accounts/{id}/write-off` drive them and seal events into the audit spine.
-- Tests for recovery notice and same-day cash posting. Done.
+- Tests for recovery notice, same-day cash posting, field evidence, PTP status, and statutory legal clocks. Done.
 
 Done when:
 
