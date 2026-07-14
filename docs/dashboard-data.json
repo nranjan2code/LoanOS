@@ -1,9 +1,70 @@
 {
-  "generated": "2026-07-14T20:07:38.523Z",
+  "generated": "2026-07-14T20:17:32.547Z",
   "git": {
     "branch": "main",
-    "count": 176,
-    "commits": []
+    "count": 178,
+    "commits": [
+      {
+        "hash": "ce1aacb",
+        "subject": "fix(web): serve product journeys publicly",
+        "when": "51 seconds ago"
+      },
+      {
+        "hash": "0848776",
+        "subject": "feat(integrations): complete deployment execution ports",
+        "when": "9 minutes ago"
+      },
+      {
+        "hash": "5f992d0",
+        "subject": "feat(integrations): complete adapter execution baseline",
+        "when": "14 minutes ago"
+      },
+      {
+        "hash": "3037e82",
+        "subject": "chore: sync and update workspace files",
+        "when": "21 minutes ago"
+      },
+      {
+        "hash": "81f7941",
+        "subject": "docs(dashboard): refresh integration wave metadata",
+        "when": "22 minutes ago"
+      },
+      {
+        "hash": "73efaa1",
+        "subject": "feat(integrations): persist delivery and file conformance",
+        "when": "23 minutes ago"
+      },
+      {
+        "hash": "9603764",
+        "subject": "feat(integrations): add adverse provider simulation",
+        "when": "29 minutes ago"
+      },
+      {
+        "hash": "35c274b",
+        "subject": "docs(integrations): map APIs by platform module",
+        "when": "45 minutes ago"
+      },
+      {
+        "hash": "9faac39",
+        "subject": "docs(integrations): add vendor procurement catalogue",
+        "when": "58 minutes ago"
+      },
+      {
+        "hash": "7c24518",
+        "subject": "feat(web): add governed product journey library",
+        "when": "63 minutes ago"
+      },
+      {
+        "hash": "391c6e2",
+        "subject": "feat(system): eliminate unstarted capability gaps",
+        "when": "65 minutes ago"
+      },
+      {
+        "hash": "0213b3d",
+        "subject": "feat(product): close broad lending capability gaps",
+        "when": "71 minutes ago"
+      }
+    ]
   },
   "overall": {
     "counts": {
@@ -16,6 +77,11 @@
       "External": 6
     },
     "total": 453,
+    "scored": 444,
+    "excluded": 9,
+    "maturityPct": 52,
+    "evidenceCount": 34,
+    "evidencePct": 8,
     "pct": 52
   },
   "planes": [
@@ -81,6 +147,11 @@
         "External": 0
       },
       "total": 111,
+      "scored": 110,
+      "excluded": 1,
+      "maturityPct": 47,
+      "evidenceCount": 17,
+      "evidencePct": 15,
       "pct": 47
     },
     {
@@ -139,6 +210,11 @@
         "External": 0
       },
       "total": 98,
+      "scored": 97,
+      "excluded": 1,
+      "maturityPct": 55,
+      "evidenceCount": 3,
+      "evidencePct": 3,
       "pct": 55
     },
     {
@@ -179,6 +255,11 @@
         "External": 0
       },
       "total": 50,
+      "scored": 49,
+      "excluded": 1,
+      "maturityPct": 57,
+      "evidenceCount": 4,
+      "evidencePct": 8,
       "pct": 57
     },
     {
@@ -225,6 +306,11 @@
         "External": 1
       },
       "total": 65,
+      "scored": 64,
+      "excluded": 1,
+      "maturityPct": 55,
+      "evidenceCount": 3,
+      "evidencePct": 5,
       "pct": 55
     },
     {
@@ -247,6 +333,11 @@
         "External": 0
       },
       "total": 15,
+      "scored": 15,
+      "excluded": 0,
+      "maturityPct": 64,
+      "evidenceCount": 2,
+      "evidencePct": 13,
       "pct": 64
     },
     {
@@ -269,6 +360,11 @@
         "External": 0
       },
       "total": 15,
+      "scored": 15,
+      "excluded": 0,
+      "maturityPct": 64,
+      "evidenceCount": 1,
+      "evidencePct": 7,
       "pct": 64
     },
     {
@@ -291,6 +387,11 @@
         "External": 0
       },
       "total": 11,
+      "scored": 11,
+      "excluded": 0,
+      "maturityPct": 40,
+      "evidenceCount": 0,
+      "evidencePct": 0,
       "pct": 40
     },
     {
@@ -313,6 +414,11 @@
         "External": 0
       },
       "total": 12,
+      "scored": 12,
+      "excluded": 0,
+      "maturityPct": 40,
+      "evidenceCount": 0,
+      "evidencePct": 0,
       "pct": 40
     },
     {
@@ -335,6 +441,11 @@
         "External": 2
       },
       "total": 17,
+      "scored": 15,
+      "excluded": 2,
+      "maturityPct": 48,
+      "evidenceCount": 0,
+      "evidencePct": 0,
       "pct": 48
     },
     {
@@ -357,6 +468,11 @@
         "External": 0
       },
       "total": 14,
+      "scored": 14,
+      "excluded": 0,
+      "maturityPct": 44,
+      "evidenceCount": 0,
+      "evidencePct": 0,
       "pct": 44
     },
     {
@@ -379,6 +495,11 @@
         "External": 0
       },
       "total": 15,
+      "scored": 15,
+      "excluded": 0,
+      "maturityPct": 44,
+      "evidenceCount": 0,
+      "evidencePct": 0,
       "pct": 44
     },
     {
@@ -407,6 +528,11 @@
         "External": 3
       },
       "total": 30,
+      "scored": 27,
+      "excluded": 3,
+      "maturityPct": 44,
+      "evidenceCount": 4,
+      "evidencePct": 13,
       "pct": 44
     }
   ],
@@ -654,6 +780,11 @@
         "External": 0
       },
       "total": 15,
+      "scored": 15,
+      "excluded": 0,
+      "maturityPct": 64,
+      "evidenceCount": 2,
+      "evidencePct": 13,
       "pct": 64
     },
     {
@@ -802,6 +933,11 @@
         "External": 0
       },
       "total": 10,
+      "scored": 10,
+      "excluded": 0,
+      "maturityPct": 52,
+      "evidenceCount": 0,
+      "evidencePct": 0,
       "pct": 52
     },
     {
@@ -1015,6 +1151,11 @@
         "External": 0
       },
       "total": 15,
+      "scored": 15,
+      "excluded": 0,
+      "maturityPct": 56,
+      "evidenceCount": 0,
+      "evidencePct": 0,
       "pct": 56
     },
     {
@@ -1275,6 +1416,11 @@
         "External": 0
       },
       "total": 10,
+      "scored": 10,
+      "excluded": 0,
+      "maturityPct": 40,
+      "evidenceCount": 7,
+      "evidencePct": 70,
       "pct": 40
     },
     {
@@ -1580,6 +1726,11 @@
         "External": 0
       },
       "total": 12,
+      "scored": 12,
+      "excluded": 0,
+      "maturityPct": 45,
+      "evidenceCount": 6,
+      "evidencePct": 50,
       "pct": 45
     },
     {
@@ -1807,6 +1958,11 @@
         "External": 1
       },
       "total": 14,
+      "scored": 13,
+      "excluded": 1,
+      "maturityPct": 68,
+      "evidenceCount": 2,
+      "evidencePct": 14,
       "pct": 68
     },
     {
@@ -2062,6 +2218,11 @@
         "External": 0
       },
       "total": 17,
+      "scored": 17,
+      "excluded": 0,
+      "maturityPct": 46,
+      "evidenceCount": 1,
+      "evidencePct": 6,
       "pct": 46
     },
     {
@@ -2236,6 +2397,11 @@
         "External": 0
       },
       "total": 12,
+      "scored": 11,
+      "excluded": 1,
+      "maturityPct": 51,
+      "evidenceCount": 0,
+      "evidencePct": 0,
       "pct": 51
     },
     {
@@ -2423,6 +2589,11 @@
         "External": 0
       },
       "total": 13,
+      "scored": 12,
+      "excluded": 1,
+      "maturityPct": 39,
+      "evidenceCount": 0,
+      "evidencePct": 0,
       "pct": 39
     },
     {
@@ -2701,6 +2872,11 @@
         "External": 0
       },
       "total": 20,
+      "scored": 20,
+      "excluded": 0,
+      "maturityPct": 48,
+      "evidenceCount": 0,
+      "evidencePct": 0,
       "pct": 48
     },
     {
@@ -2886,6 +3062,11 @@
         "External": 0
       },
       "total": 12,
+      "scored": 12,
+      "excluded": 0,
+      "maturityPct": 40,
+      "evidenceCount": 1,
+      "evidencePct": 8,
       "pct": 40
     },
     {
@@ -3113,6 +3294,11 @@
         "External": 0
       },
       "total": 14,
+      "scored": 14,
+      "excluded": 0,
+      "maturityPct": 61,
+      "evidenceCount": 2,
+      "evidencePct": 14,
       "pct": 61
     },
     {
@@ -3300,6 +3486,11 @@
         "External": 0
       },
       "total": 13,
+      "scored": 13,
+      "excluded": 0,
+      "maturityPct": 52,
+      "evidenceCount": 0,
+      "evidencePct": 0,
       "pct": 52
     },
     {
@@ -3529,6 +3720,11 @@
         "External": 0
       },
       "total": 15,
+      "scored": 15,
+      "excluded": 0,
+      "maturityPct": 48,
+      "evidenceCount": 1,
+      "evidencePct": 7,
       "pct": 48
     },
     {
@@ -3753,6 +3949,11 @@
         "External": 0
       },
       "total": 15,
+      "scored": 15,
+      "excluded": 0,
+      "maturityPct": 60,
+      "evidenceCount": 1,
+      "evidencePct": 7,
       "pct": 60
     },
     {
@@ -3966,6 +4167,11 @@
         "External": 0
       },
       "total": 15,
+      "scored": 14,
+      "excluded": 1,
+      "maturityPct": 49,
+      "evidenceCount": 0,
+      "evidencePct": 0,
       "pct": 49
     },
     {
@@ -4164,6 +4370,11 @@
         "External": 0
       },
       "total": 13,
+      "scored": 13,
+      "excluded": 0,
+      "maturityPct": 49,
+      "evidenceCount": 1,
+      "evidencePct": 8,
       "pct": 49
     },
     {
@@ -4377,6 +4588,11 @@
         "External": 0
       },
       "total": 15,
+      "scored": 15,
+      "excluded": 0,
+      "maturityPct": 60,
+      "evidenceCount": 0,
+      "evidencePct": 0,
       "pct": 60
     },
     {
@@ -4551,6 +4767,11 @@
         "External": 0
       },
       "total": 12,
+      "scored": 12,
+      "excluded": 0,
+      "maturityPct": 60,
+      "evidenceCount": 0,
+      "evidencePct": 0,
       "pct": 60
     },
     {
@@ -4738,6 +4959,11 @@
         "External": 0
       },
       "total": 13,
+      "scored": 13,
+      "excluded": 0,
+      "maturityPct": 63,
+      "evidenceCount": 0,
+      "evidencePct": 0,
       "pct": 63
     },
     {
@@ -4963,6 +5189,11 @@
         "External": 0
       },
       "total": 13,
+      "scored": 13,
+      "excluded": 0,
+      "maturityPct": 63,
+      "evidenceCount": 3,
+      "evidencePct": 23,
       "pct": 63
     },
     {
@@ -5179,6 +5410,11 @@
         "External": 0
       },
       "total": 14,
+      "scored": 14,
+      "excluded": 0,
+      "maturityPct": 57,
+      "evidenceCount": 1,
+      "evidencePct": 7,
       "pct": 57
     },
     {
@@ -5340,6 +5576,11 @@
         "External": 0
       },
       "total": 11,
+      "scored": 11,
+      "excluded": 0,
+      "maturityPct": 56,
+      "evidenceCount": 0,
+      "evidencePct": 0,
       "pct": 56
     },
     {
@@ -5551,6 +5792,11 @@
         "External": 0
       },
       "total": 14,
+      "scored": 14,
+      "excluded": 0,
+      "maturityPct": 44,
+      "evidenceCount": 1,
+      "evidencePct": 7,
       "pct": 44
     },
     {
@@ -5725,6 +5971,11 @@
         "External": 0
       },
       "total": 12,
+      "scored": 12,
+      "excluded": 0,
+      "maturityPct": 40,
+      "evidenceCount": 0,
+      "evidencePct": 0,
       "pct": 40
     },
     {
@@ -5886,6 +6137,11 @@
         "External": 0
       },
       "total": 11,
+      "scored": 11,
+      "excluded": 0,
+      "maturityPct": 40,
+      "evidenceCount": 0,
+      "evidencePct": 0,
       "pct": 40
     },
     {
@@ -6120,6 +6376,11 @@
         "External": 0
       },
       "total": 15,
+      "scored": 15,
+      "excluded": 0,
+      "maturityPct": 64,
+      "evidenceCount": 1,
+      "evidencePct": 7,
       "pct": 64
     },
     {
@@ -6294,6 +6555,11 @@
         "External": 0
       },
       "total": 12,
+      "scored": 12,
+      "excluded": 0,
+      "maturityPct": 55,
+      "evidenceCount": 0,
+      "evidencePct": 0,
       "pct": 55
     },
     {
@@ -6533,6 +6799,11 @@
         "External": 2
       },
       "total": 17,
+      "scored": 15,
+      "excluded": 2,
+      "maturityPct": 48,
+      "evidenceCount": 0,
+      "evidencePct": 0,
       "pct": 48
     },
     {
@@ -6733,6 +7004,11 @@
         "External": 0
       },
       "total": 14,
+      "scored": 14,
+      "excluded": 0,
+      "maturityPct": 44,
+      "evidenceCount": 0,
+      "evidencePct": 0,
       "pct": 44
     },
     {
@@ -6946,6 +7222,11 @@
         "External": 0
       },
       "total": 15,
+      "scored": 15,
+      "excluded": 0,
+      "maturityPct": 44,
+      "evidenceCount": 0,
+      "evidencePct": 0,
       "pct": 44
     },
     {
@@ -7249,6 +7530,11 @@
         "External": 0
       },
       "total": 17,
+      "scored": 17,
+      "excluded": 0,
+      "maturityPct": 47,
+      "evidenceCount": 4,
+      "evidencePct": 24,
       "pct": 47
     },
     {
@@ -7436,6 +7722,11 @@
         "External": 3
       },
       "total": 13,
+      "scored": 10,
+      "excluded": 3,
+      "maturityPct": 40,
+      "evidenceCount": 0,
+      "evidencePct": 0,
       "pct": 40
     }
   ],
@@ -7474,11 +7765,11 @@
     },
     {
       "name": "Epic 9: Regulatory Reporting and Integrations",
-      "status": ""
+      "status": "governed reporting and integration control-plane first slices complete; proprietary provider certification and live authority connectivity remain external."
     },
     {
       "name": "Epic 10: Security and Production Platform",
-      "status": ""
+      "status": "governed production-control first slices complete; managed infrastructure, live security services and independently witnessed operating evidence remain deployment work."
     },
     {
       "name": "Epic 11: Implementation, Migration, and Adoption",
@@ -7494,9 +7785,11 @@
     }
   ],
   "tests": {
-    "pass": 411,
+    "pass": 413,
     "fail": 0,
-    "total": 416,
-    "ran": true
+    "skipped": 5,
+    "total": 418,
+    "ran": true,
+    "source": "live"
   }
 }

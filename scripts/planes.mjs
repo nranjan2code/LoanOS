@@ -32,6 +32,7 @@ export function parseRegister(md) {
 }
 
 export function normalizeStatus(raw) {
+  if (typeof raw !== 'string' || !raw.trim()) throw new Error('Capability status is required.');
   const s = raw.toLowerCase();
   if (s.includes('mock') && s.includes('partial')) return 'Partial/Mock';
   if (s.startsWith('mostly missing') || s === 'missing' || s.startsWith('missing')) return 'Missing';
@@ -40,5 +41,5 @@ export function normalizeStatus(raw) {
   if (s.startsWith('partner') || s.includes('/partner')) return 'Partner';
   if (s.startsWith('external')) return 'External';
   if (s.startsWith('mock')) return 'Mock';
-  return 'Partial';
+  throw new Error(`Unknown capability status: ${raw}`);
 }

@@ -280,6 +280,8 @@ Done when:
 
 ## Epic 9: Regulatory Reporting and Integrations
 
+Status: governed reporting and integration control-plane first slices complete; proprietary provider certification and live authority connectivity remain external.
+
 Goal: generate required reporting evidence from runtime data.
 
 Tasks:
@@ -300,6 +302,8 @@ Done when:
 - Reporting exports can be generated from source-of-truth records, not manual re-entry.
 
 ## Epic 10: Security and Production Platform
+
+Status: governed production-control first slices complete; managed infrastructure, live security services and independently witnessed operating evidence remain deployment work.
 
 Goal: production-grade operating platform for regulated data.
 

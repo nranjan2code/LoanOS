@@ -3,30 +3,29 @@
 // Re-scans git, the full capability register (453 caps across 33 categories),
 // backlog epics, and runs the test suite, then writes a self-contained
 // docs/dashboard.html. Run: node scripts/build-dashboard.mjs
-import { execSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { PLANE_ORDER, normalizeStatus, parseRegister } from './planes.mjs';
+import { DASHBOARD_STATUSES, parseBacklogEpics, parseTapSummary, rollupCapabilities } from './dashboard-utils.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const sh = (c) => execSync(c, { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+const gitCommand = (...args) => execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
 const read = (p) => readFileSync(join(ROOT, p), 'utf8');
 
 // --- git ---
 let git = { branch: '?', count: 0, commits: [] };
 try {
-  git.branch = sh('git branch --show-current');
-  git.count = Number(sh('git rev-list --count HEAD'));
-  git.commits = sh('git log -12 --format=%h|%s|%cr').split('\n').map((l) => {
-    const [hash, subject, when] = l.split('|'); return { hash, subject, when };
+  git.branch = gitCommand('branch', '--show-current');
+  git.count = Number(gitCommand('rev-list', '--count', 'HEAD'));
+  git.commits = gitCommand('log', '-12', '--format=%h%x00%s%x00%cr').split('\n').filter(Boolean).map((line) => {
+    const [hash, subject, when] = line.split('\0'); return { hash, subject, when };
   });
 } catch {}
 
 // --- capability register: 33 categories -> features (ID, name, applicability, status) ---
-const STATUSES = ['Implemented', 'Partial', 'Partial/Mock', 'Mock', 'Missing', 'Partner', 'External'];
-// completion weight per status (Partner/External excluded from scored denominator)
-const WEIGHT = { Implemented: 1, 'Partial/Mock': 0.4, Partial: 0.4, Mock: 0.3, Missing: 0, Partner: null, External: null };
+const STATUSES = DASHBOARD_STATUSES;
 
 // capability trace register (curated evidence per capability ID), if present
 const tracePath = join(ROOT, 'docs/product/capability-trace.json');
@@ -46,13 +45,7 @@ const categories = parseRegister(cat).map((category) => ({
   }),
 }));
 // per-category rollup + overall
-const rollup = (features) => {
-  const counts = Object.fromEntries(STATUSES.map((s) => [s, 0]));
-  features.forEach((f) => counts[f.status]++);
-  let num = 0, den = 0;
-  features.forEach((f) => { const w = WEIGHT[f.status]; if (w !== null) { num += w; den += 1; } });
-  return { counts, total: features.length, pct: den ? Math.round((num / den) * 100) : 0 };
-};
+const rollup = (features) => { const result = rollupCapabilities(features); return { ...result, pct: result.maturityPct }; };
 categories.forEach((c) => { Object.assign(c, rollup(c.features)); });
 const allFeatures = categories.flatMap((c) => c.features);
 const overall = rollup(allFeatures);
@@ -64,19 +57,12 @@ const planes = PLANE_ORDER.map((name) => {
 }).filter((p) => p.total);
 
 // --- backlog epics ---
-const epics = [];
-const bk = read('docs/product/build-backlog.md').split('\n');
-for (let i = 0; i < bk.length; i++) {
-  const e = bk[i].match(/^##\s+(Epic\s+\d+:.*)/); if (!e) continue;
-  let status = '';
-  for (let j = i + 1; j < Math.min(i + 4, bk.length); j++) { const s = bk[j].match(/^Status:\s*(.+)/); if (s) { status = s[1]; break; } }
-  epics.push({ name: e[1], status });
-}
+const epics = parseBacklogEpics(read('docs/product/build-backlog.md'));
 
 // --- tests ---
 // Reuse an existing run when DASHBOARD_TEST_LOG points to a test log (set by loanos.sh build,
 // which already runs `npm test`); otherwise run the suite live.
-let tests = { pass: null, fail: null, total: null, ran: false };
+let tests = { pass: null, fail: null, skipped: null, total: null, ran: false, source: 'none' };
 try {
   let out = '';
   const logPath = process.env.DASHBOARD_TEST_LOG;
@@ -85,8 +71,7 @@ try {
     try { out = execSync('node --test tests/*.test.js 2>&1', { cwd: ROOT, encoding: 'utf8', timeout: 120000 }); }
     catch (e) { out = (e.stdout || '') + (e.stderr || ''); }
   }
-  const g = (k) => { const m = out.match(new RegExp('[#ℹ]\\s*' + k + '\\s+(\\d+)')); return m ? Number(m[1]) : null; };
-  tests = { pass: g('pass'), fail: g('fail'), total: g('tests'), ran: g('tests') != null };
+  tests = { ...parseTapSummary(out), source: logPath ? 'provided-log' : 'live' };
 } catch {}
 
 const data = { generated: new Date().toISOString(), git, overall, planes, categories, epics, tests };
@@ -162,11 +147,11 @@ summary::-webkit-details-marker{display:none}summary:hover{background:#1a1e26}
 <p class="sub">Generated ${new Date(data.generated).toLocaleString()} · branch <b>${git.branch}</b> · ${allFeatures.length} capabilities across ${categories.length} categories · regenerate: <code>node scripts/build-dashboard.mjs</code></p>
 
 <div class="grid">
-  <div class="card"><div class="kpi">${overall.pct}%</div><div class="muted">overall completion (weighted)</div></div>
+  <div class="card"><div class="kpi">${overall.pct}%</div><div class="muted">catalogue maturity (weighted; ${overall.excluded} external/partner excluded)</div></div>
   <div class="card"><div class="kpi">${overall.counts.Implemented}<small> / ${allFeatures.length}</small></div><div class="muted">implemented</div></div>
   <div class="card"><div class="kpi">${overall.counts.Partial + overall.counts['Partial/Mock'] + overall.counts.Mock}</div><div class="muted">partial / mock</div></div>
   <div class="card"><div class="kpi">${overall.counts.Missing}</div><div class="muted">missing</div></div>
-  <div class="card"><div class="kpi">${allFeatures.filter((f) => f.evidence.length).length}<small> / ${allFeatures.length}</small></div><div class="muted">traced (evidence linked)</div></div>
+  <div class="card"><div class="kpi">${overall.evidencePct}%<small> · ${overall.evidenceCount}/${allFeatures.length}</small></div><div class="muted">evidence coverage (not completion)</div></div>
   <div class="card"><div class="kpi" style="font-size:14px;padding-top:7px">${testBadge}</div><div class="muted">test suite</div></div>
 </div>
 
@@ -268,4 +253,4 @@ render();
 </body></html>`;
 
 writeFileSync(join(ROOT, 'docs/dashboard.html'), html);
-console.log(`dashboard.html · ${allFeatures.length} caps / ${categories.length} categories · ${overall.pct}% weighted · impl=${overall.counts.Implemented} missing=${overall.counts.Missing} · tests=${t.ran ? `${t.pass}/${t.total}(${t.fail}f)` : 'skip'}`);
+console.log(`dashboard.html · ${allFeatures.length} caps / ${categories.length} categories · ${overall.pct}% catalogue maturity · evidence=${overall.evidenceCount}/${overall.total} · impl=${overall.counts.Implemented} missing=${overall.counts.Missing} · tests=${t.ran ? `${t.pass}/${t.total}(${t.fail}f,${t.skipped ?? 0}s)` : 'skip'}`);

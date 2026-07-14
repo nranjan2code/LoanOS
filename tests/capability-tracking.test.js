@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 import { normalizeStatus, parseRegister } from '../scripts/planes.mjs';
+import { parseBacklogEpics, parseTapSummary, rollupCapabilities } from '../scripts/dashboard-utils.mjs';
 
 const catalogueUrl = new URL('../docs/product/complete-system-capability-catalog.md', import.meta.url);
 const traceUrl = new URL('../docs/product/capability-trace.json', import.meta.url);
@@ -39,13 +40,29 @@ test('trace and dashboard artifacts cover every parsed capability', async () => 
   assert.equal(Object.keys(trace).length, parsed.length);
   assert.equal(dashboard.overall.total, parsed.length);
   assert.equal(dashboardCapabilities.length, parsed.length);
+  assert.ok(dashboard.git.commits.length > 0, 'dashboard must contain recent commits');
+  assert.equal(dashboard.epics.length, 13);
+  assert.ok(dashboard.epics.every((epic) => epic.status), 'every backlog epic must have an explicit status');
+  assert.equal(dashboard.overall.evidenceCount, dashboardCapabilities.filter((capability) => capability.evidence.length).length);
+  assert.equal(dashboard.overall.scored + dashboard.overall.excluded, dashboard.overall.total);
   assert.ok(trace['UX-001']);
   assert.ok(dashboardCapabilities.some((capability) => capability.id === 'UX-017'));
 });
 
-test('status normalization remains conservative for unknown labels', () => {
+test('status normalization fails closed for unknown labels', () => {
   assert.equal(normalizeStatus('Implemented'), 'Implemented');
   assert.equal(normalizeStatus('Partial/Mock'), 'Partial/Mock');
   assert.equal(normalizeStatus('Missing'), 'Missing');
-  assert.equal(normalizeStatus('unrecognised-status'), 'Partial');
+  assert.throws(() => normalizeStatus('unrecognised-status'), /Unknown capability status/);
+});
+
+test('dashboard helpers parse distant epic statuses and final TAP summary', () => {
+  const epics = parseBacklogEpics('## Epic 1: One\n\nGoal: x\n\nStatus: complete.\n\n## Epic 2: Two\nStatus: partial.');
+  assert.deepEqual(epics.map((epic) => epic.status), ['complete.', 'partial.']);
+  assert.deepEqual(parseTapSummary('ℹ tests 10\nℹ pass 8\nℹ fail 1\nℹ skipped 1\n'), { pass: 8, fail: 1, skipped: 1, total: 10, ran: true, source: 'live' });
+});
+
+test('catalogue maturity discloses exclusions and evidence coverage', () => {
+  const result = rollupCapabilities([{ status: 'Implemented', evidence: [{ type: 'test' }] }, { status: 'Partial', evidence: [] }, { status: 'External', evidence: [] }]);
+  assert.equal(result.maturityPct, 70); assert.equal(result.scored, 2); assert.equal(result.excluded, 1); assert.equal(result.evidencePct, 33);
 });
