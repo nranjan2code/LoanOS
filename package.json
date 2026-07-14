@@ -6,6 +6,8 @@
   "description": "India-only LoanOS foundation covering LOS, LMS, LWS, and compliance-first AI governance.",
   "scripts": {
     "test": "node --test tests/*.test.js",
+    "trace:sync": "node scripts/sync-capability-trace.mjs",
+    "dashboard": "node scripts/sync-capability-trace.mjs && node scripts/build-dashboard.mjs",
     "dev:api": "node apps/api/src/server.js",
     "start": "node apps/api/src/server.js"
   },

@@ -61,7 +61,11 @@ if ! command -v cargo >/dev/null; then
 fi
 export PATH="/root/.cargo/bin:$PATH"
 
-install -d -m 0750 /opt/loanos "$STATE_DIR" "$STATE_DIR/audit"
+# PostgreSQL runs as its own OS user and must traverse this parent directory
+# while importing the read-only schema below. Sensitive runtime state remains
+# restricted under STATE_DIR and configuration under /etc/loanos.
+install -d -m 0755 /opt/loanos
+install -d -m 0750 "$STATE_DIR" "$STATE_DIR/audit"
 [[ -f "$APP_DIR/package.json" ]] || {
   echo "LoanOS source archive is missing package.json in its root" >&2
   exit 1

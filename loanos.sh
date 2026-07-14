@@ -19,7 +19,7 @@ RULES_SIGNING_KEY="00112233445566778899aabbccddeeff00112233445566778899aabbccdde
 RULES_ADMIN_TOKEN="dev-admin-token"
 
 usage() {
-    echo "Usage: $0 {build|start [all|api|rules]|stop [all|api|rules]|restart [all|api|rules]|status [all|api|rules]|logs|clean}"
+    echo "Usage: $0 {build|start [all|api|rules]|stop [all|api|rules]|restart [all|api|rules]|status [all|api|rules]|logs|clean|dashboard}"
     exit 1
 }
 
@@ -149,7 +149,28 @@ EOF
 
     echo "==> Dependencies installed and verified successfully."
     echo "==> Running Node verification tests..."
-    npm test
+    set -o pipefail
+    npm test 2>&1 | tee test_output.log
+    TEST_RC=${PIPESTATUS[0]}
+    set +o pipefail
+
+    echo "==> Syncing capability trace register (docs/product/capability-trace.json)..."
+    node scripts/sync-capability-trace.mjs || echo "Warning: trace sync failed (non-fatal)."
+
+    echo "==> Regenerating capability & build dashboard (docs/dashboard.html)..."
+    DASHBOARD_TEST_LOG=test_output.log node scripts/build-dashboard.mjs || \
+        echo "Warning: dashboard generation failed (non-fatal)."
+
+    return $TEST_RC
+}
+
+# Sync the capability trace register (preserving curated evidence) and regenerate
+# docs/dashboard.html from git, the capability catalogue, backlog, and a live test run.
+dashboard() {
+    echo "==> Syncing capability trace register..."
+    node scripts/sync-capability-trace.mjs
+    echo "==> Regenerating capability & build dashboard..."
+    node scripts/build-dashboard.mjs
 }
 
 start() {
@@ -473,6 +494,9 @@ case "$1" in
         ;;
     logs)
         logs
+        ;;
+    dashboard)
+        dashboard
         ;;
     *)
         usage
