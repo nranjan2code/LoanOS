@@ -23,21 +23,27 @@ The default `t3.small` and 24 GB encrypted `gp3` volume consume AWS credits.
 Budget notifications are alerts, not a hard spending cap. Delete the stack
 before credits expire if continued paid usage is not acceptable.
 
-## Before uploading the template
+## Package and upload the private source
 
-The EC2 bootstrap downloads `bootstrap-demo.sh` from the URL supplied as the
-`BootstrapScriptUrl` parameter and clones the repository/ref supplied in the
-stack parameters. The checked-in defaults use the dedicated
-`codex/aws-demo-deployment` branch so publishing the demo does not require
-changing the repository's remote `main`; alternatively, host the reviewed
-script at another HTTPS URL and override both source parameters.
+The repository is private. Do not put a GitHub token in CloudFormation or EC2
+user data. Generate a tracked-source archive locally:
+
+```bash
+./deploy/aws/package-demo.sh
+```
+
+Create a private, general-purpose S3 bucket in the same AWS region as the
+stack and upload `loanos-demo-source.tar.gz`. Keep **Block all public access**
+enabled. The instance role receives permission to read only the exact bucket
+and object key entered as stack parameters.
 
 ## Create the stack in the AWS console
 
 1. Open **CloudFormation → Stacks → Create stack → With new resources**.
 2. Choose **Upload a template file** and upload `cloudformation-demo.yaml`.
 3. Use a stack name such as `loanos-demo`.
-4. Enter the billing-alert email. Keep `t3.small` for the first build.
+4. Enter the private S3 bucket and object key, plus the billing-alert email.
+   Keep `t3.small` for the first build.
 5. Confirm the IAM-resource acknowledgement and create the stack.
 6. Confirm the AWS Budget subscription email when it arrives.
 
@@ -90,3 +96,6 @@ instance are not CloudFormation resources, so delete this path afterward:
 Also check **EC2 Global View** and **Billing → Bills** after teardown. This
 stack intentionally creates no NAT Gateway, load balancer, Elastic IP, RDS
 database, or Route 53 hosted zone.
+
+Delete the uploaded source archive and its S3 bucket after the stack is
+healthy, or retain the private archive only if you need reproducible rebuilds.

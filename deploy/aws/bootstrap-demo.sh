@@ -5,14 +5,12 @@ set -Eeuo pipefail
 # This intentionally installs one tenant-bound Rust runtime and PostgreSQL on
 # the same encrypted demo VM. It is not a production topology.
 
-: "${LOANOS_SOURCE_REPOSITORY:?LOANOS_SOURCE_REPOSITORY is required}"
-: "${LOANOS_SOURCE_REF:=main}"
 : "${LOANOS_STACK_NAME:?LOANOS_STACK_NAME is required}"
 : "${LOANOS_AWS_REGION:?LOANOS_AWS_REGION is required}"
 
 STATUS_PARAMETER="/loanos-demo/${LOANOS_STACK_NAME}/status"
 CREDENTIALS_PARAMETER="/loanos-demo/${LOANOS_STACK_NAME}/credentials"
-APP_DIR=/opt/loanos/app
+APP_DIR=${LOANOS_APP_DIR:-/opt/loanos/app}
 STATE_DIR=/var/lib/loanos
 RULES_PORT=47311
 
@@ -63,14 +61,10 @@ fi
 export PATH="/root/.cargo/bin:$PATH"
 
 install -d -m 0750 /opt/loanos "$STATE_DIR" "$STATE_DIR/audit"
-if [[ -d "$APP_DIR/.git" ]]; then
-  git -C "$APP_DIR" fetch --depth 1 origin "$LOANOS_SOURCE_REF"
-  git -C "$APP_DIR" checkout --force FETCH_HEAD
-else
-  rm -rf "$APP_DIR"
-  git clone --depth 1 --branch "$LOANOS_SOURCE_REF" \
-    "$LOANOS_SOURCE_REPOSITORY" "$APP_DIR"
-fi
+[[ -f "$APP_DIR/package.json" ]] || {
+  echo "LoanOS source archive is missing package.json in its root" >&2
+  exit 1
+}
 
 cd "$APP_DIR"
 npm ci --omit=dev
