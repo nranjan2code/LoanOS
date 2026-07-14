@@ -398,6 +398,23 @@ export {
 } from "./service-operations.js";
 
 export {
+  SBOM_FORMATS,
+  SCAN_STATUSES,
+  SCAN_TYPES,
+  SEVERITIES,
+  VULNERABILITY_SLA_DAYS,
+  VULNERABILITY_STATUSES,
+  approveVulnerabilityException,
+  createSecurityScanBundle,
+  createVulnerability,
+  enrichVulnerability,
+  evaluateReleaseSecurityGate,
+  projectSecurityAssurance,
+  registerSbom,
+  transitionVulnerability
+} from "./security-assurance.js";
+
+export {
   validateMarketplaceNeutrality,
   rankMarketplaceOffers
 } from "./offer-marketplace.js";

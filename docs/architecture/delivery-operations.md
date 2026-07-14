@@ -14,7 +14,7 @@ The current lifecycle is:
 
 A canary may instead enter `canary_failed`; it cannot promote, but may be re-evaluated after remediation.
 
-Release creation requires an immutable SHA-256 artifact digest, source revision, target environment, risk, change ticket, authenticated proposer, rollback version/runbook, and references for tests, security scan, build provenance, and pre-release recovery point. Approval and promotion actors must be independent of the proposer. Canary evaluation requires a minimum request volume plus error-rate and p95-latency measurements and thresholds. Rollback is available only from `deployed`, uses the predeclared target, and retains reason, approval and incident/change evidence.
+Release creation requires an immutable SHA-256 artifact digest, source revision, target environment, risk, change ticket, authenticated proposer, rollback version/runbook, and references for tests, security scan, build provenance, and pre-release recovery point. Approval additionally fails closed unless the exact artifact/revision has a complete six-class scan bundle, signed/checksum-bound SBOM record, reconciled severe findings, and no unaccepted release-blocking vulnerability; the evaluated security gate is retained on the release. Approval and promotion actors must be independent of the proposer. Canary evaluation requires a minimum request volume plus error-rate and p95-latency measurements and thresholds. Rollback is available only from `deployed`, uses the predeclared target, and retains reason, approval and incident/change evidence.
 
 All transitions append the complete current release projection to the platform audit chain. `GET /platform/delivery/controls` reconstructs current state from that chain; there is no mutable unaudited release row.
 
@@ -51,7 +51,7 @@ The governed assessment supports load, soak, concurrency, volume, dependency-fai
 ## Operating sequence
 
 1. Establish approved development/test/UAT/production baselines and resolve unexplained parity gaps.
-2. Build once; preserve artifact digest, source revision, SBOM/signature/provenance evidence in the external pipeline, and register the release.
+2. Build once; preserve artifact digest and source revision, run and register all required security scans, register signed/checksum-bound SBOM evidence, resolve the security release gate, and register the release.
 3. Obtain independent change approval. Create and verify the pre-release recovery point.
 4. Exercise realistic load/resilience scenarios in an isolated environment and record assessments/findings/actions.
 5. Deploy the same digest to a bounded canary. Record sufficient volume, error and latency evidence.
@@ -60,4 +60,4 @@ The governed assessment supports load, soak, concurrency, volume, dependency-fai
 
 ## Production completion gaps
 
-Before D4 Production, integrate these records with signed artifacts/SBOM, CI/CD and cloud rollout controllers, database migration gates, automated traffic shifting/rollback, tenant maintenance communications, continuous IaC/config/secret-version collectors, drift alerts and remediation, production-representative datasets, long soak and peak-volume suites, database/queue/resource saturation, dependency and region fault injection, scheduled regression thresholds, and capacity forecasts. Until evidenced, OPS-011, OPS-012 and OPS-013 remain `Partial`.
+Before D4 Production, integrate these records with SBOM/signature content verification, signed provenance/artifacts, authenticated scanner and CI/CD submissions, cloud rollout controllers, database migration gates, automated traffic shifting/rollback, tenant maintenance communications, continuous IaC/config/secret-version collectors, drift alerts and remediation, production-representative datasets, long soak and peak-volume suites, database/queue/resource saturation, dependency and region fault injection, scheduled regression thresholds, and capacity forecasts. Until evidenced, OPS-011, OPS-012 and OPS-013 remain `Partial`.

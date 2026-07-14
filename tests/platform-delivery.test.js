@@ -129,6 +129,17 @@ test("bounded probe executes concurrent HTTP requests and platform APIs retain d
 
   const createdResponse = await post("/platform/delivery/releases", releaseInput(), makerCookie);
   assert.equal(createdResponse.status, 201);
+  const scanBundleResponse = await post("/platform/security-assurance/scan-bundles", {
+    bundleId: "bundle_delivery_2001",
+    artifactSha256: releaseInput().artifactSha256,
+    sourceRevision: releaseInput().sourceRevision,
+    pipelineRunRef: "ci://runs/2001/security",
+    recordedBy: "release_maker",
+    scans: ["sast", "dast", "dependency", "container", "iac", "secret"].map((type, index) => ({ scanId: `scan_delivery_${type}`, type, status: "passed", tool: `scanner-${type}`, toolVersion: "1.0.0", rulesetRef: `policy://security/${type}/v1`, evidenceRef: `evidence://security/${type}/2001`, startedAt: `2026-07-14T08:0${index}:00.000Z`, completedAt: `2026-07-14T08:1${index}:00.000Z`, findings: { critical: 0, high: 0, medium: 0, low: 0 } }))
+  }, makerCookie);
+  assert.equal(scanBundleResponse.status, 201);
+  const sbomResponse = await post("/platform/security-assurance/sboms", { sbomId: "sbom_delivery_2001", artifactSha256: releaseInput().artifactSha256, documentSha256: "d".repeat(64), format: "cyclonedx", formatVersion: "1.6", componentCount: 20, generator: "delivery-test-pipeline", evidenceRef: "evidence://sbom/2001", signatureRef: "signature://sbom/2001", recordedBy: "release_maker", generatedAt: "2026-07-14T08:20:00.000Z" }, makerCookie);
+  assert.equal(sbomResponse.status, 201);
   const approvalResponse = await post(`/platform/delivery/releases/${releaseInput().releaseId}/approval`, { approvedBy: "release_checker", approvalRef: "CAB-2001" }, checkerCookie);
   assert.equal(approvalResponse.status, 200);
   const canaryResponse = await post(`/platform/delivery/releases/${releaseInput().releaseId}/canary`, { requestCount: 1000, minimumRequests: 500, errorRatePct: 0, errorRateThresholdPct: 1, p95LatencyMs: 120, p95LatencyThresholdMs: 500, observedBy: "release_checker", evidenceRef: "metrics://canary/2001" }, checkerCookie);
