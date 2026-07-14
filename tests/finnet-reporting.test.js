@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHmac } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -42,5 +43,8 @@ test("FINnet API persists XML packet and exact acknowledgement", async (t) => {
   let response = await request("/fiu/reports", { method: "POST", body: JSON.stringify(input()) }); assert.equal(response.status, 201); let body = await response.json();
   response = await request(`/fiu/reports/${body.report.reportId}/review`, { method: "POST", body: JSON.stringify({ actor: "po", actorRole: "principal_officer", reviewNotes: "confirmed" }) }); assert.equal(response.status, 200);
   response = await request(`/fiu/reports/${body.report.reportId}/filing`, { method: "POST", body: JSON.stringify({ actor: "po" }) }); assert.equal(response.status, 200, response.status === 200 ? undefined : await response.text()); body = await response.json(); assert.equal(body.report.status, "filed"); assert.match(body.report.finnetPacket.xml, /FINnetReport/);
-  response = await request(`/fiu/reports/${body.report.reportId}/acknowledgement`, { method: "POST", body: JSON.stringify({ status: "accepted", acknowledgementRef: "ACK-API", checksumSha256: body.report.finnetPacket.checksumSha256, receivedBy: "po" }) }); assert.equal(response.status, 200); body = await response.json(); assert.equal(body.report.status, "acknowledged");
+  process.env.LOANOS_PROVIDER_CALLBACK_SECRETS = JSON.stringify({ fiu: "callback-secret" });
+  t.after(() => { delete process.env.LOANOS_PROVIDER_CALLBACK_SECRETS; });
+  const payload = { reportId: body.report.reportId, status: "accepted", acknowledgementRef: "ACK-API", checksumSha256: body.report.finnetPacket.checksumSha256, receivedBy: "po" }; const eventId = "evt_fiu_001"; const signature = createHmac("sha256", "callback-secret").update(`fiu.${eventId}.${JSON.stringify(payload)}`).digest("hex");
+  response = await request("/integrations/fiu/callbacks", { method: "POST", headers: { "x-provider-signature": `sha256=${signature}` }, body: JSON.stringify({ eventId, payload }) }); assert.equal(response.status, 202); body = await response.json(); assert.equal(body.callback.reconciled.outcome, "acknowledged");
 });

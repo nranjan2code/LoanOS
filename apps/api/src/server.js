@@ -1088,8 +1088,22 @@ async function route(req, res, dataDir, platformAdminKey) {
       const verified = manager.verifyProviderCallback(provider, body.eventId, body.payload, Array.isArray(signature) ? signature[0] : signature);
       const state = await store.load(); const existing = state.providerCallbacks?.[`${provider}:${body.eventId}`];
       if (existing) { sendJson(res, 200, { callback: existing, idempotent: true }); return; }
-      const callback = { callbackId: `${provider}:${body.eventId}`, provider, eventId: body.eventId, payloadHash: verified.payloadHash, receivedAt: new Date().toISOString(), receivedBy: "provider_callback" };
-      await store.save(appendEvent({ ...state, providerCallbacks: { ...(state.providerCallbacks ?? {}), [callback.callbackId]: callback } }, { type: "integration.provider_callback.accepted", provider, eventId: body.eventId, payloadHash: callback.payloadHash }));
+      const now = new Date(); let reconciled = null; let nextState = state;
+      if (provider === "cersai") {
+        const interest = state.securityInterests?.[body.payload?.securityInterestId];
+        const result = acknowledgeCersaiSubmission(interest, body.payload, now);
+        if (result.summary.status === "blocked") { sendJson(res, 422, { error: { code: "provider_callback_reconciliation_blocked", message: "CERSAI callback does not satisfy security-interest acknowledgement controls." }, findings: result.findings }); return; }
+        reconciled = { resourceType: "security_interest", resourceId: result.securityInterest.securityInterestId, outcome: result.securityInterest.status };
+        nextState = { ...nextState, securityInterests: { ...nextState.securityInterests, [result.securityInterest.securityInterestId]: result.securityInterest } };
+      } else if (provider === "fiu") {
+        const report = state.fiuReports?.[body.payload?.reportId];
+        const result = acknowledgeFiuReport(report, body.payload, now);
+        if (result.summary.status === "blocked") { sendJson(res, 422, { error: { code: "provider_callback_reconciliation_blocked", message: "FIU callback does not satisfy report acknowledgement controls." }, findings: result.findings }); return; }
+        reconciled = { resourceType: "fiu_report", resourceId: result.report.reportId, outcome: result.report.status };
+        nextState = { ...nextState, fiuReports: { ...nextState.fiuReports, [result.report.reportId]: result.report } };
+      }
+      const callback = { callbackId: `${provider}:${body.eventId}`, provider, eventId: body.eventId, payloadHash: verified.payloadHash, receivedAt: now.toISOString(), receivedBy: "provider_callback", reconciled };
+      await store.save(appendEvent({ ...nextState, providerCallbacks: { ...(nextState.providerCallbacks ?? {}), [callback.callbackId]: callback } }, { type: "integration.provider_callback.accepted", provider, eventId: body.eventId, payloadHash: callback.payloadHash, reconciled }));
       sendJson(res, 202, { callback, idempotent: false });
     } catch (error) { sendJson(res, 401, { error: { code: "provider_callback_rejected", message: error.message } }); }
     return;
