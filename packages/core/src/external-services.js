@@ -92,6 +92,8 @@ export class ExternalServiceManager {
       fiuApiKey: config.fiuApiKey ?? (typeof process !== "undefined" ? process.env.LOANOS_FIU_API_KEY : "") ?? "",
       fiuDataResidencyCountry: config.fiuDataResidencyCountry ?? (typeof process !== "undefined" ? process.env.LOANOS_FIU_DATA_RESIDENCY_COUNTRY : "IN") ?? "IN",
       providerCallbackSecrets: config.providerCallbackSecrets ?? (typeof process !== "undefined" && process.env.LOANOS_PROVIDER_CALLBACK_SECRETS ? JSON.parse(process.env.LOANOS_PROVIDER_CALLBACK_SECRETS) : {})
+      ,providerTimeoutMs: Number(config.providerTimeoutMs ?? (typeof process !== "undefined" ? process.env.LOANOS_PROVIDER_TIMEOUT_MS : 5000) ?? 5000),
+      providerMaxAttempts: Number(config.providerMaxAttempts ?? (typeof process !== "undefined" ? process.env.LOANOS_PROVIDER_MAX_ATTEMPTS : 2) ?? 2)
     };
 
     if (config.isSandbox) {
@@ -569,18 +571,7 @@ export class ExternalServiceManager {
       if (!this.config.cersaiApiUrl || !this.config.cersaiApiKey) {
         throw new Error("Real CERSAI provider configured but credentials missing.");
       }
-      const res = await fetch(`${this.config.cersaiApiUrl}/security-interests`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${this.config.cersaiApiKey}`
-        },
-        body: JSON.stringify(securityInterestData)
-      });
-      if (!res.ok) {
-        throw new Error(`Real CERSAI service failed with status ${res.status}`);
-      }
-      return await res.json();
+      return postProviderJson(`${this.config.cersaiApiUrl}/security-interests`, securityInterestData, this.config.cersaiApiKey, securityInterestData.checksumSha256, "CERSAI", this.config);
     } else {
       // Mock provider
       return {
@@ -634,18 +625,7 @@ export class ExternalServiceManager {
       if (!this.config.fiuApiUrl || !this.config.fiuApiKey) {
         throw new Error("Real FIU-IND provider configured but credentials missing.");
       }
-      const res = await fetch(`${this.config.fiuApiUrl}/reports`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${this.config.fiuApiKey}`
-        },
-        body: JSON.stringify(reportData)
-      });
-      if (!res.ok) {
-        throw new Error(`Real FIU-IND filing failed with status ${res.status}`);
-      }
-      return await res.json();
+      return postProviderJson(`${this.config.fiuApiUrl}/reports`, reportData, this.config.fiuApiKey, reportData.checksumSha256, "FIU-IND", this.config);
     } else {
       // Mock provider
       return {
@@ -690,6 +670,24 @@ export class ExternalServiceManager {
 
 function normalizeName(value) {
   return String(value ?? "").trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+async function postProviderJson(url, payload, apiKey, idempotencyKey, provider, config) {
+  const attempts = Math.max(1, Math.min(3, Number.isInteger(config.providerMaxAttempts) ? config.providerMaxAttempts : 2));
+  const timeoutMs = Math.max(250, Math.min(30000, Number.isFinite(config.providerTimeoutMs) ? config.providerTimeoutMs : 5000));
+  let lastError = null;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}`, "Idempotency-Key": idempotencyKey }, body: JSON.stringify(payload), signal: AbortSignal.timeout(timeoutMs) });
+      if (res.ok) return await res.json();
+      if (res.status < 500 || attempt === attempts) throw new Error(`${provider} provider failed with status ${res.status}`);
+      lastError = new Error(`${provider} provider transiently failed with status ${res.status}`);
+    } catch (error) {
+      lastError = error;
+      if (attempt === attempts) break;
+    }
+  }
+  throw new Error(`${provider} provider unavailable after ${attempts} attempt(s): ${lastError?.message ?? "unknown error"}`);
 }
 
 function normalizeNachMandateInput(input = {}) {

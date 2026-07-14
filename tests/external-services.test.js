@@ -40,6 +40,16 @@ test("ExternalServiceManager accepts only HMAC-authenticated provider callbacks"
   assert.throws(() => manager.verifyProviderCallback("cersai", eventId, payload, "sha256=00"), /signature is invalid/);
 });
 
+test("CERSAI real submission retries transient failures with a stable idempotency key", async () => {
+  const originalFetch = globalThis.fetch; let calls = 0; let idempotencyKey = null;
+  globalThis.fetch = async (_url, options) => { calls++; idempotencyKey = options.headers["Idempotency-Key"]; return calls === 1 ? new Response("temporary", { status: 503 }) : new Response(JSON.stringify({ providerSubmissionRef: "SUB-001" }), { status: 200 }); };
+  try {
+    const manager = new ExternalServiceManager({ cersaiProvider: "real", cersaiApiUrl: "https://cersai.example.in", cersaiApiKey: "key", providerMaxAttempts: 2, providerTimeoutMs: 500 });
+    const result = await manager.fileCersaiSecurityInterest({ checksumSha256: "a".repeat(64) });
+    assert.equal(calls, 2); assert.equal(idempotencyKey, "a".repeat(64)); assert.equal(result.providerSubmissionRef, "SUB-001");
+  } finally { globalThis.fetch = originalFetch; }
+});
+
 test("ExternalServiceManager email and WhatsApp providers default to mock with India data posture", async () => {
   const manager = new ExternalServiceManager();
 
