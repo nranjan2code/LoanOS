@@ -30,6 +30,10 @@ import {
   buildManagementFinanceJournals,
   buildProfitabilityReport,
   buildTenantOperationalHealth,
+  approvePlatformRelease,
+  assessConfigurationDrift,
+  assessConfigurationParity,
+  buildResilienceAssessment,
   calculateEclAssessment,
   acknowledgeCicBatch,
   classifyLoanAsset,
@@ -37,6 +41,8 @@ import {
   commentOnWorkflowTask,
   completeWorkflowTask,
   createLoanAccountFromApplication,
+  createConfigurationBaseline,
+  createPlatformRelease,
   createLegalRecoveryCase,
   createPromiseToPay,
   drawRevolvingCredit,
@@ -75,6 +81,7 @@ import {
   evaluateEligibility,
   evaluateKycStatus,
   evaluateLoanApplication,
+  evaluatePlatformCanary,
   generateDlaCimsExport,
   generateClosureCertificate,
   generateDocumentPacket,
@@ -122,10 +129,13 @@ import {
   writeOffSuspenseReceipt,
   prepayLoanAccount,
   proposeDecision,
+  projectPlatformDelivery,
+  promotePlatformRelease,
   recordCollectionsReminder,
   recordCollectionContact,
   recordLegalRecoveryEvent,
   reviewRevolvingFacility,
+  rollbackPlatformRelease,
   restructureLoanAccount,
   resetFloatingRate,
   settleLoanAccount,
@@ -8194,6 +8204,159 @@ async function routePlatform(req, res, { dataDir, platformAdminKey, method, path
   }
   const authContext = platformAuth.authContext;
 
+  if (method === "GET" && path === "/platform/delivery/controls") {
+    if (!hasPlatformRole(authContext, ["platform_admin", "security_admin", "auditor"])) {
+      sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } });
+      return;
+    }
+    const state = await loadWholeState(dataDir);
+    sendJson(res, 200, projectPlatformDelivery(state.controlPlane.platformEvents ?? []));
+    return;
+  }
+
+  if (method === "POST" && path === "/platform/delivery/releases") {
+    if (!hasPlatformRole(authContext, ["platform_admin", "security_admin"])) {
+      sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } });
+      return;
+    }
+    const body = await readJson(req);
+    if (body.proposedBy !== authActor(authContext)) {
+      sendJson(res, 403, { error: { code: "delivery_actor_mismatch", message: "proposedBy must be the authenticated platform actor." } });
+      return;
+    }
+    try {
+      const state = await loadWholeState(dataDir);
+      const projection = projectPlatformDelivery(state.controlPlane.platformEvents ?? []);
+      const release = createPlatformRelease(body, projection.releases);
+      const nextState = appendPlatformEvent(state, { type: "platform.delivery.release_created", release }, { actor: authActor(authContext) });
+      await saveWholeState(nextState, dataDir);
+      sendJson(res, 201, { release });
+    } catch (error) { sendDeliveryError(res, error); }
+    return;
+  }
+
+  const releaseActionMatch = path.match(/^\/platform\/delivery\/releases\/([^/]+)\/(approval|canary|promotion|rollback)$/);
+  if (method === "POST" && releaseActionMatch) {
+    if (!hasPlatformRole(authContext, ["platform_admin", "security_admin"])) {
+      sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } });
+      return;
+    }
+    const body = await readJson(req);
+    const actor = authActor(authContext);
+    const action = releaseActionMatch[2];
+    const actorField = action === "approval" || action === "rollback" ? "approvedBy" : action === "canary" ? "observedBy" : "promotedBy";
+    if (body[actorField] !== actor) {
+      sendJson(res, 403, { error: { code: "delivery_actor_mismatch", message: `${actorField} must be the authenticated platform actor.` } });
+      return;
+    }
+    try {
+      const state = await loadWholeState(dataDir);
+      const projection = projectPlatformDelivery(state.controlPlane.platformEvents ?? []);
+      const releaseId = decodeURIComponent(releaseActionMatch[1]);
+      const current = projection.releases.find((release) => release.releaseId === releaseId);
+      if (!current) {
+        sendJson(res, 404, { error: { code: "release_not_found", message: "Release not found." } });
+        return;
+      }
+      const transition = action === "approval" ? approvePlatformRelease : action === "canary" ? evaluatePlatformCanary : action === "promotion" ? promotePlatformRelease : rollbackPlatformRelease;
+      const release = transition(current, body);
+      const suffix = action === "approval" ? "approved" : action === "canary" ? "canary_evaluated" : action === "promotion" ? "promoted" : "rolled_back";
+      const nextState = appendPlatformEvent(state, { type: `platform.delivery.release_${suffix}`, release }, { actor });
+      await saveWholeState(nextState, dataDir);
+      sendJson(res, 200, { release });
+    } catch (error) { sendDeliveryError(res, error); }
+    return;
+  }
+
+  if (method === "POST" && path === "/platform/delivery/configuration-baselines") {
+    if (!hasPlatformRole(authContext, ["platform_admin", "security_admin"])) {
+      sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } });
+      return;
+    }
+    const body = await readJson(req);
+    if (body.approvedBy !== authActor(authContext)) {
+      sendJson(res, 403, { error: { code: "delivery_actor_mismatch", message: "approvedBy must be the authenticated platform actor." } });
+      return;
+    }
+    try {
+      const state = await loadWholeState(dataDir);
+      const projection = projectPlatformDelivery(state.controlPlane.platformEvents ?? []);
+      if ((state.controlPlane.platformEvents ?? []).some((event) => event.baseline?.baselineId === body.baselineId)) throw Object.assign(new Error("baselineId already exists."), { code: "configuration_baseline_duplicate" });
+      const baseline = createConfigurationBaseline(body);
+      const nextState = appendPlatformEvent(state, { type: "platform.delivery.configuration_baseline_approved", baseline }, { actor: authActor(authContext) });
+      await saveWholeState(nextState, dataDir);
+      sendJson(res, 201, { baseline });
+    } catch (error) { sendDeliveryError(res, error); }
+    return;
+  }
+
+  if (method === "POST" && path === "/platform/delivery/configuration-assessments") {
+    if (!hasPlatformRole(authContext, ["platform_admin", "security_admin"])) {
+      sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } });
+      return;
+    }
+    const body = await readJson(req);
+    if (body.observedBy !== authActor(authContext)) {
+      sendJson(res, 403, { error: { code: "delivery_actor_mismatch", message: "observedBy must be the authenticated platform actor." } });
+      return;
+    }
+    try {
+      const state = await loadWholeState(dataDir);
+      const projection = projectPlatformDelivery(state.controlPlane.platformEvents ?? []);
+      if (projection.configurationAssessments.some((item) => item.assessmentId === body.assessmentId)) throw Object.assign(new Error("assessmentId already exists."), { code: "delivery_assessment_duplicate" });
+      const baseline = projection.baselines.find((item) => item.baselineId === body.baselineId);
+      const assessment = assessConfigurationDrift(baseline, body);
+      const nextState = appendPlatformEvent(state, { type: "platform.delivery.configuration_assessed", assessment }, { actor: authActor(authContext) });
+      await saveWholeState(nextState, dataDir);
+      sendJson(res, 201, { assessment });
+    } catch (error) { sendDeliveryError(res, error); }
+    return;
+  }
+
+  if (method === "POST" && path === "/platform/delivery/configuration-parity-assessments") {
+    if (!hasPlatformRole(authContext, ["platform_admin", "security_admin"])) {
+      sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } });
+      return;
+    }
+    const body = await readJson(req);
+    if (body.observedBy !== authActor(authContext)) {
+      sendJson(res, 403, { error: { code: "delivery_actor_mismatch", message: "observedBy must be the authenticated platform actor." } });
+      return;
+    }
+    try {
+      const state = await loadWholeState(dataDir);
+      const projection = projectPlatformDelivery(state.controlPlane.platformEvents ?? []);
+      if (projection.parityAssessments.some((item) => item.assessmentId === body.assessmentId)) throw Object.assign(new Error("assessmentId already exists."), { code: "delivery_assessment_duplicate" });
+      const assessment = assessConfigurationParity(projection.baselines, body);
+      const nextState = appendPlatformEvent(state, { type: "platform.delivery.configuration_parity_assessed", assessment }, { actor: authActor(authContext) });
+      await saveWholeState(nextState, dataDir);
+      sendJson(res, 201, { assessment });
+    } catch (error) { sendDeliveryError(res, error); }
+    return;
+  }
+
+  if (method === "POST" && path === "/platform/delivery/resilience-assessments") {
+    if (!hasPlatformRole(authContext, ["platform_admin", "security_admin"])) {
+      sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } });
+      return;
+    }
+    const body = await readJson(req);
+    if (body.approvedBy !== authActor(authContext)) {
+      sendJson(res, 403, { error: { code: "delivery_actor_mismatch", message: "approvedBy must be the authenticated platform actor." } });
+      return;
+    }
+    try {
+      const assessment = buildResilienceAssessment(body);
+      const state = await loadWholeState(dataDir);
+      const projection = projectPlatformDelivery(state.controlPlane.platformEvents ?? []);
+      if (projection.resilienceAssessments.some((item) => item.assessmentId === body.assessmentId)) throw Object.assign(new Error("assessmentId already exists."), { code: "delivery_assessment_duplicate" });
+      const nextState = appendPlatformEvent(state, { type: "platform.delivery.resilience_assessed", assessment }, { actor: authActor(authContext) });
+      await saveWholeState(nextState, dataDir);
+      sendJson(res, 201, { assessment });
+    } catch (error) { sendDeliveryError(res, error); }
+    return;
+  }
+
   if (method === "GET" && ["/platform/operations/health", "/platform/operations/metrics"].includes(path)) {
     if (!hasPlatformRole(authContext, ["platform_admin", "security_admin", "auditor"])) {
       sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } });
@@ -8962,6 +9125,14 @@ function sendRecoveryError(res, error) {
       code,
       message: error?.message ?? "Recovery operation failed closed."
     }
+  });
+}
+
+function sendDeliveryError(res, error) {
+  const code = error?.code ?? "delivery_operation_failed";
+  const conflictCodes = new Set(["release_duplicate", "configuration_baseline_duplicate", "delivery_assessment_duplicate"]);
+  sendJson(res, conflictCodes.has(code) ? 409 : 422, {
+    error: { code, message: error?.message ?? "Delivery control failed closed." }
   });
 }
 

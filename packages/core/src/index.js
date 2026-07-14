@@ -363,6 +363,19 @@ export {
 export { buildTenantOperationalHealth } from "./operations-monitoring.js";
 
 export {
+  approvePlatformRelease,
+  assessConfigurationDrift,
+  assessConfigurationParity,
+  buildResilienceAssessment,
+  createConfigurationBaseline,
+  createPlatformRelease,
+  evaluatePlatformCanary,
+  projectPlatformDelivery,
+  promotePlatformRelease,
+  rollbackPlatformRelease
+} from "./platform-delivery.js";
+
+export {
   validateMarketplaceNeutrality,
   rankMarketplaceOffers
 } from "./offer-marketplace.js";

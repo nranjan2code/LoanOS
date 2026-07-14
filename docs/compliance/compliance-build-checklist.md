@@ -225,7 +225,7 @@ Before production, the platform needs:
 3. Authentication, authorization, maker-checker, and audit hardening.
 4. Secure secrets management. Partial: service secrets are one-time/hash-only with independent rotation and fail-closed compromise containment linked to incident reporting; production vault/KMS custody, workload identity, and automated leak detection remain required.
 5. India-hosted production database and object storage.
-6. Observability, SIEM, incident response, backup, DR, and BCP. Partial: authenticated operational-health APIs, local SLI/SLO and error-budget evaluation, provider/stuck-work alerts, protected Prometheus metrics, encrypted integrity-verified recovery packages, four-eyes restore, and RTO/RPO drill evidence exist. External telemetry retention, SIEM/paging, multi-replica aggregation, managed immutable backup/PITR, real failover/failback, and witnessed BCP exercises remain required.
+6. Observability, SIEM, incident response, backup, DR, BCP, change, and resilience. Partial: authenticated operational health, local SLI/SLO, provider/stuck-work alerts, protected metrics, encrypted recovery/four-eyes restore, RTO/RPO drills, governed artifact-to-canary-to-promotion/rollback evidence, secret-safe configuration drift/parity, and concurrent HTTP resilience assessment exist. External telemetry/SIEM, managed backup/PITR, deployment-controller enforcement, continuous configuration reconciliation, production-scale soak/chaos, real failover/failback, and witnessed BCP exercises remain required.
 7. Vendor due diligence and contracts with audit rights and data residency obligations.
 8. Penetration testing and vulnerability management.
 9. Privacy impact assessment and DPDP operating model.
