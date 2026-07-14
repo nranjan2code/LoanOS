@@ -13,13 +13,16 @@ real regulated submissions in this environment.
 
 - one encrypted Ubuntu EC2 instance;
 - one security group exposing HTTP port 80 only;
+- one CloudFront distribution providing the user-facing HTTPS endpoint and a
+  stack-specific origin header; direct requests to EC2 receive HTTP 403;
 - an IAM role for Systems Manager Session Manager (no SSH port or key pair);
 - an AWS Budget with forecasted 50%, actual 80%, and actual 100% alerts;
 - local PostgreSQL with the repository schema and RLS role model;
 - one active, tenant-bound Rust runtime for tenant `dev`;
 - generated credentials stored in an SSM Parameter Store `SecureString`.
 
-The default `t3.small` and 24 GB encrypted `gp3` volume consume AWS credits.
+The default `t3.small`, 24 GB encrypted `gp3` volume, public IPv4 address, and
+CloudFront traffic consume AWS credits.
 Budget notifications are alerts, not a hard spending cap. Delete the stack
 before credits expire if continued paid usage is not acceptable.
 

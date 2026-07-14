@@ -89,7 +89,6 @@ Resources:
               - Effect: Allow
                 Action:
                   - ssm:PutParameter
-                  - ssm:AddTagsToResource
                 Resource: !Sub "arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/loanos-demo/${AWS::StackName}/*"
               - Effect: Allow
                 Action: s3:GetObject
@@ -212,13 +211,41 @@ Resources:
           export LOANOS_STACK_NAME='${AWS::StackName}'
           export LOANOS_AWS_REGION='${AWS::Region}'
           export LOANOS_APP_DIR=/opt/loanos/app
+          export LOANOS_ORIGIN_TOKEN='${AWS::StackId}'
           /opt/loanos/app/deploy/aws/bootstrap-demo.sh \
             > /var/log/loanos-bootstrap.log 2>&1
 
+  DemoDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Comment: !Sub "${AWS::StackName} synthetic demo HTTPS entry point"
+        Enabled: true
+        HttpVersion: http2and3
+        IPV6Enabled: true
+        Origins:
+          - Id: DemoEc2Origin
+            DomainName: !GetAtt DemoInstance.PublicDnsName
+            CustomOriginConfig:
+              HTTPPort: 80
+              OriginProtocolPolicy: http-only
+            OriginCustomHeaders:
+              - HeaderName: X-LoanOS-Origin-Token
+                HeaderValue: !Ref AWS::StackId
+        DefaultCacheBehavior:
+          TargetOriginId: DemoEc2Origin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [DELETE, GET, HEAD, OPTIONS, PATCH, POST, PUT]
+          CachedMethods: [GET, HEAD]
+          CachePolicyId: 413f160d-ff4e-4b1d-a2e6-f94c0e6d2934
+          OriginRequestPolicyId: 216adef6-5c7f-47e4-b989-5492eafa07d3
+          Compress: true
+        PriceClass: PriceClass_100
+
 Outputs:
   DemoUrl:
-    Description: HTTP demo URL. Wait 15-25 minutes for the first Rust build.
-    Value: !Sub "http://${DemoInstance.PublicDnsName}/"
+    Description: HTTPS demo URL. Wait for both bootstrap COMPLETE and CloudFront deployment.
+    Value: !Sub "https://${DemoDistribution.DomainName}/"
   InstanceId:
     Description: Instance identifier for Systems Manager Session Manager.
     Value: !Ref DemoInstance

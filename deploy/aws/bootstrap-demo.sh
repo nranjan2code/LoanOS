@@ -7,6 +7,7 @@ set -Eeuo pipefail
 
 : "${LOANOS_STACK_NAME:?LOANOS_STACK_NAME is required}"
 : "${LOANOS_AWS_REGION:?LOANOS_AWS_REGION is required}"
+: "${LOANOS_ORIGIN_TOKEN:?LOANOS_ORIGIN_TOKEN is required}"
 
 STATUS_PARAMETER="/loanos-demo/${LOANOS_STACK_NAME}/status"
 CREDENTIALS_PARAMETER="/loanos-demo/${LOANOS_STACK_NAME}/credentials"
@@ -98,6 +99,7 @@ LOANOS_ACTIVE_MASTER_KEY_ID=demo-key-v1
 LOANOS_RULES_ENGINE=active
 LOANOS_RULES_ENGINE_URLS='{"dev":"http://127.0.0.1:${RULES_PORT}"}'
 LOANOS_EMAIL_PROVIDER=mock
+LOANOS_COOKIE_SECURE=true
 LOANOS_DEV_TENANT_KEY=${TENANT_API_KEY}
 LOANOS_DEV_ADMIN_PASSWORD=${TENANT_ADMIN_PASSWORD}
 LOANOS_PLATFORM_ADMIN_KEY=${PLATFORM_ADMIN_KEY}
@@ -220,6 +222,9 @@ server {
 
     add_header X-LoanOS-Environment "synthetic-demo" always;
     location / {
+        if ($http_x_loanos_origin_token != "__LOANOS_ORIGIN_TOKEN__") {
+            return 403;
+        }
         proxy_pass http://127.0.0.1:3040;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
@@ -228,6 +233,7 @@ server {
     }
 }
 EOF
+sed -i "s|__LOANOS_ORIGIN_TOKEN__|${LOANOS_ORIGIN_TOKEN}|g" /etc/nginx/sites-available/loanos-demo
 rm -f /etc/nginx/sites-enabled/default
 ln -sfn /etc/nginx/sites-available/loanos-demo /etc/nginx/sites-enabled/loanos-demo
 nginx -t
@@ -268,11 +274,5 @@ aws ssm put-parameter \
   --type SecureString \
   --overwrite \
   --value "$CREDENTIALS_JSON" >/dev/null
-aws ssm add-tags-to-resource \
-  --region "$LOANOS_AWS_REGION" \
-  --resource-type Parameter \
-  --resource-id "$CREDENTIALS_PARAMETER" \
-  --tags Key=LoanOS-Environment,Value=demo >/dev/null
-
 put_status COMPLETE
 trap - ERR
