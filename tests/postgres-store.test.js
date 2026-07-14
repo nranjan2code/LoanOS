@@ -56,6 +56,20 @@ async function resetDatabase(pool) {
   await pool.query(`TRUNCATE ${TABLES_IN_TRUNCATE_ORDER.join(", ")} RESTART IDENTITY CASCADE`);
 }
 
+test("Postgres tenant envelopes are ciphertext-only, tenant-bound, and key-versioned", async () => {
+  const { encodePostgresTenantData, decodePostgresTenantData } = await import("../apps/api/src/postgres-store.js");
+  const env = { LOANOS_MASTER_KEY: "b".repeat(64), LOANOS_MASTER_KEY_ID: "kms-prod-2026-07" };
+  const tenantData = { borrowers: { bor_1: { pan: "ABCDE1234F" } }, auditEvents: [] };
+  const envelope = encodePostgresTenantData("tnt_a", tenantData, env);
+  assert.equal(envelope.__enc, "v1");
+  assert.equal(envelope.kid, "kms-prod-2026-07");
+  assert.equal(JSON.stringify(envelope).includes("ABCDE1234F"), false);
+  assert.deepEqual(decodePostgresTenantData("tnt_a", envelope, env), tenantData);
+  assert.throws(() => decodePostgresTenantData("tnt_b", envelope, env));
+  assert.throws(() => decodePostgresTenantData("tnt_a", envelope, { ...env, LOANOS_MASTER_KEY_ID: "kms-prod-2026-08" }), /requires master key/);
+  assert.throws(() => decodePostgresTenantData("tnt_a", envelope, {}), /LOANOS_MASTER_KEY is not set/);
+});
+
 test("postgres schema applies cleanly and RLS blocks cross-tenant visibility", { skip: describeSkip && skipReason }, async (t) => {
   const pg = await import("pg");
   const { Pool } = pg.default;

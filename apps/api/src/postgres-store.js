@@ -65,6 +65,12 @@ import {
   createEmptyTenantData,
   normalizeState as fileStoreNormalizeState
 } from "./file-store.js";
+import {
+  decryptTenantData,
+  encryptTenantData,
+  getMasterKey,
+  isEncryptedEnvelope
+} from "./encryption.js";
 
 const { Pool } = pg;
 
@@ -275,7 +281,7 @@ async function loadAllTenantData(client) {
   const result = await client.query("SELECT tenant_id, data FROM tenant_data");
   const tenants = {};
   for (const row of result.rows) {
-    tenants[row.tenant_id] = row.data;
+    tenants[row.tenant_id] = decodePostgresTenantData(row.tenant_id, row.data);
   }
   return tenants;
 }
@@ -424,11 +430,12 @@ async function persistControlPlane(client, controlPlane) {
 // (saveTenantDataOnly, below) writes exactly one tenant's row instead.
 async function persistAllTenantData(client, tenants) {
   for (const [tenantId, data] of Object.entries(tenants)) {
+    const storedData = encodePostgresTenantData(tenantId, data ?? createEmptyTenantData());
     await client.query(
       `INSERT INTO tenant_data (tenant_id, data, updated_at)
        VALUES ($1, $2::jsonb, now())
        ON CONFLICT (tenant_id) DO UPDATE SET data = EXCLUDED.data, updated_at = now()`,
-      [tenantId, JSON.stringify(data ?? createEmptyTenantData())]
+      [tenantId, JSON.stringify(storedData)]
     );
   }
   const currentDataTenantIds = Object.keys(tenants);
@@ -481,20 +488,43 @@ export async function loadTenantDataOnly(_dataDirIgnored, tenantId) {
   const client = currentClient();
   return withTenantRole(client, tenantId, async () => {
     const result = await client.query("SELECT data FROM tenant_data WHERE tenant_id = $1", [tenantId]);
-    return result.rows[0]?.data ?? createEmptyTenantData();
+    return result.rows[0]
+      ? decodePostgresTenantData(tenantId, result.rows[0].data)
+      : createEmptyTenantData();
   });
 }
 
 export async function saveTenantDataOnly(_dataDirIgnored, tenantId, tenantData) {
   const client = currentClient();
+  const storedData = encodePostgresTenantData(tenantId, tenantData ?? createEmptyTenantData());
   await withTenantRole(client, tenantId, () =>
     client.query(
       `INSERT INTO tenant_data (tenant_id, data, updated_at)
        VALUES ($1, $2::jsonb, now())
        ON CONFLICT (tenant_id) DO UPDATE SET data = EXCLUDED.data, updated_at = now()`,
-      [tenantId, JSON.stringify(tenantData ?? createEmptyTenantData())]
+      [tenantId, JSON.stringify(storedData)]
     )
   );
+}
+
+// Application-layer envelope encryption complements, rather than replaces,
+// the managed database/storage encryption attested at deployment. JSONB rows
+// contain only an authenticated ciphertext envelope when LOANOS_MASTER_KEY is
+// configured; tenant identity is bound into HKDF key derivation, so copying an
+// envelope to another tenant row cannot make it decrypt there.
+export function encodePostgresTenantData(tenantId, tenantData, env = process.env) {
+  const masterKey = getMasterKey(env);
+  if (!masterKey) return tenantData;
+  return encryptTenantData(masterKey, tenantId, tenantData, env.LOANOS_MASTER_KEY_ID);
+}
+
+export function decodePostgresTenantData(tenantId, storedData, env = process.env) {
+  if (!isEncryptedEnvelope(storedData)) return storedData;
+  const masterKey = getMasterKey(env);
+  if (!masterKey) {
+    throw new Error(`Postgres tenant ${tenantId} is encrypted but LOANOS_MASTER_KEY is not set.`);
+  }
+  return decryptTenantData(masterKey, tenantId, storedData, env.LOANOS_MASTER_KEY_ID);
 }
 
 export async function saveControlPlaneOnly(_dataDirIgnored, controlPlaneState) {

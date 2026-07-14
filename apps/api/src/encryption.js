@@ -24,6 +24,7 @@ const ENVELOPE_VERSION = "v1";
 const IV_BYTES = 12;
 const KEY_BYTES = 32;
 const HKDF_INFO = "loanos:tenant-dek:v1";
+const DEFAULT_KEY_ID = "local-root-v1";
 // A fixed, non-secret salt is acceptable for HKDF here: the input keying
 // material (the root key) is already a high-entropy secret, and the per-tenant
 // separation comes from the `info` parameter (the tenantId).
@@ -54,6 +55,14 @@ export function encryptionEnabled(env = process.env) {
   return getMasterKey(env) !== null;
 }
 
+export function getMasterKeyId(env = process.env) {
+  const keyId = env.LOANOS_MASTER_KEY_ID ?? DEFAULT_KEY_ID;
+  if (!/^[a-zA-Z0-9._:-]{3,128}$/.test(keyId)) {
+    throw new Error("LOANOS_MASTER_KEY_ID must be 3-128 safe characters.");
+  }
+  return keyId;
+}
+
 export function deriveTenantKey(masterKey, tenantId) {
   const info = Buffer.from(`${HKDF_INFO}:${tenantId}`);
   const derived = hkdfSync("sha256", masterKey, HKDF_SALT, info, KEY_BYTES);
@@ -64,7 +73,7 @@ export function isEncryptedEnvelope(value) {
   return Boolean(value) && typeof value === "object" && value.__enc === ENVELOPE_VERSION && typeof value.ct === "string";
 }
 
-export function encryptTenantData(masterKey, tenantId, dataObject) {
+export function encryptTenantData(masterKey, tenantId, dataObject, keyId = getMasterKeyId()) {
   const key = deriveTenantKey(masterKey, tenantId);
   const iv = randomBytes(IV_BYTES);
   const cipher = createCipheriv(ALG, key, iv);
@@ -74,13 +83,17 @@ export function encryptTenantData(masterKey, tenantId, dataObject) {
   return {
     __enc: ENVELOPE_VERSION,
     alg: ALG,
+    kid: keyId,
     iv: iv.toString("base64"),
     tag: tag.toString("base64"),
     ct: ct.toString("base64")
   };
 }
 
-export function decryptTenantData(masterKey, tenantId, envelope) {
+export function decryptTenantData(masterKey, tenantId, envelope, expectedKeyId = getMasterKeyId()) {
+  if (envelope.kid !== expectedKeyId) {
+    throw new Error(`Tenant data requires master key ${envelope.kid ?? "unknown"}; active key is ${expectedKeyId}.`);
+  }
   const key = deriveTenantKey(masterKey, tenantId);
   const iv = Buffer.from(envelope.iv, "base64");
   const tag = Buffer.from(envelope.tag, "base64");
