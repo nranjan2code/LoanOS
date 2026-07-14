@@ -21,7 +21,7 @@ Lending policy and AI guardrails are evaluated by a pure-Rust decision engine in
 
 - Design source of truth: [docs/architecture/decision-engine-design.md](docs/architecture/decision-engine-design.md) (ADR: [0003](docs/decisions/0003-decision-engine-pure-rust-per-tenant.md))
 - Build/run: `cd rules && cargo test --workspace`; local fleet via `rules-fleet` (see [rules/README.md](rules/README.md))
-- API integration: eligibility call sites route through the engine behind `LOANOS_RULES_ENGINE=off|shadow|active` (default `off`; run `shadow` to a clean divergence window before `active`)
+- API integration: eligibility uses the per-tenant business engine behind `LOANOS_RULES_ENGINE`; identity/staffing authority uses a separate pinned `ctrl-*` runtime behind `LOANOS_CONTROL_RULES_ENGINE` (ADR 0005). Production requires both active and physically separate.
 
 ## Current Executable Slice
 

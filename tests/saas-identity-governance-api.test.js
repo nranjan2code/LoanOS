@@ -18,7 +18,7 @@ test("canonical SaaS identity API binds verified users and enforces session-boun
   const base = `http://127.0.0.1:${server.address().port}`;
   const serviceHeaders = { "content-type": "application/json", "x-api-key": TENANT.apiKey };
   const users = [
-    ["owner", ["tenant_admin"]], ["bootstrap-checker", ["user_admin"]], ["admin", ["tenant_admin"]],
+    ["owner", ["tenant_admin"]], ["bootstrap-checker", ["user_admin"]], ["admin", ["tenant_admin"]], ["access-reviewer", ["operator"]],
     ["security", ["operator"]], ["audit", ["operator"]], ["product", ["operator"]],
     ["credit-maker", ["operator"]], ["credit-checker", ["operator"]], ["ops-maker", ["operator"]],
     ["ops-checker", ["operator"]], ["compliance", ["operator"]]
@@ -59,7 +59,7 @@ test("canonical SaaS identity API binds verified users and enforces session-boun
   assert.equal((await response.json()).error.code, "saas_role_unknown");
 
   const grants = [
-    ["admin", ["tenant_admin", "user_admin"]], ["security", ["security_admin"]], ["audit", ["auditor"]],
+    ["admin", ["tenant_admin", "user_admin"]], ["access-reviewer", ["access_reviewer"]], ["security", ["security_admin"]], ["audit", ["auditor"]],
     ["product", ["product_manager"]], ["credit-maker", ["credit_maker"]], ["credit-checker", ["credit_checker"]],
     ["ops-maker", ["operations_maker"]], ["ops-checker", ["operations_checker"]], ["compliance", ["compliance_officer"]]
   ];
@@ -88,4 +88,17 @@ test("canonical SaaS identity API binds verified users and enforces session-boun
   assert.equal(transition.ownership.status, "active");
   assert.equal(transition.ownership.bootstrapCompletedBy, "owner");
   assert.equal(transition.ownership.bootstrapApprovedBy, "bootstrap-checker");
+
+  response = await post("/activity/screen-events", { activityType: "screen_view", screenId: "staff.identity_governance", clientOccurredAt: new Date().toISOString() });
+  assert.equal(response.status, 202, await response.clone().text());
+  const activityRequestId = (await response.json()).requestId;
+  response = await fetch(`${base}/activity/events`, { headers: { cookie: ownerCookie } });
+  const audit = await response.json();
+  assert.equal(audit.chainValid, true);
+  const activity = audit.events.find((event) => event.type === "ui.activity.recorded" && event.requestId === activityRequestId);
+  assert.equal(activity.principalId, "owner");
+  assert.equal(activity.principalType, "tenant_user");
+  assert.ok(activity.sessionId);
+  assert.ok(audit.events.some((event) => event.type === "access.api.request" && event.principalId === "owner" && event.sessionId));
+  assert.ok(audit.events.some((event) => event.type === "access.api.response" && event.requestId === activityRequestId && event.statusCode === 202));
 });

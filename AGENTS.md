@@ -20,7 +20,7 @@ Two runtimes, one system:
 1. **Node control/data plane** (`apps/api` + `packages/core`) — workflows, storage (file-backed JSON or Postgres+RLS), tenancy, audit chain. Run: `npm test`, `npm run dev:api`, or `./loanos.sh start`.
 2. **Rust decision engine** (`rules/`) — the deterministic policy brain: one fully isolated runtime instance per tenant, signed policy bundles, fail-closed evaluation, AI kill-switch enforcement, agent guardrails. Run: `cd rules && cargo test --workspace`. Read `rules/README.md`.
 
-They meet at `apps/api/src/rules-engine.js`: eligibility call sites in `server.js` are gated by `LOANOS_RULES_ENGINE=off|shadow|active` (default `off`).
+They meet at two deliberately isolated gateways: `apps/api/src/rules-engine.js` for lending/business decisions and `apps/api/src/control-rules-engine.js` for identity/staffing authority. Production requires separate per-tenant business and `ctrl-*` runtime instances (ADR 0005); they may not share a URL, bundle, identity or operator boundary.
 
 ## Load-bearing documents (read before structural changes)
 
@@ -29,6 +29,7 @@ They meet at `apps/api/src/rules-engine.js`: eligibility call sites in `server.j
 | `docs/architecture/decision-engine-design.md` | Source of truth for the engine. Requirements carry stable IDs — INV-n (invariants = test obligations), DEC-n (design decisions), SEC-n (security controls), PH-n (phases). If code and doc disagree, the doc wins until amended. Cite IDs in commits. |
 | `docs/decisions/000*.md` | ADRs: compliance-first foundation, multi-tenant SaaS delivery, per-tenant pure-Rust engine. |
 | `docs/architecture/current-implementation.md` | What exists today and where each control lives. |
+| `docs/architecture/tenant-role-staffing-and-feature-gating.md` | Canonical roles, feature staffing, IdP/SCIM, agents, revocation/pause and activity-attribution source. |
 | `docs/compliance/india-regulatory-register.md` | Regulatory control families (RBI Digital Lending Directions 2025 etc.). |
 | `docs/README.md` | Documentation map + definition of done: features are incomplete until the relevant docs are updated. |
 

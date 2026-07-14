@@ -123,6 +123,17 @@ async function jsonFetch(url, options) {
   return data;
 }
 
+function recordScreenActivity(activityType, screenId, actionId = null, entityType = null) {
+  if (!state.auth.borrowerId) return;
+  fetch('/activity/screen-events', {
+    method: 'POST',
+    credentials: 'same-origin',
+    keepalive: true,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ activityType, screenId, actionId, entityType, clientOccurredAt: new Date().toISOString() })
+  }).catch(() => {});
+}
+
 async function loadBranding() {
   try {
     const data = await jsonFetch(`/t/${encodeURIComponent(urlTenantId)}/branding`);
@@ -157,6 +168,7 @@ function openPanel(name, focus = true) {
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
   });
+  recordScreenActivity('screen_view', `customer.${name}`);
 }
 
 function applicationStage(status) {

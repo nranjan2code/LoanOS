@@ -506,6 +506,8 @@ export function createLoanOsServer({
   let bootstrapPromise = null;
   return createServer(async (req, res) => {
     const requestId = `req_${randomBytes(8).toString("hex")}`;
+    req._loanosRequestId = requestId;
+    res.setHeader("X-Request-Id", requestId);
     applySecurityHeaders(res);
     observability.trackRequest(req, res);
     try {
@@ -532,14 +534,10 @@ export function createLoanOsServer({
       // driver can serialize per-tenant instead of platform-wide; the file
       // driver ignores it (see withStateLock in file-store.js).
       const lockKey = await resolveLockKey(req, dataDir);
-      await withStateLock(dataDir, lockKey, () => route(
-        req,
-        res,
-        dataDir,
-        adminKey,
-        observability,
-        allowDirectTenantProvisioning
-      ));
+      await withStateLock(dataDir, lockKey, async () => {
+        await route(req, res, dataDir, adminKey, observability, allowDirectTenantProvisioning);
+        if (req._loanosResponsePersistencePromise) await req._loanosResponsePersistencePromise;
+      });
     } catch (error) {
       console.error(`[${requestId}]`, error);
       if (res.headersSent) {
@@ -571,6 +569,12 @@ function validateProductionConfiguration(env = process.env) {
   }
   if (!env.LOANOS_RULES_ENGINE_URLS) {
     throw new Error("Production requires per-tenant LOANOS_RULES_ENGINE_URLS routing.");
+  }
+  if (env.LOANOS_CONTROL_RULES_ENGINE !== "active") {
+    throw new Error("Production requires LOANOS_CONTROL_RULES_ENGINE=active so access and staffing policy cannot bypass the isolated control engine.");
+  }
+  if (!env.LOANOS_CONTROL_RULES_ENGINE_URLS) {
+    throw new Error("Production requires per-tenant LOANOS_CONTROL_RULES_ENGINE_URLS routing.");
   }
   if (env.LOANOS_EMAIL_PROVIDER !== "real") {
     throw new Error("Production requires a real email provider for borrower authentication and KFS delivery.");
@@ -1088,6 +1092,14 @@ async function route(req, res, dataDir, platformAdminKey, observability, allowDi
       : authContext?.principalType === "borrower"
         ? { actor: authContext.userId, actorType: AUDIT_ACTOR_TYPES.BORROWER }
       : { actor: tenant.tenantId, actorType: AUDIT_ACTOR_TYPES.TENANT };
+  req._loanosActivityContext = {
+    tenantId: tenant.tenantId,
+    principalId: authActor(authContext),
+    principalType: authContext?.principalType ?? "unknown",
+    sessionId: authContext?.sessionId ?? null,
+    serviceCredentialId: authContext?.serviceCredential?.credentialId ?? null,
+    delegatedGrantId: authContext?.grantId ?? null
+  };
   const store = {
     load: async () => currentTenantData,
     save: async (nextTenantData) => {
@@ -1100,6 +1112,7 @@ async function route(req, res, dataDir, platformAdminKey, observability, allowDi
       await saveTenantDataOnly(dataDir, tenant.tenantId, sealed);
     }
   };
+  installResponseActivityRecorder(req, res, store, req._loanosActivityContext, method, path);
   // Control-plane state exposed to routeTenantAdmin (/admin/*) for the two
   // operations that legitimately need it (session revocation on password
   // reset, api-key rotation) and to the CKYC mock-registry handlers further
@@ -1140,6 +1153,45 @@ async function route(req, res, dataDir, platformAdminKey, observability, allowDi
         path
       })
     );
+  }
+
+  // Every authenticated request is attributable even when it is read-only or
+  // the downstream handler emits no domain event. Network and client values
+  // are pseudonymised before persistence; request bodies and query strings are
+  // never copied into the audit chain.
+  await store.save(appendAccessActivityEvent(await store.load(), authenticatedRequestAuditEvent(req, authContext, method, path)));
+
+  if (method === "POST" && path === "/activity/screen-events") {
+    if (!["tenant_user", "borrower"].includes(authContext?.principalType)) {
+      sendJson(res, 403, { error: { code: "interactive_identity_required", message: "Screen activity requires an authenticated interactive session." } });
+      return;
+    }
+    try {
+      const body = await readJson(req);
+      const activity = validateScreenActivity(body);
+      await store.save(appendAccessActivityEvent(await store.load(), {
+        type: "ui.activity.recorded",
+        requestId: req._loanosRequestId,
+        sessionId: authContext.sessionId,
+        principalId: authContext.userId,
+        principalType: authContext.principalType,
+        ...activity
+      }));
+      sendJson(res, 202, { accepted: true, requestId: req._loanosRequestId });
+    } catch (error) {
+      sendJson(res, 422, { error: { code: error.code ?? "screen_activity_invalid", message: error.message } });
+    }
+    return;
+  }
+
+  if (method === "GET" && path === "/activity/events") {
+    if (authContext?.principalType !== "tenant_user" || !(authContext.roles ?? []).some((role) => ["tenant_admin", "security_admin", "auditor"].includes(role))) {
+      sendJson(res, 403, { error: { code: "activity_audit_forbidden", message: "Tenant administration, security or audit authority is required." } });
+      return;
+    }
+    const state = await store.load();
+    sendJson(res, 200, { tenantId: tenant.tenantId, count: state.accessActivityEvents?.length ?? 0, chainValid: verifyAccessActivityChain(state.accessActivityEvents ?? []), events: state.accessActivityEvents ?? [] });
+    return;
   }
 
   if (method === "GET" && path === "/audit/events") {
@@ -7816,6 +7868,95 @@ function authActor(authContext) {
     ?? authContext?.staffId
     ?? authContext?.actor
     ?? "system";
+}
+
+const SCREEN_ACTIVITY_TYPES = new Set(["screen_view", "task_opened", "task_closed", "action_intent", "validation_error"]);
+const SAFE_ACTIVITY_ID = /^[a-zA-Z0-9][a-zA-Z0-9._:/-]{0,159}$/;
+
+function authenticatedRequestAuditEvent(req, authContext, method, path) {
+  const forwarded = Array.isArray(req.headers["x-forwarded-for"]) ? req.headers["x-forwarded-for"][0] : req.headers["x-forwarded-for"];
+  const address = String(forwarded ?? req.socket?.remoteAddress ?? "unknown").split(",")[0].trim();
+  const userAgent = Array.isArray(req.headers["user-agent"]) ? req.headers["user-agent"][0] : req.headers["user-agent"];
+  return {
+    type: "access.api.request",
+    requestId: req._loanosRequestId,
+    method,
+    path,
+    principalId: authActor(authContext),
+    principalType: authContext?.principalType ?? "unknown",
+    sessionId: authContext?.sessionId ?? null,
+    serviceCredentialId: authContext?.serviceCredential?.credentialId ?? null,
+    delegatedGrantId: authContext?.grantId ?? null,
+    authenticationSource: authContext?.sessionId ? "session" : authContext?.serviceCredential ? "service_credential" : authContext?.grantId ? "break_glass" : "unknown",
+    networkFingerprintSha256: sha256(address),
+    clientFingerprintSha256: sha256(String(userAgent ?? "unknown"))
+  };
+}
+
+function appendAccessActivityEvent(state, event, now = new Date()) {
+  const events = state.accessActivityEvents ?? [];
+  const previousHash = events.at(-1)?.checksumSha256 ?? "0".repeat(64);
+  const base = { ...event, sequence: events.length + 1, previousHash, occurredAt: event.occurredAt ?? now.toISOString() };
+  return { ...state, accessActivityEvents: [...events, { ...base, checksumSha256: sha256(JSON.stringify(base)) }] };
+}
+
+function installResponseActivityRecorder(req, res, store, context, method, path) {
+  if (!context?.tenantId || res._loanosActivityRecorderInstalled) return;
+  res._loanosActivityRecorderInstalled = true;
+  const originalEnd = res.end.bind(res);
+  let ending = false;
+  res.end = (chunk, encoding, callback) => {
+    if (ending) return originalEnd(chunk, encoding, callback);
+    ending = true;
+    req._loanosResponsePersistencePromise = (async () => {
+      const now = new Date();
+      try {
+        const state = await store.load();
+        await store.save(appendAccessActivityEvent(state, {
+          type: "access.api.response",
+          requestId: req._loanosRequestId,
+          method,
+          path,
+          statusCode: res.statusCode,
+          principalId: context.principalId,
+          principalType: context.principalType,
+          sessionId: context.sessionId,
+          serviceCredentialId: context.serviceCredentialId,
+          delegatedGrantId: context.delegatedGrantId,
+          completedAt: now.toISOString()
+        }, now));
+      } finally {
+        originalEnd(chunk, encoding, callback);
+      }
+    })();
+    return res;
+  };
+}
+
+function verifyAccessActivityChain(events) {
+  let previousHash = "0".repeat(64);
+  for (let index = 0; index < events.length; index += 1) {
+    const { checksumSha256, ...base } = events[index];
+    if (base.sequence !== index + 1 || base.previousHash !== previousHash || checksumSha256 !== sha256(JSON.stringify(base))) return false;
+    previousHash = checksumSha256;
+  }
+  return true;
+}
+
+function validateScreenActivity(input = {}) {
+  if (!SCREEN_ACTIVITY_TYPES.has(input.activityType)) throw Object.assign(new Error("activityType is not permitted."), { code: "screen_activity_type_invalid" });
+  if (typeof input.screenId !== "string" || !SAFE_ACTIVITY_ID.test(input.screenId)) throw Object.assign(new Error("screenId must be a stable non-sensitive identifier."), { code: "screen_activity_screen_invalid" });
+  if (input.actionId !== undefined && input.actionId !== null && (typeof input.actionId !== "string" || !SAFE_ACTIVITY_ID.test(input.actionId))) throw Object.assign(new Error("actionId must be a stable non-sensitive identifier."), { code: "screen_activity_action_invalid" });
+  if (input.entityType !== undefined && input.entityType !== null && (typeof input.entityType !== "string" || !SAFE_ACTIVITY_ID.test(input.entityType))) throw Object.assign(new Error("entityType must be a stable non-sensitive identifier."), { code: "screen_activity_entity_invalid" });
+  if (input.entityRefHashSha256 !== undefined && input.entityRefHashSha256 !== null && !/^[a-f0-9]{64}$/.test(input.entityRefHashSha256)) throw Object.assign(new Error("entityRefHashSha256 must be a SHA-256 digest."), { code: "screen_activity_entity_ref_invalid" });
+  return {
+    activityType: input.activityType,
+    screenId: input.screenId,
+    actionId: input.actionId ?? null,
+    entityType: input.entityType ?? null,
+    entityRefHashSha256: input.entityRefHashSha256 ?? null,
+    clientOccurredAt: input.clientOccurredAt && Number.isFinite(Date.parse(input.clientOccurredAt)) ? new Date(input.clientOccurredAt).toISOString() : null
+  };
 }
 
 // A non-admin-safe projection of a tenant login user's workflow-facing

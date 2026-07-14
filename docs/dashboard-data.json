@@ -1,38 +1,43 @@
 {
-  "generated": "2026-07-14T21:45:27.370Z",
+  "generated": "2026-07-14T22:29:56.691Z",
   "git": {
     "branch": "main",
-    "count": 183,
+    "count": 184,
     "commits": [
+      {
+        "hash": "b411a51",
+        "subject": "feat(identity): govern organisation admission and bootstrap access",
+        "when": "42 minutes ago"
+      },
       {
         "hash": "f0e72f7",
         "subject": "docs(ai): define governed digital-worker architecture",
-        "when": "21 minutes ago"
+        "when": "66 minutes ago"
       },
       {
         "hash": "876775d",
         "subject": "feat(platform): govern tenant product provisioning",
-        "when": "38 minutes ago"
+        "when": "83 minutes ago"
       },
       {
         "hash": "adfb90c",
         "subject": "feat(platform): add production execution foundations",
-        "when": "65 minutes ago"
+        "when": "2 hours ago"
       },
       {
         "hash": "5d36a8c",
         "subject": "feat(governance): complete capability evidence trace",
-        "when": "82 minutes ago"
+        "when": "2 hours ago"
       },
       {
         "hash": "647c86c",
         "subject": "fix(dashboard): make capability metrics auditable",
-        "when": "87 minutes ago"
+        "when": "2 hours ago"
       },
       {
         "hash": "ce1aacb",
         "subject": "fix(web): serve product journeys publicly",
-        "when": "89 minutes ago"
+        "when": "2 hours ago"
       },
       {
         "hash": "0848776",
@@ -47,22 +52,17 @@
       {
         "hash": "3037e82",
         "subject": "chore: sync and update workspace files",
-        "when": "2 hours ago"
+        "when": "3 hours ago"
       },
       {
         "hash": "81f7941",
         "subject": "docs(dashboard): refresh integration wave metadata",
-        "when": "2 hours ago"
+        "when": "3 hours ago"
       },
       {
         "hash": "73efaa1",
         "subject": "feat(integrations): persist delivery and file conformance",
-        "when": "2 hours ago"
-      },
-      {
-        "hash": "9603764",
-        "subject": "feat(integrations): add adverse provider simulation",
-        "when": "2 hours ago"
+        "when": "3 hours ago"
       }
     ]
   },
@@ -678,29 +678,35 @@
         },
         {
           "id": "PLT-005",
-          "name": "Tenant onboarding with RE, product, owner, modules, and readiness",
+          "name": "Verified organisation admission, bootstrap ownership, product/module selection, tenant provisioning, and readiness",
           "applicability": "Core",
           "status": "Implemented",
           "raw": "Implemented",
           "evidence": [
             {
               "type": "code",
-              "ref": "apps/api/src/server.js",
-              "note": "Implementation evidence for tenant onboarding with re, product, owner, modules, and readiness."
+              "ref": "packages/core/src/organisation-signup.js",
+              "note": "Fail-closed organisation admission, representative verification, quarantined tenant reservation and bootstrap-owner handoff."
             },
             {
               "type": "test",
-              "ref": "tests/compliance.test.js",
-              "note": "Executable acceptance evidence for tenant onboarding with re, product, owner, modules, and readiness."
+              "ref": "tests/organisation-signup-api.test.js",
+              "note": "HTTP acceptance coverage for two-person admission, single-use MFA ownership, provisioning-only access and activation blockers."
+            },
+            {
+              "type": "test",
+              "ref": "tests/tenant-provisioning-saga.test.js",
+              "note": "Executable provisioning, compensation, reconciliation and evidence-bound handover coverage."
             }
           ],
           "owner": "Platform Engineering & Security",
-          "acceptance": "Automated tests exercise tenant onboarding with re, product, owner, modules, and readiness and the cited implementation enforces the capability boundary.",
+          "acceptance": "Automated tests prove verified two-person admission, a quarantined tenant, single-use MFA bootstrap ownership, dependency-ordered provisioning, compensation and fail-closed activation readiness.",
           "dependencies": [
+            "INT-ADM-01 through INT-ADM-10 for production external services",
             "Platform identity and audit controls",
-            "Tenant registry"
+            "Tenant registry and provisioning saga"
           ],
-          "notes": "Implemented scope is supported by cited executable evidence; production deployment remains subject to environment readiness controls.",
+          "notes": "The governed platform capability is implemented, but no commercial admission or cloud-control integration is live. Production remains blocked until the applicable INT-ADM adapters, direct-authority sources, contracts, credentials and witnessed UAT are certified.",
           "lastReviewed": "2026-07-15"
         },
         {
@@ -11394,33 +11400,33 @@
         },
         {
           "id": "AUD-002",
-          "name": "Uniform actor, role, data class, policy, and consent provenance",
+          "name": "End-to-end API, UI, domain, decision and integration actor/session/role/correlation provenance",
           "applicability": "Core",
           "status": "Partial",
           "raw": "Partial",
           "evidence": [
             {
               "type": "code",
-              "ref": "packages/core/src/data-governance.js",
-              "note": "Executable control implementation relevant to AUD-002."
+              "ref": "apps/api/src/server.js",
+              "note": "Authenticated request and bounded screen events carry principal, session/credential/delegation, request and pseudonymised client/network attribution in a separate tenant activity hash chain."
             },
             {
               "type": "test",
-              "ref": "tests/data-governance.test.js",
-              "note": "Automated evidence covering the AUD-002 control family."
+              "ref": "tests/saas-identity-governance-api.test.js",
+              "note": "HTTP evidence joins an authenticated screen event and API request to the exact human session."
             },
             {
               "type": "doc",
-              "ref": "docs/architecture/current-implementation.md",
-              "note": "Documented architecture or regulatory boundary for AUD-002."
+              "ref": "docs/architecture/tenant-role-staffing-and-feature-gating.md",
+              "note": "Forensic activity schema, privacy limits and cross-system correlation target."
             }
           ],
           "owner": "Compliance Assurance",
-          "acceptance": "Uniform actor, role, data class, policy, and consent provenance is accepted when tenant-scoped execution fails closed on invalid authority or evidence, retains auditable lineage, and the cited automated control-family tests pass.",
+          "acceptance": "Every material API, UI, domain, decision and provider action can be traced to the originating human, borrower, agent or service identity and current delegation without trusting a client-supplied human actor.",
           "dependencies": [
             "AUD-001"
           ],
-          "notes": "Remaining gap for AUD-002: production-grade institutional configuration, external-provider or assessor evidence where applicable, and witnessed operating-effectiveness validation are not yet complete.",
+          "notes": "Tenant API requests and wired dashboard/borrower screens are attributable today. Universal UI coverage, provider correlation propagation, SIEM export and missing-event reconciliation remain.",
           "lastReviewed": "2026-07-15"
         },
         {
@@ -11791,64 +11797,64 @@
         },
         {
           "id": "SEC-002",
-          "name": "Enterprise OIDC/SAML federation and tenant IdP policy",
+          "name": "Enterprise OIDC/SAML federation, certified provider policy, MFA and session binding",
           "applicability": "Core",
           "status": "Partial",
           "raw": "Partial",
           "evidence": [
             {
               "type": "code",
-              "ref": "packages/core/src/security-operations.js",
-              "note": "Executable control implementation relevant to SEC-002."
+              "ref": "packages/core/src/enterprise-identity.js",
+              "note": "Certified Entra, Okta, AD FS, Keycloak, OpenLDAP-bridge and generic OIDC/SAML provider-policy contract."
             },
             {
               "type": "test",
-              "ref": "tests/security-operations.test.js",
-              "note": "Automated evidence covering the SEC-002 control family."
+              "ref": "tests/enterprise-platform.test.js",
+              "note": "Automated federation certification, MFA, metadata and provider-policy evidence."
             },
             {
               "type": "doc",
-              "ref": "docs/architecture/current-implementation.md",
-              "note": "Documented architecture or regulatory boundary for SEC-002."
+              "ref": "docs/architecture/tenant-role-staffing-and-feature-gating.md",
+              "note": "Provider trust, authentication-versus-authorization and commercial-integration boundary."
             }
           ],
           "owner": "Information Security",
-          "acceptance": "Enterprise OIDC/SAML federation and tenant IdP policy is accepted when tenant-scoped execution fails closed on invalid authority or evidence, retains auditable lineage, and the cited automated control-family tests pass.",
+          "acceptance": "A tenant can independently certify exact issuer/audience/metadata, MFA, login/logout and group mappings for a supported enterprise IdP without letting the IdP bypass canonical authorization.",
           "dependencies": [
             "AUD-001"
           ],
-          "notes": "Remaining gap for SEC-002: production-grade institutional configuration, external-provider or assessor evidence where applicable, and witnessed operating-effectiveness validation are not yet complete.",
+          "notes": "The policy and test contract is executable. No commercial IdP tenant, signed-token validation path, secrets/certificates, metadata rotation operation or witnessed provider conformance is live.",
           "lastReviewed": "2026-07-15"
         },
         {
           "id": "SEC-003",
-          "name": "SCIM provisioning/deprovisioning and group mapping",
+          "name": "SCIM provisioning/deprovisioning, group mapping, immediate canonical suspension and governed role requests",
           "applicability": "Core",
           "status": "Partial",
           "raw": "Partial",
           "evidence": [
             {
               "type": "code",
-              "ref": "packages/core/src/security-operations.js",
-              "note": "Executable control implementation relevant to SEC-003."
+              "ref": "packages/core/src/enterprise-identity.js",
+              "note": "Idempotent SCIM events, group mappings and canonical-role request disposition."
             },
             {
               "type": "test",
-              "ref": "tests/security-operations.test.js",
-              "note": "Automated evidence covering the SEC-003 control family."
+              "ref": "tests/enterprise-platform.test.js",
+              "note": "Provisioning/deactivation, domain restriction and role-request evidence."
             },
             {
               "type": "doc",
-              "ref": "docs/architecture/current-implementation.md",
-              "note": "Documented architecture or regulatory boundary for SEC-003."
+              "ref": "docs/architecture/tenant-role-staffing-and-feature-gating.md",
+              "note": "Immediate deactivation, no direct role grant and reactivation edge cases."
             }
           ],
           "owner": "Information Security",
-          "acceptance": "SCIM provisioning/deprovisioning and group mapping is accepted when tenant-scoped execution fails closed on invalid authority or evidence, retains auditable lineage, and the cited automated control-family tests pass.",
+          "acceptance": "Certified SCIM events are idempotent; deactivation removes interactive and canonical authority immediately, while group additions only request roles through LoanOS maker-checker.",
           "dependencies": [
             "AUD-001"
           ],
-          "notes": "Remaining gap for SEC-003: production-grade institutional configuration, external-provider or assessor evidence where applicable, and witnessed operating-effectiveness validation are not yet complete.",
+          "notes": "Local API behavior exists. A live SCIM service credential, provider webhook/signature path, session/token revocation conformance and vendor SLA remain.",
           "lastReviewed": "2026-07-15"
         },
         {
@@ -11884,33 +11890,33 @@
         },
         {
           "id": "SEC-005",
-          "name": "Fine-grained RBAC/ABAC and separation-of-duty policy",
+          "name": "Fine-grained scoped RBAC/ABAC, separation of duty, per-feature minimum staffing and isolated control-policy enforcement",
           "applicability": "Core",
           "status": "Partial",
           "raw": "Partial",
           "evidence": [
             {
               "type": "code",
-              "ref": "packages/core/src/security-operations.js",
-              "note": "Executable control implementation relevant to SEC-005."
+              "ref": "packages/core/src/saas-identity-governance.js",
+              "note": "85 canonical roles, hard SoD, 34 feature staffing policies, sponsored-agent restrictions and immediate containment."
             },
             {
               "type": "test",
-              "ref": "tests/security-operations.test.js",
-              "note": "Automated evidence covering the SEC-005 control family."
+              "ref": "tests/saas-identity-governance.test.js",
+              "note": "Role authority, staffing, maker-checker, agent, suspension, lockout and escalation coverage."
             },
             {
               "type": "doc",
-              "ref": "docs/architecture/current-implementation.md",
-              "note": "Documented architecture or regulatory boundary for SEC-005."
+              "ref": "docs/architecture/tenant-role-staffing-and-feature-gating.md",
+              "note": "Exhaustive role/staffing/edge-case and operations specification."
             }
           ],
           "owner": "Information Security",
-          "acceptance": "Fine-grained RBAC/ABAC and separation-of-duty policy is accepted when tenant-scoped execution fails closed on invalid authority or evidence, retains auditable lineage, and the cited automated control-family tests pass.",
+          "acceptance": "Current scoped authority, hard SoD, distinct verified-human staffing and isolated control decisions gate every protected feature; access loss pauses unsafe work without delaying containment.",
           "dependencies": [
             "AUD-001"
           ],
-          "notes": "Remaining gap for SEC-005: production-grade institutional configuration, external-provider or assessor evidence where applicable, and witnessed operating-effectiveness validation are not yet complete.",
+          "notes": "The kernel, persistent administration APIs and isolated control gateway exist. Universal LOS/LMS/LWS/finance/compliance mutation-route enforcement, production control fleet and complete administration UI remain.",
           "lastReviewed": "2026-07-15"
         },
         {
@@ -12168,6 +12174,11 @@
           "status": "Partial",
           "raw": "Partial",
           "evidence": [
+            {
+              "type": "code",
+              "ref": "apps/api/src/server.js",
+              "note": "Every authenticated tenant API request and allow-listed UI activity is appended with principal/session/request attribution and pseudonymised client/network evidence."
+            },
             {
               "type": "code",
               "ref": "packages/core/src/security-operations.js",
@@ -14050,11 +14061,11 @@
     }
   ],
   "tests": {
-    "pass": 502,
+    "pass": 506,
     "fail": 0,
     "skipped": 5,
-    "total": 507,
+    "total": 511,
     "ran": true,
-    "source": "live"
+    "source": "provided-log"
   }
 }

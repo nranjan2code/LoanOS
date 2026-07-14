@@ -2,7 +2,7 @@
 
 The deterministic policy brain of LoanOS: a pure-Rust decision engine that runs as one fully isolated instance per tenant, evaluates versioned/signed policy bundles, enforces the AI kill switch, and gates every AI-agent action.
 
-Authority: this README is operational documentation. The specification is [docs/architecture/decision-engine-design.md](../docs/architecture/decision-engine-design.md) (invariants INV-1..12, decisions DEC-1..10, security controls SEC-1..11, phases PH-0..5 — all phases implemented). The why is [ADR 0003](../docs/decisions/0003-decision-engine-pure-rust-per-tenant.md). If this README and the design doc disagree, the design doc wins.
+Authority: this README is operational documentation. The specification is [docs/architecture/decision-engine-design.md](../docs/architecture/decision-engine-design.md) (invariants INV-1..13, decisions DEC-1..11, security controls SEC-1..12, phases PH-0..6). The why is in [ADR 0003](../docs/decisions/0003-decision-engine-pure-rust-per-tenant.md) and [ADR 0005](../docs/decisions/0005-isolated-platform-control-policy-engine.md). If this README and the design doc disagree, the design doc wins.
 
 ## The one-paragraph mental model
 
@@ -25,7 +25,7 @@ Policy is data, not code: a `DecisionModel` (JSON — typed fact bindings, expre
 | `tools/rules-fleet` | Sign bundles, spawn/stop instances, health checks, kill-switch broadcast |
 | `tools/rules-replay` | Determinism canary: replays audit records, requires byte-identical reproduction (INV-8) |
 | `tools/rules-diff` | Shadow divergence report between two models over a corpus |
-| `fixtures/` | `lending-eligibility.json` (the ported credit policy), platform guardrails, the 542-case differential corpus |
+| `fixtures/` | `lending-eligibility.json` (the ported credit policy), platform guardrails including `platform-control-staffing.json`, the 542-case differential corpus |
 
 ## Build and test
 
@@ -92,6 +92,23 @@ Every decision appends `{request, response}` to the tenant's audit JSONL; verify
 - `active` — the engine's decision, findings, summary, and signed-bundle lineage are authoritative; an unreachable engine fails closed to `refer` for manual handling.
 
 `LOANOS_RULES_ENGINE_URLS` is a required JSON object mapping every tenant ID to its isolated instance URL. There is no shared-instance or single-URL fallback: an absent tenant mapping fails closed before a request is sent.
+
+### Separate platform-control instance
+
+Identity, feature staffing, SoD and agent-authority decisions use `apps/api/src/control-rules-engine.js`, never the business gateway above. Production requires:
+
+```bash
+LOANOS_CONTROL_RULES_ENGINE=active
+LOANOS_CONTROL_RULES_ENGINE_URLS='{
+  "ten_dev": {
+    "url": "https://ctrl-ten-dev.internal",
+    "instanceId": "ctrl-ten-dev-1",
+    "tenantBundleHash": "sha256:<approved-control-bundle>"
+  }
+}'
+```
+
+The control URL must differ from `LOANOS_RULES_ENGINE_URLS[tenant]`. Provision it as a separate process/pod or stronger isolation unit with a `ctrl-*` identity, separate service identity, bundle/key grants, audit partition and operator permissions. `off` and `shadow` exist for local development and cutover evidence only; production validation rejects them. Any unavailable endpoint, shared URL, wrong instance ID, wrong bundle hash or malformed response denies the action (INV-13/SEC-12).
 
 ## Rules of engagement for changes
 

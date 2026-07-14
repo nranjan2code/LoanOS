@@ -14,7 +14,9 @@ import {
   registerEventSchema,
   registerManagedKeyAttestation,
   registerPitrPolicy,
-  registerSecurityLogCustody
+  registerSaasPrincipal,
+  registerSecurityLogCustody,
+  suspendSaasPrincipalFromIdentityProvider
 } from "../../../../packages/core/src/index.js";
 
 export async function routeEnterpriseTenantControls(context) {
@@ -42,8 +44,25 @@ export async function routeEnterpriseTenantControls(context) {
       const applied = applyScimIdentityEvent(state.users, state.scimEvents, state.federationPolicies, { ...body, appliedBy: authActor(authContext) });
       const userResult = upsertFederatedTenantUser(state.users, applied.userInput);
       if (userResult.findings.length) { sendJson(res, 422, { error: { code: "scim_user_invalid", message: "SCIM identity could not be applied." }, findings: userResult.findings }); return true; }
-      await store.save(appendEvent({ ...state, users: userResult.users, scimEvents: applied.events }, { type: `identity.scim.${applied.event.operation}_applied`, eventId: applied.event.eventId, userId: applied.event.userId, policyId: applied.event.policyId, evidenceChecksumSha256: applied.event.evidenceChecksumSha256, actor: authActor(authContext) }));
-      sendJson(res, 201, { event: applied.event, user: userResult.user });
+      let next = { ...state, users: userResult.users, scimEvents: applied.events };
+      const principalKey = `${authContext.tenantId}:${applied.event.userId}`;
+      let principal = next.saasPrincipals?.[principalKey] ?? null;
+      let staffingImpact = null;
+      let escalations = [];
+      if (applied.event.operation === "upsert" && !principal) {
+        const registered = registerSaasPrincipal(next, { tenantId: authContext.tenantId, principalId: applied.event.userId, principalType: "human", displayName: userResult.user.displayName, status: "active", emailVerified: true, mfaEnrolled: true, identityEvidenceRef: `scim:${applied.event.eventId}:${applied.event.evidenceChecksumSha256}` });
+        next = registered.state;
+        principal = registered.principal;
+      }
+      if (applied.event.operation === "deactivate" && principal) {
+        const suspended = suspendSaasPrincipalFromIdentityProvider(next, { tenantId: authContext.tenantId, principalId: principal.principalId, policyId: applied.event.policyId, evidenceRef: `scim:${applied.event.eventId}:${applied.event.evidenceChecksumSha256}` });
+        next = suspended.state;
+        principal = suspended.principal;
+        staffingImpact = suspended.staffingImpact;
+        escalations = suspended.escalations;
+      }
+      await store.save(appendEvent(next, { type: `identity.scim.${applied.event.operation}_applied`, eventId: applied.event.eventId, userId: applied.event.userId, policyId: applied.event.policyId, evidenceChecksumSha256: applied.event.evidenceChecksumSha256, requestedCanonicalRoleIds: applied.event.requestedCanonicalRoleIds, canonicalRoleDisposition: applied.event.canonicalRoleDisposition, staffingImpact, actor: authActor(authContext) }));
+      sendJson(res, 201, { event: applied.event, user: userResult.user, principal, staffingImpact, escalations });
     } catch (error) { sendEnterpriseError(res, sendJson, error); } return true;
   }
   return false;

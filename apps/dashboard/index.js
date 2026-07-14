@@ -302,6 +302,17 @@ function updateConnectionStatus(connected, tenantLabel) {
   }
 }
 
+function recordScreenActivity(activityType, screenId, actionId = null, entityType = null) {
+  if (apiState.authScope !== 'tenant' || !apiState.currentUser?.userId) return;
+  fetch('/activity/screen-events', {
+    method: 'POST',
+    credentials: 'same-origin',
+    keepalive: true,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ activityType, screenId, actionId, entityType, clientOccurredAt: new Date().toISOString() })
+  }).catch(() => {});
+}
+
 // ─── Toast Notifications ────────────────────────────────────────────────────
 const MAX_TOASTS = 4;
 
@@ -457,6 +468,7 @@ async function loadTenantWorkspace(label) {
   const res = await apiFetch('/staff/actors');
   apiState.actors = res.actors || [];
   updateConnectionStatus(true, label || `Tenant: ${apiState.currentTenant?.tenantId || 'active'}`);
+  recordScreenActivity('screen_view', 'staff.workspace');
 
   const unrestricted = currentUserQueues() === null;
   dom.filterMyQueues.closest('.filter-section').classList.toggle('hidden', unrestricted);
@@ -757,6 +769,7 @@ function renderTasksList() {
 // ─── Select Task & Fill Details ─────────────────────────────────────────────
 function selectTask(task) {
   apiState.selectedTaskId = task.taskId;
+  recordScreenActivity('task_opened', 'staff.task_detail', 'open_task', 'workflow_task');
   
   dom.detailEmptyState.classList.add('hidden');
   dom.detailContent.classList.remove('hidden');

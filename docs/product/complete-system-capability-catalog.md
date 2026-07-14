@@ -1,6 +1,6 @@
 # LoanOS India Complete-System Capability Catalogue
 
-Status date: 2026-07-14
+Status date: 2026-07-15
 
 ## Purpose
 
@@ -67,7 +67,7 @@ Composite labels such as `Partial/Mock` identify a mixed capability: some intern
 
 LoanOS currently has a strong compliance-first domain foundation and executable slices for amortising, bullet, moratorium, step-up, and revolving facilities. Its best-developed capabilities are tenant isolation, KFS and fund-flow gates, policy/evidence lineage, maker-checker, audit integrity, borrower privacy rights, model governance, deterministic decision-engine infrastructure, and finance controls.
 
-The principal gaps before bank production are live integrations, downstream GL certification, regulatory submission formats, product-specific lending depth, repossession/auction and legal-expense depth, live IdP/KMS/SIEM/database/deployment infrastructure, and independent bank-assurance evidence. The product now governs federation/SCIM state, purpose-attested keys, security-log custody, PostgreSQL HA/PITR/capacity dependencies, API/event/webhook contracts and deployment readiness alongside bounded observability, encrypted recovery, governed release, security assurance, SOC investigation and compliance evidence. Actual token/signature validation, KMS grants, SIEM/WORM/NTP/collectors, managed replication/WAL/PITR, queue/dispatch/replay workers, cloud rollout controllers, institutional control methodology, pen tests, ITSM/paging, 24x7 staffing, production-scale soak/chaos, contract enforcement, real failover/failback and exercised continuity remain open. Collections/legal recovery also retains partner depth for dialers, route/capacity optimization, court integration, possession, auction and recovery accounting. Public positioning must remain narrower than this catalogue until each advertised journey reaches agreed maturity.
+The principal gaps before bank production are live integrations, downstream GL certification, regulatory submission formats, product-specific lending depth, repossession/auction and legal-expense depth, live IdP/KMS/SIEM/database/deployment infrastructure, and independent bank-assurance evidence. The product now governs federation/SCIM state, an 85-role canonical catalogue, 34 per-feature verified-human staffing policies, immediate revocation pause/escalation, human-sponsored agent identities, isolated platform-control decision routing, purpose-attested keys, security-log custody, API/screen actor attribution, PostgreSQL HA/PITR/capacity dependencies, API/event/webhook contracts and deployment readiness. Commercial IdP/token/signature integration, universal protected-route staffing enforcement, a separately deployed control fleet, KMS grants, SIEM/WORM/NTP/collectors, managed replication/WAL/PITR, queue/dispatch/replay workers, cloud rollout controllers, institutional control methodology, pen tests, ITSM/paging, 24x7 staffing, production-scale soak/chaos, contract enforcement, real failover/failback and exercised continuity remain open. Public positioning must remain narrower than this catalogue until each advertised journey reaches agreed maturity.
 
 The detailed register contains **453 individually identified capabilities**. At this snapshot, 87 are `Implemented`, 339 `Partial`, 11 `Partial/Mock`, 7 `Mock`, 0 `Missing`, 3 `Partner`, and 6 `External`. These counts measure scope coverage, not delivery percentage: a single partial ledger, reconciliation, security, integration or recovery control can block production even when no capability remains unclassified as missing.
 
@@ -118,7 +118,7 @@ The detailed register contains **453 individually identified capabilities**. At 
 | PLT-002 | Pooled tenant isolation at application and database layers | Core | Implemented |
 | PLT-003 | Dedicated database/data-plane deployment tier | Institution | Partial |
 | PLT-004 | Per-tenant data encryption and key hierarchy | Core | Partial |
-| PLT-005 | Tenant onboarding with RE, product, owner, modules, and readiness | Core | Implemented |
+| PLT-005 | Verified organisation admission, bootstrap ownership, product/module selection, tenant provisioning, and readiness | Core | Implemented |
 | PLT-006 | Sandbox environments with synthetic-data enforcement | Core | Implemented |
 | PLT-007 | Tenant branding and customer-facing identity | Core | Partial |
 | PLT-008 | Entitlements, subscribed modules, limits, and commercial plan controls | Core | Partial |
@@ -615,7 +615,7 @@ The detailed register contains **453 individually identified capabilities**. At 
 | ID | Capability | Applicability | Status |
 | --- | --- | --- | --- |
 | AUD-001 | Tenant-scoped append-only hash-chained audit events | Core | Implemented |
-| AUD-002 | Uniform actor, role, data class, policy, and consent provenance | Core | Partial |
+| AUD-002 | End-to-end API, UI, domain, decision and integration actor/session/role/correlation provenance | Core | Partial |
 | AUD-003 | Integrity verification and filtered evidence export | Core | Implemented |
 | AUD-004 | External timestamp/anchor or WORM retention | Core | Partial |
 | AUD-005 | Business-event completeness reconciliation | Core | Partial |
@@ -632,10 +632,10 @@ The detailed register contains **453 individually identified capabilities**. At 
 | ID | Capability | Applicability | Status |
 | --- | --- | --- | --- |
 | SEC-001 | Local human authentication and secure password hashing | Core | Implemented |
-| SEC-002 | Enterprise OIDC/SAML federation and tenant IdP policy | Core | Partial |
-| SEC-003 | SCIM provisioning/deprovisioning and group mapping | Core | Partial |
+| SEC-002 | Enterprise OIDC/SAML federation, certified provider policy, MFA and session binding | Core | Partial |
+| SEC-003 | SCIM provisioning/deprovisioning, group mapping, immediate canonical suspension and governed role requests | Core | Partial |
 | SEC-004 | Enforced MFA, step-up authentication, and recovery | Core | Partial |
-| SEC-005 | Fine-grained RBAC/ABAC and separation-of-duty policy | Core | Partial |
+| SEC-005 | Fine-grained scoped RBAC/ABAC, separation of duty, per-feature minimum staffing and isolated control-policy enforcement | Core | Partial |
 | SEC-006 | Privileged access management and just-in-time elevation | Core | Partial |
 | SEC-007 | Named, scoped, expiring, and independently rotatable service credentials | Core | Implemented |
 | SEC-008 | KMS/HSM-backed key custody, rotation, and destruction | Core | Partial |

@@ -290,11 +290,16 @@ export function createEmptyTenantData() {
     saasPrincipals: {},
     saasRoleRequests: {},
     saasRoleGrants: {},
+    tenantFeatureStaffingConfigs: {},
+    staffingEscalations: {},
+    featureStaffingRequests: {},
+    staffingEscalationClosureRequests: {},
     tenantOwnership: {},
     bootstrapTransitionRequests: {},
     ownershipTransferRequests: {},
     emergencyAccessRequests: {},
     emergencyAccessGrants: {},
+    accessActivityEvents: [],
     events: []
   };
 }
@@ -504,11 +509,16 @@ function normalizeTenantData(data) {
     saasPrincipals: data?.saasPrincipals ?? {},
     saasRoleRequests: data?.saasRoleRequests ?? {},
     saasRoleGrants: data?.saasRoleGrants ?? {},
+    tenantFeatureStaffingConfigs: data?.tenantFeatureStaffingConfigs ?? {},
+    staffingEscalations: data?.staffingEscalations ?? {},
+    featureStaffingRequests: data?.featureStaffingRequests ?? {},
+    staffingEscalationClosureRequests: data?.staffingEscalationClosureRequests ?? {},
     tenantOwnership: data?.tenantOwnership ?? {},
     bootstrapTransitionRequests: data?.bootstrapTransitionRequests ?? {},
     ownershipTransferRequests: data?.ownershipTransferRequests ?? {},
     emergencyAccessRequests: data?.emergencyAccessRequests ?? {},
     emergencyAccessGrants: data?.emergencyAccessGrants ?? {},
+    accessActivityEvents: Array.isArray(data?.accessActivityEvents) ? data.accessActivityEvents : [],
     events: Array.isArray(data?.events) ? data.events : []
   };
 }
@@ -961,6 +971,10 @@ export function resetSandbox(state, sandboxId, preserveConfig = false) {
       accessReviews: tenantData.accessReviews ?? {},
       saasPrincipals: tenantData.saasPrincipals ?? {},
       saasRoleGrants: tenantData.saasRoleGrants ?? {},
+      tenantFeatureStaffingConfigs: tenantData.tenantFeatureStaffingConfigs ?? {},
+      staffingEscalations: tenantData.staffingEscalations ?? {},
+      featureStaffingRequests: tenantData.featureStaffingRequests ?? {},
+      staffingEscalationClosureRequests: tenantData.staffingEscalationClosureRequests ?? {},
       tenantOwnership: tenantData.tenantOwnership ?? {},
     };
   } else {

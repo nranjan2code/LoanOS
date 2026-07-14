@@ -1,6 +1,6 @@
 # LoanOS Decision Engine — Design
 
-Status: Approved design, pre-implementation. Companion decision record: `docs/decisions/0003-decision-engine-pure-rust-per-tenant.md`.
+Status: Approved and implemented through PH-6 locally. Companion decision records: `docs/decisions/0003-decision-engine-pure-rust-per-tenant.md` and `docs/decisions/0005-isolated-platform-control-policy-engine.md`.
 
 Classification: Internal — restricted. This document describes the platform's decision brain. It contains no tenant rule content, but its threat model and control descriptions are sensitive. Do not share outside the engineering and compliance teams.
 
@@ -67,10 +67,11 @@ These are the load-bearing guarantees. Each must have automated verification (se
 - INV-10 Rule confidentiality. Rule content exists only in the control plane store and inside the owning tenant's instance memory. Logs, metrics, and error messages carry rule/node IDs and hashes only. Responses to agent-facing or borrower-facing callers carry audience-filtered reasons, never traces or rule internals.
 - INV-11 Data, not code. Bundles are declarative data. Instances load no dynamic code, no plugins, no tenant-supplied functions. Engine behavior changes only via signed platform releases.
 - INV-12 Time is an input. `effective_at` and `evaluated_at` arrive on the request (stamped by the gateway). The engine never reads the system clock during evaluation. All tenant-facing effective dates are interpreted in IST.
+- INV-13 Authority-plane isolation. A tenant's `guardrail.platform_control.*` decisions execute in a physically and administratively separate per-tenant runtime from lending/business decisions. The two runtime classes share no URL, process, mutable state, tenant bundle, service identity, key grant, audit partition or runtime administrator. A missing, untrusted, mismatched or shared control instance denies the action.
 
 ## 5. System Topology
 
-Per ADR 0003, the runtime is per-tenant; the control plane and gateway are shared but thin.
+Per ADRs 0003 and 0005, each runtime is per-tenant and single-purpose; the control plane and gateways are shared but thin.
 
 ```
 callers (API app, LWS workflows, AI agents)
@@ -89,6 +90,8 @@ control plane ── authoring, four-eyes review, canonicalization, signing,
                  bundle distribution, kill-switch feed, fleet controller
 ```
 
+The diagram is instantiated twice per tenant. The business gateway routes lending and business guardrails to `eng-<tenant>-*`. The platform-control gateway routes identity, staffing, SoD and agent-authority decisions to `ctrl-<tenant>-*`. Routing configuration and runtime identity checks forbid the two URLs or instance identities from collapsing into one boundary (INV-13).
+
 Shared components hold no evaluation state and never see decrypted tenant rule content outside the control-plane store boundary. The gateway routes; the instance decides.
 
 Isolation tiers (same binary, escalating boundary): supervised process with cgroup limits → per-tenant pod with network policy → Firecracker microVM or dedicated node → instance deployed in the tenant's own VPC. The tier is a commercial/contractual attribute of the tenant, recorded in the tenant registry.
@@ -105,6 +108,7 @@ Isolation tiers (same binary, escalating boundary): supervised process with cgro
 - DEC-8 Small total expression language. CEL-like, statically typed, with a vetted domain standard library (`emi`, `age_years`, `round` with explicit rounding mode, date/tenor arithmetic). No tenant-defined functions in v1; stdlib grows only via platform release.
 - DEC-9 JSON everywhere, decimals as strings. Wire format, canonical form, and authoring format are JSON. Canonicalization: UTF-8 NFC, lexicographically sorted keys, no insignificant whitespace, decimals as strings. The canonical bytes are what gets hashed and signed.
 - DEC-10 Evaluation core: first-party. Resolved 2026-07-10 during PH-1. Rationale: (a) INV-6 requires decimals-as-strings and decimal-only arithmetic through the entire evaluation path — ZEN's JDM evaluates JSON numbers natively and would need forking to uphold INV-5/INV-6 semantics unmodified; (b) SEC-7's minimal-dependency policy for eval-path crates is trivially met by the first-party core (serde, rust_decimal, chrono, sha2 only); (c) the v1 node set proved small enough that the eligibility port plus differential harness cost less than adapter integration would have. JDM format compatibility at the model layer remains open for authoring-tool reuse, and the `DecisionProvider` trait (DEC-7) keeps a future ZEN adapter possible per tenant.
+- DEC-11 Separate authority policy. Platform-control models use the same pure evaluator and decision contract but a distinct gateway, runtime class, bundle/key namespace and operating team per ADR 0005. Identity-provider assertions and Node projections are facts; they are not authorization decisions. Production never falls back from the control instance to local application logic.
 
 ## 7. The Decision Contract
 
@@ -299,6 +303,7 @@ Controls:
 - SEC-9 RBAC. Roles: rule author, reviewer/approver, platform guardrail owner (separate from tenant authors), fleet operator (no rule read access), auditor (read-only traces + versions). No role combines author and approver over the same version (INV-9).
 - SEC-10 Memory hygiene. Key material zeroized on drop; instances run non-root, read-only filesystem, seccomp/AppArmor profile per isolation tier.
 - SEC-11 Anti-inference. Audience filtering of reasons (INV-10) plus rate limits and anomaly detection on guardrail probing patterns (an agent systematically sweeping fact values to map a threshold is a reportable security event).
+- SEC-12 Control-instance identity. The platform-control gateway pins the expected `ctrl-*` instance ID and optional tenant bundle hash, refuses a URL used by the business engine, and denies on transport, identity, bundle or response-validation failure. Control and business fleet access, signing keys and audit partitions require separate privileges.
 
 ## 13. Crate Architecture
 
@@ -345,6 +350,7 @@ Dependency rule: `rules-core`, `rules-expr`, `rules-model`, `rules-eval` must no
 - Overlay (INV-4): approval-time tests for provable loosening; runtime tests asserting post-check override + trace record + alert.
 - Golden decision corpus: every ruleset version carries a fixture set (inputs → expected outcome + key outputs); approval requires green goldens. Slice 1 seeds this corpus from the existing JS eligibility tests.
 - Differential shadow (PH-1): the ported eligibility graph runs against `packages/core/src/eligibility.js` outcomes over the seed-user corpus; cutover requires zero unexplained divergence.
+- Authority isolation (INV-13): tests deny a shared URL, wrong instance identity, missing facts, missing human role coverage, non-independent maker/checker, open staffing pauses, agent attempts to occupy human controls, and unavailable active control engines.
 
 ## 15. Delivery Phases
 
@@ -385,6 +391,14 @@ Each phase has acceptance criteria; a phase is done when all its criteria have a
 ### PH-5 — Federation — complete 2026-07-10 (in-process pilot)
 - [x] `DecisionProvider` trait (`rules-provider`), `NativeProvider` (with optional guardrail wrapping — INV-4 applies through the provider path too), and the per-tenant `Router` with `posture()` reporting each binding's trace fidelity for the tenant's compliance record. An unbound key errors (caller maps to fail-closed, INV-5); a dead remote errors, never a fabricated approval.
 - [x] First remote adapter: `RestProvider` for engines speaking the decision contract over HTTP (incumbent behind a shim, another rules-service, OPA/BRMS behind a mapper), declaring `OutcomeOnly` trace fidelity. Strangler playbook executed against a mock incumbent (Drools-shim simulation): proxy on day one → shadow surfaced the incumbent's undocumented 9L referral band as exactly one explained divergence → binding flipped to native (a data change) → rollback binding verified still live. (Amendments: pilot ran in-process against a simulated incumbent — no tenant has a real legacy engine yet; instance-level router config wiring accompanies the first real one. Format-specific adapters (DMN, OPA rego I/O) are written when a concrete target exists.)
+
+### PH-6 — Platform-control authority plane — complete 2026-07-15 (local staging)
+
+- [x] ADR 0005, INV-13, DEC-11 and SEC-12 establish a separate per-tenant runtime class for identity, feature staffing, SoD and agent authority.
+- [x] `guardrail.platform_control.staffing` has a declarative fixture and fail-closed Rust corpus covering complete staffing, missing checker/minimum people, agent human-control attempts and malformed facts.
+- [x] `apps/api/src/control-rules-engine.js` has independent off/shadow/active modes, per-tenant routing, expected `ctrl-*` identity and tenant-bundle checks, shared-business-URL rejection and active-mode fail-closed behavior.
+- [x] Production configuration requires both business and control engine mappings.
+- [ ] Production fleet manifests, mTLS identities, separate KMS grants, external audit sinks and clean shadow evidence remain deployment work; local completion does not claim a commercially live control fleet.
 
 ## 16. Open Questions
 

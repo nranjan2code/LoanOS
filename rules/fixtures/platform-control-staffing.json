@@ -1,0 +1,35 @@
+{
+  "key": "guardrail.platform_control.staffing",
+  "bindings": [
+    { "name": "feature_configured", "path": "/staffing/feature_configured", "type": "bool", "required": true },
+    { "name": "missing_role_sets", "path": "/staffing/missing_role_sets", "type": "int", "required": true },
+    { "name": "independence_failures", "path": "/staffing/independence_failures", "type": "int", "required": true },
+    { "name": "sod_violations", "path": "/staffing/sod_violations", "type": "int", "required": true },
+    { "name": "active_human_principals", "path": "/staffing/active_human_principals", "type": "int", "required": true },
+    { "name": "minimum_distinct_principals", "path": "/staffing/minimum_distinct_principals", "type": "int", "required": true },
+    { "name": "open_operational_pauses", "path": "/staffing/open_operational_pauses", "type": "int", "required": true },
+    { "name": "actor_authorized", "path": "/action/actor_authorized", "type": "bool", "required": true },
+    { "name": "agent_attempts_human_control", "path": "/action/agent_attempts_human_control", "type": "bool", "required": true },
+    { "name": "agent_guardrail_allowed", "path": "/action/agent_guardrail_allowed", "type": "bool", "required": true }
+  ],
+  "expressions": [
+    { "name": "insufficient_people", "expr": "active_human_principals < minimum_distinct_principals" },
+    { "name": "agent_guardrail_failed", "expr": "not agent_guardrail_allowed" }
+  ],
+  "findings": [
+    { "id": "pc_feature_unconfigured", "when": ["not feature_configured"], "severity": "error", "code": "FEATURE_NOT_CONFIGURED", "regulation": "RBI-IT-23", "message": "The feature is not enabled by an approved staffing configuration.", "path": "staffing.feature_configured", "audience": "internal" },
+    { "id": "pc_role_missing", "when": ["missing_role_sets > 0"], "severity": "error", "code": "REQUIRED_ROLE_UNSTAFFED", "regulation": "RBI-IT-23", "message": "One or more required human role sets have no active verified principal.", "path": "staffing.missing_role_sets", "audience": "tenant_ops" },
+    { "id": "pc_independence", "when": ["independence_failures > 0"], "severity": "error", "code": "MAKER_CHECKER_NOT_INDEPENDENT", "regulation": "RBI-IT-9", "message": "Maker, checker or accountable-control roles are not independently staffed.", "path": "staffing.independence_failures", "audience": "tenant_ops" },
+    { "id": "pc_sod", "when": ["sod_violations > 0"], "severity": "error", "code": "SEGREGATION_OF_DUTIES_VIOLATION", "regulation": "RBI-IT-23", "message": "An active principal has an incompatible role combination.", "path": "staffing.sod_violations", "audience": "internal" },
+    { "id": "pc_minimum_people", "when": ["insufficient_people"], "severity": "error", "code": "MINIMUM_DISTINCT_PEOPLE_NOT_MET", "regulation": "RBI-IT-23", "message": "The feature has fewer active verified humans than its minimum staffing requirement.", "path": "staffing.active_human_principals", "audience": "tenant_ops" },
+    { "id": "pc_pause", "when": ["open_operational_pauses > 0"], "severity": "error", "code": "STAFFING_ESCALATION_OPEN", "regulation": "RBI-IT-27", "message": "Work remains paused until the staffing escalation is independently closed.", "path": "staffing.open_operational_pauses", "audience": "tenant_ops" },
+    { "id": "pc_actor", "when": ["not actor_authorized"], "severity": "error", "code": "ACTOR_ROLE_NOT_AUTHORIZED", "regulation": "RBI-IT-19", "message": "The acting principal does not hold the required current scoped role.", "path": "action.actor_authorized", "audience": "internal" },
+    { "id": "pc_agent_human_control", "when": ["agent_attempts_human_control"], "severity": "error", "code": "AGENT_HUMAN_CONTROL_FORBIDDEN", "regulation": "RBI-IT-23", "message": "An agent cannot act as a human maker, checker, accountable officer, access administrator or auditor.", "path": "action.agent_attempts_human_control", "audience": "internal" },
+    { "id": "pc_agent_guardrail", "when": ["agent_guardrail_failed"], "severity": "error", "code": "AGENT_GUARDRAIL_DENIED", "regulation": "MODEL-HUMAN-OVERSIGHT", "message": "The separate agent guardrail did not authorize this action.", "path": "action.agent_guardrail_allowed", "audience": "internal" }
+  ],
+  "outcome": "severity_fold",
+  "outputs": {
+    "active_human_principals": "active_human_principals",
+    "minimum_distinct_principals": "minimum_distinct_principals"
+  }
+}

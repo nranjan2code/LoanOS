@@ -30,7 +30,7 @@ const sha = (value) => createHash("sha256").update(value).digest("hex");
 const approval = { proposedBy: "platform_maker", approvedBy: "platform_checker", approvalRef: "change-approval-1" };
 
 function activeFederation() {
-  const draft = createFederationPolicy({}, { policyId: "idp-bank", protocol: "oidc", issuer: "https://idp.bank.in", metadataUrl: "https://idp.bank.in/.well-known/openid-configuration", audience: "loanos", allowedDomains: ["bank.in"], groupMappings: { "loan-ops": { adminRoles: ["operator"], roles: ["loan_officer"], queues: ["origination"] } }, pkceRequired: true, mfaRequired: true, owner: "identity_owner", proposedBy: "identity_maker" }, NOW);
+  const draft = createFederationPolicy({}, { policyId: "idp-bank", providerType: "entra_id", protocol: "oidc", issuer: "https://idp.bank.in", metadataUrl: "https://idp.bank.in/.well-known/openid-configuration", audience: "loanos", allowedDomains: ["bank.in"], groupMappings: { "loan-ops": { adminRoles: ["operator"], roles: ["loan_officer"], canonicalRoleIds: ["loan_officer"], queues: ["origination"] } }, pkceRequired: true, mfaRequired: true, owner: "identity_owner", proposedBy: "identity_maker" }, NOW);
   return certifyFederationPolicy(draft.registry, "idp-bank", { approvedBy: "identity_checker", approvalRef: "idp-approval", metadataChecksumSha256: sha("metadata"), metadataValidUntil: "2027-07-14T00:00:00.000Z", loginTestRef: "test-login", logoutTestRef: "test-logout", mfaTestRef: "test-mfa" }, NOW);
 }
 
@@ -42,6 +42,8 @@ test("OIDC policy certification gates idempotent SCIM provisioning and deprovisi
   assert.equal(user.findings.length, 0);
   assert.equal(user.user.authenticationSource, "federated");
   assert.equal(user.user.passwordHash, undefined);
+  assert.deepEqual(applied.event.requestedCanonicalRoleIds, ["loan_officer"]);
+  assert.equal(applied.event.canonicalRoleDisposition, "pending_loanos_maker_checker");
   const deactivated = applyScimIdentityEvent(user.users, applied.events, certified.registry, { eventId: "scim-2", policyId: "idp-bank", externalId: "staff-1", email: "asha@bank.in", displayName: "Asha", operation: "deactivate", groups: [], idempotencyKey: "scim-key-2", appliedBy: "scim_gateway" }, NOW);
   assert.equal(upsertFederatedTenantUser(user.users, deactivated.userInput, NOW).user.status, "inactive");
   assert.throws(() => applyScimIdentityEvent(user.users, applied.events, certified.registry, { eventId: "scim-3", policyId: "idp-bank", externalId: "staff-2", email: "outside@example.com", displayName: "Outside", operation: "upsert", groups: ["loan-ops"], idempotencyKey: "scim-key-3" }, NOW), /allowed domains/);
@@ -94,7 +96,7 @@ test("tenant federation and platform enterprise APIs persist governed controls",
   const server = createLoanOsServer({ dataDir, bootstrapTenants: [tenant], platformAdminKey }); await new Promise((resolve, reject) => server.listen(0, "127.0.0.1", (error) => error ? reject(error) : resolve()));
   t.after(async () => { await new Promise((resolve) => server.close(resolve)); await rm(dataDir, { recursive: true, force: true }); });
   const base = `http://127.0.0.1:${server.address().port}`;
-  let response = await fetch(`${base}/admin/federation/policies`, { method: "POST", headers: { "content-type": "application/json", "x-api-key": tenant.apiKey }, body: JSON.stringify({ policyId: "tenant-idp", protocol: "oidc", issuer: "https://idp.enterprise.in", metadataUrl: "https://idp.enterprise.in/.well-known/openid-configuration", audience: "loanos", allowedDomains: ["enterprise.in"], groupMappings: { staff: { adminRoles: ["operator"], roles: [], queues: [] } }, pkceRequired: true, mfaRequired: true, owner: "identity_owner" }) });
+  let response = await fetch(`${base}/admin/federation/policies`, { method: "POST", headers: { "content-type": "application/json", "x-api-key": tenant.apiKey }, body: JSON.stringify({ policyId: "tenant-idp", providerType: "okta", protocol: "oidc", issuer: "https://idp.enterprise.in", metadataUrl: "https://idp.enterprise.in/.well-known/openid-configuration", audience: "loanos", allowedDomains: ["enterprise.in"], groupMappings: { staff: { adminRoles: ["operator"], roles: [], queues: [] } }, pkceRequired: true, mfaRequired: true, owner: "identity_owner" }) });
   assert.equal(response.status, 201, await response.clone().text());
   const platformPost = (path, body) => fetch(`${base}${path}`, { method: "POST", headers: { "content-type": "application/json", "x-platform-admin-key": platformAdminKey }, body: JSON.stringify(body) });
   response = await platformPost("/platform/enterprise/key-attestations", { attestationId: "api-key-db", keyId: "db-v1", provider: "kms", keyRef: "kms/db", purpose: "database", region: "ap-south-1", algorithm: "AES_256", nonExportable: true, hsmBacked: true, dualControl: true, rotationDays: 180, destructionPolicyRef: "destroy/db", evidenceRef: "evidence/db", proposedBy: "platform_maker", approvedBy: "platform_admin_key", approvalRef: "approval-api" });

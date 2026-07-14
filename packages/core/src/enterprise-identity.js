@@ -1,7 +1,9 @@
 import { createHash } from "node:crypto";
 import { KNOWN_STAFF_ROLES } from "./access-control.js";
+import { CANONICAL_ROLE_CATALOGUE } from "./saas-identity-governance.js";
 
 const FEDERATION_PROTOCOLS = new Set(["oidc", "saml"]);
+const IDENTITY_PROVIDER_TYPES = new Set(["entra_id", "okta", "adfs", "keycloak", "openldap_bridge", "generic_oidc", "generic_saml"]);
 const POLICY_STATUSES = new Set(["draft", "active", "suspended"]);
 const TENANT_ADMIN_ROLES = new Set(["tenant_admin", "user_admin", "security_admin", "auditor", "operator"]);
 
@@ -9,6 +11,7 @@ export function createFederationPolicy(registry = {}, input = {}, now = new Date
   requireText(input.policyId, "policyId");
   if (registry[input.policyId]) throw identityError("federation_policy_duplicate", "policyId already exists.");
   if (!FEDERATION_PROTOCOLS.has(input.protocol)) throw identityError("federation_policy_invalid", "protocol must be oidc or saml.");
+  if (!IDENTITY_PROVIDER_TYPES.has(input.providerType)) throw identityError("federation_policy_invalid", "providerType must identify a supported enterprise identity integration.");
   for (const field of ["issuer", "metadataUrl", "audience", "owner", "proposedBy"]) requireText(input[field], field);
   requireHttps(input.metadataUrl, "metadataUrl");
   const allowedDomains = stringList(input.allowedDomains, "allowedDomains", true).map((item) => item.toLowerCase());
@@ -17,7 +20,7 @@ export function createFederationPolicy(registry = {}, input = {}, now = new Date
   if (input.protocol === "saml" && input.signedAssertionsRequired !== true) throw identityError("federation_policy_invalid", "SAML requires signed assertions.");
   if (input.mfaRequired !== true) throw identityError("federation_policy_invalid", "Federated staff access requires MFA at the identity provider.");
   const policy = {
-    policyId: String(input.policyId), protocol: input.protocol, issuer: String(input.issuer), metadataUrl: String(input.metadataUrl),
+    policyId: String(input.policyId), providerType: input.providerType, protocol: input.protocol, issuer: String(input.issuer), metadataUrl: String(input.metadataUrl),
     audience: String(input.audience), allowedDomains, groupMappings, mfaRequired: true,
     pkceRequired: input.protocol === "oidc", signedAssertionsRequired: input.protocol === "saml",
     secretRef: optionalText(input.secretRef), owner: String(input.owner), proposedBy: String(input.proposedBy),
@@ -52,6 +55,7 @@ export function applyScimIdentityEvent(users = {}, events = {}, policies = {}, i
   const adminRoles = [...new Set(mapped.flatMap((item) => item.adminRoles))];
   const roles = [...new Set(mapped.flatMap((item) => item.roles))];
   const queues = [...new Set(mapped.flatMap((item) => item.queues))];
+  const requestedCanonicalRoleIds = [...new Set(mapped.flatMap((item) => item.canonicalRoleIds))];
   if (input.operation === "upsert" && (mapped.length === 0 || adminRoles.length === 0)) throw identityError("scim_group_unmapped", "At least one SCIM group must map to an explicit tenant admin role set.");
   const userInput = {
     userId: existing?.userId ?? `fusr_${digest(`${policy.policyId}:${input.externalId}`).slice(0, 20)}`, email, displayName: String(input.displayName),
@@ -62,8 +66,8 @@ export function applyScimIdentityEvent(users = {}, events = {}, policies = {}, i
     canAssignQueues: input.operation === "deactivate" ? existing.canAssignQueues : [], country: "IN",
     federationPolicyId: policy.policyId, federationExternalId: String(input.externalId), authenticationSource: "federated", mfaRequired: true
   };
-  const event = { eventId: String(input.eventId), policyId: policy.policyId, externalId: String(input.externalId), userId: userInput.userId, operation: input.operation, groups, idempotencyKey: String(input.idempotencyKey), status: "applied", appliedBy: String(input.appliedBy ?? "scim"), appliedAt: now.toISOString(), evidenceChecksumSha256: digest({ policyId: policy.policyId, externalId: input.externalId, operation: input.operation, groups }) };
-  return { userInput, event, events: { ...events, [event.eventId]: event } };
+  const event = { eventId: String(input.eventId), policyId: policy.policyId, externalId: String(input.externalId), userId: userInput.userId, operation: input.operation, groups, requestedCanonicalRoleIds, canonicalRoleDisposition: input.operation === "deactivate" ? "revoke_access_immediately" : requestedCanonicalRoleIds.length ? "pending_loanos_maker_checker" : "none", idempotencyKey: String(input.idempotencyKey), status: "applied", appliedBy: String(input.appliedBy ?? "scim"), appliedAt: now.toISOString(), evidenceChecksumSha256: digest({ policyId: policy.policyId, externalId: input.externalId, operation: input.operation, groups, requestedCanonicalRoleIds }) };
+  return { userInput, event, requestedCanonicalRoleIds, events: { ...events, [event.eventId]: event } };
 }
 
 export function assessFederationPolicy(policy, now = new Date()) {
@@ -78,10 +82,11 @@ function normalizeGroupMappings(value) {
   if (!value || Array.isArray(value) || typeof value !== "object" || Object.keys(value).length === 0) throw identityError("federation_policy_invalid", "groupMappings must define at least one group.");
   return Object.fromEntries(Object.entries(value).map(([group, mapping]) => {
     requireText(group, "groupMappings group");
-    const adminRoles = stringList(mapping?.adminRoles, "adminRoles", true); const roles = stringList(mapping?.roles, "roles");
+    const adminRoles = stringList(mapping?.adminRoles, "adminRoles", true); const roles = stringList(mapping?.roles, "roles"); const canonicalRoleIds = stringList(mapping?.canonicalRoleIds, "canonicalRoleIds");
     if (adminRoles.some((role) => !TENANT_ADMIN_ROLES.has(role))) throw identityError("federation_policy_invalid", `Unknown tenant admin role in group ${group}.`);
     if (roles.some((role) => !KNOWN_STAFF_ROLES.has(role))) throw identityError("federation_policy_invalid", `Unknown staff role in group ${group}.`);
-    return [group, { adminRoles, roles, queues: stringList(mapping?.queues, "queues") }];
+    for (const roleId of canonicalRoleIds) { const role = CANONICAL_ROLE_CATALOGUE[roleId]; if (!role || !role.assignable || role.domain === "automation") throw identityError("federation_policy_invalid", `Canonical role ${roleId} cannot be requested by identity-provider group ${group}.`); }
+    return [group, { adminRoles, roles, canonicalRoleIds, queues: stringList(mapping?.queues, "queues") }];
   }));
 }
 function stringList(value, field, required = false) { if (value == null && !required) return []; if (!Array.isArray(value)) throw identityError("enterprise_identity_invalid", `${field} must be an array.`); const result = [...new Set(value.map(String).map((item) => item.trim()).filter(Boolean))]; if (required && !result.length) throw identityError("enterprise_identity_invalid", `${field} requires at least one value.`); return result; }

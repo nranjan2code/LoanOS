@@ -30,6 +30,7 @@ Every `BOTH` integration requires idempotent commands, status/read, authenticate
 | Compliance/reporting | CKYCRR, CIC, FIU, CERSAI, CRILC/CIMS/XBRL/PSL/DLA, RBI CMS | Institutional onboarding, schemas, signing keys, transport and portal acknowledgements |
 | Partner/LSP | onboarding/KYB, CRM, commissions, tax, bank payouts, SLA telemetry | Partner identity/feeds, GST/bank/CBS integration and live telemetry |
 | Enterprise platform/data | IdP/SCIM, KMS/HSM, SIEM/WORM/time, DB, queue, CDC/DW/BI, deploy, MDM | Most are governance attestations, not managed-service adapters |
+| SaaS organisation admission and tenant lifecycle | contact verification, legal/RE status, representative authority, domain control, abuse defence, contracting, billing and cloud provisioning | Direct-authority ingestion, production verification/delivery adapters, signed contracts, cloud/DNS/certificate controllers and re-verification feeds |
 
 ## 1. Customer channels, CRM and assisted acquisition
 
@@ -178,9 +179,9 @@ Regulatory integration must be in the regulated entity’s name where required. 
 
 | ID | Needed at | External operations | Direction / response | Current state | Also used by |
 | --- | --- | --- | --- | --- | --- |
-| INT-PLT-01 | Workforce identity | OIDC/SAML/JWKS, MFA, SCIM and access-review export | BOTH | Governance only | LWS, admin |
+| INT-PLT-01 | Workforce identity | Entra/Okta/AD FS/Keycloak/OpenLDAP-bridge or generic OIDC/SAML metadata/JWKS/signatures, MFA/conditional access, SCIM JML, group-to-role request, logout/token revoke and access-review export | BOTH | Provider-specific policy and SCIM lifecycle implemented locally; no live IdP, token validator or SCIM service credential; IdP groups never grant canonical roles directly | LWS, admin, isolated control engine |
 | INT-PLT-02 | Secrets/crypto | Vault lease/revoke; KMS/HSM encrypt/sign/rotate/destroy | BOTH | Attestation; local/env keys | Every adapter |
-| INT-PLT-03 | Security monitoring | SIEM ingest, alert/SOAR, DLP/scanner and threat intelligence | BOTH | Internal SOC; collectors missing | Compliance |
+| INT-PLT-03 | Security monitoring | Attributed API/UI/domain/decision/integration events, correlation propagation, SIEM ingest, completeness reconciliation, alert/SOAR, DLP/scanner and threat intelligence | BOTH | Authenticated API and bounded screen activity are tenant-audited; external collectors, cross-system correlation and SIEM reconciliation missing | Compliance |
 | INT-PLT-04 | Evidence/time | WORM/object lock, hold/deletion, trusted NTP/TSA/anchor | BOTH | Attestations only | Audit |
 | INT-PLT-05 | Database | Managed PostgreSQL HA/replica/PITR/restore/failover/telemetry | BOTH | Live-capable pg; control API absent | Whole platform |
 | INT-PLT-06 | Events/jobs | Queue/topic, scheduler, offsets, retry/DLQ and replay | BOTH | Persistent callback queue plus bounded HTTP dispatcher, circuit/health metrics complete; production scheduler/broker deployment pending | All modules |
@@ -192,6 +193,23 @@ Regulatory integration must be in the regulated entity’s name where required. 
 | INT-PLT-12 | Tenant billing | Meter, invoice/tax, payment, credit/refund and accounting export | BOTH | Commercial controls only | Platform finance |
 | INT-PLT-13 | Device management | MDM/attestation/certificates/wipe/app config | BOTH | Missing | Channels, collections |
 | INT-PLT-14 | Portability/archive | Encrypted bulk export/import, manifest, receipt and deletion attestation | BOTH/file | Local export; external custody missing | Tenant lifecycle |
+
+## 12. SaaS organisation admission, contracting and tenant lifecycle
+
+These dependencies verify the prospective platform customer and safely create its tenant. They do **not** replace borrower KYC/CDD performed by the adopting regulated entity. A regulator or registry may provide a list, file or portal rather than a public API; the adapter must retain source/version/checksum evidence and fail closed when authority or status cannot be established.
+
+| ID | Needed at | External operations | Direction / response | Current state | Also used by |
+| --- | --- | --- | --- | --- | --- |
+| INT-ADM-01 | Signup contact and invitations | Work-email and mobile OTP; invite/expiry; DLT/template; delivery, bounce, complaint and suppression | BOTH | Communication boundary is Bound/Mock; production signup deliberately denies mock delivery | Platform IAM, support |
+| INT-ADM-02 | Legal-entity and tax identity | MCA company/LLP master, CIN/LLPIN, directors/signatories, GSTIN, PAN/TAN and Udyam status/change evidence | OUT/BOTH/file | Evidence references only; no admission-specific adapter | LOS KYB, partner onboarding |
+| INT-ADM-03 | Regulated-entity authority | RBI/other-authority current and cancelled lists, licence/CoR category, layer, deposit permission and permitted activities | IN/OUT/file/portal | Applicant evidence plus manual review; no authoritative ingestion/monitor | Compliance, product eligibility |
+| INT-ADM-04 | Representative authority and signature | Director/DIN/signatory match, board resolution, official-contact confirmation, DSC/eSign chain/CRL/OCSP and long-term validation evidence | BOTH/file | Representative proofs and checksums are local; live authority/signature validation missing | Contracting, IAM |
+| INT-ADM-05 | Corporate domain and contact assurance | DNS TXT challenge, RDAP/WHOIS, MX/mailbox, domain age/reputation, website/official-contact corroboration and certificate challenge | BOTH | Caller-supplied domain evidence only; no DNS/RDAP/reputation adapter | Branding, federation |
+| INT-ADM-06 | Signup abuse and fraud defence | WAF/rate-limit/bot challenge; IP, device, email, phone/SIM and velocity intelligence; confirmed-abuse feedback | BOTH | Local rate limits and submitted risk evidence; edge/bot/device providers missing | Customer acquisition, SOC |
+| INT-ADM-07 | Contract and outsourcing due diligence | NDA/MSA/DPA/SLA/order form, eSign, questionnaire/evidence exchange, subprocessor/BCP/DR/exit approval and change callbacks | BOTH/file | Version/evidence references only; no DMS/eSign/GRC connector | Vendor risk, legal, compliance |
+| INT-ADM-08 | Subscription, invoicing and tax | Plan/entitlement, meter, invoice/GST, payment, credit/refund, dunning and accounting export | BOTH/file | Commercial controls only; no billing/tax/payment provider | Finance, entitlements |
+| INT-ADM-09 | Tenant infrastructure provisioning | Cloud/IAM, namespace/network, DNS/certificate, KMS, DB, queue, object/WORM, observability, backup/DR; status, compensation and rollback proof | BOTH | Dependency saga and injected execution ports exist; no cloud/DNS/certificate controllers | Deployment, security, data |
+| INT-ADM-10 | Workforce federation and re-verification | OIDC/SAML/SCIM onboarding; domain/group proof; JML; licence/legal/domain/representative delta rescreen; case/ticket escalation | BOTH/file | Federation and re-verification governance only; live IdP/registry/ticket feeds missing | LWS, platform operations |
 
 ## Cross-module dependency matrix
 
@@ -210,6 +228,7 @@ Regulatory integration must be in the regulated entity’s name where required. 
 | Regulatory submissions | — | C | C | C | C | C | C | C | P | C | C |
 | HRMS/CRM/partner systems | C | C | — | C | — | C | — | C | C | P | C |
 | IdP/KMS/SIEM/DB/queue/data/deploy | C | C | C | C | C | C | C | C | C | C | P |
+| Organisation admission/licence/domain/provisioning | — | C | C | C | — | — | — | C | C | C | P |
 
 ## Completeness and change-control rule
 

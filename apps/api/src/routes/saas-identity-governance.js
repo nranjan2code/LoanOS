@@ -1,24 +1,32 @@
 import {
   CANONICAL_ROLE_CATALOGUE,
+  FEATURE_STAFFING_POLICIES,
   MINIMUM_LAUNCH_ROLE_COVERAGE,
   SEGREGATION_OF_DUTIES_RULES,
   approveEmergencyAccess,
   approveOwnershipTransfer,
   approveRoleGrant,
   approveRoleRevocation,
+  assessPrincipalRemovalImpact,
   assessMinimumLaunchCoverage,
+  authorizeStaffedFeatureAction,
   authorizeSaasAction,
+  changeSaasPrincipalStatus,
+  closeStaffingEscalation,
   closeEmergencyAccess,
   completeBootstrapTransition,
+  configureTenantFeatureStaffing,
   issueBootstrapChecker,
   issueBootstrapOwner,
   projectPrincipalAccess,
+  projectTenantFeatureStaffing,
   proposeRoleGrant,
   proposeRoleRevocation,
   registerSaasPrincipal,
   requestEmergencyAccess,
   requestOwnershipTransfer
 } from "../../../../packages/core/src/saas-identity-governance.js";
+import { decidePlatformControlStaffing } from "../control-rules-engine.js";
 
 const PREFIX = "/admin/identity-governance";
 const LEGACY_BOOTSTRAP_ADMIN_ROLES = new Set(["tenant_admin", "user_admin", "security_admin"]);
@@ -31,7 +39,8 @@ export async function routeSaasIdentityGovernance(req, res, { method, path, tena
       sendJson(res, 200, {
         roles: Object.values(CANONICAL_ROLE_CATALOGUE),
         segregationOfDutiesRules: SEGREGATION_OF_DUTIES_RULES,
-        minimumLaunchRoleCoverage: MINIMUM_LAUNCH_ROLE_COVERAGE
+        minimumLaunchRoleCoverage: MINIMUM_LAUNCH_ROLE_COVERAGE,
+        featureStaffingPolicies: Object.values(FEATURE_STAFFING_POLICIES)
       });
       return true;
     }
@@ -39,6 +48,102 @@ export async function routeSaasIdentityGovernance(req, res, { method, path, tena
     const actor = humanActor(authContext, tenant.tenantId);
     const body = method === "POST" ? await readJson(req) : {};
     let state = await store.load();
+
+    if (method === "GET" && path === `${PREFIX}/feature-readiness`) {
+      sendJson(res, 200, { readiness: projectTenantFeatureStaffing(state, tenant.tenantId) });
+      return true;
+    }
+
+    if (method === "GET" && path === `${PREFIX}/staffing-escalations`) {
+      sendJson(res, 200, { escalations: Object.values(state.staffingEscalations ?? {}).filter((item) => item.tenantId === tenant.tenantId) });
+      return true;
+    }
+
+    if (method === "POST" && path === `${PREFIX}/staffing-config/proposals`) {
+      requireCanonicalAction(state, tenant.tenantId, actor, "role.propose");
+      const requestId = required(body.requestId, "requestId");
+      if (state.featureStaffingRequests?.[requestId]) fail("saas_feature_staffing_request_exists", "Feature staffing request already exists.", 409);
+      const request = { requestId, tenantId: tenant.tenantId, features: body.features, proposedBy: actor, reason: required(body.reason, "reason"), status: "pending", proposedAt: new Date().toISOString() };
+      state = { ...state, featureStaffingRequests: { ...(state.featureStaffingRequests ?? {}), [requestId]: request } };
+      await persist(store, state, "saas_identity.feature_staffing_proposed", actor, { requestId });
+      sendJson(res, 201, { request });
+      return true;
+    }
+
+    const staffingApproval = path.match(/^\/admin\/identity-governance\/staffing-config\/([^/]+)\/approval$/);
+    if (method === "POST" && staffingApproval) {
+      const requestId = decodeURIComponent(staffingApproval[1]);
+      const request = state.featureStaffingRequests?.[requestId];
+      if (!request || request.tenantId !== tenant.tenantId || request.status !== "pending") fail("saas_feature_staffing_request_not_pending", "A pending same-tenant staffing request is required.", 409);
+      const result = configureTenantFeatureStaffing(state, { tenantId: tenant.tenantId, features: request.features, proposedBy: request.proposedBy, approvedBy: actor, approvalRef: required(body.approvalRef, "approvalRef"), reason: request.reason });
+      const enabled = result.readiness.features.filter((item) => item.requestedStatus === "enabled");
+      const decisions = await Promise.all(enabled.map((readiness) => decidePlatformControlStaffing({ tenantId: tenant.tenantId, requestId: `${requestId}:${readiness.featureId}`, readiness, actorAuthorized: true })));
+      if (decisions.some((decision) => decision.decision !== "allow")) {
+        sendJson(res, 409, { error: { code: "saas_feature_staffing_control_denied", message: "The isolated platform-control policy engine denied one or more feature activations." }, readiness: result.readiness, decisions });
+        return true;
+      }
+      const decided = { ...request, status: "approved", approvedBy: actor, approvalRef: body.approvalRef, decidedAt: new Date().toISOString() };
+      const next = { ...result.state, featureStaffingRequests: { ...(result.state.featureStaffingRequests ?? {}), [requestId]: decided } };
+      await persist(store, next, "saas_identity.feature_staffing_approved", actor, { requestId, configurationVersion: result.configuration.version });
+      sendJson(res, 200, { request: decided, configuration: result.configuration, readiness: result.readiness, decisions });
+      return true;
+    }
+
+    if (method === "POST" && path === `${PREFIX}/feature-actions/authorize`) {
+      const local = authorizeStaffedFeatureAction(state, { ...body, tenantId: tenant.tenantId, principalId: actor });
+      const decision = await decidePlatformControlStaffing({ tenantId: tenant.tenantId, requestId: required(body.requestId, "requestId"), readiness: local.readiness, actorAuthorized: local.outcome === "allow", agentAttemptsHumanControl: false });
+      sendJson(res, decision.decision === "allow" ? 200 : 403, { authorization: decision, local });
+      return true;
+    }
+
+    const removalImpact = path.match(/^\/admin\/identity-governance\/principals\/([^/]+)\/removal-impact$/);
+    if (method === "GET" && removalImpact) {
+      sendJson(res, 200, { impact: assessPrincipalRemovalImpact(state, { tenantId: tenant.tenantId, principalId: decodeURIComponent(removalImpact[1]) }) });
+      return true;
+    }
+
+    const principalStatus = path.match(/^\/admin\/identity-governance\/principals\/([^/]+)\/status$/);
+    if (method === "POST" && principalStatus) {
+      requireCanonicalAction(state, tenant.tenantId, actor, "user.manage");
+      const result = changeSaasPrincipalStatus(state, { ...body, tenantId: tenant.tenantId, principalId: decodeURIComponent(principalStatus[1]), changedBy: actor });
+      await persist(store, result.state, "saas_identity.principal_status_changed", actor, { principalId: result.principal.principalId, status: result.principal.status, staffingImpact: result.staffingImpact });
+      sendJson(res, 200, { principal: result.principal, staffingImpact: result.staffingImpact, escalations: result.escalations });
+      return true;
+    }
+
+    if (method === "POST" && path === `${PREFIX}/principals/agents`) {
+      requireCanonicalAction(state, tenant.tenantId, actor, "user.manage");
+      const result = registerSaasPrincipal(state, { ...body, tenantId: tenant.tenantId, sponsorPrincipalId: actor, status: "active" });
+      await persist(store, result.state, "saas_identity.agent_registered", actor, { principalId: result.principal.principalId, principalType: result.principal.principalType });
+      sendJson(res, 201, { principal: result.principal });
+      return true;
+    }
+
+    if (method === "POST" && path === `${PREFIX}/staffing-escalations/closure-proposals`) {
+      requireCanonicalAction(state, tenant.tenantId, actor, "role.propose");
+      const requestId = required(body.requestId, "requestId");
+      if (state.staffingEscalationClosureRequests?.[requestId]) fail("saas_staffing_closure_request_exists", "Staffing closure request already exists.", 409);
+      const escalation = state.staffingEscalations?.[body.escalationId];
+      if (!escalation || escalation.tenantId !== tenant.tenantId || escalation.status !== "open") fail("saas_staffing_escalation_not_open", "An open same-tenant staffing escalation is required.", 409);
+      const request = { requestId, tenantId: tenant.tenantId, escalationId: escalation.escalationId, proposedBy: actor, resolutionRef: required(body.resolutionRef, "resolutionRef"), status: "pending", proposedAt: new Date().toISOString() };
+      const next = { ...state, staffingEscalationClosureRequests: { ...(state.staffingEscalationClosureRequests ?? {}), [requestId]: request } };
+      await persist(store, next, "saas_identity.staffing_escalation_closure_proposed", actor, { requestId, escalationId: escalation.escalationId });
+      sendJson(res, 201, { request });
+      return true;
+    }
+
+    const closureApproval = path.match(/^\/admin\/identity-governance\/staffing-escalations\/closure-proposals\/([^/]+)\/approval$/);
+    if (method === "POST" && closureApproval) {
+      const requestId = decodeURIComponent(closureApproval[1]);
+      const request = state.staffingEscalationClosureRequests?.[requestId];
+      if (!request || request.tenantId !== tenant.tenantId || request.status !== "pending") fail("saas_staffing_closure_request_not_pending", "A pending same-tenant closure request is required.", 409);
+      const result = closeStaffingEscalation(state, { escalationId: request.escalationId, proposedBy: request.proposedBy, approvedBy: actor, resolutionRef: request.resolutionRef, approvalRef: required(body.approvalRef, "approvalRef") });
+      const decided = { ...request, status: "approved", approvedBy: actor, approvalRef: body.approvalRef, decidedAt: new Date().toISOString() };
+      const next = { ...result.state, staffingEscalationClosureRequests: { ...(result.state.staffingEscalationClosureRequests ?? {}), [requestId]: decided } };
+      await persist(store, next, "saas_identity.staffing_escalation_closed", actor, { requestId, escalationId: request.escalationId });
+      sendJson(res, 200, { request: decided, escalation: result.escalation });
+      return true;
+    }
 
     const syncMatch = path.match(/^\/admin\/identity-governance\/principals\/([^/]+)\/sync$/);
     if (method === "POST" && syncMatch) {

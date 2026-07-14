@@ -9,11 +9,14 @@ import {
   approveOwnershipTransfer,
   approveRoleGrant,
   approveRoleRevocation,
+  assessFeatureStaffingReadiness,
   assessMinimumLaunchCoverage,
+  authorizeStaffedFeatureAction,
   authorizeSaasAction,
   changeSaasPrincipalStatus,
   closeEmergencyAccess,
   completeBootstrapTransition,
+  configureTenantFeatureStaffing,
   getCanonicalRole,
   issueBootstrapChecker,
   issueBootstrapOwner,
@@ -33,7 +36,7 @@ function addPrincipal(state, principalId, { tenantId = "tenant-a", status = "act
   return registerSaasPrincipal(state, { tenantId, principalId, displayName: principalId, status, emailVerified: verified, mfaEnrolled: verified, identityEvidenceRef: `identity/${principalId}` }, NOW).state;
 }
 
-function bootstrap(principalIds = ["owner", "bootstrap-checker", "admin", "security", "audit", "credit-maker", "credit-checker", "ops-maker", "ops-checker", "product", "compliance"]) {
+function bootstrap(principalIds = ["owner", "bootstrap-checker", "admin", "access-reviewer", "security", "audit", "credit-maker", "credit-checker", "ops-maker", "ops-checker", "product", "compliance"]) {
   let state = {};
   state = addPrincipal(state, "owner");
   state = issueBootstrapOwner(state, { tenantId: "tenant-a", principalId: "owner", verificationRef: "verification/owner", expiresAt: FUTURE }, NOW).state;
@@ -50,6 +53,7 @@ function grant(state, requestId, principalId, roleIds, proposedBy = "owner", app
 function launchReadyState() {
   let state = bootstrap();
   state = grant(state, "g-admin", "admin", ["tenant_admin", "user_admin"]);
+  state = grant(state, "g-access-reviewer", "access-reviewer", ["access_reviewer"]);
   state = grant(state, "g-security", "security", ["security_admin"]);
   state = grant(state, "g-audit", "audit", ["auditor"]);
   state = grant(state, "g-credit-maker", "credit-maker", ["credit_maker"]);
@@ -133,29 +137,51 @@ test("bootstrap transition requires readiness and reduces temporary authority to
   const access = projectPrincipalAccess(result.state, "tenant-a", "owner", NOW);
   assert.deepEqual(access.roleIds, ["tenant_owner"]);
   assert.equal(authorizeSaasAction(result.state, { tenantId: "tenant-a", principalId: "owner", action: "user.invite" }, NOW).outcome, "deny");
+
+  let activeState = addPrincipal(result.state, "new-operator");
+  activeState = proposeRoleGrant(activeState, { requestId: "post-bootstrap-role", tenantId: "tenant-a", principalId: "new-operator", roleIds: ["operator"], proposedBy: "admin", reason: "operations access" }, NOW).state;
+  assert.throws(() => approveRoleGrant(activeState, { requestId: "post-bootstrap-role", tenantId: "tenant-a", approvedBy: "security", approvalRef: "approval/wrong" }, NOW), { code: "saas_action_forbidden" });
+  const approved = approveRoleGrant(activeState, { requestId: "post-bootstrap-role", tenantId: "tenant-a", approvedBy: "access-reviewer", approvalRef: "approval/access-reviewer" }, NOW);
+  assert.equal(approved.grants[0].roleId, "operator");
 });
 
-test("revocation uses independent approval and cannot remove the last effective administrator", () => {
+test("revocation is independently approved, takes effect immediately, and escalates administrative lockout", () => {
   let state = launchReadyState();
+  state = configureTenantFeatureStaffing(state, { tenantId: "tenant-a", features: [{ featureId: "FST-001", requestedStatus: "enabled" }], proposedBy: "owner", approvedBy: "bootstrap-checker", approvalRef: "approval/staffing", reason: "enable IAM" }, NOW).state;
   const adminAccess = projectPrincipalAccess(state, "tenant-a", "admin", NOW);
   const userAdminGrant = adminAccess.activeGrants.find((item) => item.roleId === "user_admin");
   const tenantAdminGrant = adminAccess.activeGrants.find((item) => item.roleId === "tenant_admin");
-  assert.throws(() => proposeRoleRevocation(state, { requestId: "revoke-both", tenantId: "tenant-a", grantIds: [userAdminGrant.grantId, tenantAdminGrant.grantId], proposedBy: "owner", reason: "bad" }, NOW), { code: "saas_last_effective_admin" });
-  state = addPrincipal(state, "admin-two");
-  state = grant(state, "g-admin-two", "admin-two", ["tenant_admin"], "owner", "bootstrap-checker");
-  state = proposeRoleRevocation(state, { requestId: "revoke-one", tenantId: "tenant-a", grantIds: [userAdminGrant.grantId, tenantAdminGrant.grantId], proposedBy: "admin-two", reason: "role change" }, NOW).state;
-  assert.throws(() => approveRoleRevocation(state, { requestId: "revoke-one", tenantId: "tenant-a", approvedBy: "admin-two", approvalRef: "same" }, NOW), { code: "saas_role_four_eyes_required" });
-  const revoked = approveRoleRevocation(state, { requestId: "revoke-one", tenantId: "tenant-a", approvedBy: "bootstrap-checker", approvalRef: "approval/revoke" }, NOW);
+  state = proposeRoleRevocation(state, { requestId: "revoke-both", tenantId: "tenant-a", grantIds: [userAdminGrant.grantId, tenantAdminGrant.grantId], proposedBy: "owner", reason: "compromise containment" }, NOW).state;
+  assert.throws(() => approveRoleRevocation(state, { requestId: "revoke-both", tenantId: "tenant-a", approvedBy: "owner", approvalRef: "same" }, NOW), { code: "saas_role_four_eyes_required" });
+  const revoked = approveRoleRevocation(state, { requestId: "revoke-both", tenantId: "tenant-a", approvedBy: "bootstrap-checker", approvalRef: "approval/revoke" }, NOW);
   assert.ok(revoked.grants.every((item) => item.status === "revoked"));
+  assert.equal(revoked.staffingImpact.administrativeLockout, true);
+  assert.ok(revoked.escalations.some((item) => item.featureId === "administrative_lockout"));
+  assert.equal(assessFeatureStaffingReadiness(revoked.state, { tenantId: "tenant-a", featureId: "FST-001" }, NOW).ready, false);
 });
 
-test("operator and auditor do not count as an effective administrator during suspension", () => {
+test("suspension contains access immediately and pauses affected control-plane work", () => {
   let state = launchReadyState();
-  assert.throws(() => changeSaasPrincipalStatus(state, { tenantId: "tenant-a", principalId: "admin", status: "suspended", reason: "investigation", changedBy: "security" }, NOW), { code: "saas_last_effective_admin" });
-  state = addPrincipal(state, "admin-two");
-  state = grant(state, "g-admin-two", "admin-two", ["tenant_admin"]);
-  const result = changeSaasPrincipalStatus(state, { tenantId: "tenant-a", principalId: "admin", status: "suspended", reason: "investigation", changedBy: "security" }, NOW);
+  state = configureTenantFeatureStaffing(state, { tenantId: "tenant-a", features: [{ featureId: "FST-001", requestedStatus: "enabled" }], proposedBy: "owner", approvedBy: "bootstrap-checker", approvalRef: "approval/staffing", reason: "enable IAM" }, NOW).state;
+  const result = changeSaasPrincipalStatus(state, { tenantId: "tenant-a", principalId: "admin", status: "suspended", reason: "investigation", evidenceRef: "incident/1", changedBy: "security" }, NOW);
   assert.equal(result.principal.status, "suspended");
+  assert.throws(() => authorizeSaasAction(result.state, { tenantId: "tenant-a", principalId: "admin", action: "user.manage" }, NOW), { code: "saas_principal_inactive" });
+  assert.equal(result.staffingImpact.administrativeLockout, true);
+});
+
+test("staffing policy counts only distinct verified humans and agents cannot fill human controls", () => {
+  let state = launchReadyState();
+  state = configureTenantFeatureStaffing(state, { tenantId: "tenant-a", features: [{ featureId: "FST-003", requestedStatus: "enabled" }], proposedBy: "owner", approvedBy: "bootstrap-checker", approvalRef: "approval/credit", reason: "enable credit" }, NOW).state;
+  const readiness = assessFeatureStaffingReadiness(state, { tenantId: "tenant-a", featureId: "FST-003" }, NOW);
+  assert.equal(readiness.ready, false);
+  assert.ok(readiness.blockers.includes("missing_role_set:loan_officer"));
+  state = addPrincipal(state, "loan-officer");
+  state = grant(state, "g-loan-officer", "loan-officer", ["loan_officer"]);
+  assert.equal(assessFeatureStaffingReadiness(state, { tenantId: "tenant-a", featureId: "FST-003" }, NOW).ready, true);
+  assert.equal(authorizeStaffedFeatureAction(state, { tenantId: "tenant-a", featureId: "FST-003", principalId: "credit-checker", requiredRoleId: "credit_checker" }, NOW).outcome, "allow");
+
+  const agent = registerSaasPrincipal(state, { tenantId: "tenant-a", principalId: "agent-1", principalType: "dynamic_agent", displayName: "Credit helper", status: "active", sponsorPrincipalId: "admin", agentDefinitionRef: "agent/credit-helper/v1", modelRef: "model/credit-helper/v1", workloadIdentityRef: "spiffe://tenant-a/agent-1", workloadIdentityVerified: true, identityEvidenceRef: "workload/agent-1", expiresAt: "2026-07-15T20:00:00.000Z" }, NOW);
+  assert.throws(() => proposeRoleGrant(agent.state, { requestId: "agent-human-role", tenantId: "tenant-a", principalId: "agent-1", roleIds: ["credit_checker"], proposedBy: "owner", reason: "bad" }, NOW), { code: "saas_agent_role_forbidden" });
 });
 
 test("emergency access is limited, independently approved, time-bounded, auditable and does not create a role", () => {
