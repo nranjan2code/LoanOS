@@ -293,13 +293,16 @@ export {
   createCustomerMergePlan,
   createSuccessionCase,
   executeCustomerMerge,
+  issueSuccessionAuthority,
   recordCustomerPreferences,
+  recordSuccessionServiceAction,
   registerChannelPartner,
   registerCustomerRelationship,
   registerPartnerCommissionPolicy,
   transitionChannelLead,
   transitionPartnerCommission,
-  transitionSuccessionCase
+  transitionSuccessionCase,
+  revokeSuccessionAuthority
 } from "./customer-channel-operations.js";
 export {
   PROVIDER_INTEGRATIONS,

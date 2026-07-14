@@ -109,9 +109,10 @@ node docs/gtm/automation/gtm-backlog-sync.mjs
 | C-76 | Branch and approved channel intake fails closed on identity scope, partner authority, programme/product eligibility, territory and PIN serviceability | Partial | architecture/customer-channel-experiences.md; application-layer partner/unit scope is built, while database RLS and access certification remain |
 | C-77 | Lead contact matching surfaces open leads and known customers; merge execution requires current sealed impact, four-eyes approval and rollback lineage | Partial | architecture/customer-channel-experiences.md; conflict UI, external identity reconciliation and executable rollback remain planned |
 | C-78 | Every lead action retains actor, reason and evidence; conversion links only an existing application owned by the named borrower | Partial | architecture/customer-channel-experiences.md; one-click full-compliance application creation remains planned |
-| C-79 | Customer party relationships, accessibility/contact intent, succession restrictions and exact related exposure join into customer-360 | Partial | architecture/customer-channel-experiences.md; transactional merge and full servicing actions remain planned |
+| C-79 | Customer party relationships, accessibility/contact intent, succession restrictions and exact related exposure join into customer-360 | Partial | architecture/customer-channel-experiences.md; external identity reconciliation and downstream servicing execution remain planned |
 | C-80 | Tenant-branded channel workspace is accessible, installable and caches only its static shell—not customer or lead API data | Partial | architecture/customer-channel-experiences.md; production assistive/device certification and encrypted field-offline queues remain planned |
 | C-81 | Converted-lead commission is calculated in exact paise, independently approved, payment-reconciled and clawed back only inside policy | Partial | architecture/customer-channel-experiences.md; invoice/GST/TDS/GL/bank-file/dispute depth remains planned |
+| C-82 | Completed succession cases issue expiring account/action-scoped claimant authority; material requests and revocation require four eyes | Partial | architecture/customer-channel-experiences.md; downstream LMS/finance execution, reconciliation, reversal and legal queues remain planned |
 
 ## Change process
 

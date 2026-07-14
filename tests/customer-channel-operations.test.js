@@ -11,13 +11,16 @@ import {
   createCustomerMergePlan,
   createSuccessionCase,
   executeCustomerMerge,
+  issueSuccessionAuthority,
   recordCustomerPreferences,
+  recordSuccessionServiceAction,
   registerChannelPartner,
   registerCustomerRelationship,
   registerPartnerCommissionPolicy,
   transitionChannelLead,
   transitionPartnerCommission,
-  transitionSuccessionCase
+  transitionSuccessionCase,
+  revokeSuccessionAuthority
 } from "../packages/core/src/index.js";
 import { createLoanOsServer } from "../apps/api/src/server.js";
 import { projectChannelOperations } from "../apps/api/src/routes/customer-channel-controls.js";
@@ -50,6 +53,28 @@ test("customer relationships, governed merge plans, and accessibility preference
 
 test("nominee and legal-heir succession remains manually restricted through independent approval", () => {
   const state = baseState(); const relationship = registerCustomerRelationship({}, state, { relationshipId: "nominee1", fromBorrowerId: "b1", toBorrowerId: "b2", relationshipType: "nominee", evidenceRef: "nomination/1", ...approval }, NOW).relationship; const caseState = { ...state, customerRelationships: { [relationship.relationshipId]: relationship } }; let succession = createSuccessionCase({}, caseState, { caseId: "succession1", borrowerId: "b1", claimantBorrowerId: "b2", relationshipId: "nominee1", deathCertificateRef: "death/1", identityEvidenceRefs: ["identity/1"], legalEvidenceRefs: ["legal/1"], affectedLoanAccountIds: ["loan1"], reportedBy: "service-agent" }, NOW).successionCase; assert.equal(succession.servicingRestriction, "manual_review_only"); succession = transitionSuccessionCase(succession, { action: "verify", actor: "service-agent", reason: "documents verified", evidenceRefs: ["verification/1"] }, NOW); assert.throws(() => transitionSuccessionCase(succession, { action: "approve", actor: "manager", reason: "approve", evidenceRefs: ["approval/1"], proposedBy: "manager", approvedBy: "manager", approvalRef: "same" }, NOW), /Independent/); succession = transitionSuccessionCase(succession, { action: "approve", actor: "manager", reason: "approve", evidenceRefs: ["approval/1"], proposedBy: "service-agent", approvedBy: "manager", approvalRef: "approval/2" }, NOW); assert.equal(succession.status, "approved");
+});
+
+test("succession servicing is limited by account, action, expiry, exact money, and four-eyes authority", () => {
+  const state = baseState();
+  const relationship = registerCustomerRelationship({}, state, { relationshipId: "nominee1", fromBorrowerId: "b1", toBorrowerId: "b2", relationshipType: "nominee", evidenceRef: "nomination/1", ...approval }, NOW).relationship;
+  const caseState = { ...state, customerRelationships: { nominee1: relationship }, loanAccounts: { loan1: { loanAccountId: "loan1", borrowerId: "b1" }, loan2: { loanAccountId: "loan2", borrowerId: "b2" } } };
+  let succession = createSuccessionCase({}, caseState, { caseId: "succession1", borrowerId: "b1", claimantBorrowerId: "b2", relationshipId: "nominee1", deathCertificateRef: "death/1", identityEvidenceRefs: ["identity/1"], legalEvidenceRefs: ["legal/1"], affectedLoanAccountIds: ["loan1"], reportedBy: "service-agent" }, NOW).successionCase;
+  succession = transitionSuccessionCase(succession, { action: "verify", actor: "service-agent", reason: "verified", evidenceRefs: ["verify/1"] }, NOW);
+  succession = transitionSuccessionCase(succession, { action: "approve", actor: "checker", reason: "approved", evidenceRefs: ["approve/1"], ...approval }, NOW);
+  succession = transitionSuccessionCase(succession, { action: "complete", actor: "service-agent", reason: "authority ready", evidenceRefs: ["complete/1"] }, NOW);
+  const authorityState = { ...caseState, successionCases: { succession1: succession } };
+  assert.throws(() => issueSuccessionAuthority({}, authorityState, { authorityId: "bad", caseId: "succession1", loanAccountIds: ["loan1"], permittedActions: ["new_credit"], legalReviewRef: "legal/review", identityReverificationRef: "identity/recheck", communicationAddressRef: "address/1", validUntil: "2026-08-14T00:00:00.000Z", ...approval }, NOW), /prohibited/);
+  const authority = issueSuccessionAuthority({}, authorityState, { authorityId: "authority1", caseId: "succession1", loanAccountIds: ["loan1"], permittedActions: ["communication", "repayment", "closure_request"], legalReviewRef: "legal/review", identityReverificationRef: "identity/recheck", communicationAddressRef: "address/1", validUntil: "2026-08-14T00:00:00.000Z", ...approval }, NOW).authority;
+  const serviceState = { ...authorityState, successionAuthorities: { authority1: authority } };
+  const repayment = recordSuccessionServiceAction({}, serviceState, { actionId: "action1", authorityId: "authority1", loanAccountId: "loan1", actionType: "repayment", amountPaise: "100000", requestRef: "payment/request-1", evidenceRefs: ["payment/evidence-1"], actor: "claimant-service" }, NOW).action;
+  assert.equal(repayment.amountPaise, "100000");
+  assert.throws(() => recordSuccessionServiceAction({}, serviceState, { actionId: "wrong-account", authorityId: "authority1", loanAccountId: "loan2", actionType: "repayment", amountPaise: "1", requestRef: "payment/request-2", evidenceRefs: ["payment/evidence-2"], actor: "claimant-service" }, NOW), /outside claimant authority/);
+  assert.throws(() => recordSuccessionServiceAction({}, serviceState, { actionId: "same-actor", authorityId: "authority1", loanAccountId: "loan1", actionType: "closure_request", requestRef: "closure/1", evidenceRefs: ["closure/evidence-1"], actor: "checker", proposedBy: "checker", approvedBy: "checker", approvalRef: "approval/same" }, NOW), /Independent/);
+  const closure = recordSuccessionServiceAction({}, serviceState, { actionId: "action2", authorityId: "authority1", loanAccountId: "loan1", actionType: "closure_request", requestRef: "closure/2", evidenceRefs: ["closure/evidence-2"], actor: "checker", ...approval }, NOW).action;
+  assert.equal(closure.status, "approved_request");
+  const revoked = revokeSuccessionAuthority(authority, { reason: "claimant requested revocation", evidenceRefs: ["revocation/1"], ...approval }, NOW);
+  assert.throws(() => recordSuccessionServiceAction({}, { ...serviceState, successionAuthorities: { authority1: revoked } }, { actionId: "after-revoke", authorityId: "authority1", loanAccountId: "loan1", actionType: "communication", requestRef: "contact/1", evidenceRefs: ["contact/evidence-1"], actor: "agent" }, NOW), /active unexpired/);
 });
 
 test("customer 360 aggregates related-party exact exposure and lifecycle records", () => {

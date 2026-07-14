@@ -1,8 +1,8 @@
 {
-  "generated": "2026-07-14T18:29:23.538Z",
+  "generated": "2026-07-14T18:34:31.766Z",
   "git": {
     "branch": "main",
-    "count": 159,
+    "count": 161,
     "commits": []
   },
   "overall": {
@@ -1404,24 +1404,29 @@
             {
               "type": "code",
               "ref": "packages/core/src/customer-channel-operations.js",
-              "note": "manual-restriction succession workflow"
+              "note": "manual restriction plus expiring account/action-scoped claimant authority and servicing requests"
             },
             {
               "type": "endpoint",
-              "ref": "POST /customers/succession-cases",
-              "note": "claim evidence intake"
+              "ref": "POST /customers/succession-authorities",
+              "note": "independently approved claimant authority after completed claim review"
+            },
+            {
+              "type": "endpoint",
+              "ref": "POST /customers/succession-service-actions",
+              "note": "exact repayment and evidence-bound servicing requests within authority"
             },
             {
               "type": "test",
               "ref": "tests/customer-channel-operations.test.js",
-              "note": "nominee and independent approval"
+              "note": "nominee approval, authority scope, expiry/revocation, exact money, and four-eyes material requests"
             }
           ],
           "owner": "",
           "acceptance": "",
           "dependencies": [],
           "notes": "",
-          "lastReviewed": "2026-07-14"
+          "lastReviewed": "2026-07-15"
         },
         {
           "id": "CUS-009",
@@ -7291,9 +7296,9 @@
     }
   ],
   "tests": {
-    "pass": 294,
+    "pass": 295,
     "fail": 0,
-    "total": 299,
+    "total": 300,
     "ran": true
   }
 }
