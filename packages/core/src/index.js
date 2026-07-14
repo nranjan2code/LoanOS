@@ -431,6 +431,27 @@ export {
 } from "./security-operations.js";
 
 export {
+  CERTIFICATION_RESULTS,
+  ENGAGEMENT_STATUSES,
+  ENGAGEMENT_TYPES,
+  ISSUE_SEVERITIES,
+  ISSUE_STATUSES,
+  PLAN_FREQUENCIES,
+  TEST_RESULTS,
+  approveControlCertification,
+  createAssuranceIssue,
+  createAssurancePlan,
+  createAuditEngagement,
+  createControlCertification,
+  generateGovernancePack,
+  projectControlAssurance,
+  recordControlTest,
+  respondAuditRequest,
+  transitionAssuranceIssue,
+  transitionAuditEngagement
+} from "./control-assurance.js";
+
+export {
   validateMarketplaceNeutrality,
   rankMarketplaceOffers
 } from "./offer-marketplace.js";

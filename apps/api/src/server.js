@@ -34,6 +34,7 @@ import {
   buildManagementFinanceJournals,
   buildProfitabilityReport,
   buildTenantOperationalHealth,
+  approveControlCertification,
   approvePlatformRelease,
   approveVulnerabilityException,
   assessConfigurationDrift,
@@ -47,7 +48,11 @@ import {
   completeWorkflowTask,
   completeVendorReview,
   createLoanAccountFromApplication,
+  createAssuranceIssue,
+  createAssurancePlan,
+  createAuditEngagement,
   createConfigurationBaseline,
+  createControlCertification,
   createDetectionRule,
   createPlatformRelease,
   createProblemRecord,
@@ -83,6 +88,7 @@ import {
   evaluatePromisesToPay,
   fulfillErasureRequest,
   generateFraudCommitteePack,
+  generateGovernancePack,
   issueShowCauseNotice,
   redactBorrowerProfile,
   redactBorrowerKycRecords,
@@ -115,6 +121,7 @@ import {
   recordDocumentPacketDelivered,
   recordDocumentPacketDelivery,
   recordDocumentPacketGenerated,
+  recordControlTest,
   recordPostIncidentReview,
   recordCkycrrResponse,
   requestHumanHandoff,
@@ -123,6 +130,7 @@ import {
   releaseWorkflowTask,
   renderLoanStatementDocument,
   resolveComplaint,
+  respondAuditRequest,
   resolveCicCorrectionRequest,
   resolveCkycrrProbableMatch,
   selectProductPolicyVersion,
@@ -143,6 +151,7 @@ import {
   writeOffSuspenseReceipt,
   prepayLoanAccount,
   proposeDecision,
+  projectControlAssurance,
   projectPlatformDelivery,
   projectSecurityAssurance,
   projectSecurityOperations,
@@ -169,6 +178,8 @@ import {
   summarizeLoanAccount,
   startComplaintReview,
   startWorkflowTask,
+  transitionAssuranceIssue,
+  transitionAuditEngagement,
   transitionModel,
   transitionProblemRecord,
   transitionSecurityInvestigation,
@@ -8230,6 +8241,88 @@ async function routePlatform(req, res, { dataDir, platformAdminKey, method, path
   }
   const authContext = platformAuth.authContext;
 
+  if (method === "GET" && path === "/platform/control-assurance") {
+    if (!hasPlatformRole(authContext, ["platform_admin", "security_admin", "auditor"])) { sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } }); return; }
+    const state = await loadWholeState(dataDir);
+    sendJson(res, 200, projectControlAssurance(state.controlPlane.platformEvents ?? []));
+    return;
+  }
+
+  if (method === "POST" && path === "/platform/control-assurance/plans") {
+    if (!hasPlatformRole(authContext, ["platform_admin", "security_admin", "auditor"])) { sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } }); return; }
+    const body = await readJson(req); const actor = authActor(authContext);
+    if (body.approvedBy !== actor) { sendJson(res, 403, { error: { code: "assurance_actor_mismatch", message: "approvedBy must be the authenticated platform actor." } }); return; }
+    try { const state = await loadWholeState(dataDir); const projection = projectControlAssurance(state.controlPlane.platformEvents ?? []); const plan = createAssurancePlan(body, listRegulatoryControls().map((item) => item.id), projection.plans); const nextState = appendPlatformEvent(state, { type: "platform.assurance.plan_approved", plan }, { actor }); await saveWholeState(nextState, dataDir); sendJson(res, 201, { plan }); } catch (error) { sendControlAssuranceError(res, error); }
+    return;
+  }
+
+  if (method === "POST" && path === "/platform/control-assurance/tests") {
+    if (!hasPlatformRole(authContext, ["platform_admin", "security_admin", "auditor"])) { sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } }); return; }
+    const body = await readJson(req); const actor = authActor(authContext);
+    if (body.tester !== actor) { sendJson(res, 403, { error: { code: "assurance_actor_mismatch", message: "tester must be the authenticated platform actor." } }); return; }
+    try { const state = await loadWholeState(dataDir); const projection = projectControlAssurance(state.controlPlane.platformEvents ?? []); const controlTest = recordControlTest(body, projection.plans, projection.tests); const nextState = appendPlatformEvent(state, { type: "platform.assurance.test_recorded", test: controlTest }, { actor }); await saveWholeState(nextState, dataDir); sendJson(res, 201, { test: controlTest }); } catch (error) { sendControlAssuranceError(res, error); }
+    return;
+  }
+
+  if (method === "POST" && path === "/platform/control-assurance/issues") {
+    if (!hasPlatformRole(authContext, ["platform_admin", "security_admin", "auditor"])) { sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } }); return; }
+    const body = await readJson(req); const actor = authActor(authContext);
+    if (body.detectedBy !== actor) { sendJson(res, 403, { error: { code: "assurance_actor_mismatch", message: "detectedBy must be the authenticated platform actor." } }); return; }
+    try { const state = await loadWholeState(dataDir); const projection = projectControlAssurance(state.controlPlane.platformEvents ?? []); const issue = createAssuranceIssue(body, projection.tests, projection.issues); const nextState = appendPlatformEvent(state, { type: "platform.assurance.issue_created", issue }, { actor }); await saveWholeState(nextState, dataDir); sendJson(res, 201, { issue }); } catch (error) { sendControlAssuranceError(res, error); }
+    return;
+  }
+
+  const assuranceIssueMatch = path.match(/^\/platform\/control-assurance\/issues\/([^/]+)\/transition$/);
+  if (method === "POST" && assuranceIssueMatch) {
+    if (!hasPlatformRole(authContext, ["platform_admin", "security_admin", "auditor"])) { sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } }); return; }
+    const body = await readJson(req); const actor = authActor(authContext);
+    if (body.updatedBy !== actor) { sendJson(res, 403, { error: { code: "assurance_actor_mismatch", message: "updatedBy must be the authenticated platform actor." } }); return; }
+    try { const state = await loadWholeState(dataDir); const projection = projectControlAssurance(state.controlPlane.platformEvents ?? []); const current = projection.issues.find((item) => item.issueId === decodeURIComponent(assuranceIssueMatch[1])); if (!current) { sendJson(res, 404, { error: { code: "assurance_issue_not_found", message: "Assurance issue not found." } }); return; } const issue = transitionAssuranceIssue(current, body); const nextState = appendPlatformEvent(state, { type: "platform.assurance.issue_transitioned", issue }, { actor }); await saveWholeState(nextState, dataDir); sendJson(res, 200, { issue }); } catch (error) { sendControlAssuranceError(res, error); }
+    return;
+  }
+
+  if (method === "POST" && path === "/platform/control-assurance/certifications") {
+    if (!hasPlatformRole(authContext, ["platform_admin", "security_admin", "auditor"])) { sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } }); return; }
+    const body = await readJson(req); const actor = authActor(authContext);
+    if (body.certifiedBy !== actor) { sendJson(res, 403, { error: { code: "assurance_actor_mismatch", message: "certifiedBy must be the authenticated platform actor." } }); return; }
+    try { const state = await loadWholeState(dataDir); const projection = projectControlAssurance(state.controlPlane.platformEvents ?? []); const certification = createControlCertification(body, projection.tests, projection.issues, projection.certifications); const nextState = appendPlatformEvent(state, { type: "platform.assurance.certification_created", certification }, { actor }); await saveWholeState(nextState, dataDir); sendJson(res, 201, { certification }); } catch (error) { sendControlAssuranceError(res, error); }
+    return;
+  }
+
+  const certificationApprovalMatch = path.match(/^\/platform\/control-assurance\/certifications\/([^/]+)\/approval$/);
+  if (method === "POST" && certificationApprovalMatch) {
+    if (!hasPlatformRole(authContext, ["platform_admin", "security_admin", "auditor"])) { sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } }); return; }
+    const body = await readJson(req); const actor = authActor(authContext);
+    if (body.approvedBy !== actor) { sendJson(res, 403, { error: { code: "assurance_actor_mismatch", message: "approvedBy must be the authenticated platform actor." } }); return; }
+    try { const state = await loadWholeState(dataDir); const projection = projectControlAssurance(state.controlPlane.platformEvents ?? []); const current = projection.certifications.find((item) => item.certificationId === decodeURIComponent(certificationApprovalMatch[1])); if (!current) { sendJson(res, 404, { error: { code: "certification_not_found", message: "Certification not found." } }); return; } const certification = approveControlCertification(current, body); const nextState = appendPlatformEvent(state, { type: "platform.assurance.certification_approved", certification }, { actor }); await saveWholeState(nextState, dataDir); sendJson(res, 200, { certification }); } catch (error) { sendControlAssuranceError(res, error); }
+    return;
+  }
+
+  if (method === "POST" && path === "/platform/control-assurance/engagements") {
+    if (!hasPlatformRole(authContext, ["platform_admin", "security_admin", "auditor"])) { sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } }); return; }
+    const body = await readJson(req); const actor = authActor(authContext);
+    if (body.createdBy !== actor) { sendJson(res, 403, { error: { code: "assurance_actor_mismatch", message: "createdBy must be the authenticated platform actor." } }); return; }
+    try { const state = await loadWholeState(dataDir); const projection = projectControlAssurance(state.controlPlane.platformEvents ?? []); const engagement = createAuditEngagement(body, projection.engagements, projection.issues); const nextState = appendPlatformEvent(state, { type: "platform.assurance.engagement_created", engagement }, { actor }); await saveWholeState(nextState, dataDir); sendJson(res, 201, { engagement }); } catch (error) { sendControlAssuranceError(res, error); }
+    return;
+  }
+
+  const engagementActionMatch = path.match(/^\/platform\/control-assurance\/engagements\/([^/]+)\/(responses|transition)$/);
+  if (method === "POST" && engagementActionMatch) {
+    if (!hasPlatformRole(authContext, ["platform_admin", "security_admin", "auditor"])) { sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } }); return; }
+    const body = await readJson(req); const actor = authActor(authContext); const actorField = engagementActionMatch[2] === "responses" ? "respondedBy" : "updatedBy";
+    if (body[actorField] !== actor) { sendJson(res, 403, { error: { code: "assurance_actor_mismatch", message: `${actorField} must be the authenticated platform actor.` } }); return; }
+    try { const state = await loadWholeState(dataDir); const projection = projectControlAssurance(state.controlPlane.platformEvents ?? []); const current = projection.engagements.find((item) => item.engagementId === decodeURIComponent(engagementActionMatch[1])); if (!current) { sendJson(res, 404, { error: { code: "audit_engagement_not_found", message: "Audit engagement not found." } }); return; } const engagement = engagementActionMatch[2] === "responses" ? respondAuditRequest(current, body) : transitionAuditEngagement(current, body, projection.issues); const nextState = appendPlatformEvent(state, { type: `platform.assurance.engagement_${engagementActionMatch[2]}_recorded`, engagement }, { actor }); await saveWholeState(nextState, dataDir); sendJson(res, 200, { engagement }); } catch (error) { sendControlAssuranceError(res, error); }
+    return;
+  }
+
+  if (method === "POST" && path === "/platform/control-assurance/governance-packs") {
+    if (!hasPlatformRole(authContext, ["platform_admin", "security_admin", "auditor"])) { sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } }); return; }
+    const body = await readJson(req); const actor = authActor(authContext);
+    if (body.approvedBy !== actor) { sendJson(res, 403, { error: { code: "assurance_actor_mismatch", message: "approvedBy must be the authenticated platform actor." } }); return; }
+    try { const state = await loadWholeState(dataDir); const projection = projectControlAssurance(state.controlPlane.platformEvents ?? []); if (projection.governancePacks.some((item) => item.packId === body.packId)) throw Object.assign(new Error("packId already exists."), { code: "governance_pack_duplicate" }); const pack = generateGovernancePack(body, projection); const nextState = appendPlatformEvent(state, { type: "platform.assurance.governance_pack_generated", pack }, { actor }); await saveWholeState(nextState, dataDir); sendJson(res, 201, { pack }); } catch (error) { sendControlAssuranceError(res, error); }
+    return;
+  }
+
   if (method === "GET" && path === "/platform/security-operations") {
     if (!hasPlatformRole(authContext, ["platform_admin", "security_admin", "auditor"])) {
       sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } });
@@ -9679,6 +9772,14 @@ function sendSecurityOperationsError(res, error) {
   const conflictCodes = new Set(["detection_rule_duplicate", "security_alert_duplicate", "security_alert_duplicate_signal", "security_investigation_duplicate", "security_evidence_duplicate", "coverage_assessment_duplicate"]);
   sendJson(res, conflictCodes.has(code) ? 409 : 422, {
     error: { code, message: error?.message ?? "Security operation failed closed." }
+  });
+}
+
+function sendControlAssuranceError(res, error) {
+  const code = error?.code ?? "control_assurance_failed";
+  const conflictCodes = new Set(["assurance_plan_duplicate", "control_test_duplicate", "assurance_issue_duplicate", "certification_duplicate", "audit_engagement_duplicate", "governance_pack_duplicate"]);
+  sendJson(res, conflictCodes.has(code) ? 409 : 422, {
+    error: { code, message: error?.message ?? "Control assurance operation failed closed." }
   });
 }
 
