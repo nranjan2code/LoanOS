@@ -133,11 +133,11 @@ Exit criteria:
 
 Deliverables:
 
-- CERSAI. First slice done: security-interest lifecycle (`cersai.js`) with a `securedLoan` disbursement gate and mock/real `cersaiProvider`; real CERSAI submission format pending.
-- FIU-IND STR/CTR reporting. First slice done: `fiu-str.js` with Principal Officer review, CTR threshold, tipping-off guard, and mock/real `fiuProvider`; real FIU-IND submission format pending.
+- CERSAI. Governed canonical submission slice done: `cersai.js` builds checksum-sealed registration packets, retains provider submission/payment/certificate evidence, reconciles HMAC-authenticated registered/rejected callbacks, and supports independently approved repair lineage; certified CERSAI gateway schema and live credential onboarding remain planned.
+- FIU-IND STR/CTR/CCR reporting. Governed canonical FINnet slice done: `fiu-str.js` emits ARF/TRF/CRF XML, retains provider submission evidence, reconciles HMAC-authenticated accepted/rejected callbacks against the exact packet checksum, and supports approved repair lineage; FIU XSD/rule-set certification and live FINGate onboarding remain planned.
 - Credit bureaus/CICs.
 - Bank account verification. First slice done: `ExternalServiceManager` supports mock/real bank-account verification, `POST /integrations/bank-account-verification` returns sanitized verification evidence, and disbursement is blocked without verified active account proof matching the destination account.
-- eSign/document vault. First slice done: successful eSign automatically creates a tenant-scoped document-vault receipt with signature evidence, storage country, retention policy, per-document SHA-256 checksums, and a manifest checksum; PDF generation and external eSign envelope storage remain planned.
+- eSign/document vault. First slice done: successful eSign automatically creates a tenant-scoped document-vault receipt with signature evidence, storage country, retention policy, per-document HTML/PDF SHA-256 checksums, and a manifest checksum; certified external eSign envelope onboarding remains planned.
 - NACH/UPI/payment rails. First slice done: `ExternalServiceManager` supports mock/real payment rail provider switching with India residency enforcement, `POST /integrations/payment-rails/nach-mandates` and `POST /integrations/payment-rails/upi-collects` store sanitized initiation evidence, and `GET /payment-rails` exposes the tenant ledger. Live settlement files, reconciliation, refunds, and production provider onboarding remain planned.
 - SMS/email/WhatsApp provider with India data posture. First slice done: `ExternalServiceManager` dispatches SMS/email/WhatsApp through mock/real providers with India residency enforcement, `POST /integrations/communications` stores masked/hash-only dispatch evidence, and `GET /communications` exposes the tenant ledger.
 - Observability, secrets, IAM, DR, incident response.
