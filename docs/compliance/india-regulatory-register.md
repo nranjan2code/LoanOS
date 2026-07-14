@@ -2,7 +2,7 @@
 
 This register is the first compliance spine for LoanOS India. It is not legal advice. It is a product and engineering control map that must be reviewed by counsel, compliance, risk, security, and the regulated entity before production use.
 
-Date of research baseline: 2026-07-08.
+Date of research baseline: 2026-07-15.
 
 ## Control Families
 
@@ -26,6 +26,7 @@ Date of research baseline: 2026-07-08.
 | RBI-FRAUD-2024 | Fraud risk management | Requires fraud governance, reporting, LEA workflows, natural justice in fraud classification. | Fraud case workflow, committee pack, FMR/LEA evidence |
 | RBI-MRM-DRAFT-2026 | Model risk management and AI kill switch | Draft guidance indicates broad model inventory, validation, human oversight, customer-facing AI safeguards, and kill-switch/override controls. | AI model registry, kill switch, model use guard |
 | FREE-AI-2025 | Responsible and ethical AI | RBI committee report recommends trust, people-first AI, fairness, accountability, explainability, resilience, red-teaming, incident reporting. | AI governance policy, model tests, incident process |
+| INDIA-AI-GOV-2025 | Cross-sector AI governance guidance | MeitY/IndiaAI's final guidelines apply seven people-first, fairness, accountability, understandability, safety and innovation principles through risk-based, techno-legal controls; they are guidance and do not replace RBI directions or applicable law. | `docs/architecture/agentic-ai-digital-workers.md`, AI use-case admission, human oversight, audit trail, incident and transparency controls |
 | DPDP-2023 | Digital personal data protection | Digital personal data processing needs lawful purpose, notice/consent where applicable, principal rights, breach response, fiduciary duties. | Consent ledger, data minimization, retention/deletion workflow, minimum channel intake, consent references, customer communication/accessibility intent and static-shell-only PWA caching |
 | DPDP-RULES-2025 | DPDP implementation rules | Operationalizes granular notice/consent and breach notice to affected principals and the Data Protection Board. | Consent ledger; immediate and 72-hour breach reporting clocks |
 | UIDAI-AADHAAR | Aadhaar/e-KYC constraints | Aadhaar biometrics/OTP/PID must not be stored on permanent storage; authentication must follow UIDAI controls. | Aadhaar connector boundaries, no biometric persistence test |
@@ -56,6 +57,7 @@ Date of research baseline: 2026-07-08.
 - RBI, `Storage of Payment System Data` FAQ, June 26, 2019: https://www.rbi.org.in/commonperson/english/scripts/FAQs.aspx?Id=2995
 - RBI official PDF URL found for draft `Guidance on Regulatory Principles for Model Risk Management`, June 24, 2026, public consultation: https://rbidocs.rbi.org.in/rdocs/Content/PDFs/DRAFTGUIDANCE24062026FF12A4FF7BC84E8887009D5C5365F8BF.PDF
 - RBI official PDF URL found for `FREE-AI` committee report, August 13, 2025: https://rbidocs.rbi.org.in/rdocs/PublicationReport/Pdfs/FREEAIR130820250A24FF2D4578453F824C72ED9F5D5851.PDF
+- MeitY/IndiaAI, `India AI Governance Guidelines`, November 2025: https://static.pib.gov.in/WriteReadData/specificdocs/documents/2025/nov/doc2025115685601.pdf
 - MeitY, `The Digital Personal Data Protection Act, 2023`: https://www.meity.gov.in/static/uploads/2024/06/2bf1f0e9f04e6fb4f8fef35e82c42aa5.pdf
 - MeitY, `Digital Personal Data Protection Rules, 2025`: https://www.meity.gov.in/documents/act-and-policies/digital-personal-data-protection-rules-2025-gDOxUjMtQWa?pageTitle=Digital-Personal-Data-Protection-Rules-2025
 - UIDAI, `Authentication Devices and Documents`: https://uidai.gov.in/en/ecosystem/authentication-devices-documents.html
@@ -78,3 +80,4 @@ Date of research baseline: 2026-07-08.
 12. Tenant isolation is a compliance control, not only an engineering concern: a cross-tenant data leak between two REs is a reportable event for both customers.
 13. Channel sourcing does not transfer lender responsibility. Partner authority, geography, customer consent/disclosure, conduct evidence, attribution, matching and every lifecycle action must remain visible and auditable to the RE; channel users cannot approve credit or promise outcomes.
 14. Offline/PWA design is a data-governance boundary. Static shell caching may improve resilience, but personal, lead, application and financial API responses must not enter general browser caches; encrypted purpose-built field queues require a separate threat model and approval.
+15. Agentic AI is a governed workload, not a new source of authority. Each digital worker needs a tenant-scoped identity, declared purpose, inventory/risk tier, independently validated model/prompt/tool/knowledge configuration, deterministic pre-action guardrail, bounded human-approved autonomy, India-resident data flow, audit lineage, kill switch, and safe manual fallback. See the agentic AI digital-workers architecture document.
