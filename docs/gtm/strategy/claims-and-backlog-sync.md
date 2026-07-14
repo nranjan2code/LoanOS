@@ -113,6 +113,10 @@ node docs/gtm/automation/gtm-backlog-sync.mjs
 | C-80 | Tenant-branded channel workspace is accessible, installable and caches only its static shell—not customer or lead API data | Partial | architecture/customer-channel-experiences.md; production assistive/device certification and encrypted field-offline queues remain planned |
 | C-81 | Converted-lead commission is calculated in exact paise, independently approved, payment-reconciled and clawed back only inside policy | Partial | architecture/customer-channel-experiences.md; invoice/GST/TDS/GL/bank-file/dispute depth remains planned |
 | C-82 | Succession uses expiring scoped authority, assigned independent legal review, LMS repayment/settlement/NOC, non-novating servicing transfer and same-account mandate migration | Partial | architecture/customer-channel-experiences.md; external court/registrar/provider confirmations and workforce/SLA depth remain planned |
+| C-83 | Partner operations govern onboarding, expiring credentials, territory/capacity, complete access review and evidence-bound conduct outcomes | Partial | architecture/completion-workstreams.md; IAM/HR feeds, administration UX and database isolation evidence remain planned |
+| C-84 | Partner commission finance validates GST/TDS evidence and exact balanced payables through bank reconciliation, statements, disputes and reversals | Partial | architecture/completion-workstreams.md; live GSTN/bank/CBS adapters and statutory filing remain planned |
+| C-85 | Customer identity merge requires explicit field decisions, provider-link reconciliation, checksum/version guards, outbox lineage and executable rollback | Partial | architecture/completion-workstreams.md; operator UI, certified provider adapters and durable broker dispatch remain planned |
+| C-86 | Succession external actions require certified connector scope, checksum/idempotency lineage and verified callbacks with SLA/capacity escalation | Partial | architecture/completion-workstreams.md; live court/registrar/provider connectivity and workforce feeds remain planned |
 
 ## Change process
 

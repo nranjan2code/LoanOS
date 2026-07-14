@@ -307,6 +307,10 @@ export {
   transitionSuccessionLegalReview,
   revokeSuccessionAuthority
 } from "./customer-channel-operations.js";
+export { allocateTerritoryCapacity, approvePartnerOnboarding, certifyPartnerAccess, closePartnerConductCase, createFieldHierarchy, createPartnerOnboarding, issuePartnerCredential, openPartnerConductCase, revokePartnerCredential } from "./channel-crm-governance.js";
+export { approvePartnerFinanceReversal, buildPartnerStatement, createPartnerBankPaymentFile, createPartnerPayableInstruction, openPartnerFinanceDispute, reconcilePartnerPayment, validatePartnerCommissionInvoice } from "./partner-finance.js";
+export { executeCustomerIdentityMerge, prepareCustomerIdentityMerge, reconcileExternalIdentity, rollbackCustomerIdentityMerge } from "./customer-identity-operations.js";
+export { buildSuccessionOperationsQueue, reconcileSuccessionExternalInstruction, registerSuccessionOperationsPolicy, submitSuccessionExternalInstruction } from "./succession-operations.js";
 export {
   PROVIDER_INTEGRATIONS,
   assessProviderCertification,

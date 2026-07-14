@@ -23,7 +23,7 @@ The current implementation is intentionally small:
 - Internal staff workspace in `apps/dashboard/`.
 - Borrower customer portal in `apps/customer/`: a responsive, white-labelled journey home with prioritised next actions, visual application milestones, repayment schedules, a document centre, guided media, grievance tracking, and DPDP access/correction/erasure controls.
 - Shared design system tokens in `apps/shared/`.
-- Automated tests in `tests/`: 296 file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
+- Automated tests in `tests/`: 310 file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
 
 Run it:
 
@@ -106,6 +106,10 @@ npm run dev:api
 | `packages/core/src/institutional-operations.js` | Pure institutional controls for RE programme/hierarchy, applicability/obligations, business calendars, configurable workflows and approvals, workforce/delegation, bulk plans, and exception taxonomy. |
 | `apps/api/src/routes/institutional-operations.js` | Tenant-authenticated persistence and audit projection for institutional governance and configured operations. |
 | `packages/core/src/customer-channel-operations.js` | Pure customer/channel controls for partner authority, exact-paise commission lifecycle, serviceable lead lifecycle, party graph/merge/preferences, succession authority/actions, assigned legal review, LMS repayment/settlement/NOC, non-novating servicing transfer, mandate migration and exact-paise customer-360 exposure. |
+| `packages/core/src/channel-crm-governance.js` | Tenant-local partner onboarding, expiring credential lifecycle, field hierarchy, territory/capacity allocation, access certification and conduct cases. |
+| `packages/core/src/partner-finance.js` | Exact integer-paise GST/TDS invoice, balanced payable/GL, bank-file, reconciliation, statement, dispute and reversal controls. |
+| `packages/core/src/customer-identity-operations.js` | Per-field merge decisions, external identity reconciliation, checksum/version-bound execution, outbox lineage and executable snapshot rollback. |
+| `packages/core/src/succession-operations.js` | Certified checksum/idempotency-bound external succession instructions, verified callback reconciliation and SLA/capacity queue projection. |
 | `apps/api/src/routes/customer-channel-controls.js` | Tenant-authenticated persistence, role gates and audit projection for customer/channel operations. |
 | `apps/partner/` | Tenant-branded responsive branch/channel lead workspace with consent-led intake, matching review, evidence-bound actions, accessible/reduced-motion UI, and a static-shell-only PWA that never caches business API data. |
 | `apps/api/src/observability.js` | Bounded process-local HTTP telemetry registry: normalized route/status aggregates, availability and latency SLIs, configurable SLO/error-budget state, in-flight/capacity signals, tenant-scoped snapshots, and Prometheus text output without tenant labels. |
@@ -153,6 +157,11 @@ npm run dev:api
 | `POST /customers/succession-authorities`, `/customers/succession-service-actions`, `/customers/succession-authorities/:id/revoke` | Issues expiring account/action-scoped claimant authority, records exact repayments and evidence-bound requests, and four-eyes revokes authority without directly mutating financial/account state. |
 | `POST /customers/succession-service-actions/:id/execute` | Revalidates authority and approved legal review, applies fresh four-eyes control, and executes LMS repayment/settlement/NOC, non-novating servicing transfer, mandate migration or evidence-bound downstream completion. |
 | `POST /customers/succession-legal-reviews`, `/customers/succession-legal-reviews/:id/transitions` | Assigns due-dated checklist/legal-basis review and independently approves or rejects the exact succession action before execution. |
+| `GET /completion/operations`, `GET /completion/succession/queue` | Returns tenant-local completion registries and derived succession SLA/capacity pressure. |
+| `POST /completion/channel/*` | Governs partner onboarding, credentials, hierarchy/capacity, access certification and conduct cases. |
+| `POST /completion/partner-finance/*` | Governs invoices, exact payables/GL, payment files/reconciliation, statements, disputes and reversals. |
+| `POST /completion/customer-identity/*` | Prepares/reconciles, checksum/version executes and snapshot-rolls-back customer identity merges. |
+| `POST /completion/succession/*` | Governs operations policy, certified external instruction submission and verified callback reconciliation. |
 | `GET /customers/:id/360` | Joins tenant-local profile, preferences, parties, lifecycle records and exact-paise related exposure. |
 | `POST /institution/operations/units`, `/programmes`, `/applicability-profiles`, `/obligation-calendars` | Governs same-RE operating structure/programmes and canonical applicability-driven compliance schedules. |
 | `POST /institution/operations/business-calendars`, `/workflow-definitions`, `/workflow-cases`, `/workflow-cases/:id/transitions` | Governs India calendar policy and executable pinned state/role/evidence/condition/four-eyes workflows. |

@@ -7,6 +7,7 @@ import { routeRiskAmlControls } from "./routes/risk-aml-controls.js";
 import { routeImplementationControls } from "./routes/implementation-controls.js";
 import { routeInstitutionalOperations } from "./routes/institutional-operations.js";
 import { routeCustomerChannelControls } from "./routes/customer-channel-controls.js";
+import { routeCompletionControls } from "./routes/completion-controls.js";
 import { routeCersaiSearch } from "./routes/cersai-search.js";
 import { createObservabilityRegistry } from "./observability.js";
 import { readFile } from "node:fs/promises";
@@ -1104,6 +1105,7 @@ async function route(req, res, dataDir, platformAdminKey, observability) {
   if (await routeImplementationControls({ method, path, req, res, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
   if (await routeInstitutionalOperations({ method, path, req, res, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
   if (await routeCustomerChannelControls({ method, path, req, res, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
+  if (await routeCompletionControls({ method, path, req, res, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
 
   // Standing sub-processor disclosure: every authenticated tenant RE can read
   // the platform-wide register of LoanOS sub-processors that apply to it.

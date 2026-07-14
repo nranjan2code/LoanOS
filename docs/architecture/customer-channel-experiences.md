@@ -49,11 +49,11 @@ All mutations append actor-attributed records to the tenant audit chain. API-key
 
 The following remain before a bank can treat this as a complete channel/CRM system:
 
-1. Add partner onboarding UI, credential lifecycle, field hierarchy, territory/capacity allocation, periodic access certification, and conduct-monitoring cases. Partner/unit row-level entitlement is now enforced in the application layer; production database policies and negative isolation tests remain required.
+1. Add partner administration UX plus live IAM/HR/territory feeds. The control layer now covers onboarding, credential lifecycle, field hierarchy, territory/capacity, access certification and conduct cases; production database policies and negative isolation evidence remain required.
 2. Join lead conversion more deeply into the standard application-creation UX; safe existing-application linkage is now enforced, while one-click creation must continue to use the full borrower/KYC/consent/product compliance path.
-3. Extend commission assessment/approval/settlement/clawback with invoice validation, GST/TDS documents, GL payable postings, bank-file generation, disputes, reversals and partner statements.
-4. Extend transactional customer merge beyond the supported borrower-reference collections with per-field conflict UI, external identity/provider reconciliation, downstream event publication, executable rollback and production-scale concurrency tests.
-5. Add external legal-document/court/registrar connectors, payment-provider mandate cancellation confirmation, SLA escalation dashboards and operational capacity reporting. The tenant-local staffed legal queue, LMS settlement, non-novating servicing transfer and same-account mandate migration are now executable.
+3. Connect the now-executable GST/TDS invoice, exact payable/GL, bank-file, statement, dispute and reversal controls to certified GSTN, bank and CBS adapters with statutory filing and posting acknowledgements.
+4. Add the operator conflict-resolution UI, certified identity-provider adapters and durable outbox dispatch. Explicit per-field decisions, provider-link reconciliation, version/checksum-bound execution, event creation and executable rollback are now controlled; expanded reference migration and production concurrency tests remain.
+5. Connect the certified checksum/idempotency-bound legal/court/registrar/mandate/notification instruction layer to live providers, signature verification and workforce feeds. SLA/capacity queues are now derived; escalation delivery and witnessed operations remain.
 6. Add Indian-language content packs and institution-approved templates; storing language preference is not equivalent to translated content.
 7. Complete assistive-technology testing, device/browser certification, field/offline encrypted work queues, and production PWA security review. Business data must never enter general browser caches.
 

@@ -1,22 +1,22 @@
 {
-  "generated": "2026-07-14T18:45:43.230Z",
+  "generated": "2026-07-14T18:55:12.807Z",
   "git": {
     "branch": "main",
-    "count": 163,
+    "count": 164,
     "commits": []
   },
   "overall": {
     "counts": {
       "Implemented": 87,
-      "Partial": 271,
+      "Partial": 272,
       "Partial/Mock": 11,
       "Mock": 7,
-      "Missing": 68,
+      "Missing": 67,
       "Partner": 3,
       "External": 6
     },
     "total": 453,
-    "pct": 45
+    "pct": 46
   },
   "planes": [
     {
@@ -153,7 +153,7 @@
         {
           "n": 21,
           "name": "Co-lending, DLG, LSP, and Partner Economics",
-          "pct": 51,
+          "pct": 54,
           "total": 13
         },
         {
@@ -171,10 +171,10 @@
       ],
       "counts": {
         "Implemented": 14,
-        "Partial": 26,
+        "Partial": 27,
         "Partial/Mock": 1,
         "Mock": 0,
-        "Missing": 8,
+        "Missing": 7,
         "Partner": 1,
         "External": 0
       },
@@ -1230,12 +1230,28 @@
           "applicability": "Channel",
           "status": "Partial",
           "raw": "Partial",
-          "evidence": [],
+          "evidence": [
+            {
+              "type": "code",
+              "ref": "packages/core/src/channel-crm-governance.js",
+              "note": "partner onboarding, access certification, credential revocation and conduct cases"
+            },
+            {
+              "type": "endpoint",
+              "ref": "POST /completion/channel/conduct-cases",
+              "note": "tenant-local evidence-bound conduct investigation"
+            },
+            {
+              "type": "test",
+              "ref": "tests/channel-crm-governance.test.js",
+              "note": "four-eyes conduct and complete-access review controls"
+            }
+          ],
           "owner": "",
           "acceptance": "",
           "dependencies": [],
           "notes": "",
-          "lastReviewed": ""
+          "lastReviewed": "2026-07-15"
         }
       ],
       "counts": {
@@ -1302,6 +1318,16 @@
               "type": "test",
               "ref": "tests/customer-channel-operations.test.js",
               "note": "impact checksum, cross-record migration and rollback lineage"
+            },
+            {
+              "type": "code",
+              "ref": "packages/core/src/customer-identity-operations.js",
+              "note": "per-field decisions, external identity reconciliation, version guard, outbox and executable rollback"
+            },
+            {
+              "type": "test",
+              "ref": "tests/customer-identity-operations.test.js",
+              "note": "idempotent checksum-bound execution and snapshot restoration"
             }
           ],
           "owner": "",
@@ -1430,6 +1456,16 @@
               "type": "test",
               "ref": "tests/customer-channel-operations.test.js",
               "note": "authority and legal gates plus exact repayment, settlement, NOC, servicing transfer, and mandate migration"
+            },
+            {
+              "type": "code",
+              "ref": "packages/core/src/succession-operations.js",
+              "note": "certified external instructions, verified callbacks and operational SLA/capacity queues"
+            },
+            {
+              "type": "test",
+              "ref": "tests/succession-operations.test.js",
+              "note": "connector lineage, signed reconciliation and escalation evidence"
             }
           ],
           "owner": "",
@@ -4777,12 +4813,23 @@
           "applicability": "Product",
           "status": "Partial",
           "raw": "Partial",
-          "evidence": [],
+          "evidence": [
+            {
+              "type": "code",
+              "ref": "packages/core/src/partner-finance.js",
+              "note": "bank reconciliation, statements, disputes and approved reversals"
+            },
+            {
+              "type": "test",
+              "ref": "tests/partner-finance.test.js",
+              "note": "exact reconciliation and reversal controls"
+            }
+          ],
           "owner": "",
           "acceptance": "",
           "dependencies": [],
           "notes": "",
-          "lastReviewed": ""
+          "lastReviewed": "2026-07-15"
         },
         {
           "id": "PAR-011",
@@ -4814,27 +4861,43 @@
           "id": "PAR-013",
           "name": "DSA/BC/dealer/merchant commission and clawback",
           "applicability": "Channel",
-          "status": "Missing",
-          "raw": "Missing",
-          "evidence": [],
+          "status": "Partial",
+          "raw": "Partial",
+          "evidence": [
+            {
+              "type": "code",
+              "ref": "packages/core/src/partner-finance.js",
+              "note": "GST/TDS invoice, exact payable/GL, bank file, dispute and reversal lifecycle"
+            },
+            {
+              "type": "endpoint",
+              "ref": "POST /completion/partner-finance/invoices",
+              "note": "evidence-bound partner commission invoice intake"
+            },
+            {
+              "type": "test",
+              "ref": "tests/partner-finance.test.js",
+              "note": "integer-paise balance, maker-checker and idempotency"
+            }
+          ],
           "owner": "",
           "acceptance": "",
           "dependencies": [],
           "notes": "",
-          "lastReviewed": ""
+          "lastReviewed": "2026-07-15"
         }
       ],
       "counts": {
         "Implemented": 5,
-        "Partial": 4,
+        "Partial": 5,
         "Partial/Mock": 0,
         "Mock": 0,
-        "Missing": 4,
+        "Missing": 3,
         "Partner": 0,
         "External": 0
       },
       "total": 13,
-      "pct": 51
+      "pct": 54
     },
     {
       "n": 22,
@@ -4964,12 +5027,28 @@
           "applicability": "Core",
           "status": "Partial",
           "raw": "Partial",
-          "evidence": [],
+          "evidence": [
+            {
+              "type": "code",
+              "ref": "packages/core/src/succession-operations.js",
+              "note": "derived SLA breach, escalation, utilization and capacity queue"
+            },
+            {
+              "type": "endpoint",
+              "ref": "GET /completion/succession/queue",
+              "note": "tenant succession operational pressure projection"
+            },
+            {
+              "type": "test",
+              "ref": "tests/succession-operations.test.js",
+              "note": "overdue and unassigned escalation evidence"
+            }
+          ],
           "owner": "",
           "acceptance": "",
           "dependencies": [],
           "notes": "",
-          "lastReviewed": ""
+          "lastReviewed": "2026-07-15"
         },
         {
           "id": "LWS-011",
@@ -7306,9 +7385,9 @@
     }
   ],
   "tests": {
-    "pass": 296,
+    "pass": 310,
     "fail": 0,
-    "total": 301,
+    "total": 315,
     "ran": true
   }
 }

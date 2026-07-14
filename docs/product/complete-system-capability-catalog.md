@@ -501,7 +501,7 @@ The detailed register contains **453 individually identified capabilities**. At 
 | PAR-010 | Partner reconciliation, break management, and statements | Product | Partial |
 | PAR-011 | Servicing transfer, portfolio sale, assignment, and participation | Product | Missing |
 | PAR-012 | Partner SLA, performance, concentration, and audit | Channel | Missing |
-| PAR-013 | DSA/BC/dealer/merchant commission and clawback | Channel | Missing |
+| PAR-013 | DSA/BC/dealer/merchant commission and clawback | Channel | Partial |
 
 ### 22. Workflow, Maker-Checker, and Operations
 
