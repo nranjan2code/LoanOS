@@ -1080,6 +1080,21 @@ async function route(req, res, dataDir, platformAdminKey) {
     return;
   }
 
+  const providerCallbackMatch = path.match(/^\/integrations\/([a-z_]{2,40})\/callbacks$/);
+  if (method === "POST" && providerCallbackMatch) {
+    const body = await readJson(req); const provider = providerCallbackMatch[1]; const signature = req.headers["x-provider-signature"];
+    const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox });
+    try {
+      const verified = manager.verifyProviderCallback(provider, body.eventId, body.payload, Array.isArray(signature) ? signature[0] : signature);
+      const state = await store.load(); const existing = state.providerCallbacks?.[`${provider}:${body.eventId}`];
+      if (existing) { sendJson(res, 200, { callback: existing, idempotent: true }); return; }
+      const callback = { callbackId: `${provider}:${body.eventId}`, provider, eventId: body.eventId, payloadHash: verified.payloadHash, receivedAt: new Date().toISOString(), receivedBy: "provider_callback" };
+      await store.save(appendEvent({ ...state, providerCallbacks: { ...(state.providerCallbacks ?? {}), [callback.callbackId]: callback } }, { type: "integration.provider_callback.accepted", provider, eventId: body.eventId, payloadHash: callback.payloadHash }));
+      sendJson(res, 202, { callback, idempotent: false });
+    } catch (error) { sendJson(res, 401, { error: { code: "provider_callback_rejected", message: error.message } }); }
+    return;
+  }
+
   if (method === "POST" && path === "/integrations/communications") {
     const body = await readJson(req);
     let payload = null;

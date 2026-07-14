@@ -283,7 +283,7 @@ Security-interest filing now builds a checksum-sealed canonical CERSAI packet fr
 ### REV-64 — Live integrations to replace mocks · P2 · PARTIAL
 No live integrations are onboarded: bureau, bank-account verification, eSign (+PDF envelopes), NACH file exchange
 + settlement/reconciliation + refunds, SMS/email/WhatsApp, V-CIP, CKYC, CERSAI, FIU-IND. Sequence one
-provider per category behind the existing `ExternalServiceManager` boundary. The shared readiness endpoint now reports, without exposing credentials, each adapter's mock/ready/blocked state and explicitly blocks real mode until endpoint, credential, and India-residency prerequisites are present. **Acceptance:** one product can complete end-to-end on live providers.
+provider per category behind the existing `ExternalServiceManager` boundary. The shared readiness endpoint now reports, without exposing credentials, each adapter's mock/ready/blocked state and explicitly blocks real mode until endpoint, credential, and India-residency prerequisites are present. Provider callbacks are tenant-authenticated, HMAC-verified, idempotent by provider/event identity, and audit-sealed with a keyed payload hash. **Acceptance:** one product can complete end-to-end on live providers.
 
 ---
 

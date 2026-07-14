@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert";
+import { createHmac } from "node:crypto";
 import { ExternalServiceManager } from "../packages/core/src/index.js";
 
 test("ExternalServiceManager SMS provider defaults to mock and successfully logs messages", async () => {
@@ -29,6 +30,14 @@ test("ExternalServiceManager exposes credential-safe provider readiness", () => 
   assert.equal(sms.hasCredential, false);
   assert.equal(cersai.status, "mock");
   assert.equal(Object.hasOwn(sms, "apiKey"), false);
+});
+
+test("ExternalServiceManager accepts only HMAC-authenticated provider callbacks", () => {
+  const manager = new ExternalServiceManager({ providerCallbackSecrets: { cersai: "callback-secret" } });
+  const payload = { responseRef: "RESP-001", outcome: "registered" }; const eventId = "evt_001";
+  const signature = createHmac("sha256", "callback-secret").update(`cersai.${eventId}.${JSON.stringify(payload)}`).digest("hex");
+  assert.equal(manager.verifyProviderCallback("cersai", eventId, payload, `sha256=${signature}`).eventId, eventId);
+  assert.throws(() => manager.verifyProviderCallback("cersai", eventId, payload, "sha256=00"), /signature is invalid/);
 });
 
 test("ExternalServiceManager email and WhatsApp providers default to mock with India data posture", async () => {

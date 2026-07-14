@@ -1,4 +1,5 @@
 import { createFinding } from "./compliance-controls.js";
+import { createHmac, timingSafeEqual } from "node:crypto";
 
 // Mock pre-seeded data for Credit Bureau (CIBIL equivalent)
 const MOCK_BUREAU_SCORES = {
@@ -89,7 +90,8 @@ export class ExternalServiceManager {
       fiuProvider: config.fiuProvider ?? (typeof process !== "undefined" ? process.env.LOANOS_FIU_PROVIDER : "mock") ?? "mock",
       fiuApiUrl: config.fiuApiUrl ?? (typeof process !== "undefined" ? process.env.LOANOS_FIU_API_URL : "") ?? "",
       fiuApiKey: config.fiuApiKey ?? (typeof process !== "undefined" ? process.env.LOANOS_FIU_API_KEY : "") ?? "",
-      fiuDataResidencyCountry: config.fiuDataResidencyCountry ?? (typeof process !== "undefined" ? process.env.LOANOS_FIU_DATA_RESIDENCY_COUNTRY : "IN") ?? "IN"
+      fiuDataResidencyCountry: config.fiuDataResidencyCountry ?? (typeof process !== "undefined" ? process.env.LOANOS_FIU_DATA_RESIDENCY_COUNTRY : "IN") ?? "IN",
+      providerCallbackSecrets: config.providerCallbackSecrets ?? (typeof process !== "undefined" && process.env.LOANOS_PROVIDER_CALLBACK_SECRETS ? JSON.parse(process.env.LOANOS_PROVIDER_CALLBACK_SECRETS) : {})
     };
 
     if (config.isSandbox) {
@@ -114,6 +116,16 @@ export class ExternalServiceManager {
       const provider = this.config[`${prefix}Provider`]; const dataResidencyCountry = this.config[`${prefix}DataResidencyCountry`]; const hasEndpoint = Boolean(this.config[`${prefix}ApiUrl`]); const hasCredential = Boolean(this.config[`${prefix}ApiKey`]); const residencyCompliant = dataResidencyCountry === "IN"; const configured = provider === "mock" || (hasEndpoint && hasCredential && residencyCompliant);
       return { integration, label, provider, mode: provider === "mock" ? "mock" : "real", status: configured ? (provider === "mock" ? "mock" : "ready") : "blocked", dataResidencyCountry, residencyCompliant, hasEndpoint, hasCredential, reason: configured ? null : !residencyCompliant ? "india_data_residency_required" : "endpoint_or_credential_missing" };
     });
+  }
+
+  verifyProviderCallback(provider, eventId, payload, signature) {
+    if (!/^[a-z_]{2,40}$/.test(String(provider ?? "")) || !eventId || !signature) throw new Error("Provider callback requires a valid provider, eventId, and signature.");
+    const secret = this.config.providerCallbackSecrets?.[provider];
+    if (!secret) throw new Error(`Provider callback secret is not configured for ${provider}.`);
+    const expected = createHmac("sha256", secret).update(`${provider}.${eventId}.${JSON.stringify(payload ?? {})}`).digest("hex");
+    const supplied = String(signature).replace(/^sha256=/i, "");
+    if (supplied.length !== expected.length || !timingSafeEqual(Buffer.from(supplied, "hex"), Buffer.from(expected, "hex"))) throw new Error("Provider callback signature is invalid.");
+    return { provider, eventId, payloadHash: createHmac("sha256", secret).update(JSON.stringify(payload ?? {})).digest("hex") };
   }
 
   /**
