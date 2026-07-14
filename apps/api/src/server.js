@@ -9,6 +9,7 @@ import { routeInstitutionalOperations } from "./routes/institutional-operations.
 import { routeCustomerChannelControls } from "./routes/customer-channel-controls.js";
 import { routeCompletionControls } from "./routes/completion-controls.js";
 import { routeCersaiSearch } from "./routes/cersai-search.js";
+import { routeSaasIdentityGovernance } from "./routes/saas-identity-governance.js";
 import { createObservabilityRegistry } from "./observability.js";
 import { readFile } from "node:fs/promises";
 import { join, dirname } from "node:path";
@@ -18,6 +19,19 @@ import { claimDueProviderCallbacks, enqueueProviderCallback, projectProviderCall
 import { buildSignedFileManifest, createSignedFileCorrection, recordSignedFileAcknowledgement, registerSignedFileSchemaProfile } from "../../../packages/core/src/signed-file-conformance.js";
 import { createTransportRecord, createTransportResubmission, markTransportDispatched, recordTransportPoll } from "../../../packages/core/src/signed-file-transport.js";
 import { createBusinessAdapterRequest, projectBusinessAdapterReconciliation, recordBusinessAdapterEvent, registerBusinessAdapter } from "../../../packages/core/src/business-adapter-conformance.js";
+import {
+  acceptSignupLegalDocuments,
+  activateFirstOwner,
+  decideOrganisationAdmission,
+  issueFirstOwnerInvitation,
+  projectOrganisationSignup,
+  recordAuthorisedRepresentativeProof,
+  recordCorporateDomainProof,
+  requestTenantProvisioning,
+  startOrganisationSignup,
+  submitOrganisationIdentity,
+  verifySignupContact
+} from "../../../packages/core/src/organisation-signup.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -358,6 +372,7 @@ import {
   hasPlatformRole,
   hasTenantAdminRole,
   hashSecret,
+  generateTotpSecret,
   isLastActiveTenantAdmin,
   isLoginLocked,
   loginAttemptKey,
@@ -374,6 +389,7 @@ import {
   upsertPlatformUser,
   upsertFederatedTenantUser,
   upsertTenantUser,
+  totpAuthUrl,
   verifyTotpCode
 } from "./identity.js";
 
@@ -474,7 +490,12 @@ async function resolveLockKey(req, dataDir) {
   return tenantId;
 }
 
-export function createLoanOsServer({ dataDir, bootstrapTenants = [], platformAdminKey } = {}) {
+export function createLoanOsServer({
+  dataDir,
+  bootstrapTenants = [],
+  platformAdminKey,
+  allowDirectTenantProvisioning = process.env.NODE_ENV !== "production"
+} = {}) {
   validateProductionConfiguration();
   const adminKey = platformAdminKey ?? process.env.LOANOS_PLATFORM_ADMIN_KEY ?? null;
   const observability = createObservabilityRegistry({
@@ -511,7 +532,14 @@ export function createLoanOsServer({ dataDir, bootstrapTenants = [], platformAdm
       // driver can serialize per-tenant instead of platform-wide; the file
       // driver ignores it (see withStateLock in file-store.js).
       const lockKey = await resolveLockKey(req, dataDir);
-      await withStateLock(dataDir, lockKey, () => route(req, res, dataDir, adminKey, observability));
+      await withStateLock(dataDir, lockKey, () => route(
+        req,
+        res,
+        dataDir,
+        adminKey,
+        observability,
+        allowDirectTenantProvisioning
+      ));
     } catch (error) {
       console.error(`[${requestId}]`, error);
       if (res.headersSent) {
@@ -631,7 +659,7 @@ function bufferRequestBody(req) {
   });
 }
 
-async function route(req, res, dataDir, platformAdminKey, observability) {
+async function route(req, res, dataDir, platformAdminKey, observability, allowDirectTenantProvisioning) {
   const method = req.method ?? "GET";
   const url = new URL(req.url ?? "/", "http://localhost");
   // API versioning: routes are served both unprefixed and under an explicit
@@ -699,6 +727,14 @@ async function route(req, res, dataDir, platformAdminKey, observability) {
 
   if (path === "/auth" || path.startsWith("/auth/")) {
     await routeAuth(req, res, { dataDir, method, path });
+    return;
+  }
+
+  // Organisation admission is public only for starting and proving an
+  // application. It never creates an active tenant or an authenticated user;
+  // platform admission and provisioning remain independently authorised.
+  if (path === "/organisation-signups" || path.startsWith("/organisation-signups/")) {
+    await routeOrganisationSignup(req, res, { dataDir, method, path });
     return;
   }
 
@@ -783,15 +819,19 @@ async function route(req, res, dataDir, platformAdminKey, observability) {
   if (method === "GET" && tenantRouteMatch) {
     const tenantSlug = decodeURIComponent(tenantRouteMatch[1]);
     const subPath = tenantRouteMatch[2] || "/";
+    const tenantControlState = await loadControlPlaneOnly(dataDir);
+    const tenantRecord = tenantControlState.controlPlane.tenants?.[tenantSlug];
+    // A reserved/provisioning/restricted tenant must not obtain a public
+    // RE-branded surface. That would let an unverified claimant impersonate
+    // a lender before admission and launch handover have completed.
+    if (!tenantRecord || tenantRecord.status !== "active") {
+      sendJson(res, 404, { error: { code: "tenant_not_found", message: "Tenant not found." } });
+      return;
+    }
 
     // GET /t/{tenantId}/branding → Tenant identity for white-labeling
     if (subPath === "/branding") {
       const state = await loadWholeState(dataDir);
-      const tenantRecord = state.controlPlane.tenants[tenantSlug];
-      if (!tenantRecord) {
-        sendJson(res, 404, { error: { code: "tenant_not_found", message: "Tenant not found." } });
-        return;
-      }
       const tenantData = state.tenants[tenantSlug] || {};
       const reList = Object.values(tenantData.regulatedEntities || {});
       const primaryRe = reList[0] || {};
@@ -851,7 +891,15 @@ async function route(req, res, dataDir, platformAdminKey, observability) {
   // --- Platform control plane: administers tenants and the sub-processor
   // register, gated on the platform admin key (never a tenant api key). ---
   if (path === "/platform" || path.startsWith("/platform/")) {
-    await routePlatform(req, res, { dataDir, platformAdminKey, method, path, url, observability });
+    await routePlatform(req, res, {
+      dataDir,
+      platformAdminKey,
+      method,
+      path,
+      url,
+      observability,
+      allowDirectTenantProvisioning
+    });
     return;
   }
 
@@ -7386,9 +7434,13 @@ function requiredModuleForPath(path) {
 // restricted to finishing an outstanding required action. MFA setup takes
 // priority over a forced password change so a user isn't asked to rotate a
 // password they're about to be told to re-enter anyway during enrollment.
-function sessionRestriction(user) {
+function sessionRestriction(user, tenantStatus = null) {
   if (user.mfaRequired && !user.mfaEnabled) return "mfa_setup";
   if (user.mustChangePassword) return "password_change";
+  if (
+    tenantStatus === "provisioning" &&
+    ["bootstrap_owner", "bootstrap_checker"].includes(user.bootstrapAuthority)
+  ) return "bootstrap";
   return null;
 }
 
@@ -7402,6 +7454,17 @@ const RESTRICTED_SESSION_ALLOWED_PATHS = new Set([
   "/auth/mfa/setup",
   "/auth/mfa/enable"
 ]);
+const BOOTSTRAP_SESSION_ALLOWED_PATHS = new Set([
+  "/admin/me",
+  "/admin/governance-summary",
+  "/admin/users/invite",
+  "/admin/role-catalogue",
+  "/admin/role-coverage"
+]);
+
+function bootstrapSessionPathAllowed(path) {
+  return BOOTSTRAP_SESSION_ALLOWED_PATHS.has(path) || path.startsWith("/admin/identity-governance/");
+}
 
 // Clears a session's restriction once its matching required action resolves,
 // so the same session becomes fully usable without forcing a re-login.
@@ -7432,8 +7495,305 @@ function clearSessionRestrictionAndRevokeOthers(sessions, userId, currentSession
   return next;
 }
 
+const ORGANISATION_SIGNUP_REALM = process.env.LOANOS_PLATFORM_REALM_ID ?? "india-prod";
+
+function requestIdempotencyKey(req) {
+  const value = req.headers["idempotency-key"];
+  return (Array.isArray(value) ? value[0] : value)?.trim() || null;
+}
+
+function signupAccessToken(req) {
+  const value = req.headers["x-signup-access-token"];
+  return (Array.isArray(value) ? value[0] : value)?.trim() || null;
+}
+
+function signupAccessAllowed(signup, req) {
+  const token = signupAccessToken(req);
+  return Boolean(
+    signup?.accessTokenHashSha256 &&
+    token &&
+    timingSafeStringEqual(signup.accessTokenHashSha256, sha256(token))
+  );
+}
+
+function sha256(value) {
+  return createHash("sha256").update(String(value ?? "")).digest("hex");
+}
+
+function signupCommand(req, signupId, extra = {}) {
+  return {
+    platformRealmId: ORGANISATION_SIGNUP_REALM,
+    signupId,
+    idempotencyKey: requestIdempotencyKey(req),
+    ...extra
+  };
+}
+
+function publicSignupView(signup) {
+  if (!signup) return null;
+  const progress = projectOrganisationSignup(signup);
+  return {
+    signupId: signup.signupId,
+    status: signup.status,
+    revision: signup.revision,
+    proposedTenantId: signup.proposedTenantId,
+    blockers: progress.blockers,
+    canInviteOwner: progress.canInviteOwner,
+    canRequestProvisioning: progress.canRequestProvisioning,
+    tenantActive: false,
+    expiresAt: signup.expiresAt,
+    updatedAt: signup.updatedAt
+  };
+}
+
+function platformSignupView(signup) {
+  const copy = structuredClone(signup);
+  delete copy.accessTokenHashSha256;
+  for (const challenge of Object.values(copy.contact?.challenges ?? {})) delete challenge.secretHashSha256;
+  if (copy.ownerInvitation) delete copy.ownerInvitation.tokenHashSha256;
+  if (copy.ownerMfaEnrollment) delete copy.ownerMfaEnrollment.secretHashSha256;
+  return { ...copy, progress: publicSignupView(signup) };
+}
+
+function sendSignupFailure(res, error, { neutral = false } = {}) {
+  const code = error?.code ?? "organisation_signup_invalid";
+  if (neutral && [
+    "organisation_signup_not_found", "organisation_signup_invitation_invalid",
+    "organisation_signup_invitation_expired", "organisation_signup_invitation_replayed",
+    "organisation_signup_invitation_revoked"
+  ].includes(code)) {
+    sendJson(res, 202, { status: "accepted", message: "If the application and evidence are valid, processing will continue." });
+    return;
+  }
+  const conflict = code.includes("duplicate") || code.includes("conflict") || code.includes("blocked") || code.includes("replayed");
+  sendJson(res, conflict ? 409 : 422, { error: { code, message: error?.message ?? "Organisation signup failed closed." } });
+}
+
+async function routeOrganisationSignup(req, res, { dataDir, method, path }) {
+  const now = new Date();
+  if (method === "POST" && path === "/organisation-signups") {
+    if (process.env.NODE_ENV === "production") {
+      sendJson(res, 503, { error: { code: "organisation_signup_delivery_unavailable", message: "Organisation signup is disabled until approved email and SMS verification providers are configured." } });
+      return;
+    }
+    const body = await readJson(req);
+    const idempotencyKey = requestIdempotencyKey(req);
+    if (!idempotencyKey || !body.email || !body.mobile) {
+      sendJson(res, 422, { error: { code: "organisation_signup_invalid", message: "Idempotency-Key, email and mobile are required." } });
+      return;
+    }
+    const email = String(body.email).trim().toLowerCase();
+    const mobile = String(body.mobile).replace(/[\s()-]/g, "");
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || !/^\+91[6-9][0-9]{9}$/.test(mobile)) {
+      sendJson(res, 422, { error: { code: "organisation_signup_invalid", message: "A valid email and Indian mobile number are required." } });
+      return;
+    }
+    const state = await loadWholeState(dataDir);
+    const emailKey = sha256(email);
+    const attempts = state.controlPlane.organisationSignupRateLimits?.[emailKey] ?? [];
+    const recent = attempts.filter((item) => now.getTime() - Date.parse(item) < 24 * 60 * 60 * 1000);
+    if (recent.length >= 5) {
+      sendJson(res, 429, { error: { code: "organisation_signup_rate_limited", message: "Signup request limit reached. Try again later." } });
+      return;
+    }
+    const emailChallenge = String(randomBytes(4).readUInt32BE() % 1_000_000).padStart(6, "0");
+    const mobileChallenge = String(randomBytes(4).readUInt32BE() % 1_000_000).padStart(6, "0");
+    const accessToken = `los_signup_${randomBytes(32).toString("hex")}`;
+    try {
+      const result = startOrganisationSignup(state.controlPlane.organisationSignups ?? {}, {
+        platformRealmId: ORGANISATION_SIGNUP_REALM,
+        signupId: `signup_${randomBytes(12).toString("hex")}`,
+        idempotencyKey,
+        requestedBy: `prospect:${emailKey.slice(0, 20)}`,
+        emailHashSha256: emailKey,
+        mobileHashSha256: sha256(mobile),
+        emailChallengeHashSha256: sha256(emailChallenge),
+        mobileChallengeHashSha256: sha256(mobileChallenge),
+        challengeExpiresAt: new Date(now.getTime() + 15 * 60 * 1000).toISOString(),
+        expiresAt: new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000).toISOString()
+      }, now);
+      const securedSignup = result.idempotent
+        ? result.signup
+        : { ...result.signup, accessTokenHashSha256: sha256(accessToken) };
+      const securedRegistry = result.idempotent
+        ? result.registry
+        : { ...result.registry, [securedSignup.signupId]: securedSignup };
+      let nextState = {
+        ...state,
+        controlPlane: {
+          ...state.controlPlane,
+          organisationSignups: securedRegistry,
+          organisationSignupRateLimits: { ...(state.controlPlane.organisationSignupRateLimits ?? {}), [emailKey]: [...recent, now.toISOString()] }
+        }
+      };
+      nextState = appendPlatformEvent(nextState, { type: "platform.organisation_signup.started", signupId: result.signup.signupId }, { actor: result.signup.requestedBy }, now);
+      await saveWholeState(nextState, dataDir);
+      sendJson(res, result.idempotent ? 200 : 202, {
+        application: publicSignupView(securedSignup),
+        verificationDelivery: result.idempotent ? { provider: "already_dispatched" } : {
+          provider: "mock", emailChallenge, mobileChallenge, signupAccessToken: accessToken,
+          warning: "Mock delivery evidence only; production must deliver through approved OTP providers."
+        }
+      });
+    } catch (error) { sendSignupFailure(res, error); }
+    return;
+  }
+
+  const contactMatch = path.match(/^\/organisation-signups\/([^/]+)\/contacts\/(email|mobile)\/verification$/);
+  if (method === "POST" && contactMatch) {
+    const body = await readJson(req); const signupId = decodeURIComponent(contactMatch[1]);
+    try {
+      const state = await loadWholeState(dataDir);
+      if (!signupAccessAllowed(state.controlPlane.organisationSignups?.[signupId], req)) {
+        sendJson(res, 202, { status: "accepted", message: "If the application and evidence are valid, processing will continue." });
+        return;
+      }
+      const result = verifySignupContact(state.controlPlane.organisationSignups ?? {}, signupId, signupCommand(req, signupId, {
+        channel: contactMatch[2], responseHashSha256: sha256(body.challengeResponse),
+        verificationEvidenceRef: body.verificationEvidenceRef ?? `mock-otp:${contactMatch[2]}:${signupId}`, actor: `prospect:${signupId}`
+      }), now);
+      await saveWholeState({ ...state, controlPlane: { ...state.controlPlane, organisationSignups: result.registry } }, dataDir);
+      sendJson(res, 200, { application: publicSignupView(result.signup) });
+    } catch (error) { sendSignupFailure(res, error, { neutral: true }); }
+    return;
+  }
+
+  const actionMatch = path.match(/^\/organisation-signups\/([^/]+)\/(identity|proofs|legal-acceptances)$/);
+  if (method === "POST" && actionMatch) {
+    const body = await readJson(req); const signupId = decodeURIComponent(actionMatch[1]);
+    try {
+      const state = await loadWholeState(dataDir); const registry = state.controlPlane.organisationSignups ?? {};
+      if (!signupAccessAllowed(registry[signupId], req)) {
+        sendJson(res, 202, { status: "accepted", message: "If the application and evidence are valid, processing will continue." });
+        return;
+      }
+      let result;
+      if (actionMatch[2] === "identity") result = submitOrganisationIdentity(registry, signupId, signupCommand(req, signupId, { ...body, actor: `prospect:${signupId}`, corporateDomainHashSha256: sha256(String(body.corporateDomain ?? "").trim().toLowerCase()) }), now);
+      if (actionMatch[2] === "proofs") {
+        result = recordCorporateDomainProof(registry, signupId, signupCommand(req, signupId, { domainHashSha256: sha256(String(body.corporateDomain ?? "").trim().toLowerCase()), method: body.domainMethod, evidenceRef: body.domainEvidenceRef, verifiedBy: body.domainVerifierRef ?? "mock:domain-verifier", actor: `prospect:${signupId}` }), now);
+        result = recordAuthorisedRepresentativeProof(result.registry, signupId, { ...signupCommand(req, signupId, { ...body, idempotencyKey: `${requestIdempotencyKey(req)}:representative`, actor: `prospect:${signupId}` }), representativeIdentityHashSha256: sha256(body.representativeIdentity) }, now);
+      }
+      if (actionMatch[2] === "legal-acceptances") result = acceptSignupLegalDocuments(registry, signupId, signupCommand(req, signupId, { ...body, actor: `prospect:${signupId}`, acceptedBy: `prospect:${signupId}` }), now);
+      await saveWholeState({ ...state, controlPlane: { ...state.controlPlane, organisationSignups: result.registry } }, dataDir);
+      sendJson(res, 200, { application: publicSignupView(result.signup) });
+    } catch (error) { sendSignupFailure(res, error, { neutral: error?.code === "organisation_signup_not_found" }); }
+    return;
+  }
+
+  const mfaSetupMatch = path.match(/^\/organisation-signups\/([^/]+)\/owner\/mfa-setup$/);
+  if (method === "POST" && mfaSetupMatch) {
+    const body = await readJson(req); const signupId = decodeURIComponent(mfaSetupMatch[1]);
+    const state = await loadWholeState(dataDir); const signup = state.controlPlane.organisationSignups?.[signupId];
+    const tokenHash = sha256(body.invitationToken);
+    if (!signup || signup.status !== "owner_invited" || !signup.ownerInvitation?.tokenHashSha256 || !timingSafeStringEqual(signup.ownerInvitation.tokenHashSha256, tokenHash) || Date.parse(signup.ownerInvitation.expiresAt) <= now.getTime()) {
+      sendJson(res, 202, { status: "accepted", message: "If the invitation is valid, MFA setup can continue." }); return;
+    }
+    const secret = generateTotpSecret();
+    const updated = { ...signup, ownerMfaEnrollment: { secretHashSha256: sha256(secret), expiresAt: new Date(now.getTime() + 10 * 60 * 1000).toISOString(), setupAt: now.toISOString() } };
+    await saveWholeState({ ...state, controlPlane: { ...state.controlPlane, organisationSignups: { ...state.controlPlane.organisationSignups, [signupId]: updated } } }, dataDir);
+    sendJson(res, 200, { factor: "totp", secret, otpauthUrl: totpAuthUrl(secret, { accountName: `first-owner:${signupId}` }), expiresAt: updated.ownerMfaEnrollment.expiresAt });
+    return;
+  }
+
+  const ownerAcceptMatch = path.match(/^\/organisation-signups\/([^/]+)\/owner\/acceptance$/);
+  if (method === "POST" && ownerAcceptMatch) {
+    const body = await readJson(req); const signupId = decodeURIComponent(ownerAcceptMatch[1]);
+    try {
+      const state = await loadWholeState(dataDir); const signup = state.controlPlane.organisationSignups?.[signupId];
+      if (!signup || signup.status !== "owner_invited" || !signup.ownerMfaEnrollment || Date.parse(signup.ownerMfaEnrollment.expiresAt) <= now.getTime() || !timingSafeStringEqual(signup.ownerMfaEnrollment.secretHashSha256, sha256(body.mfaSecret)) || !verifyTotpCode(body.mfaSecret, body.mfaCode, { now }) || !timingSafeStringEqual(signup.ownerInvitation.ownerIdentityHashSha256, sha256(String(body.email).trim().toLowerCase()))) throw Object.assign(new Error("Invitation evidence is invalid."), { code: "organisation_signup_invitation_invalid" });
+      const tenant = state.controlPlane.tenants[signup.proposedTenantId];
+      if (!tenant || tenant.status !== "provisioning" || tenant.organisationSignupId !== signupId) throw Object.assign(new Error("Provisioning tenant is unavailable."), { code: "organisation_signup_owner_activation_blocked" });
+      const principalId = body.principalId ?? `owner_${sha256(body.email).slice(0, 16)}`;
+      const userResult = upsertTenantUser(state.tenants[tenant.tenantId]?.users ?? {}, { userId: principalId, email: body.email, displayName: body.displayName, password: body.password, status: "active", adminRoles: ["tenant_admin"], roles: [], mfaRequired: true, mfaEnabled: true, mfaSecret: body.mfaSecret, mustChangePassword: false, bootstrapAuthority: "bootstrap_owner" }, now);
+      if (userResult.findings.length) { sendJson(res, 422, { error: { code: "tenant_owner_invalid", message: "First owner details are invalid." }, findings: userResult.findings }); return; }
+      const bootstrapOwner = { ...userResult.users[principalId], bootstrapAuthority: "bootstrap_owner" };
+      const bootstrapUsers = { ...userResult.users, [principalId]: bootstrapOwner };
+      const result = activateFirstOwner(state.controlPlane.organisationSignups, signupId, signupCommand(req, signupId, { tenantId: tenant.tenantId, invitationTokenHashSha256: sha256(body.invitationToken), ownerIdentityHashSha256: sha256(String(body.email).trim().toLowerCase()), principalId, passwordCredentialRef: `tenant-user:${principalId}:password`, mfaEnrollmentRef: `tenant-user:${principalId}:totp`, mfaFactors: ["totp"], activationEvidenceRef: body.activationEvidenceRef ?? `mfa-proof:${principalId}`, actor: principalId }), now);
+      result.registry[signupId] = { ...result.signup, ownerMfaEnrollment: null };
+      let nextState = { ...state, controlPlane: { ...state.controlPlane, organisationSignups: result.registry }, tenants: { ...state.tenants, [tenant.tenantId]: { ...state.tenants[tenant.tenantId], users: bootstrapUsers } } };
+      nextState = appendPlatformEvent(nextState, { type: "platform.organisation_signup.owner_activated", signupId, tenantId: tenant.tenantId, principalId }, { actor: principalId }, now);
+      await saveWholeState(nextState, dataDir);
+      sendJson(res, 201, { application: publicSignupView(result.registry[signupId]), owner: publicTenantUser(bootstrapOwner) });
+    } catch (error) { sendSignupFailure(res, error, { neutral: true }); }
+    return;
+  }
+
+  sendJson(res, 404, { error: { code: "not_found", message: "Route not found." } });
+}
+
+async function routePlatformOrganisationSignup(req, res, { dataDir, method, path, authContext }) {
+  if (!(path === "/platform/organisation-signups" || path.startsWith("/platform/organisation-signups/"))) return false;
+  if (!hasPlatformRole(authContext, ["platform_admin", "tenant_provisioner", "security_admin", "auditor"])) { sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } }); return true; }
+  const actor = authActor(authContext);
+  if (method === "GET" && path === "/platform/organisation-signups") { const state = await loadWholeState(dataDir); sendJson(res, 200, { applications: Object.values(state.controlPlane.organisationSignups ?? {}).map(platformSignupView) }); return true; }
+  const match = path.match(/^\/platform\/organisation-signups\/([^/]+)(?:\/(admission-proposal|admission|tenant|owner-invitation|provisioning|activation))?$/);
+  if (!match) { sendJson(res, 404, { error: { code: "not_found", message: "Platform route not found." } }); return true; }
+  const signupId = decodeURIComponent(match[1]); const action = match[2]; const state = await loadWholeState(dataDir); const signup = state.controlPlane.organisationSignups?.[signupId];
+  if (!signup) { sendJson(res, 404, { error: { code: "organisation_signup_not_found", message: "Organisation signup not found." } }); return true; }
+  if (method === "GET" && !action) { sendJson(res, 200, { application: platformSignupView(signup) }); return true; }
+  const body = await readJson(req); const now = new Date();
+  try {
+    if (method === "POST" && action === "admission-proposal") {
+      if (authContext.principalType !== "platform_user" || !hasPlatformRole(authContext, ["platform_admin", "security_admin"])) throw Object.assign(new Error("An authenticated human admission maker is required."), { code: "platform_role_forbidden" });
+      if (signup.admissionProposal && signup.admissionProposal.idempotencyKey === requestIdempotencyKey(req)) { sendJson(res, 200, { application: platformSignupView(signup), proposal: signup.admissionProposal }); return true; }
+      if (signup.admissionProposal) throw Object.assign(new Error("An admission proposal is already pending."), { code: "organisation_signup_admission_blocked" });
+      const requiredProposalFields = ["decision", "reasonCode", "fraudAssessmentRef", "deviceRiskRef", "rateControlRef", "sanctionsDecisionRef", "adverseRiskDecisionRef", "decisionEvidenceRef", "organisationRef"];
+      if (!requestIdempotencyKey(req) || requiredProposalFields.some((field) => typeof body[field] !== "string" || !body[field].trim())) throw Object.assign(new Error("Complete, idempotent admission proposal evidence is required."), { code: "organisation_signup_invalid" });
+      if (body.decision === "approved" && !body.proposedTenantId) throw Object.assign(new Error("An approved proposal requires proposedTenantId."), { code: "organisation_signup_invalid" });
+      const proposal = { proposalId: `admission_${randomBytes(10).toString("hex")}`, proposedBy: actor, idempotencyKey: requestIdempotencyKey(req), payload: { ...body, proposedBy: undefined, decidedBy: undefined }, proposedAt: now.toISOString() };
+      const updated = { ...signup, admissionProposal: proposal, revision: signup.revision + 1, commandKeys: [...signup.commandKeys, requestIdempotencyKey(req)], updatedAt: now.toISOString() };
+      let nextState = { ...state, controlPlane: { ...state.controlPlane, organisationSignups: { ...state.controlPlane.organisationSignups, [signupId]: updated } } };
+      nextState = appendPlatformEvent(nextState, { type: "platform.organisation_signup.admission_proposed", signupId, proposalId: proposal.proposalId, decision: body.decision }, { actor }, now); await saveWholeState(nextState, dataDir);
+      sendJson(res, 201, { application: platformSignupView(updated), proposal }); return true;
+    }
+    if (method === "POST" && action === "admission") {
+      if (authContext.principalType !== "platform_user" || !hasPlatformRole(authContext, ["platform_admin", "security_admin"])) throw Object.assign(new Error("An authenticated human admission checker is required."), { code: "platform_role_forbidden" });
+      if (!signup.admissionProposal) throw Object.assign(new Error("A persisted admission proposal is required."), { code: "organisation_signup_admission_blocked" });
+      if (signup.admissionProposal.proposedBy === actor) throw Object.assign(new Error("Admission maker cannot approve their own proposal."), { code: "organisation_signup_four_eyes_required" });
+      const result = decideOrganisationAdmission(state.controlPlane.organisationSignups, signupId, signupCommand(req, signupId, { ...signup.admissionProposal.payload, proposedBy: signup.admissionProposal.proposedBy, decidedBy: actor, actor }), now);
+      let nextState = { ...state, controlPlane: { ...state.controlPlane, organisationSignups: result.registry } };
+      nextState = appendPlatformEvent(nextState, { type: "platform.organisation_signup.admission_decided", signupId, decision: result.signup.admission.status, proposalId: signup.admissionProposal.proposalId }, { actor }, now); await saveWholeState(nextState, dataDir);
+      sendJson(res, 200, { application: platformSignupView(result.signup) }); return true;
+    }
+    if (method === "POST" && action === "tenant") {
+      if (!hasPlatformRole(authContext, ["platform_admin", "tenant_provisioner"])) throw Object.assign(new Error("Tenant provisioner role is required."), { code: "platform_role_forbidden" });
+      if (signup.status !== "verified_pending_provisioning") throw Object.assign(new Error("Approved organisation admission is required."), { code: "organisation_signup_provisioning_blocked" });
+      if (state.controlPlane.tenants[signup.proposedTenantId]) throw Object.assign(new Error("Tenant already exists."), { code: "organisation_signup_organisation_conflict" });
+      let nextState = registerTenant(state, { tenantId: signup.proposedTenantId, name: body.name, isolationTier: body.isolationTier, status: "provisioning", organisationSignupId: signupId, deploymentStage: "namespace_created" }, now);
+      nextState = appendPlatformEvent(nextState, { type: "platform.organisation_signup.provisioning_tenant_created", signupId, tenantId: signup.proposedTenantId }, { actor }, now); await saveWholeState(nextState, dataDir);
+      sendJson(res, 201, { tenant: publicTenant(nextState.controlPlane.tenants[signup.proposedTenantId]), application: publicSignupView(signup) }); return true;
+    }
+    if (method === "POST" && action === "owner-invitation") {
+      if (!hasPlatformRole(authContext, ["platform_admin", "tenant_provisioner", "security_admin"])) throw Object.assign(new Error("Owner invitation role is required."), { code: "platform_role_forbidden" });
+      const tenant = state.controlPlane.tenants[signup.proposedTenantId]; if (!tenant || tenant.status !== "provisioning") throw Object.assign(new Error("Provisioning tenant is required."), { code: "organisation_signup_owner_invite_blocked" });
+      if (process.env.NODE_ENV === "production") throw Object.assign(new Error("Owner invitation delivery is disabled until an approved provider is configured."), { code: "organisation_signup_delivery_unavailable" });
+      const token = `los_owner_${randomBytes(32).toString("hex")}`; const maxExpiry = Math.min(Date.parse(signup.expiresAt), now.getTime() + 24 * 60 * 60 * 1000);
+      const result = issueFirstOwnerInvitation(state.controlPlane.organisationSignups, signupId, signupCommand(req, signupId, { tenantId: signup.proposedTenantId, invitationId: `invite_${randomBytes(10).toString("hex")}`, invitationTokenHashSha256: sha256(token), ownerIdentityHashSha256: signup.contact.emailHashSha256, deliveryEvidenceRef: body.deliveryEvidenceRef ?? `mock-owner-delivery:${signupId}`, issuedBy: actor, invitationExpiresAt: new Date(maxExpiry).toISOString(), actor }), now);
+      await saveWholeState({ ...state, controlPlane: { ...state.controlPlane, organisationSignups: result.registry } }, dataDir);
+      sendJson(res, 201, { application: publicSignupView(result.signup), delivery: { provider: "mock", invitationToken: token, expiresAt: result.signup.ownerInvitation.expiresAt } }); return true;
+    }
+    if (method === "POST" && action === "provisioning") {
+      if (!hasPlatformRole(authContext, ["platform_admin", "tenant_provisioner"])) throw Object.assign(new Error("Tenant provisioner role is required."), { code: "platform_role_forbidden" });
+      const result = requestTenantProvisioning(state.controlPlane.organisationSignups, signupId, signupCommand(req, signupId, { ...body, tenantId: signup.proposedTenantId, requestedBy: actor, actor }), now);
+      const tenant = state.controlPlane.tenants[signup.proposedTenantId];
+      const nextState = { ...state, controlPlane: { ...state.controlPlane, organisationSignups: result.registry, tenants: { ...state.controlPlane.tenants, [tenant.tenantId]: { ...tenant, deploymentStage: "saga_requested", updatedAt: now.toISOString() } } } };
+      await saveWholeState(nextState, dataDir); sendJson(res, 202, { application: publicSignupView(result.signup), tenant: publicTenant(nextState.controlPlane.tenants[tenant.tenantId]) }); return true;
+    }
+    if (method === "POST" && action === "activation") {
+      const tenant = state.controlPlane.tenants[signup.proposedTenantId]; const gates = tenant?.activationGates ?? {};
+      const blockers = ["provisioning", "roleCoverage", "uat", "handover"].filter((gate) => !gates[gate]);
+      sendJson(res, 409, { error: { code: "tenant_activation_blocked", message: "Activation is controlled by the provisioning saga after independent readiness approval." }, blockers: blockers.length ? blockers : ["independent_activation_approval"] }); return true;
+    }
+  } catch (error) { if (error?.code === "platform_role_forbidden") sendJson(res, 403, { error: { code: error.code, message: error.message } }); else sendSignupFailure(res, error); return true; }
+  sendJson(res, 404, { error: { code: "not_found", message: "Platform route not found." } }); return true;
+}
+
 function rejectIfRestricted(res, session, path) {
-  if (!session?.restricted || RESTRICTED_SESSION_ALLOWED_PATHS.has(path)) {
+  if (
+    !session?.restricted ||
+    RESTRICTED_SESSION_ALLOWED_PATHS.has(path) ||
+    (session.restricted === "bootstrap" && bootstrapSessionPathAllowed(path))
+  ) {
     return false;
   }
   sendJson(res, 403, {
@@ -7442,7 +7802,9 @@ function rejectIfRestricted(res, session, path) {
       message:
         session.restricted === "mfa_setup"
           ? "MFA enrollment is required before this session can be used."
-          : "A password change is required before this session can be used.",
+          : session.restricted === "bootstrap"
+            ? "This bootstrap session is restricted until tenant activation."
+            : "A password change is required before this session can be used.",
       reason: session.restricted
     }
   });
@@ -7707,13 +8069,19 @@ async function routeAuth(req, res, { dataDir, method, path }) {
     const tenantId = body.tenantId;
     const tenant = state.controlPlane.tenants?.[tenantId];
     const tenantData = state.tenants?.[tenantId];
-    if (!tenant || tenant.status !== "active" || !tenantData) {
+    if (!tenant || !["active", "provisioning"].includes(tenant.status) || !tenantData) {
       await failLogin();
       sendJson(res, 401, { error: { code: "invalid_credentials", message: "Invalid tenant, email, or password." } });
       return;
     }
     const authenticated = authenticateTenantUser(tenantData, body, now);
     if (!authenticated) {
+      await failLogin();
+      sendJson(res, 401, { error: { code: "invalid_credentials", message: "Invalid tenant, email, or password." } });
+      return;
+    }
+    const restricted = sessionRestriction(authenticated.user, tenant.status);
+    if (tenant.status === "provisioning" && !restricted) {
       await failLogin();
       sendJson(res, 401, { error: { code: "invalid_credentials", message: "Invalid tenant, email, or password." } });
       return;
@@ -7730,7 +8098,7 @@ async function routeAuth(req, res, { dataDir, method, path }) {
       email: authenticated.user.email,
       displayName: authenticated.user.displayName,
       roles: authenticated.user.adminRoles,
-      restricted: sessionRestriction(authenticated.user)
+      restricted
     }, now);
     const nextTenantData = {
       ...tenantData,
@@ -8167,6 +8535,9 @@ async function routeAuth(req, res, { dataDir, method, path }) {
 }
 
 async function routeTenantAdmin(req, res, { dataDir, method, path, tenant, authContext, store, stateRef }) {
+  if (await routeSaasIdentityGovernance(req, res, { method, path, tenant, authContext, store, stateRef, readJson })) {
+    return;
+  }
   if (!hasTenantAdminRole(authContext)) {
     sendJson(res, 403, {
       error: {
@@ -8608,7 +8979,14 @@ async function routeTenantAdmin(req, res, { dataDir, method, path, tenant, authC
   sendJson(res, 404, { error: { code: "not_found", message: "Admin route not found." } });
 }
 
-async function routePlatform(req, res, { dataDir, platformAdminKey, method, path, observability }) {
+async function routePlatform(req, res, {
+  dataDir,
+  platformAdminKey,
+  method,
+  path,
+  observability,
+  allowDirectTenantProvisioning
+}) {
   const platformAuth = await platformAuthFromRequest(req, dataDir, platformAdminKey);
   if (!platformAuth.authContext && !platformAdminKey) {
     sendJson(res, 403, {
@@ -8632,6 +9010,8 @@ async function routePlatform(req, res, { dataDir, platformAdminKey, method, path
     return;
   }
   const authContext = platformAuth.authContext;
+
+  if (await routePlatformOrganisationSignup(req, res, { dataDir, method, path, authContext })) return;
 
   if (await routeEnterprisePlatformControls({ method, path, req, res, dataDir, authContext, readJson, sendJson, hasPlatformRole, authActor, loadWholeState, saveWholeState, appendPlatformEvent })) return;
 
@@ -9821,6 +10201,15 @@ async function routePlatform(req, res, { dataDir, platformAdminKey, method, path
   }
 
   if (method === "POST" && path === "/platform/tenants") {
+    if (!allowDirectTenantProvisioning) {
+      sendJson(res, 409, {
+        error: {
+          code: "verified_organisation_admission_required",
+          message: "Direct tenant creation is disabled. Complete verified organisation admission and provisioning instead."
+        }
+      });
+      return;
+    }
     if (!hasPlatformRole(authContext, ["platform_admin", "tenant_provisioner"])) {
       sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } });
       return;
@@ -9925,6 +10314,16 @@ async function routePlatform(req, res, { dataDir, platformAdminKey, method, path
     if (existing.status === "offboarded") {
       sendJson(res, 409, {
         error: { code: "tenant_offboarded", message: "An offboarded tenant cannot change status; it must be re-onboarded." }
+      });
+      return;
+    }
+    if (body.status === "active" && existing.organisationSignupId) {
+      sendJson(res, 409, {
+        error: {
+          code: "tenant_activation_blocked",
+          message: "A signup-provisioned tenant may be activated only by the provisioning saga after role coverage, UAT and handover gates pass."
+        },
+        blockers: ["provisioning", "roleCoverage", "uat", "handover"].filter((gate) => !existing.activationGates?.[gate])
       });
       return;
     }

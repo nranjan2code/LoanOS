@@ -23,7 +23,7 @@ The current implementation is intentionally small:
 - Internal staff workspace in `apps/dashboard/`.
 - Borrower customer portal in `apps/customer/`: a responsive, white-labelled journey home with prioritised next actions, visual application milestones, repayment schedules, a document centre, guided media, grievance tracking, and DPDP access/correction/erasure controls.
 - Shared design system tokens in `apps/shared/`.
-- Automated tests in `tests/`: 474 tracked file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
+- Automated tests in `tests/`: 502 tracked file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
 
 Run it:
 
@@ -88,6 +88,10 @@ npm run dev:api
 | `packages/core/src/product-template-catalogue.js` | Exact 21-template built-in catalogue plus versioned platform and tenant-derived extensions, full prerequisite manifests, dependency plans and additive activation. |
 | `packages/core/src/tenant-provisioning-saga.js` | Dependency-ordered tenant/add-product provisioning with revision checkpoints, leased fencing, retries, irreversible approvals, reverse compensation, reconciliation and evidence-bound handover. |
 | `packages/core/src/saas-deployment-blueprints.js` | Approved shared, dedicated-data-plane, dedicated-environment and customer-managed deployment blueprints with responsibility matrices, 17-component plans, rollback metadata and evidence readiness. |
+| `packages/core/src/organisation-signup.js` | Non-active organisation admission application with hashed contact challenges, legal/tax/RE evidence, domain and representative proof, abuse/EDD decisions, appeal/reverification, single-use MFA owner activation and provisioning handoff. |
+| `packages/core/src/saas-identity-governance.js` | Canonical 46-role catalogue, tenant/product scopes, hard SoD, minimum launch staffing, expiring bootstrap authority, maker-checker grants/revocations, effective-admin protection, ownership transfer and emergency access. |
+| `apps/api/src/server.js` organisation-admission routes | Persistent public application/contact/identity/proof/legal flow; session-bound platform maker/checker admission; provisioning-only tenant reservation; single-use owner invitation and TOTP acceptance; production mock-delivery denial and activation-bypass guards. |
+| `apps/api/src/routes/saas-identity-governance.js` | Persistent same-tenant human-session API for verified-principal binding, bootstrap owner/checker issuance, canonical role catalogue, maker-checker grants/revocations, launch coverage, bootstrap reduction, ownership transfer and emergency access. It recomputes the role-coverage activation gate and rejects service credentials for human RBAC mutations. |
 | `apps/api/src/provider-callback-dispatcher.js` | Bounded executable callback worker with tenant lease claims, exact-body HMAC delivery, HTTPS/timeout/Retry-After handling, response classification, per-provider circuit breaker and queue/run health. Scheduler/target/KMS resolvers remain deployment-owned. |
 | `packages/core/src/provider-governance.js` | Fifteen-family provider certification registry: production/India/time/evidence scope, four-eyes approval, suspension, expiry assessment, and live-readiness authority. |
 | `packages/core/src/data-governance.js` | Verified audit anchoring, source-to-event completeness reconciliation, immutable evidence custody/legal hold/deletion proof, field lineage, and declarative data-quality assessment/certification. |
@@ -185,12 +189,24 @@ npm run dev:api
 | `tests/implementation-governance.test.js` | Configuration/mapping lineage, exact-paise migration/balance failures, parallel/UAT/training readiness, rollback/hypercare gates, and tenant API persistence. |
 | `tests/institutional-operations.test.js` | RE hierarchy/programme lineage, applicability obligations, configured transitions, exact-paise approval rules, workforce/bulk controls, exception taxonomy, and tenant API persistence. |
 | `tests/customer-channel-operations.test.js` | Partner/commission authority, programme/product/PIN rejection, lead lifecycle, party/merge/preferences, succession authority/legal gates plus repayment/settlement/NOC/servicing-transfer/mandate execution, exact related exposure, API persistence, customer-360, and partner/PWA delivery. |
+| `tests/organisation-signup.test.js`, `tests/organisation-signup-api.test.js` | Hashed contact verification, legal/RE/representative evidence, abuse/EDD, four-eyes admission, rejection/appeal/reverification, quarantined tenant creation, single-use MFA owner, provisioning-only sessions, second-admin invitation/password/MFA/checker binding, replay controls and activation-bypass rejection. |
+| `tests/saas-identity-governance.test.js`, `tests/saas-identity-governance-api.test.js` | Exact canonical roles, hard SoD, verified principal binding, session-bound maker-checker grants/revocations, minimum staffing, bootstrap reduction, last-effective-admin protection, ownership transfer, emergency access and persistent role-coverage gating. |
 
 ## Implemented API Endpoints
 
 | Endpoint | Purpose |
 | --- | --- |
 | `GET /health` | Service and bounded runtime SLI health. Open route, no tenant context. |
+| `POST /organisation-signups`, `POST /organisation-signups/:id/contacts/:channel/verification` | Starts a non-active organisation application, returns a one-time case access secret and verifies hashed email/mobile possession without creating a tenant. The opaque case ID alone cannot mutate the case. Development/test delivery is explicitly mock; production fails closed until a certified provider is configured. |
+| `POST /organisation-signups/:id/identity`, `/proofs`, `/legal-acceptances` | Persists legal/tax/RE evidence, corporate-domain and authorised-representative proof, and versioned contractual/privacy acceptance. |
+| `POST /platform/organisation-signups/:id/admission-proposal`, `/admission` | Uses two distinct authenticated platform users for admission proposal and approval; actor identity comes from the sessions, not request fields. |
+| `POST /platform/organisation-signups/:id/tenant`, `/owner-invitation`, `/provisioning`, `/activation` | Reserves only a provisioning tenant without API key, issues the single-use owner invitation, requests provisioning, and exposes fail-closed activation blockers. |
+| `POST /organisation-signups/:id/owner/mfa-setup`, `/owner/acceptance` | Lets the verified first representative choose their password and prove TOTP enrollment before receiving expiring bootstrap-owner authority. |
+| `GET /admin/identity-governance/roles`, `/launch-coverage` | Projects the exact 46-role catalogue, SoD/minimum-coverage policy and current same-tenant launch coverage. |
+| `POST /admin/identity-governance/principals/:id/sync` | Binds an existing active, MFA-enrolled tenant login to a verified canonical principal and, where authorised, temporary bootstrap owner/checker authority. |
+| `POST /admin/identity-governance/role-grants/proposals`, `/role-grants/:id/approval`, `/role-revocations/proposals`, `/role-revocations/:id/approval` | Persists session-bound, same-tenant maker-checker role changes and recomputes the activation role-coverage gate. |
+| `POST /admin/identity-governance/bootstrap-transition/proposal`, `/bootstrap-transition/:id/approval` | Reduces temporary bootstrap authority only after independently approved minimum launch coverage. |
+| `POST /admin/identity-governance/ownership-transfers/*`, `/emergency-access/*` | Governs accountable ownership transfer and time-bounded, independently approved emergency access. |
 | `GET /risk/controls` | Role-gated tenant projection of screening/CDD/TM, fraud, portfolio/stress, RCSA, model-report and risk-pack records. |
 | `GET /implementation/controls` | Role-gated tenant projection of implementation projects through hypercare reviews. |
 | `GET /institution/operations` | Role-gated projection of institutional hierarchy/programmes, applicability/obligations, workflow/approval, workforce/bulk, calendar and exception records. |
@@ -299,7 +315,7 @@ npm run dev:api
 | `GET /platform/onboarding-options` | Lists supported tenant-onboarding modules, flows, launch modes, and isolation tiers. |
 | `GET /platform/encryption/rotations` | Lists credential-safe, audit-derived re-encryption records for security and audit review. |
 | `POST /platform/encryption/rekey` | Governed all-tenant re-encryption under the provider's active key version; requires available decrypt-only source versions, change ticket, reason, and platform security authority. |
-| `POST /platform/tenants` | Onboards a tenant, optionally creating the first owner user, regulated entity profile, initial product policies, enabled module/flow blueprint, readiness checklist, and one-time api key; requires platform tenant-provisioning authority. |
+| `POST /platform/tenants` | Explicit development/test fixture that can construct an active tenant and one-time API key for existing suites. It is disabled by default in production, where callers must use verified organisation admission and provisioning. |
 | `GET /platform/tenants` | Lists tenants (no secrets); requires platform authority. |
 | `GET /platform/tenants/:id` | Reads one tenant record; requires platform authority. |
 | `GET /platform/tenants/:id/onboarding` | Reads the tenant onboarding blueprint, readiness, seeded regulated entities, and seeded product policies. |
@@ -616,11 +632,11 @@ npm run dev:api
 | --- | --- |
 | Tenant isolation | State is partitioned per tenant; each data-plane request receives only its own tenant's partition, so a handler has no code path to another tenant's records. |
 | Tenant authentication | Data-plane routes require either a tenant user session cookie or a valid `x-api-key`/bearer token mapping to an active tenant; missing or invalid tenant context returns 401. Only health and static reference routes are open. |
-| Tenant users and sessions | `POST /auth/login` authenticates tenant users with PBKDF2-hashed passwords, issues HTTP-only session cookies, and stamps session-backed events as `tenant_user` in the audit chain. |
+| Tenant users and sessions | `POST /auth/login` authenticates active-tenant users with PBKDF2-hashed passwords. During provisioning it issues only purpose-restricted MFA/password/bootstrap sessions; those sessions can reach the resolution action and governed bootstrap administration but not the general tenant/data plane. |
 | Login lockout | Failed logins are throttled two ways: per-account (5 attempts / 15 min, keyed by scope+email) and per-source-IP (20 attempts / 15 min) — the IP throttle catches both credential stuffing across many accounts from one source and the fact that knowing someone's email alone is enough to trigger the per-account lock. |
 | Request body hardening | Every request body is buffered with a 5MB cap and a 15s deadline before the state lock is acquired, so a slow or oversized client can't hold every tenant's requests hostage; oversized/slow bodies return 413 without tearing down the connection mid-write. |
-| Tenant administration | Tenant admins manage users, linked staff actors, access reviews, and service-key rotation through `/admin/*`; tenant service keys remain valid for integrations and bootstrap administration. |
-| Tenant provisioning and onboarding | The platform control plane onboards tenants behind an admin key or platform admin session, optionally creates the first tenant owner, seeds the regulated entity and first product policies through the same compliance validators as data-plane APIs, captures enabled modules/flows, computes readiness, and returns a one-time api key stored only as a SHA-256 hash. |
+| Tenant administration | Active-tenant administrators manage users, linked staff actors, access reviews, and service-key rotation through `/admin/*`. Canonical identity-governance mutations require a same-tenant human session; service credentials cannot become role makers/checkers. |
+| Tenant provisioning and onboarding | The greenfield production path requires verified organisation admission, reserves a `provisioning` tenant without an API key, activates a single-use MFA first owner, binds an independent bootstrap checker, computes canonical role coverage and keeps public branding/data-plane routes closed. Direct active-tenant minting remains available only when the server explicitly enables the development/test fixture path; it defaults off in production. |
 | Platform administration | Platform users can log in with sessions, list/provision tenants, administer platform users, manage sub-processors, and mint/revoke break-glass grants according to platform roles. |
 | Audit spine | Every save seals the tenant's events into an append-only SHA-256 hash chain with a tenant-bound genesis; `verifyAuditChain` detects any edit, drop, reorder, or genesis swap. |
 | Uniform audit provenance | Every event is stamped with an `actor`/`actorType`/`dataClass` envelope before sealing (tenant-attributed normally, platform-staff under break-glass), hashed into the chain. |
@@ -759,11 +775,12 @@ Current tests prove:
 - Data-plane routes reject missing or invalid tenant context with 401, while health and compliance-controls stay open.
 - Sealing events produces a verifiable hash chain; editing, dropping, or reordering an event breaks verification, a chain does not verify under another tenant's genesis, and re-sealing is idempotent.
 - The API seals origination events into an audit chain, reports chain validity, exports an integrity-attested (and filterable) evidence pack, and keeps the audit spine tenant-scoped.
-- The platform admin can mint a tenant, receives a one-time api key, and that key immediately authenticates data-plane calls; duplicate tenant ids are rejected.
-- The platform onboarding flow can create a tenant owner, seed a regulated entity and product policy, persist enabled modules/flows, compute readiness, and expose onboarding readback.
+- The explicit development/test fixture path can mint a tenant and one-time API key; production-mode configuration rejects this path and requires verified organisation admission.
+- The greenfield admission flow verifies contact, organisation, licence, domain and representative evidence, requires two platform actors, creates only a quarantined tenant, and blocks generic status activation.
+- The verified first owner can log in only to the bootstrap control plane, bind canonical ownership and invite a second administrator. That user chooses their password, completes mandatory MFA and can become the independent bootstrap checker; neither session can use the general tenant/data plane before activation.
 - Two provisioned tenants are isolated: tenant B sees none of tenant A's records across resource types, by-id reads return 404, a re-used id writes only into B's own partition, and tenant A's data is unchanged.
 - Tenant users can log in with session cookies, create/suspend users, create and complete access reviews, rotate the tenant service key, and leave `tenant_user` audit evidence.
-- Platform users can log in with session cookies and provision a tenant with an initial owner user who can immediately log in to that tenant.
+- Platform users can log in with session cookies; admission proposal and approval derive distinct actors from those sessions rather than trusting request-body actor fields.
 - Valid India-only loan application passes preflight.
 - Non-India borrower/currency/storage are blocked.
 - LSP/pass-through fund flow is blocked.

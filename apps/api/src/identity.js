@@ -1,5 +1,5 @@
 import { createHash, createHmac, pbkdf2Sync, randomBytes, timingSafeEqual } from "node:crypto";
-import { KNOWN_STAFF_ROLES } from "../../../packages/core/src/index.js";
+import { CANONICAL_ROLE_CATALOGUE, KNOWN_STAFF_ROLES } from "../../../packages/core/src/index.js";
 
 const PASSWORD_ITERATIONS = 120000;
 const PASSWORD_KEYLEN = 32;
@@ -14,8 +14,15 @@ const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 export const TENANT_USER_STATUSES = new Set(["active", "suspended", "inactive"]);
 export const TENANT_ADMIN_ROLES = new Set(["tenant_admin", "user_admin", "security_admin", "auditor", "operator"]);
+const EFFECTIVE_TENANT_ADMIN_ROLES = new Set(["tenant_admin", "user_admin", "security_admin"]);
 export const PLATFORM_USER_STATUSES = new Set(["active", "suspended", "inactive"]);
 export const PLATFORM_ROLES = new Set(["platform_admin", "tenant_provisioner", "security_admin", "auditor"]);
+const TENANT_ASSIGNABLE_ROLE_IDS = new Set([
+  ...KNOWN_STAFF_ROLES,
+  ...Object.values(CANONICAL_ROLE_CATALOGUE)
+    .filter((role) => role.assignable && role.domain !== "platform")
+    .map((role) => role.roleId)
+]);
 
 export function normalizeEmail(value) {
   return String(value ?? "").trim().toLowerCase();
@@ -360,7 +367,8 @@ export function createSessionRecord(input, now = new Date()) {
 
 // Resolves everything about a session that's determinable from control-plane
 // data alone: the session record itself, and — for a tenant_user session —
-// the tenant it belongs to (validated active). Deliberately does NOT
+// the tenant it belongs to (validated active, except for an explicitly
+// restricted bootstrap session on a provisioning tenant). Deliberately does NOT
 // validate the tenant_user's own login record, since that lives in
 // tenant_data, not the control plane; see resolveSessionUser below, split
 // out specifically so a caller holding only a control-plane snapshot (no
@@ -376,7 +384,10 @@ export function resolveSessionRecord(state, token, now = new Date()) {
   if (!session) return null;
   if (session.principalType === "tenant_user") {
     const tenant = state.controlPlane.tenants?.[session.tenantId];
-    if (!tenant || tenant.status !== "active") {
+    const bootstrapProvisioningSession =
+      tenant?.status === "provisioning" &&
+      ["bootstrap", "mfa_setup", "password_change"].includes(session.restricted);
+    if (!tenant || (tenant.status !== "active" && !bootstrapProvisioningSession)) {
       return null;
     }
     return { session, tenant };
@@ -560,12 +571,12 @@ export function hasPlatformRole(authContext, roles = ["platform_admin"]) {
 export function isLastActiveTenantAdmin(users = {}, userId) {
   const target = users[userId];
   if (!target || target.status !== "active") return false;
-  if (!(target.adminRoles ?? []).some((role) => TENANT_ADMIN_ROLES.has(role))) return false;
+  if (!(target.adminRoles ?? []).some((role) => EFFECTIVE_TENANT_ADMIN_ROLES.has(role))) return false;
   const otherActiveAdmins = Object.values(users).filter(
     (user) =>
       user.userId !== userId &&
       user.status === "active" &&
-      (user.adminRoles ?? []).some((role) => TENANT_ADMIN_ROLES.has(role))
+      (user.adminRoles ?? []).some((role) => EFFECTIVE_TENANT_ADMIN_ROLES.has(role))
   );
   return otherActiveAdmins.length === 0;
 }
@@ -736,6 +747,16 @@ function normalizeTenantUser(input = {}, existing = {}, now = new Date()) {
     authenticationSource: input.authenticationSource ?? existing.authenticationSource ?? "local",
     federationPolicyId: input.federationPolicyId ?? existing.federationPolicyId ?? null,
     federationExternalId: input.federationExternalId ?? existing.federationExternalId ?? null,
+    // Temporary authority exists only during a verified organisation's
+    // provisioning phase. Persist it explicitly through store
+    // normalisation; silently dropping it would strand the first owner on
+    // the next request, while accepting arbitrary values would create an
+    // undeclared privilege path.
+    bootstrapAuthority: ["bootstrap_owner", "bootstrap_checker"].includes(input.bootstrapAuthority)
+      ? input.bootstrapAuthority
+      : ["bootstrap_owner", "bootstrap_checker"].includes(existing.bootstrapAuthority)
+        ? existing.bootstrapAuthority
+        : null,
     passwordHash: input.password ? hashPassword(input.password) : input.passwordHash ?? existing.passwordHash ?? null,
     // An admin who directly sets/resets a password knows that credential, so
     // the account must rotate it at next login; self-service password
@@ -802,7 +823,7 @@ function validateTenantUser(user, { isCreate, passwordProvided, rawPassword, all
     }
   }
   for (const role of user.roles ?? []) {
-    if (!KNOWN_STAFF_ROLES.has(role)) {
+    if (!TENANT_ASSIGNABLE_ROLE_IDS.has(role)) {
       findings.push({ code: "user_staff_role_invalid", message: `Unknown staff role: ${role}.` });
     }
   }
@@ -846,8 +867,11 @@ function findUserByEmail(users = {}, email) {
 }
 
 function normalizeRoles(value, allowed, defaults) {
-  const source = Array.isArray(value) && value.length > 0 ? value : defaults;
-  return [...new Set(source.filter((role) => allowed.has(role)))];
+  const source = Array.isArray(value) ? value : defaults;
+  // Preserve supplied values for the validator. Silently filtering a typo can
+  // turn a requested privileged role into no role (or a default role) while
+  // reporting success, which is unsafe for a banking administration plane.
+  return [...new Set(source.filter((role) => typeof role === "string" && role.trim()).map((role) => role.trim()))];
 }
 
 function normalizeStringList(value) {

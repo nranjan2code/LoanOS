@@ -1,67 +1,67 @@
 {
-  "generated": "2026-07-14T21:05:59.664Z",
+  "generated": "2026-07-14T21:45:27.370Z",
   "git": {
     "branch": "main",
-    "count": 181,
+    "count": 183,
     "commits": [
+      {
+        "hash": "f0e72f7",
+        "subject": "docs(ai): define governed digital-worker architecture",
+        "when": "21 minutes ago"
+      },
+      {
+        "hash": "876775d",
+        "subject": "feat(platform): govern tenant product provisioning",
+        "when": "38 minutes ago"
+      },
       {
         "hash": "adfb90c",
         "subject": "feat(platform): add production execution foundations",
-        "when": "26 minutes ago"
+        "when": "65 minutes ago"
       },
       {
         "hash": "5d36a8c",
         "subject": "feat(governance): complete capability evidence trace",
-        "when": "42 minutes ago"
+        "when": "82 minutes ago"
       },
       {
         "hash": "647c86c",
         "subject": "fix(dashboard): make capability metrics auditable",
-        "when": "48 minutes ago"
+        "when": "87 minutes ago"
       },
       {
         "hash": "ce1aacb",
         "subject": "fix(web): serve product journeys publicly",
-        "when": "49 minutes ago"
+        "when": "89 minutes ago"
       },
       {
         "hash": "0848776",
         "subject": "feat(integrations): complete deployment execution ports",
-        "when": "57 minutes ago"
+        "when": "2 hours ago"
       },
       {
         "hash": "5f992d0",
         "subject": "feat(integrations): complete adapter execution baseline",
-        "when": "62 minutes ago"
+        "when": "2 hours ago"
       },
       {
         "hash": "3037e82",
         "subject": "chore: sync and update workspace files",
-        "when": "69 minutes ago"
+        "when": "2 hours ago"
       },
       {
         "hash": "81f7941",
         "subject": "docs(dashboard): refresh integration wave metadata",
-        "when": "70 minutes ago"
+        "when": "2 hours ago"
       },
       {
         "hash": "73efaa1",
         "subject": "feat(integrations): persist delivery and file conformance",
-        "when": "71 minutes ago"
+        "when": "2 hours ago"
       },
       {
         "hash": "9603764",
         "subject": "feat(integrations): add adverse provider simulation",
-        "when": "78 minutes ago"
-      },
-      {
-        "hash": "35c274b",
-        "subject": "docs(integrations): map APIs by platform module",
-        "when": "2 hours ago"
-      },
-      {
-        "hash": "9faac39",
-        "subject": "docs(integrations): add vendor procurement catalogue",
         "when": "2 hours ago"
       }
     ]
@@ -14050,10 +14050,10 @@
     }
   ],
   "tests": {
-    "pass": 474,
+    "pass": 502,
     "fail": 0,
     "skipped": 5,
-    "total": 479,
+    "total": 507,
     "ran": true,
     "source": "live"
   }

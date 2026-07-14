@@ -287,6 +287,14 @@ export function createEmptyTenantData() {
     marketplaceOffers: {},
     users: {},
     accessReviews: {},
+    saasPrincipals: {},
+    saasRoleRequests: {},
+    saasRoleGrants: {},
+    tenantOwnership: {},
+    bootstrapTransitionRequests: {},
+    ownershipTransferRequests: {},
+    emergencyAccessRequests: {},
+    emergencyAccessGrants: {},
     events: []
   };
 }
@@ -493,6 +501,14 @@ function normalizeTenantData(data) {
     marketplaceOffers: data?.marketplaceOffers ?? {},
     users: normalizeTenantUsers(data?.users),
     accessReviews: normalizeAccessReviews(data?.accessReviews),
+    saasPrincipals: data?.saasPrincipals ?? {},
+    saasRoleRequests: data?.saasRoleRequests ?? {},
+    saasRoleGrants: data?.saasRoleGrants ?? {},
+    tenantOwnership: data?.tenantOwnership ?? {},
+    bootstrapTransitionRequests: data?.bootstrapTransitionRequests ?? {},
+    ownershipTransferRequests: data?.ownershipTransferRequests ?? {},
+    emergencyAccessRequests: data?.emergencyAccessRequests ?? {},
+    emergencyAccessGrants: data?.emergencyAccessGrants ?? {},
     events: Array.isArray(data?.events) ? data.events : []
   };
 }
@@ -532,6 +548,8 @@ export function normalizeState(state) {
     version: STATE_VERSION,
     controlPlane: {
       tenants: state?.controlPlane?.tenants ?? {},
+      organisationSignups: state?.controlPlane?.organisationSignups ?? {},
+      organisationSignupRateLimits: state?.controlPlane?.organisationSignupRateLimits ?? {},
       subProcessors: state?.controlPlane?.subProcessors ?? {},
       breakGlassGrants: state?.controlPlane?.breakGlassGrants ?? {},
       platformUsers: normalizePlatformUsers(state?.controlPlane?.platformUsers),
@@ -549,6 +567,8 @@ export function createEmptyState() {
     version: STATE_VERSION,
     controlPlane: {
       tenants: {},
+      organisationSignups: {},
+      organisationSignupRateLimits: {},
       subProcessors: {},
       breakGlassGrants: {},
       platformUsers: {},
@@ -882,6 +902,14 @@ export function registerTenant(state, tenant, now = new Date()) {
     isSandbox: tenant.isSandbox ?? existing?.isSandbox ?? false,
     parentTenantId: tenant.parentTenantId ?? existing?.parentTenantId ?? null,
     sandboxName: tenant.sandboxName ?? existing?.sandboxName ?? null,
+    organisationSignupId: tenant.organisationSignupId ?? existing?.organisationSignupId ?? null,
+    deploymentStage: tenant.deploymentStage ?? existing?.deploymentStage ?? null,
+    activationGates: tenant.activationGates ?? existing?.activationGates ?? {
+      provisioning: null,
+      roleCoverage: null,
+      uat: null,
+      handover: null
+    },
     onboarding: normalizeTenantOnboarding(tenant.onboarding ?? existing?.onboarding ?? {}, existing?.onboarding, now),
     createdAt: existing?.createdAt ?? now.toISOString(),
     updatedAt: now.toISOString()
@@ -931,6 +959,9 @@ export function resetSandbox(state, sandboxId, preserveConfig = false) {
       coLendingArrangements: tenantData.coLendingArrangements ?? {},
       users: tenantData.users ?? {},
       accessReviews: tenantData.accessReviews ?? {},
+      saasPrincipals: tenantData.saasPrincipals ?? {},
+      saasRoleGrants: tenantData.saasRoleGrants ?? {},
+      tenantOwnership: tenantData.tenantOwnership ?? {},
     };
   } else {
     newTenantData = createEmptyTenantData();
