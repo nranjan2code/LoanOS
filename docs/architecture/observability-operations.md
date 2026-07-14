@@ -68,6 +68,7 @@ Tenant health is computed only after tenant authentication and sandbox resolutio
 3. For provider degradation, stop permissive retries, validate the circuit reason and India-resident configuration, and use the owning provider/reconciliation workflow. Failed dependencies remain fail closed.
 4. For stuck work, open the referenced workflow, reconciliation, suspense, finance, or payment-rail record. Preserve maker-checker and finance-close blockers.
 5. Open or update the governed incident record when severity and policy require it; the existing CERT-In/RBI/DPDP notification clocks remain the regulatory system of record.
+6. For a security signal, use the platform SOC workflow to retain the approved detection rule, source checksum, triage SLA, investigation and evidence-chain references. This record does not replace the underlying SIEM/log vault.
 
 ## Production completion gaps
 
@@ -80,4 +81,4 @@ Before D4 Production, route these signals to an India-hosted durable telemetry s
 - synthetic probes, database/queue/resource saturation signals, capacity forecasts, and load/soak/resilience tests; and
 - reviewed on-call runbooks, service ownership, alert-quality tuning, and recovery exercises.
 
-Until those items are evidenced, capability catalogue entries OPS-006, OPS-007, and OPS-008 remain `Partial`.
+The first governed SOC record slice is described in [SIEM, SOC, and security investigation operations](security-operations.md). Until durable telemetry and operating effectiveness are evidenced, capability catalogue entries OPS-006, OPS-007, OPS-008, SEC-014 and SEC-016 remain `Partial`.

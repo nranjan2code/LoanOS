@@ -415,6 +415,22 @@ export {
 } from "./security-assurance.js";
 
 export {
+  ALERT_ACKNOWLEDGEMENT_MINUTES,
+  ALERT_DISPOSITIONS,
+  INVESTIGATION_STATUSES,
+  LOG_SOURCES,
+  SECURITY_SEVERITIES,
+  assessDetectionCoverage,
+  createDetectionRule,
+  createSecurityAlert,
+  createSecurityInvestigation,
+  preserveInvestigationEvidence,
+  projectSecurityOperations,
+  transitionSecurityInvestigation,
+  triageSecurityAlert
+} from "./security-operations.js";
+
+export {
   validateMarketplaceNeutrality,
   rankMarketplaceOffers
 } from "./offer-marketplace.js";
