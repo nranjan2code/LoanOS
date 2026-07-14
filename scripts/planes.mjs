@@ -25,7 +25,7 @@ export function parseRegister(md) {
   for (const line of lines) {
     const h = line.match(/^###\s+(\d+)\.\s+(.+)/);
     if (h) { cur = { n: Number(h[1]), name: h[2].trim(), plane: PLANE[Number(h[1])] || 'Other', features: [] }; categories.push(cur); continue; }
-    const m = line.match(/^\|\s*([A-Z]{3}-\d{3})\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|$/);
+    const m = line.match(/^\|\s*([A-Z]{2,3}-\d{3})\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|$/);
     if (m && cur) cur.features.push({ id: m[1], name: m[2], applicability: m[3], rawStatus: m[4] });
   }
   return categories;

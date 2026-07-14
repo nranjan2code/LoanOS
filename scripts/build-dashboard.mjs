@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 // Live build dashboard generator for LoanOS India.
-// Re-scans git, the full capability register (436 caps across 33 categories),
+// Re-scans git, the full capability register (453 caps across 33 categories),
 // backlog epics, and runs the test suite, then writes a self-contained
 // docs/dashboard.html. Run: node scripts/build-dashboard.mjs
 import { execSync } from 'node:child_process';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { PLANE, PLANE_ORDER } from './planes.mjs';
+import { PLANE_ORDER, normalizeStatus, parseRegister } from './planes.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const sh = (c) => execSync(c, { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
@@ -25,17 +25,6 @@ try {
 
 // --- capability register: 33 categories -> features (ID, name, applicability, status) ---
 const STATUSES = ['Implemented', 'Partial', 'Partial/Mock', 'Mock', 'Missing', 'Partner', 'External'];
-const normalize = (raw) => {
-  const s = raw.toLowerCase();
-  if (s.includes('mock') && s.includes('partial')) return 'Partial/Mock';
-  if (s.startsWith('mostly missing') || s === 'missing' || s.startsWith('missing')) return 'Missing';
-  if (s.startsWith('implemented')) return 'Implemented';
-  if (s.startsWith('partial')) return 'Partial';
-  if (s.startsWith('partner') || s.includes('/partner')) return 'Partner';
-  if (s.startsWith('external')) return 'External';
-  if (s.startsWith('mock')) return 'Mock';
-  return 'Partial';
-};
 // completion weight per status (Partner/External excluded from scored denominator)
 const WEIGHT = { Implemented: 1, 'Partial/Mock': 0.4, Partial: 0.4, Mock: 0.3, Missing: 0, Partner: null, External: null };
 
@@ -44,24 +33,18 @@ const tracePath = join(ROOT, 'docs/product/capability-trace.json');
 const trace = existsSync(tracePath) ? JSON.parse(readFileSync(tracePath, 'utf8')) : {};
 
 const cat = read('docs/product/complete-system-capability-catalog.md');
-const regStart = cat.indexOf('## Detailed Capability Register');
-const regEnd = cat.indexOf('## Product-Specific Capability Packs');
-const regLines = cat.slice(regStart, regEnd > 0 ? regEnd : undefined).split('\n');
-const categories = [];
-let cur = null;
-for (const line of regLines) {
-  const h = line.match(/^###\s+(\d+)\.\s+(.+)/);
-  if (h) { cur = { n: Number(h[1]), name: h[2].trim(), features: [] }; categories.push(cur); continue; }
-  const m = line.match(/^\|\s*([A-Z]{3}-\d{3})\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|$/);
-  if (m && cur) {
-    const tr = trace[m[1]] || {};
-    cur.features.push({
-      id: m[1], name: m[2], applicability: m[3], status: normalize(m[4]), raw: m[4],
+const categories = parseRegister(cat).map((category) => ({
+  ...category,
+  features: category.features.map((feature) => {
+    const tr = trace[feature.id] || {};
+    return {
+      id: feature.id, name: feature.name, applicability: feature.applicability,
+      status: normalizeStatus(feature.rawStatus), raw: feature.rawStatus,
       evidence: tr.evidence || [], owner: tr.owner || '', acceptance: tr.acceptance || '',
       dependencies: tr.dependencies || [], notes: tr.notes || '', lastReviewed: tr.lastReviewed || '',
-    });
-  }
-}
+    };
+  }),
+}));
 // per-category rollup + overall
 const rollup = (features) => {
   const counts = Object.fromEntries(STATUSES.map((s) => [s, 0]));
@@ -70,7 +53,7 @@ const rollup = (features) => {
   features.forEach((f) => { const w = WEIGHT[f.status]; if (w !== null) { num += w; den += 1; } });
   return { counts, total: features.length, pct: den ? Math.round((num / den) * 100) : 0 };
 };
-categories.forEach((c) => { Object.assign(c, rollup(c.features)); c.plane = PLANE[c.n] || 'Other'; });
+categories.forEach((c) => { Object.assign(c, rollup(c.features)); });
 const allFeatures = categories.flatMap((c) => c.features);
 const overall = rollup(allFeatures);
 // plane rollup

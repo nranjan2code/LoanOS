@@ -2,6 +2,22 @@
 
 This backlog turns the roadmap into implementation work. It is ordered for a compliance-first LoanOS build.
 
+## Large Delivery Bundle Sequence (2026-07-14)
+
+This rollup groups the detailed epics into the large execution bundles used for
+the current build. Update this table when a bundle closes; the detailed epic and
+capability rows remain the source of truth for individual features.
+
+| Bundle | Outcome | Status |
+| --- | --- | --- |
+| A | Exhaustive capability tracking: shared parser, trace/dashboard parity, and regression coverage for every catalogue family | Complete — all 453 capabilities across 33 categories, including 17 `UX-*` entries, are synchronized and test-pinned. |
+| B | One production-ready unsecured personal term-loan journey across acquisition, documents, underwriting, contracting, servicing, and operational UX | Next |
+| C | Live/certified CIC, CKYCRR, FIU, CERSAI, bureau, AA, bank-verification, eSign, V-CIP, payment, and communication integrations | Planned |
+| D | Audit integrity and data governance: external/WORM anchoring, event-completeness reconciliation, retention, evidence, lineage, and data-quality controls | Planned |
+| E | Enterprise security and scale: federation, SCIM, KMS/HSM, SIEM custody, HA/PITR, Postgres scale, event/API governance, and deployment automation | Planned |
+| F | Risk, AML, and fraud depth: ongoing CDD, transaction monitoring, fraud signals, portfolio analytics, limits, stress, RCSA, and recurring model monitoring | Planned |
+| G | Migration and go-live: mapping, conversion, balance validation, parallel run, UAT, training, readiness, cutover, and hypercare | Planned |
+
 ## Epic 1: Tenant and Regulated Entity Setup
 
 Status: first executable slice complete; LSP and DLA CIMS reporting first slices complete.

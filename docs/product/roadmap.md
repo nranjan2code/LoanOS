@@ -24,6 +24,9 @@ Sequencing guidance: **do WS-A + the P1s in WS-B/C first** (trust and correctnes
 actually runs), then WS-D (credit depth) and REV-42 (GST) to make a single real loan real, then breadth
 (WS-E/F/G) and architecture (WS-H). WS-I decisions gate how wide vs. deep the build goes.
 
+The current large-bundle execution order and completion status are maintained in
+the [build backlog's Large Delivery Bundle Sequence](build-backlog.md#large-delivery-bundle-sequence-2026-07-14).
+
 ## Cross-Cutting Workstream: SaaS Tenancy and Vendor Posture
 
 Status: S1–S9 first slice complete for every task (tenant partitioning, tenant-scoped service auth, tenant/platform human sessions, tenant user admin, access reviews, service-key rotation, isolation suite, hash-chained audit spine + evidence export, tenant portability export + evidenced offboarding, disclosed sub-processor register, 6-hour incident-notification workflow, audited platform-staff break-glass access, uniform audit provenance stamping, artifact-bound security assurance, governed SOC investigation records, and compliance-control assurance/audit evidence).

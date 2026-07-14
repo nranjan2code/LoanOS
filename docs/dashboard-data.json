@@ -1,21 +1,21 @@
 {
-  "generated": "2026-07-14T15:43:50.026Z",
+  "generated": "2026-07-14T15:49:41.258Z",
   "git": {
     "branch": "main",
-    "count": 146,
+    "count": 147,
     "commits": []
   },
   "overall": {
     "counts": {
-      "Implemented": 85,
-      "Partial": 190,
+      "Implemented": 87,
+      "Partial": 198,
       "Partial/Mock": 10,
       "Mock": 8,
-      "Missing": 134,
+      "Missing": 141,
       "Partner": 3,
       "External": 6
     },
-    "total": 436,
+    "total": 453,
     "pct": 39
   },
   "planes": [
@@ -387,8 +387,8 @@
         {
           "n": 32,
           "name": "Borrower, Staff, Branch, Partner, and Field Experiences",
-          "pct": 0,
-          "total": 0
+          "pct": 31,
+          "total": 17
         },
         {
           "n": 33,
@@ -398,22 +398,23 @@
         }
       ],
       "counts": {
-        "Implemented": 0,
-        "Partial": 2,
+        "Implemented": 2,
+        "Partial": 10,
         "Partial/Mock": 0,
         "Mock": 0,
-        "Missing": 8,
+        "Missing": 15,
         "Partner": 0,
         "External": 3
       },
-      "total": 13,
-      "pct": 8
+      "total": 30,
+      "pct": 22
     }
   ],
   "categories": [
     {
       "n": 1,
       "name": "Platform, Tenancy, and SaaS Control Plane",
+      "plane": "Platform & Tenancy",
       "features": [
         {
           "id": "PLT-001",
@@ -642,12 +643,12 @@
         "External": 0
       },
       "total": 15,
-      "pct": 53,
-      "plane": "Platform & Tenancy"
+      "pct": 53
     },
     {
       "n": 2,
       "name": "Regulated Entity, Programme, DLA, and Policy Governance",
+      "plane": "Compliance OS",
       "features": [
         {
           "id": "REG-001",
@@ -790,12 +791,12 @@
         "External": 0
       },
       "total": 10,
-      "pct": 36,
-      "plane": "Compliance OS"
+      "pct": 36
     },
     {
       "n": 3,
       "name": "Product, Pricing, and Policy Configuration",
+      "plane": "Compliance OS",
       "features": [
         {
           "id": "PRD-001",
@@ -1003,12 +1004,12 @@
         "External": 0
       },
       "total": 15,
-      "pct": 43,
-      "plane": "Compliance OS"
+      "pct": 43
     },
     {
       "n": 4,
       "name": "Acquisition Channels, Leads, and CRM",
+      "plane": "LOS",
       "features": [
         {
           "id": "CHN-001",
@@ -1151,12 +1152,12 @@
         "External": 0
       },
       "total": 10,
-      "pct": 8,
-      "plane": "LOS"
+      "pct": 8
     },
     {
       "n": 5,
       "name": "Customer, Parties, and Relationship Management",
+      "plane": "LOS",
       "features": [
         {
           "id": "CUS-001",
@@ -1325,12 +1326,12 @@
         "External": 0
       },
       "total": 12,
-      "pct": 25,
-      "plane": "LOS"
+      "pct": 25
     },
     {
       "n": 6,
       "name": "Consent, Privacy, and Data-Principal Rights",
+      "plane": "Compliance OS",
       "features": [
         {
           "id": "CON-001",
@@ -1541,12 +1542,12 @@
         "External": 1
       },
       "total": 14,
-      "pct": 65,
-      "plane": "Compliance OS"
+      "pct": 65
     },
     {
       "n": 7,
       "name": "KYC, CDD, AML, and Screening",
+      "plane": "LOS",
       "features": [
         {
           "id": "KYC-001",
@@ -1796,12 +1797,12 @@
         "External": 0
       },
       "total": 17,
-      "pct": 32,
-      "plane": "LOS"
+      "pct": 32
     },
     {
       "n": 8,
       "name": "Fraud, Identity, and Application Risk",
+      "plane": "LWS",
       "features": [
         {
           "id": "FRD-001",
@@ -1970,12 +1971,12 @@
         "External": 0
       },
       "total": 12,
-      "pct": 25,
-      "plane": "LWS"
+      "pct": 25
     },
     {
       "n": 9,
       "name": "Documents, OCR, and Verification",
+      "plane": "LOS",
       "features": [
         {
           "id": "DOC-001",
@@ -2157,12 +2158,12 @@
         "External": 0
       },
       "total": 13,
-      "pct": 22,
-      "plane": "LOS"
+      "pct": 22
     },
     {
       "n": 10,
       "name": "Credit Data, Underwriting, and Decisioning",
+      "plane": "LOS",
       "features": [
         {
           "id": "UWG-001",
@@ -2435,12 +2436,12 @@
         "External": 0
       },
       "total": 20,
-      "pct": 36,
-      "plane": "LOS"
+      "pct": 36
     },
     {
       "n": 11,
       "name": "Collateral, Valuation, Legal, and Security Perfection",
+      "plane": "LOS",
       "features": [
         {
           "id": "COL-001",
@@ -2609,12 +2610,12 @@
         "External": 0
       },
       "total": 12,
-      "pct": 13,
-      "plane": "LOS"
+      "pct": 13
     },
     {
       "n": 12,
       "name": "Offers, KFS, Sanction, and Contracting",
+      "plane": "LOS",
       "features": [
         {
           "id": "OFR-001",
@@ -2836,12 +2837,12 @@
         "External": 0
       },
       "total": 14,
-      "pct": 55,
-      "plane": "LOS"
+      "pct": 55
     },
     {
       "n": 13,
       "name": "Disbursement and Fund Flow",
+      "plane": "LOS",
       "features": [
         {
           "id": "DSB-001",
@@ -3023,12 +3024,12 @@
         "External": 0
       },
       "total": 13,
-      "pct": 40,
-      "plane": "LOS"
+      "pct": 40
     },
     {
       "n": 14,
       "name": "Loan Account, Ledger, and Accounting",
+      "plane": "LMS",
       "features": [
         {
           "id": "ACC-001",
@@ -3252,12 +3253,12 @@
         "External": 0
       },
       "total": 15,
-      "pct": 48,
-      "plane": "LMS"
+      "pct": 48
     },
     {
       "n": 15,
       "name": "Repayment Schedule, Interest, and Product Structures",
+      "plane": "LMS",
       "features": [
         {
           "id": "LMS-001",
@@ -3465,12 +3466,12 @@
         "External": 0
       },
       "total": 15,
-      "pct": 55,
-      "plane": "LMS"
+      "pct": 55
     },
     {
       "n": 16,
       "name": "Payments, Mandates, and Reconciliation",
+      "plane": "LMS",
       "features": [
         {
           "id": "PAY-001",
@@ -3678,12 +3679,12 @@
         "External": 0
       },
       "total": 15,
-      "pct": 49,
-      "plane": "LMS"
+      "pct": 49
     },
     {
       "n": 17,
       "name": "Customer and Account Servicing",
+      "plane": "LMS",
       "features": [
         {
           "id": "SRV-001",
@@ -3865,12 +3866,12 @@
         "External": 0
       },
       "total": 13,
-      "pct": 34,
-      "plane": "LMS"
+      "pct": 34
     },
     {
       "n": 18,
       "name": "Delinquency, Collections, and Field Operations",
+      "plane": "LMS",
       "features": [
         {
           "id": "CLL-001",
@@ -4078,12 +4079,12 @@
         "External": 0
       },
       "total": 15,
-      "pct": 47,
-      "plane": "LMS"
+      "pct": 47
     },
     {
       "n": 19,
       "name": "Legal Recovery, Repossession, and Enforcement",
+      "plane": "LMS",
       "features": [
         {
           "id": "REC-001",
@@ -4252,12 +4253,12 @@
         "External": 0
       },
       "total": 12,
-      "pct": 47,
-      "plane": "LMS"
+      "pct": 47
     },
     {
       "n": 20,
       "name": "Restructuring, Settlement, Write-off, and Closure",
+      "plane": "LMS",
       "features": [
         {
           "id": "CLS-001",
@@ -4439,12 +4440,12 @@
         "External": 0
       },
       "total": 13,
-      "pct": 54,
-      "plane": "LMS"
+      "pct": 54
     },
     {
       "n": 21,
       "name": "Co-lending, DLG, LSP, and Partner Economics",
+      "plane": "LWS",
       "features": [
         {
           "id": "PAR-001",
@@ -4626,12 +4627,12 @@
         "External": 0
       },
       "total": 13,
-      "pct": 51,
-      "plane": "LWS"
+      "pct": 51
     },
     {
       "n": 22,
       "name": "Workflow, Maker-Checker, and Operations",
+      "plane": "LWS",
       "features": [
         {
           "id": "LWS-001",
@@ -4826,12 +4827,12 @@
         "External": 0
       },
       "total": 14,
-      "pct": 40,
-      "plane": "LWS"
+      "pct": 40
     },
     {
       "n": 23,
       "name": "Grievance, Conduct, and Customer Protection",
+      "plane": "LWS",
       "features": [
         {
           "id": "GRV-001",
@@ -4987,12 +4988,12 @@
         "External": 0
       },
       "total": 11,
-      "pct": 42,
-      "plane": "LWS"
+      "pct": 42
     },
     {
       "n": 24,
       "name": "Regulatory and External Reporting",
+      "plane": "Compliance OS",
       "features": [
         {
           "id": "RPT-001",
@@ -5187,12 +5188,12 @@
         "External": 0
       },
       "total": 14,
-      "pct": 30,
-      "plane": "Compliance OS"
+      "pct": 30
     },
     {
       "n": 25,
       "name": "Finance, Tax, Treasury, and Profitability",
+      "plane": "Finance & Treasury",
       "features": [
         {
           "id": "FIN-001",
@@ -5361,12 +5362,12 @@
         "External": 0
       },
       "total": 12,
-      "pct": 40,
-      "plane": "Finance & Treasury"
+      "pct": 40
     },
     {
       "n": 26,
       "name": "Portfolio, Credit, Market, and Operational Risk",
+      "plane": "Risk & Portfolio",
       "features": [
         {
           "id": "RSK-001",
@@ -5522,12 +5523,12 @@
         "External": 0
       },
       "total": 11,
-      "pct": 7,
-      "plane": "Risk & Portfolio"
+      "pct": 7
     },
     {
       "n": 27,
       "name": "AI, Model Risk, and Decision Governance",
+      "plane": "AI & Model Governance",
       "features": [
         {
           "id": "AIG-001",
@@ -5756,12 +5757,12 @@
         "External": 0
       },
       "total": 15,
-      "pct": 61,
-      "plane": "AI & Model Governance"
+      "pct": 61
     },
     {
       "n": 28,
       "name": "Audit, Compliance Assurance, and Evidence",
+      "plane": "Compliance OS",
       "features": [
         {
           "id": "AUD-001",
@@ -5930,12 +5931,12 @@
         "External": 0
       },
       "total": 12,
-      "pct": 48,
-      "plane": "Compliance OS"
+      "pct": 48
     },
     {
       "n": 29,
       "name": "Identity, Security, and Cyber Controls",
+      "plane": "Security & IAM",
       "features": [
         {
           "id": "SEC-001",
@@ -6169,12 +6170,12 @@
         "External": 2
       },
       "total": 17,
-      "pct": 43,
-      "plane": "Security & IAM"
+      "pct": 43
     },
     {
       "n": 30,
       "name": "Integrations, APIs, Events, and Data Platform",
+      "plane": "Data & Integration",
       "features": [
         {
           "id": "INT-001",
@@ -6369,12 +6370,12 @@
         "External": 0
       },
       "total": 14,
-      "pct": 21,
-      "plane": "Data & Integration"
+      "pct": 21
     },
     {
       "n": 31,
       "name": "Reliability, Observability, DR, and Service Operations",
+      "plane": "Reliability & Ops",
       "features": [
         {
           "id": "OPS-001",
@@ -6582,29 +6583,251 @@
         "External": 0
       },
       "total": 15,
-      "pct": 44,
-      "plane": "Reliability & Ops"
+      "pct": 44
     },
     {
       "n": 32,
       "name": "Borrower, Staff, Branch, Partner, and Field Experiences",
-      "features": [],
+      "plane": "Experience & Adoption",
+      "features": [
+        {
+          "id": "UX-001",
+          "name": "Public platform and trust/product information",
+          "applicability": "Optional",
+          "status": "Partial",
+          "raw": "Partial",
+          "evidence": [],
+          "owner": "",
+          "acceptance": "",
+          "dependencies": [],
+          "notes": "",
+          "lastReviewed": ""
+        },
+        {
+          "id": "UX-002",
+          "name": "RE-branded DLA/tenant landing surface",
+          "applicability": "Channel",
+          "status": "Partial",
+          "raw": "Partial",
+          "evidence": [],
+          "owner": "",
+          "acceptance": "",
+          "dependencies": [],
+          "notes": "",
+          "lastReviewed": ""
+        },
+        {
+          "id": "UX-003",
+          "name": "Borrower application and onboarding journey",
+          "applicability": "Channel",
+          "status": "Missing",
+          "raw": "Missing",
+          "evidence": [],
+          "owner": "",
+          "acceptance": "",
+          "dependencies": [],
+          "notes": "",
+          "lastReviewed": ""
+        },
+        {
+          "id": "UX-004",
+          "name": "Borrower portal for application status and next action",
+          "applicability": "Channel",
+          "status": "Implemented",
+          "raw": "Implemented",
+          "evidence": [],
+          "owner": "",
+          "acceptance": "",
+          "dependencies": [],
+          "notes": "",
+          "lastReviewed": ""
+        },
+        {
+          "id": "UX-005",
+          "name": "Borrower KFS, document, agreement, and signature journey",
+          "applicability": "Channel",
+          "status": "Partial",
+          "raw": "Partial",
+          "evidence": [],
+          "owner": "",
+          "acceptance": "",
+          "dependencies": [],
+          "notes": "",
+          "lastReviewed": ""
+        },
+        {
+          "id": "UX-006",
+          "name": "Borrower repayment, statement, payment, mandate, and receipt journey",
+          "applicability": "Channel",
+          "status": "Partial",
+          "raw": "Partial",
+          "evidence": [],
+          "owner": "",
+          "acceptance": "",
+          "dependencies": [],
+          "notes": "",
+          "lastReviewed": ""
+        },
+        {
+          "id": "UX-007",
+          "name": "Borrower complaint and privacy-rights journey",
+          "applicability": "Channel",
+          "status": "Implemented",
+          "raw": "Implemented",
+          "evidence": [],
+          "owner": "",
+          "acceptance": "",
+          "dependencies": [],
+          "notes": "",
+          "lastReviewed": ""
+        },
+        {
+          "id": "UX-008",
+          "name": "Underwriter case desktop with financial, bureau, policy, deviations, and note",
+          "applicability": "Core",
+          "status": "Partial",
+          "raw": "Partial",
+          "evidence": [],
+          "owner": "",
+          "acceptance": "",
+          "dependencies": [],
+          "notes": "",
+          "lastReviewed": ""
+        },
+        {
+          "id": "UX-009",
+          "name": "Operations/disbursement task workspace",
+          "applicability": "Core",
+          "status": "Partial",
+          "raw": "Partial",
+          "evidence": [],
+          "owner": "",
+          "acceptance": "",
+          "dependencies": [],
+          "notes": "",
+          "lastReviewed": ""
+        },
+        {
+          "id": "UX-010",
+          "name": "Servicing account desktop and service-request workspace",
+          "applicability": "Core",
+          "status": "Missing",
+          "raw": "Missing",
+          "evidence": [],
+          "owner": "",
+          "acceptance": "",
+          "dependencies": [],
+          "notes": "",
+          "lastReviewed": ""
+        },
+        {
+          "id": "UX-011",
+          "name": "Collections/telecalling desktop and field mobile app",
+          "applicability": "Channel",
+          "status": "Missing",
+          "raw": "Missing",
+          "evidence": [],
+          "owner": "",
+          "acceptance": "",
+          "dependencies": [],
+          "notes": "",
+          "lastReviewed": ""
+        },
+        {
+          "id": "UX-012",
+          "name": "Compliance, CCO, risk, finance, and audit dashboards",
+          "applicability": "Institution",
+          "status": "Missing",
+          "raw": "Missing",
+          "evidence": [],
+          "owner": "",
+          "acceptance": "",
+          "dependencies": [],
+          "notes": "",
+          "lastReviewed": ""
+        },
+        {
+          "id": "UX-013",
+          "name": "Platform/tenant administration",
+          "applicability": "Core",
+          "status": "Partial",
+          "raw": "Partial",
+          "evidence": [],
+          "owner": "",
+          "acceptance": "",
+          "dependencies": [],
+          "notes": "",
+          "lastReviewed": ""
+        },
+        {
+          "id": "UX-014",
+          "name": "Branch, DSA, BC, dealer, merchant, LSP, and partner portals",
+          "applicability": "Channel",
+          "status": "Missing",
+          "raw": "Missing",
+          "evidence": [],
+          "owner": "",
+          "acceptance": "",
+          "dependencies": [],
+          "notes": "",
+          "lastReviewed": ""
+        },
+        {
+          "id": "UX-015",
+          "name": "Multilingual Indian-language content and templates",
+          "applicability": "Core",
+          "status": "Missing",
+          "raw": "Missing",
+          "evidence": [],
+          "owner": "",
+          "acceptance": "",
+          "dependencies": [],
+          "notes": "",
+          "lastReviewed": ""
+        },
+        {
+          "id": "UX-016",
+          "name": "Accessibility testing, assisted journeys, and reduced-motion support",
+          "applicability": "Core",
+          "status": "Partial",
+          "raw": "Partial",
+          "evidence": [],
+          "owner": "",
+          "acceptance": "",
+          "dependencies": [],
+          "notes": "",
+          "lastReviewed": ""
+        },
+        {
+          "id": "UX-017",
+          "name": "Mobile/PWA/offline capability",
+          "applicability": "Channel",
+          "status": "Missing",
+          "raw": "Missing",
+          "evidence": [],
+          "owner": "",
+          "acceptance": "",
+          "dependencies": [],
+          "notes": "",
+          "lastReviewed": ""
+        }
+      ],
       "counts": {
-        "Implemented": 0,
-        "Partial": 0,
+        "Implemented": 2,
+        "Partial": 8,
         "Partial/Mock": 0,
         "Mock": 0,
-        "Missing": 0,
+        "Missing": 7,
         "Partner": 0,
         "External": 0
       },
-      "total": 0,
-      "pct": 0,
-      "plane": "Experience & Adoption"
+      "total": 17,
+      "pct": 31
     },
     {
       "n": 33,
       "name": "Implementation, Migration, and Customer Adoption",
+      "plane": "Experience & Adoption",
       "features": [
         {
           "id": "IMP-001",
@@ -6786,8 +7009,7 @@
         "External": 3
       },
       "total": 13,
-      "pct": 8,
-      "plane": "Experience & Adoption"
+      "pct": 8
     }
   ],
   "epics": [
@@ -6837,9 +7059,9 @@
     }
   ],
   "tests": {
-    "pass": 240,
+    "pass": 243,
     "fail": 0,
-    "total": 245,
+    "total": 248,
     "ran": true
   }
 }

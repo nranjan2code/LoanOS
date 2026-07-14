@@ -23,7 +23,7 @@ The current implementation is intentionally small:
 - Internal staff workspace in `apps/dashboard/`.
 - Borrower customer portal in `apps/customer/`: a responsive, white-labelled journey home with prioritised next actions, visual application milestones, repayment schedules, a document centre, guided media, grievance tracking, and DPDP access/correction/erasure controls.
 - Shared design system tokens in `apps/shared/`.
-- Automated tests in `tests/`: 182 file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
+- Automated tests in `tests/`: 243 file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
 
 Run it:
 
@@ -98,6 +98,9 @@ npm run dev:api
 | `apps/api/src/recovery.js` | Encrypted platform recovery-package format and fail-closed validator: domain-separated AES-256-GCM encryption, authenticated India-resident manifest, package/content checksums, state/audit-chain verification, RTO/RPO evaluation, and governed exercise evidence. |
 | `apps/api/src/resilience-probe.js` | Dependency-free bounded concurrent HTTP probe with per-request timeout, status/error counts, p50/p95/p99 latency, throughput, duration, and concurrency evidence. |
 | `scripts/run-resilience-probe.mjs` | CLI wrapper for the bounded probe, configured by `LOANOS_PROBE_*`; emits JSON evidence and exits non-zero on request errors or invalid invocation. |
+| `scripts/planes.mjs` | Shared exhaustive capability-catalogue parser, conservative status normalizer, and category-to-product-plane mapping used by trace and dashboard generation; accepts both two-letter (`UX-*`) and three-letter capability families. |
+| `scripts/sync-capability-trace.mjs` | Non-destructively synchronizes all 453 catalogue capabilities into the machine-readable trace register while preserving curated ownership, evidence, acceptance, dependency, note, and review fields. |
+| `scripts/build-dashboard.mjs` | Generates the self-contained capability/build dashboard and JSON projection from the shared parser, trace register, backlog, Git history, and test evidence. |
 | `tests/compliance.test.js` | Regression tests for compliance, API, tenancy, audit, LOS/LMS/LWS, and integration-ledger gates. |
 | `tests/external-services.test.js` | Provider-boundary tests for `ExternalServiceManager` mock/real dispatch and residency guards. |
 | `tests/postgres-store.test.js` | Integration tests for the Postgres storage driver — RLS enforcement (direct and via the two-role model), advisory-lock serialization (same key) and non-serialization (different keys), and a full multi-tenant HTTP round-trip. Self-skips unless `DATABASE_URL_TEST` is set; not part of the default `npm test` gate but part of the `tests/*.test.js` glob it runs. |
@@ -108,6 +111,7 @@ npm run dev:api
 | `tests/security-assurance.test.js` | Scan completeness/SBOM binding, finding reconciliation, critical/high release blockers, bounded exceptions, remediation separation of duties, authenticated APIs, and release-approval gate tests. |
 | `tests/security-operations.test.js` | Detection-rule approval/source/deduplication, alert SLA/dismissal, investigation/evidence chain/response separation of duties, logging coverage, authenticated APIs, and audit projection tests. |
 | `tests/control-assurance.test.js` | Known-control plan approval, sample/deficiency/issue lifecycle, certification sign-off, audit/RBI requests and closure, governance-pack derivation/checksum, authenticated APIs, and audit projection tests. |
+| `tests/capability-tracking.test.js` | Exhaustive 453-capability/33-category parser invariant, 17-entry `UX-*` coverage, unique IDs, trace/dashboard artifact parity, and conservative status normalization. |
 
 ## Implemented API Endpoints
 
