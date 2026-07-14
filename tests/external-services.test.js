@@ -20,6 +20,17 @@ test("ExternalServiceManager SMS provider fails if set to real and missing API c
   );
 });
 
+test("ExternalServiceManager exposes credential-safe provider readiness", () => {
+  const readiness = new ExternalServiceManager({ smsProvider: "real", smsApiUrl: "https://sms.example.in" }).integrationReadiness();
+  const sms = readiness.find((item) => item.integration === "sms");
+  const cersai = readiness.find((item) => item.integration === "cersai");
+  assert.equal(sms.status, "blocked");
+  assert.equal(sms.reason, "endpoint_or_credential_missing");
+  assert.equal(sms.hasCredential, false);
+  assert.equal(cersai.status, "mock");
+  assert.equal(Object.hasOwn(sms, "apiKey"), false);
+});
+
 test("ExternalServiceManager email and WhatsApp providers default to mock with India data posture", async () => {
   const manager = new ExternalServiceManager();
 

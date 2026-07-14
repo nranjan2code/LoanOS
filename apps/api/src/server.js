@@ -1073,6 +1073,13 @@ async function route(req, res, dataDir, platformAdminKey) {
     return;
   }
 
+  if (method === "GET" && path === "/integrations/readiness") {
+    const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox });
+    const integrations = manager.integrationReadiness();
+    sendJson(res, 200, { integrations, readyCount: integrations.filter((item) => item.status === "ready").length, mockCount: integrations.filter((item) => item.status === "mock").length, blockedCount: integrations.filter((item) => item.status === "blocked").length });
+    return;
+  }
+
   if (method === "POST" && path === "/integrations/communications") {
     const body = await readJson(req);
     let payload = null;

@@ -108,6 +108,14 @@ export class ExternalServiceManager {
     }
   }
 
+  integrationReadiness() {
+    const integrations = [["sms", "SMS", "sms"], ["email", "Email", "email"], ["whatsapp", "WhatsApp", "whatsapp"], ["bureau", "Credit Bureau", "bureau"], ["vcip", "V-CIP", "vcip"], ["bank_account", "Bank account verification", "bankAccount"], ["payment_rail", "Payment rail", "paymentRail"], ["esign", "eSign", "esign"], ["cersai", "CERSAI", "cersai"], ["fiu", "FIU-IND", "fiu"], ["escrow", "Escrow", "escrow"], ["core_banking", "Core banking", "coreBanking"]];
+    return integrations.map(([integration, label, prefix]) => {
+      const provider = this.config[`${prefix}Provider`]; const dataResidencyCountry = this.config[`${prefix}DataResidencyCountry`]; const hasEndpoint = Boolean(this.config[`${prefix}ApiUrl`]); const hasCredential = Boolean(this.config[`${prefix}ApiKey`]); const residencyCompliant = dataResidencyCountry === "IN"; const configured = provider === "mock" || (hasEndpoint && hasCredential && residencyCompliant);
+      return { integration, label, provider, mode: provider === "mock" ? "mock" : "real", status: configured ? (provider === "mock" ? "mock" : "ready") : "blocked", dataResidencyCountry, residencyCompliant, hasEndpoint, hasCredential, reason: configured ? null : !residencyCompliant ? "india_data_residency_required" : "endpoint_or_credential_missing" };
+    });
+  }
+
   /**
    * Sends an SMS notification.
    */

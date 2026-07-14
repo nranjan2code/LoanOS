@@ -44,7 +44,7 @@ cite the ID in commits and PRs.
 | REV-61 | CKYC real file format (14-digit CKYC number, CKYCRR download/upload) | G | P2 | PARTIAL |
 | REV-62 | FIU-IND FINnet 2.0 XML STR/CTR format | G | P2 | PARTIAL |
 | REV-63 | CERSAI real submission format | G | P2 | PARTIAL |
-| REV-64 | Live integrations to replace mock providers (bureau, bank-verify, eSign, NACH, comms, V-CIP) | G | P2 | TODO |
+| REV-64 | Live integrations to replace mock providers (bureau, bank-verify, eSign, NACH, comms, V-CIP) | G | P2 | PARTIAL |
 | REV-70 | Split `server.js` (20,415 lines / 212 handlers) into per-resource routers | H | P2 | TODO |
 | REV-71 | Storage scale: control-plane/sandbox off whole-state on Postgres; PG per-tenant encryption | H | P2 | TODO |
 | REV-72 | LMS co-lending economics in the loan-account ledger (split servicing by legs) | H | P2 | DONE |
@@ -280,10 +280,10 @@ STR, CTR, and CCR now produce checksum-sealed canonical FINnet XML with ARF/TRF/
 ### REV-63 — CERSAI real submission format · P2 · PARTIAL
 Security-interest filing now builds a checksum-sealed canonical CERSAI packet from lender registration, debtor identity/address, stable asset/location, charge, and authorised-submitter evidence. The provider submission reference is retained; registered/rejected responses must bind to the exact packet checksum and retain a fee receipt plus either a checksum-sealed certificate or rejection error; rejected records can only be replaced through independently approved, source-corrected repair lineage. Workflow queues cover filing, response reconciliation, and rejection repair. **Internal lifecycle acceptance achieved; CERSAI-certified portal/gateway wire serialization and live credentials remain under REV-64.**
 
-### REV-64 — Live integrations to replace mocks · P2 · TODO
-No live integrations exist: bureau, bank-account verification, eSign (+PDF envelopes), NACH file exchange
+### REV-64 — Live integrations to replace mocks · P2 · PARTIAL
+No live integrations are onboarded: bureau, bank-account verification, eSign (+PDF envelopes), NACH file exchange
 + settlement/reconciliation + refunds, SMS/email/WhatsApp, V-CIP, CKYC, CERSAI, FIU-IND. Sequence one
-provider per category behind the existing `ExternalServiceManager` boundary. **Acceptance:** one product can complete end-to-end on live providers.
+provider per category behind the existing `ExternalServiceManager` boundary. The shared readiness endpoint now reports, without exposing credentials, each adapter's mock/ready/blocked state and explicitly blocks real mode until endpoint, credential, and India-residency prerequisites are present. **Acceptance:** one product can complete end-to-end on live providers.
 
 ---
 
