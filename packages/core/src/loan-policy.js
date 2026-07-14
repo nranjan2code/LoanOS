@@ -152,6 +152,9 @@ export function buildKeyFactStatement(application, terms, now = new Date()) {
     borrowerId: application.borrower?.borrowerId ?? null,
     borrowerType: application.borrower?.borrowerType ?? "individual",
     applicationId: application.applicationId ?? null,
+    language: terms?.language ?? application.preferredLanguage ?? application.origination?.preferredLanguage ?? "en",
+    languageName: terms?.languageName ?? application.origination?.languageName ?? "English",
+    languageConfirmationRef: application.origination?.languageConfirmationRef ?? null,
     lenderName: application.tenant?.regulatedEntityName ?? null,
     productCode: product.productCode ?? null,
     productType: product.productType ?? null,
@@ -220,6 +223,11 @@ export function acceptKfs(application, input = {}, now = new Date()) {
   if (!input.acceptanceEvidenceRef) {
     findings.push(createFinding("error", "RBI-KFS-2024", "KFS acceptance evidence is required.", "acceptanceEvidenceRef"));
   }
+  if (application?.kfs?.language && application.kfs.language !== "en") {
+    if (input.understoodLanguage !== application.kfs.language || !input.languageConfirmationRef) {
+      findings.push(createFinding("error", "RBI-FPC", "Borrower must confirm the KFS was understood in the issued language.", "languageConfirmationRef"));
+    }
+  }
   const summary = summarizeFindings(findings);
   if (summary.status === "blocked") return { application, findings, summary };
   return {
@@ -230,7 +238,10 @@ export function acceptKfs(application, input = {}, now = new Date()) {
         acceptedAt: now.toISOString(),
         acceptedBy: input.acceptedBy,
         acceptanceChannel: input.acceptanceChannel ?? "borrower_portal",
-        acceptanceEvidenceRef: input.acceptanceEvidenceRef
+        acceptanceEvidenceRef: input.acceptanceEvidenceRef,
+        understoodLanguage: input.understoodLanguage ?? application.kfs.language ?? "en",
+        languageConfirmationRef: input.languageConfirmationRef ?? application.kfs.languageConfirmationRef ?? null,
+        languageConfirmedAt: now.toISOString()
       }
     },
     findings,
@@ -256,6 +267,9 @@ export function validateKfs(kfs) {
   }
   if (kfs.currency !== "INR") {
     findings.push(createFinding("error", "RBI-KFS-2024", "KFS currency must be INR for India-only lending.", "kfs.currency"));
+  }
+  if (!kfs.language || !kfs.languageName) {
+    findings.push(createFinding("error", "RBI-FPC", "KFS must identify the borrower-understood language.", "kfs.language"));
   }
   if (!Number.isFinite(kfs.aprBps) || kfs.aprBps < 0) {
     findings.push(createFinding("error", "RBI-KFS-2024", "KFS must disclose APR in basis points.", "kfs.aprBps"));

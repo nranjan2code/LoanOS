@@ -74,18 +74,20 @@ Exit criteria:
 
 ## Phase 1: LOS MVP
 
-Status: started. Regulated-entity, product-policy, borrower-profile, consent-ledger, KYC-record registries, and the first LOS workflow state machine are implemented as early Phase 1 slices.
+Status: application/control-layer journey complete for the unsecured personal term-loan slice. Regulated-entity/product/borrower registries, self-service capture, policy document checklist and quarantine/review, conditions precedent, sanction validity, language-evidenced KFS, decision, contracting and disbursement gates are connected; live provider certification remains Phase 4/Bundle C.
 
 Deliverables:
 
 - Tenant and RE setup. First slice done.
 - Product registry and policy versioning. First slice done.
 - Borrower onboarding and consent ledger. First slice done, including legal-entity borrower types (company/partnership/llp/trust) with a PMLA beneficial-owner registry gating sanction.
+- Authenticated digital application journey. First slice done with safe product options, session-grounded borrower identity, source/attribution, amount/tenor/account capture, declaration, preferred language and borrower portal UI.
 - KYC state machine with CKYC registry integration and V-CIP evidence vault. First slice done.
 - Underwriting workflow with human review. Eligibility/affordability engine first slice done; refer-band applications route to a manual underwriting queue, and approving a referred application requires a recorded manual underwriting override (underwriter, reason, policy reference) recorded by a registered credit officer, and declines must cite a coded decline reason.
 - Decision proposal and maker-checker approval. First slice done.
 - KFS generation and digitally delivered document packet. First slice done.
-- Sanction and disbursement readiness checks. First slice done.
+- Product-driven application documents, quarantine, independent review/waiver and conditions precedent. First slice done.
+- Sanction and disbursement readiness checks. First slice done, including sanction expiry and governed origination gates.
 
 Exit criteria:
 

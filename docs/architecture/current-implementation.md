@@ -23,7 +23,7 @@ The current implementation is intentionally small:
 - Internal staff workspace in `apps/dashboard/`.
 - Borrower customer portal in `apps/customer/`: a responsive, white-labelled journey home with prioritised next actions, visual application milestones, repayment schedules, a document centre, guided media, grievance tracking, and DPDP access/correction/erasure controls.
 - Shared design system tokens in `apps/shared/`.
-- Automated tests in `tests/`: 243 file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
+- Automated tests in `tests/`: 248 file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
 
 Run it:
 
@@ -53,6 +53,7 @@ npm run dev:api
 | `packages/core/src/recovery-agent.js` | Recovery-agent empanelment registry: an active agent requires due-diligence/police-verification, training certification, code-of-conduct acknowledgment, and authorization-letter/ID-card evidence, referencing an active regulated entity. |
 | `packages/core/src/collections-recovery.js` | Assigned-agent call/field evidence, deterministic PTP evaluation, and maker-checker legal recovery across SARFAESI, Section 138, Lok Adalat, arbitration, DRT, civil suit, and insolvency, including checksum-sealed statutory notices and fail-closed clocks. |
 | `packages/core/src/application-workflow.js` | LOS application state machine, KFS workflow, human review, decision proposal, manual underwriting override gate for referred applications, coded decline-reason taxonomy, maker-checker approval, disbursement transition. |
+| `packages/core/src/origination-journey.js` | Governed borrower-self-service intake metadata, policy-driven document checklists, type/size/checksum/residency/malware quarantine, independent verification/deficiency/waiver, conditions precedent/subsequent, sanction validity, language evidence, and fail-closed decision/disbursement readiness. |
 | `packages/core/src/repayment-schedule.js` | Shared KFS/LMS paise-exact schedule engine for weekly, fortnightly, monthly, and quarterly amortising, bullet, moratorium, and step-up structures. |
 | `packages/core/src/loan-account.js` | LMS term and revolving account creation, ledger reconstruction, scheduled/daily-utilisation interest, bounded drawdowns, facility reviews, payment posting, part-prepayment, foreclosure, statements, charges, recovery controls, restructure/reset, resolution, classification, and CIC snapshots. |
 | `packages/core/src/cic-reporting.js` | Versioned consumer/commercial canonical UCRF records, 15th/month-end reporting calendar, checksum-sealed maker-checker batches, default-reporting alert evidence, bureau acknowledgement reconciliation, rejected-row repair/resubmission, and 21/30-day CIC correction controls. Provider-specific proprietary files and transport are adapter responsibilities. |
@@ -112,6 +113,7 @@ npm run dev:api
 | `tests/security-operations.test.js` | Detection-rule approval/source/deduplication, alert SLA/dismissal, investigation/evidence chain/response separation of duties, logging coverage, authenticated APIs, and audit projection tests. |
 | `tests/control-assurance.test.js` | Known-control plan approval, sample/deficiency/issue lifecycle, certification sign-off, audit/RBI requests and closure, governance-pack derivation/checksum, authenticated APIs, and audit projection tests. |
 | `tests/capability-tracking.test.js` | Exhaustive 453-capability/33-category parser invariant, 17-entry `UX-*` coverage, unique IDs, trace/dashboard artifact parity, and conservative status normalization. |
+| `tests/origination-journey.test.js` | Digital declaration/language gates, product checklist, malware quarantine, independent document review, conditions precedent, sanction expiry, non-English KFS acceptance, and authenticated borrower API isolation. |
 
 ## Implemented API Endpoints
 
@@ -121,6 +123,13 @@ npm run dev:api
 | `GET /metrics` | Prometheus-format process metrics; enabled only when `LOANOS_METRICS_TOKEN` is configured and protected by bearer or `x-metrics-token` authentication. Never emits tenant labels. |
 | `GET /compliance/controls` | Returns regulatory control catalog. Open route. |
 | `GET /reference/decline-reasons` | Returns the coded decline-reason taxonomy. Open route. |
+| `GET /borrower/application-options` | Authenticated borrower-safe projection of active term-loan products, amount/tenor bounds, pricing, sanction validity and document requirements. |
+| `POST /borrower/applications` | Creates a governed self-service application with session-grounded borrower identity, declared source/attribution, preferred language, accuracy evidence and a policy-generated document checklist. |
+| `GET /loans/applications/:id/origination-readiness` | Borrower/staff view of required-document, condition-precedent and sanction-expiry readiness. |
+| `POST /loans/applications/:id/documents` | Records checksum/type/size/India-residency and malware-scan evidence; infected documents are audit-retained as quarantined and fail closed. |
+| `POST /loans/applications/:id/documents/:documentId/review` | Registered credit-actor verification, borrower-facing deficiency, or independently approved policy waiver. |
+| `POST /loans/applications/:id/conditions` | Creates a maker-checker condition precedent/subsequent with policy lineage. |
+| `POST /loans/applications/:id/conditions/:conditionId/satisfaction` | Records evidence-backed satisfaction and independent verification; open precedent conditions continue to block disbursement. |
 | `POST /auth/login` | Authenticates a tenant user or platform user, returning public principal data and setting an HTTP-only session cookie. |
 | `GET /auth/me` | Reads the current session principal. |
 | `POST /auth/logout` | Revokes the current session and clears the session cookie. |
@@ -585,10 +594,11 @@ npm run dev:api
 - No certified live KYC, CKYC, bureau, bank-account, payment settlement/reconciliation, eSign, SMS, email, WhatsApp, CERSAI, escrow, or core-banking provider onboarding yet; mock-or-real fail-closed adapter contracts exist for the latter two.
 - Registries are file-backed; tenant user administration and access reviews exist, but external IAM sync and maker-checker approval for admin changes are still planned.
 - Borrower/consent/KYC records are file-backed, but support CKYC registry and V-CIP evidence vault validation boundaries.
+- Governed digital origination connects borrower self-service capture, policy document requirements, malware/quarantine evidence, independent review/waiver, conditions precedent, sanction validity and KFS language confirmation to LOS gates. Production still needs India-resident binary object upload, authenticated scanner/DLP/OCR callbacks, translated legally approved templates, save-and-resume/duplicate-lead handling, live bank verification and a dedicated staff document/condition desktop. See [governed digital origination journey](origination-journey.md).
 - Workflow is file-backed; the local dashboard is not a production workflow UI and outbound RBI CMS API integration is still planned.
 - LMS restructure/settlement/write-off, cooling-off cancellation, refunds, field collections/PTP, and statutory legal case control have first slices. UPI/NACH and bank matching provide provider-to-bank-to-ledger controls. Balanced journals, trial balance, governed posting/GL delivery/reconciliation, EOD/BOD and period close cover the finance path. Co-lent loans split into regulated-entity books with transfer pricing, entity ECL, GST/TDS exchange, escrow-gated settlement, and inter-company certification. Certified vendor payloads, secure transport/credentials, external CIC submission, possession/auction economics, court integrations, and partner-scale dialer/mobile operations remain planned.
 - Document packets and the vault produce HTML and PDF checksum evidence; certified external eSign envelope onboarding remains planned.
-- UI is limited to the local operations/admin dashboard; there is no production borrower application yet.
+- UI includes public/tenant surfaces, a governed borrower self-service application and servicing portal, and the local operations/admin dashboard; production accessibility certification, native/mobile/offline support, full translated template libraries and specialized underwriter/servicing/collections workspaces remain planned.
 - AI governance has first slices for lifecycle, validation gates (fairness/explainability/monitoring for high-risk, adversarial/hallucination for generative), drift-triggered kill switch, disclosure, and human handoff; recurring fairness reports and a sectoral incident-intelligence pack are still planned.
 - The audit spine stamps a uniform actor/actorType/dataClass envelope on every event at the seal seam; signed external anchoring is a follow-on.
 - Compliance docs are source-grounded but still require counsel/compliance review before production.

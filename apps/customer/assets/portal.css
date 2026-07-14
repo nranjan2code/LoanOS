@@ -199,6 +199,15 @@ button { color: inherit; }
 .privacy-visual span { position: absolute; left: 76px; top: 2px; width: 142px; height: 142px; display: grid; place-items: center; border: 1px solid rgba(255, 255, 255, .22); border-radius: 50%; color: var(--portal-lime); font-size: 4rem; }.privacy-visual i { position: absolute; left: 113px; top: 39px; width: 68px; height: 68px; border: 16px solid var(--portal-lime); border-radius: 50%; }
 
 .application-list, .loan-list, .document-list { display: grid; gap: 12px; }
+.application-start-card { margin-bottom: 18px; }
+.application-form { display: grid; gap: 16px; }
+.application-form-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.application-form .field-row { display: grid; gap: 7px; color: var(--portal-forest); font-size: .68rem; font-weight: 700; }
+.application-form input, .application-form select { width: 100%; min-height: 44px; border: 1px solid var(--portal-line); border-radius: 9px; background: white; color: var(--portal-forest); padding: 9px 11px; font: inherit; }
+.application-declaration { display: flex; align-items: flex-start; gap: 10px; color: var(--portal-muted); font-size: .68rem; }
+.application-declaration input { margin-top: 2px; accent-color: var(--portal-forest); }
+@media (max-width: 900px) { .application-form-grid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 560px) { .application-form-grid { grid-template-columns: 1fr; } }
 .application-card { padding: 24px; border: 1px solid var(--portal-line); border-radius: 16px; background: white; box-shadow: 0 6px 20px rgba(12, 45, 38, .035); }
 .application-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
 .application-card h2, .loan-card h2 { margin: 6px 0 4px; color: var(--portal-forest); font-size: 1rem; }

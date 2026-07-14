@@ -160,6 +160,20 @@ export {
 } from "./application-workflow.js";
 
 export {
+  ORIGINATION_CHANNELS,
+  SUPPORTED_BORROWER_LANGUAGES,
+  attachSanctionValidity,
+  createUnderwritingCondition,
+  evaluateOriginationReadiness,
+  initializeOriginationJourney,
+  recordApplicationDocument,
+  reviewApplicationDocument,
+  satisfyUnderwritingCondition,
+  validateOriginationBeforeDecision,
+  validateOriginationBeforeDisbursement
+} from "./origination-journey.js";
+
+export {
   accrueInterest,
   accrueRevolvingInterest,
   assignRecoveryAgent,

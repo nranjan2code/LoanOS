@@ -11,7 +11,7 @@ capability rows remain the source of truth for individual features.
 | Bundle | Outcome | Status |
 | --- | --- | --- |
 | A | Exhaustive capability tracking: shared parser, trace/dashboard parity, and regression coverage for every catalogue family | Complete — all 453 capabilities across 33 categories, including 17 `UX-*` entries, are synchronized and test-pinned. |
-| B | One production-ready unsecured personal term-loan journey across acquisition, documents, underwriting, contracting, servicing, and operational UX | Next |
+| B | One production-ready unsecured personal term-loan journey across acquisition, documents, underwriting, contracting, servicing, and operational UX | Complete at the application/control layer — borrower intake/UI, policy checklist, upload/quarantine evidence, review/waiver, conditions, sanction expiry and KFS-language evidence now join the existing LOS/LMS journey. Live provider certification remains Bundle C. |
 | C | Live/certified CIC, CKYCRR, FIU, CERSAI, bureau, AA, bank-verification, eSign, V-CIP, payment, and communication integrations | Planned |
 | D | Audit integrity and data governance: external/WORM anchoring, event-completeness reconciliation, retention, evidence, lineage, and data-quality controls | Planned |
 | E | Enterprise security and scale: federation, SCIM, KMS/HSM, SIEM custody, HA/PITR, Postgres scale, event/API governance, and deployment automation | Planned |
@@ -55,6 +55,7 @@ Tasks:
 - Cooling-off policy. Done.
 - Prepayment/foreclosure policy. Done: product policy validates allowability, lock-in period, and blocks fees on floating-rate individual retail loans; quoteForeclosure and prepayLoanAccount enforce these checks at transaction level.
 - Floating-rate reset policy where applicable. Done: resetFloatingRate implements choice-based re-amortization options (extend tenor, increase EMI, switch to fixed with switch fee) under maker-checker flow.
+- Sanction validity and product document policy. First slice done: product policy carries a 1–365 day sanction-validity window and optional typed document requirements with MIME/size limits; the governed digital journey binds both to the application snapshot.
 - Policy versioning and effective dates. Done: a product policy carries a `version` and `effectiveFrom`/`effectiveTo`; `upsertProductPolicy` publishes each material change as a new version (must increase and take effect after the current one), archiving the superseded version with its window closed in `priorVersions`. `selectProductPolicyVersion(product, asOf)` (and `GET /products/{id}?asOf=` / `GET /products?asOf=`) resolve the version governing a given date. `resolveLoanApplicationReferences` evaluates and binds the specific version active on the application's `appliedAt` or `createdAt` date, ensuring correct interest rates, charges, and parameters are locked at origination.
 - Tests for missing policy, invalid cooling-off, undisclosed fee posting. Done.
 
@@ -99,8 +100,10 @@ Goal: complete origination from application to sanction and disbursement readine
 Tasks:
 
 - Application state machine. Done.
+- Borrower self-service application capture. First governed slice done: the authenticated borrower portal lists safe active-term-product options and submits a session-grounded application with amount/tenor, destination-account identifiers, source/attribution, declaration and preferred-language evidence. Client-supplied borrower identity is ignored.
 - Eligibility rules engine. Done, twice over: the JS first slice (EMI/FOIR affordability, age-at-maturity, amount/tenor bounds; plus policy-data multi-bureau underwriting per REV-30 — per-bureau score bands and knockout attributes read from `product.eligibility.bureauPolicy`, evaluating single or multiple `bureauReports[]` with the most conservative outcome winning) remains the default path, and the same policy is ported to the Rust decision engine (`rules/fixtures/lending-eligibility.json`, verified by a 542-case zero-divergence differential corpus). API call sites are wired through `LOANOS_RULES_ENGINE=off|shadow|active` (default off); run shadow to a clean window, then flip per tenant. See docs/architecture/decision-engine-design.md. Open hardening before the engine is on the critical path: gateway test coverage, a CI lane that starts `rules-service`, per-tenant instance routing, and `active`-mode reason lineage — tracked as REV-10..REV-14 in [review-findings-2026-07-12](review-findings-2026-07-12.md). Engine phase/status is authoritative in `docs/architecture/decision-engine-design.md` §15 (REV-03); do not restate it here.
 - Underwriting policy rules. First slice done: approving a refer-band application requires a recorded manual underwriting override (underwriter, reason, policy reference), the named underwriter must be a registered, active credit officer, and a declined decision must cite a coded reason from the decline-reason taxonomy.
+- Application documents and conditions. First governed slice done: product-driven required checklists; checksum/type/size/India-residency/malware evidence; quarantine; independent verification, deficiency and policy-backed waiver; maker-checker conditions precedent/subsequent; and evidence-backed independent satisfaction. Required documents block approval and open conditions precedent block disbursement.
 - Manual review queue. Done: Eligibility `refer` outcomes route to a manual underwriting LWS task, task resolution/approval is gated on manual underwriting task assignment matching the override underwriter, and task completion is recorded.
 - Maker-checker decision approval. Done.
 - AI model-use evidence on decision. Done: proposeDecision retrieves model details from the registry and records a locked modelEvidence snapshot (version, validation refs, risk parameters) in the proposed decision.
@@ -110,7 +113,8 @@ Tasks:
 - Rendered LMS statement document packet. First slice done: the period statement renders as a checksum-sealed HTML/text borrower document.
 - Digital delivery evidence. First execution packet slice done.
 - Sanction readiness gate. Done.
-- Disbursement readiness gate. Done.
+- Sanction validity and language-understanding evidence. Done for the governed digital path: final approval attaches the policy window; expired sanction fails closed; KFS records the chosen language and non-English acceptance requires matching confirmation evidence.
+- Disbursement readiness gate. Done, including required-document, conditions-precedent and sanction-expiry checks for governed borrower applications.
 - Tests for each state transition and blocked unsafe transition.
 
 Done when:

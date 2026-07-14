@@ -22,12 +22,15 @@ Legend:
 | Account Aggregator (AA) data sharing | `account-aggregator.js` runs the consent-artefact lifecycle (requested → active → revoked/expired), enforces India residency, and gates FI-data fetch by consent validity and fetch type (one-time single use, periodic per-day frequency); the live FIP pull is a mocked integration boundary storing only a hashed evidence record. | Partial |
 | Borrower economic profile | Age, occupation, income required in preflight. | Done |
 | Creditworthiness assessment before sanction | Eligibility engine computes EMI/FOIR affordability, age-at-maturity, and amount/tenor bounds; ineligible borrowers cannot be approved. | Done |
+| Authenticated borrower application capture | Borrower portal lists safe active term-loan options and creates a session-grounded application; client-supplied borrower identity is ignored and declaration/source/language evidence is retained. | Partial |
+| Origination document control | Product checklist drives required types; uploads retain checksum, MIME, size, India residency and malware-scan evidence; infected files quarantine; independent review/deficiency/waiver gates approval. Binary object storage and authenticated production scanner/DLP/OCR remain planned. | Partial |
 | KFS before execution | KFS validation and acceptance gate. | Done |
-| Product policy before origination | Product registry validates active RE link, board approval, INR, amount/tenor bounds, APR (must be ≥ annualInterestRateBps + annualised mandatory charge floor), cooling-off, recovery mechanism, eligibility, charges, and mandatory `pricingPolicyRef`. `interestCalcMethod` must be `reducing_balance` or `flat`; flat-rate products must additionally disclose `flatToEirBps` (flat-to-EIR equivalent). | Done |
+| Product policy before origination | Product registry validates active RE link, board approval, INR, amount/tenor bounds, APR (must be ≥ annualInterestRateBps + annualised mandatory charge floor), cooling-off, recovery mechanism, sanction-validity days, optional typed document requirements, eligibility, charges, and mandatory `pricingPolicyRef`. `interestCalcMethod` must be `reducing_balance` or `flat`; flat-rate products must additionally disclose `flatToEirBps` (flat-to-EIR equivalent). | Done |
 | Product policy versioning and effective dates | A higher `version` publishes a new policy version, archiving the superseded window; `selectProductPolicyVersion`/`?asOf=` resolve the version governing a given date. | Done |
 | Digitally delivered KFS/documents | KFS delivery evidence gates decision; execution document packet delivery gates disbursement. | Done |
 | Borrower communication dispatch evidence | SMS/email/WhatsApp provider boundary enforces India data-residency posture and stores masked/hash-only dispatch receipts. SMS additionally requires TRAI DLT registration (`dltEntityId`, `dltTemplateId`, registered `senderId`) or the dispatch is blocked. | Done |
 | Direct disbursement to borrower/end-beneficiary | LSP/pass-through disbursement blocked; disbursement now requires verified active borrower/end-beneficiary bank-account evidence matching the destination account. | Done |
+| Conditions precedent and sanction validity | Maker-checker conditions retain policy/evidence lineage; open precedent conditions and expired sanction validity fail closed at disbursement. | Done |
 | Direct repayment to RE account | LSP/pass-through repayment blocked. | Done |
 | NACH/UPI payment rail initiation evidence | Mock/real payment rail provider boundary registers NACH mandates, creates NACH presentments and UPI collect requests with India data-residency enforcement; tenant ledger stores masked/hash-only rail evidence and seals financial audit events. UPI and NACH settlement callbacks are idempotently reconciled to their initiated collections and post only exact matched payments; unknown, failed, returned, and mismatched callbacks remain exceptions. Bank-statement reconciliation remains planned. | Partial |
 | LSP fees paid by RE, not borrower | LSP registry requires RE-paid fee controls and blocks separate borrower-charged LSP fees; vendor settlement module planned. | Partial |
@@ -50,11 +53,12 @@ Legend:
 | KFS generated before sanction | KFS is required before decision. | Done |
 | APR disclosed | KFS requires `aprBps`. | Done |
 | Loan amount and tenor disclosed | KFS requires principal and tenor. | Done |
+| Language understood by borrower | KFS records the journey language; non-English acceptance requires matching borrower language-confirmation evidence. Translated legally approved template libraries remain planned. | Partial |
 | Cooling-off period | KFS requires at least one day. | Done |
 | Recovery mechanism | KFS requires recovery mechanism. | Done |
 | Grievance officer | KFS requires name and email. | Done |
 | Undisclosed fees cannot be charged later | Ground KFS charges in Product Policy and block ad-hoc, foreclosure, and prepayment ledger charges exceeding KFS/policy limits. | Done |
-| Digitally signed/rendered KFS | HTML/text document packet renderer with checksum and delivery evidence; eSign creates a signed packet and document-vault receipt with manifest checksum. PDF generation and external envelope storage remain planned. | Partial |
+| Digitally signed/rendered KFS | HTML/text/PDF document packet renderer with checksum and delivery evidence; eSign creates a signed packet and document-vault receipt with manifest checksum. Certified external envelope onboarding remains planned. | Partial |
 | KFS workflow state | Server derives terms from the approved product/application, computes cash-flow APR and amortisation, delivers a time-bound proposal, then requires a separate authenticated borrower acceptance bound to session and proposal. | Done |
 
 ## Fair Lending and Penal Charges

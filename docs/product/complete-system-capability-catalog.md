@@ -161,7 +161,7 @@ The detailed register contains **453 individually identified capabilities**. At 
 | PRD-010 | Product approval, maker-checker publication, and rollback | Core | Partial |
 | PRD-011 | Product simulation and golden-case regression corpus | Core | Partial |
 | PRD-012 | Product authoring UI with version diff and impact analysis | Core | Missing |
-| PRD-013 | Sanction validity, renewal, review, and expiry policy | Product | Missing |
+| PRD-013 | Sanction validity, renewal, review, and expiry policy | Product | Partial |
 | PRD-014 | Credit insurance and optional add-on governance | Product | Missing |
 | PRD-015 | Product profitability and risk-adjusted return parameters | Institution | Missing |
 
@@ -169,11 +169,11 @@ The detailed register contains **453 individually identified capabilities**. At 
 
 | ID | Capability | Applicability | Status |
 | --- | --- | --- | --- |
-| CHN-001 | Digital self-serve application capture | Channel | Missing |
+| CHN-001 | Digital self-serve application capture | Channel | Partial |
 | CHN-002 | Branch-assisted application capture | Channel | Missing |
 | CHN-003 | DSA, BC, connector, dealer, merchant, and LSP lead intake | Channel | Missing |
 | CHN-004 | API/embedded-finance application intake | Channel | Partial |
-| CHN-005 | Lead source, campaign, referral, and attribution | Optional | Missing |
+| CHN-005 | Lead source, campaign, referral, and attribution | Optional | Partial |
 | CHN-006 | Lead qualification, follow-up, conversion, and abandonment | Channel | Missing |
 | CHN-007 | Duplicate-lead and existing-customer matching | Core | Missing |
 | CHN-008 | Channel eligibility, geographic serviceability, and branch routing | Channel | Missing |
@@ -259,13 +259,13 @@ The detailed register contains **453 individually identified capabilities**. At 
 
 | ID | Capability | Applicability | Status |
 | --- | --- | --- | --- |
-| DOC-001 | Product- and stage-specific document checklist | Core | Missing |
-| DOC-002 | Secure upload, malware scan, type/size validation, and quarantine | Core | Missing |
+| DOC-001 | Product- and stage-specific document checklist | Core | Partial |
+| DOC-002 | Secure upload, malware scan, type/size validation, and quarantine | Core | Partial |
 | DOC-003 | OCR, classification, field extraction, and confidence | Optional | Partner |
-| DOC-004 | Manual verification and discrepancy resolution | Core | Missing |
+| DOC-004 | Manual verification and discrepancy resolution | Core | Partial |
 | DOC-005 | Document versioning, supersession, and expiry | Core | Partial |
 | DOC-006 | KYC, income, bank, property, asset, and legal document categories | Product | Partial |
-| DOC-007 | Deficiency, waiver, re-request, and SLA workflow | Core | Missing |
+| DOC-007 | Deficiency, waiver, re-request, and SLA workflow | Core | Partial |
 | DOC-008 | Document access control, watermarking, and download audit | Core | Partial |
 | DOC-009 | India storage, retention, checksum, and legal hold | Core | Partial |
 | DOC-010 | Production PDF generation and accessible rendering | Core | Partial |
@@ -292,8 +292,8 @@ The detailed register contains **453 individually identified capabilities**. At 
 | UWG-013 | Manual underwriting workspace and credit note | Core | Partial |
 | UWG-014 | Coded decline and borrower explanation | Core | Partial |
 | UWG-015 | Maker-checker and four-eyes approval | Core | Implemented |
-| UWG-016 | Conditions precedent/subsequent and covenants | Product | Missing |
-| UWG-017 | Sanction validity and material-change reassessment | Core | Missing |
+| UWG-016 | Conditions precedent/subsequent and covenants | Product | Partial |
+| UWG-017 | Sanction validity and material-change reassessment | Core | Partial |
 | UWG-018 | Deterministic decision models with golden corpus | Core | Partial |
 | UWG-019 | Decision trace, policy/data/model lineage, and replay | Core | Partial |
 | UWG-020 | Champion/challenger, shadow, divergence, and cutover | Optional | Partial |
@@ -324,7 +324,7 @@ The detailed register contains **453 individually identified capabilities**. At 
 | OFR-003 | Objective ranking disclosure and dark-pattern prevention | Channel | Implemented |
 | OFR-004 | KFS unique proposal, validity, APR sheet, and amortisation schedule | Core | Implemented |
 | OFR-005 | KFS charges, GST, cooling-off, recovery, and grievance disclosure | Core | Implemented |
-| OFR-006 | KFS in a language understood by the borrower | Core | Missing |
+| OFR-006 | KFS in a language understood by the borrower | Core | Partial |
 | OFR-007 | Evidence that KFS contents were explained and understood | Core | Partial |
 | OFR-008 | Borrower acceptance bound to proposal and verified identity | Core | Implemented |
 | OFR-009 | Sanction letter with conditions and validity | Core | Partial |
@@ -345,7 +345,7 @@ The detailed register contains **453 individually identified capabilities**. At 
 | DSB-005 | Single full disbursement | Core | Implemented |
 | DSB-006 | Multiple, tranche, stage, and construction-linked disbursement | Product | Missing |
 | DSB-007 | Supplier/dealer/end-use payment and invoice linkage | Product | Missing |
-| DSB-008 | Conditions-precedent satisfaction and waiver | Product | Missing |
+| DSB-008 | Conditions-precedent satisfaction and waiver | Product | Partial |
 | DSB-009 | Payment initiation, bank response, settlement, and failure repair | Core | Mock |
 | DSB-010 | Disbursement cancellation, reversal, return, and refund | Core | Partial |
 | DSB-011 | Co-lending escrow and partner funding confirmation | Product | Partial |
@@ -694,7 +694,7 @@ The detailed register contains **453 individually identified capabilities**. At 
 | --- | --- | --- | --- |
 | UX-001 | Public platform and trust/product information | Optional | Partial |
 | UX-002 | RE-branded DLA/tenant landing surface | Channel | Partial |
-| UX-003 | Borrower application and onboarding journey | Channel | Missing |
+| UX-003 | Borrower application and onboarding journey | Channel | Partial |
 | UX-004 | Borrower portal for application status and next action | Channel | Implemented |
 | UX-005 | Borrower KFS, document, agreement, and signature journey | Channel | Partial |
 | UX-006 | Borrower repayment, statement, payment, mandate, and receipt journey | Channel | Partial |

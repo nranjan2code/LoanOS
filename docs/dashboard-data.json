@@ -1,22 +1,22 @@
 {
-  "generated": "2026-07-14T15:49:41.258Z",
+  "generated": "2026-07-14T16:05:51.959Z",
   "git": {
     "branch": "main",
-    "count": 147,
+    "count": 148,
     "commits": []
   },
   "overall": {
     "counts": {
       "Implemented": 87,
-      "Partial": 198,
+      "Partial": 210,
       "Partial/Mock": 10,
       "Mock": 8,
-      "Missing": 141,
+      "Missing": 129,
       "Partner": 3,
       "External": 6
     },
     "total": 453,
-    "pct": 39
+    "pct": 40
   },
   "planes": [
     {
@@ -25,7 +25,7 @@
         {
           "n": 4,
           "name": "Acquisition Channels, Leads, and CRM",
-          "pct": 8,
+          "pct": 16,
           "total": 10
         },
         {
@@ -43,13 +43,13 @@
         {
           "n": 9,
           "name": "Documents, OCR, and Verification",
-          "pct": 22,
+          "pct": 36,
           "total": 13
         },
         {
           "n": 10,
           "name": "Credit Data, Underwriting, and Decisioning",
-          "pct": 36,
+          "pct": 40,
           "total": 20
         },
         {
@@ -61,27 +61,27 @@
         {
           "n": 12,
           "name": "Offers, KFS, Sanction, and Contracting",
-          "pct": 55,
+          "pct": 58,
           "total": 14
         },
         {
           "n": 13,
           "name": "Disbursement and Fund Flow",
-          "pct": 40,
+          "pct": 43,
           "total": 13
         }
       ],
       "counts": {
         "Implemented": 14,
-        "Partial": 39,
+        "Partial": 49,
         "Partial/Mock": 5,
         "Mock": 7,
-        "Missing": 45,
+        "Missing": 35,
         "Partner": 1,
         "External": 0
       },
       "total": 111,
-      "pct": 31
+      "pct": 34
     },
     {
       "name": "LMS",
@@ -193,7 +193,7 @@
         {
           "n": 3,
           "name": "Product, Pricing, and Policy Configuration",
-          "pct": 43,
+          "pct": 45,
           "total": 15
         },
         {
@@ -217,15 +217,15 @@
       ],
       "counts": {
         "Implemented": 16,
-        "Partial": 31,
+        "Partial": 32,
         "Partial/Mock": 0,
         "Mock": 0,
-        "Missing": 17,
+        "Missing": 16,
         "Partner": 0,
         "External": 1
       },
       "total": 65,
-      "pct": 44
+      "pct": 45
     },
     {
       "name": "Platform & Tenancy",
@@ -387,7 +387,7 @@
         {
           "n": 32,
           "name": "Borrower, Staff, Branch, Partner, and Field Experiences",
-          "pct": 31,
+          "pct": 33,
           "total": 17
         },
         {
@@ -399,15 +399,15 @@
       ],
       "counts": {
         "Implemented": 2,
-        "Partial": 10,
+        "Partial": 11,
         "Partial/Mock": 0,
         "Mock": 0,
-        "Missing": 15,
+        "Missing": 14,
         "Partner": 0,
         "External": 3
       },
       "total": 30,
-      "pct": 22
+      "pct": 24
     }
   ],
   "categories": [
@@ -958,8 +958,8 @@
           "id": "PRD-013",
           "name": "Sanction validity, renewal, review, and expiry policy",
           "applicability": "Product",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -996,15 +996,15 @@
       ],
       "counts": {
         "Implemented": 4,
-        "Partial": 6,
+        "Partial": 7,
         "Partial/Mock": 0,
         "Mock": 0,
-        "Missing": 5,
+        "Missing": 4,
         "Partner": 0,
         "External": 0
       },
       "total": 15,
-      "pct": 43
+      "pct": 45
     },
     {
       "n": 4,
@@ -1015,8 +1015,8 @@
           "id": "CHN-001",
           "name": "Digital self-serve application capture",
           "applicability": "Channel",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -1067,8 +1067,8 @@
           "id": "CHN-005",
           "name": "Lead source, campaign, referral, and attribution",
           "applicability": "Optional",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -1144,15 +1144,15 @@
       ],
       "counts": {
         "Implemented": 0,
-        "Partial": 2,
+        "Partial": 4,
         "Partial/Mock": 0,
         "Mock": 0,
-        "Missing": 8,
+        "Missing": 6,
         "Partner": 0,
         "External": 0
       },
       "total": 10,
-      "pct": 8
+      "pct": 16
     },
     {
       "n": 5,
@@ -1982,8 +1982,8 @@
           "id": "DOC-001",
           "name": "Product- and stage-specific document checklist",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -1995,8 +1995,8 @@
           "id": "DOC-002",
           "name": "Secure upload, malware scan, type/size validation, and quarantine",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -2021,8 +2021,8 @@
           "id": "DOC-004",
           "name": "Manual verification and discrepancy resolution",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -2060,8 +2060,8 @@
           "id": "DOC-007",
           "name": "Deficiency, waiver, re-request, and SLA workflow",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -2150,15 +2150,15 @@
       ],
       "counts": {
         "Implemented": 0,
-        "Partial": 6,
+        "Partial": 10,
         "Partial/Mock": 0,
         "Mock": 1,
-        "Missing": 5,
+        "Missing": 1,
         "Partner": 1,
         "External": 0
       },
       "total": 13,
-      "pct": 22
+      "pct": 36
     },
     {
       "n": 10,
@@ -2364,8 +2364,8 @@
           "id": "UWG-016",
           "name": "Conditions precedent/subsequent and covenants",
           "applicability": "Product",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -2377,8 +2377,8 @@
           "id": "UWG-017",
           "name": "Sanction validity and material-change reassessment",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -2428,15 +2428,15 @@
       ],
       "counts": {
         "Implemented": 3,
-        "Partial": 9,
+        "Partial": 11,
         "Partial/Mock": 0,
         "Mock": 2,
-        "Missing": 6,
+        "Missing": 4,
         "Partner": 0,
         "External": 0
       },
       "total": 20,
-      "pct": 36
+      "pct": 40
     },
     {
       "n": 11,
@@ -2713,8 +2713,8 @@
           "id": "OFR-006",
           "name": "KFS in a language understood by the borrower",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -2829,15 +2829,15 @@
       ],
       "counts": {
         "Implemented": 5,
-        "Partial": 6,
+        "Partial": 7,
         "Partial/Mock": 0,
         "Mock": 1,
-        "Missing": 2,
+        "Missing": 1,
         "Partner": 0,
         "External": 0
       },
       "total": 14,
-      "pct": 55
+      "pct": 58
     },
     {
       "n": 13,
@@ -2939,8 +2939,8 @@
           "id": "DSB-008",
           "name": "Conditions-precedent satisfaction and waiver",
           "applicability": "Product",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -3016,15 +3016,15 @@
       ],
       "counts": {
         "Implemented": 3,
-        "Partial": 4,
+        "Partial": 5,
         "Partial/Mock": 0,
         "Mock": 2,
-        "Missing": 4,
+        "Missing": 3,
         "Partner": 0,
         "External": 0
       },
       "total": 13,
-      "pct": 40
+      "pct": 43
     },
     {
       "n": 14,
@@ -6620,8 +6620,8 @@
           "id": "UX-003",
           "name": "Borrower application and onboarding journey",
           "applicability": "Channel",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -6814,15 +6814,15 @@
       ],
       "counts": {
         "Implemented": 2,
-        "Partial": 8,
+        "Partial": 9,
         "Partial/Mock": 0,
         "Mock": 0,
-        "Missing": 7,
+        "Missing": 6,
         "Partner": 0,
         "External": 0
       },
       "total": 17,
-      "pct": 31
+      "pct": 33
     },
     {
       "n": 33,
@@ -7059,9 +7059,9 @@
     }
   ],
   "tests": {
-    "pass": 243,
+    "pass": 248,
     "fail": 0,
-    "total": 248,
+    "total": 253,
     "ran": true
   }
 }

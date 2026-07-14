@@ -671,6 +671,19 @@ export function validateProductPolicy(product, regulatedEntities = {}) {
   if (!product?.policyRefs?.boardApprovalRef) {
     findings.push(createFinding("error", "RBI-DL-2025", "Product boardApprovalRef is required.", "policyRefs.boardApprovalRef"));
   }
+  if (!Number.isInteger(product?.sanctionValidityDays) || product.sanctionValidityDays < 1 || product.sanctionValidityDays > 365) {
+    findings.push(createFinding("error", "RBI-FPC", "Product sanctionValidityDays must be between 1 and 365.", "sanctionValidityDays"));
+  }
+  const documentTypes = new Set();
+  for (const [index, requirement] of (product?.documentRequirements ?? []).entries()) {
+    if (!requirement?.type || documentTypes.has(requirement.type)) {
+      findings.push(createFinding("error", "RBI-FPC", "Product document requirements need unique non-empty types.", `documentRequirements.${index}.type`));
+    }
+    documentTypes.add(requirement?.type);
+    if (requirement?.acceptedMimeTypes && (!Array.isArray(requirement.acceptedMimeTypes) || requirement.acceptedMimeTypes.length === 0)) {
+      findings.push(createFinding("error", "RBI-IT-GRC", "Document acceptedMimeTypes must be a non-empty array when supplied.", `documentRequirements.${index}.acceptedMimeTypes`));
+    }
+  }
 
   if (!Number.isFinite(product?.eligibility?.minAgeYears) || product.eligibility.minAgeYears < 18) {
     findings.push(createFinding("error", "RBI-DL-2025", "Product eligibility minAgeYears must be at least 18.", "eligibility.minAgeYears"));
@@ -809,6 +822,17 @@ export function normalizeProductPolicy(input, now = new Date()) {
     reviewFrequencyMonths: Number.isInteger(input.reviewFrequencyMonths) ? input.reviewFrequencyMonths : null,
     facilityExpiryDate: input.facilityExpiryDate ?? null,
     coolingOffDays: input.coolingOffDays ?? 1,
+    sanctionValidityDays: Number.isInteger(input.sanctionValidityDays) ? input.sanctionValidityDays : 30,
+    sanctionValidityPolicyRef: input.sanctionValidityPolicyRef ?? input.policyRefs?.boardApprovalRef ?? null,
+    documentRequirements: Array.isArray(input.documentRequirements)
+      ? input.documentRequirements.map((requirement) => ({
+          type: requirement.type,
+          label: requirement.label ?? requirement.type,
+          required: requirement.required !== false,
+          acceptedMimeTypes: Array.isArray(requirement.acceptedMimeTypes) ? [...requirement.acceptedMimeTypes] : undefined,
+          maxSizeBytes: Number.isInteger(requirement.maxSizeBytes) ? requirement.maxSizeBytes : undefined
+        }))
+      : [],
     recoveryMechanism: input.recoveryMechanism,
     interestRateType: input.interestRateType ?? "fixed",
     interestRateResetPolicy: input.interestRateResetPolicy

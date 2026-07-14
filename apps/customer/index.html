@@ -183,6 +183,24 @@
             <div><span class="eyebrow">From request to disbursal</span><h1>Your applications</h1><p>See progress, understand each status and complete the next action.</p></div>
             <div class="heading-visual applications-visual" aria-hidden="true"><span>01</span><span>02</span><span>03</span><span>04</span></div>
           </div>
+          <article class="surface-card application-start-card">
+            <div class="section-heading">
+              <div><span class="eyebrow">New application</span><h2>Apply securely</h2><p>Choose an available product and confirm the account where funds should be sent.</p></div>
+              <span class="step-chip">About 3 minutes</span>
+            </div>
+            <form id="application-form" class="application-form">
+              <div class="application-form-grid">
+                <label class="field-row" for="application-product">Loan product<select id="application-product" required><option value="">Loading available products…</option></select></label>
+                <label class="field-row" for="application-amount">Requested amount<input id="application-amount" type="number" min="1000" step="1" inputmode="numeric" required></label>
+                <label class="field-row" for="application-tenor">Tenor in months<input id="application-tenor" type="number" min="1" step="1" inputmode="numeric" required></label>
+                <label class="field-row" for="application-language">Language you understand<select id="application-language" required><option value="en">English</option><option value="hi">हिन्दी</option><option value="bn">বাংলা</option><option value="gu">ગુજરાતી</option><option value="kn">ಕನ್ನಡ</option><option value="ml">മലയാളം</option><option value="mr">मराठी</option><option value="or">ଓଡ଼ିଆ</option><option value="pa">ਪੰਜਾਬੀ</option><option value="ta">தமிழ்</option><option value="te">తెలుగు</option><option value="ur">اردو</option></select></label>
+                <label class="field-row" for="application-ifsc">Destination IFSC<input id="application-ifsc" maxlength="11" autocomplete="off" required></label>
+                <label class="field-row" for="application-account-last4">Account last four digits<input id="application-account-last4" maxlength="4" inputmode="numeric" autocomplete="off" pattern="[0-9]{4}" required></label>
+              </div>
+              <label class="application-declaration"><input id="application-declaration" type="checkbox" required><span>I confirm that the information is accurate and I understand the selected journey language. Product terms remain subject to underwriting and the Key Fact Statement.</span></label>
+              <button class="primary-button" id="application-submit" type="submit">Submit application <span aria-hidden="true">→</span></button>
+            </form>
+          </article>
           <div class="application-list" id="app-list-container"><div class="portal-state">Loading your applications…</div></div>
         </section>
 

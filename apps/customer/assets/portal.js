@@ -4,6 +4,7 @@ const urlTenantId = pathSegments[1] === "t" && pathSegments[2] ? decodeURICompon
 const state = {
   auth: { tenantId: urlTenantId, borrowerId: "", email: "", name: "" },
   applications: [],
+  applicationOptions: [],
   loans: [],
   complaints: [],
   activeApplicationId: null,
@@ -19,6 +20,9 @@ const dom = {
   navItems: [...document.querySelectorAll(".nav-item[data-panel]")],
   panels: [...document.querySelectorAll(".portal-panel")],
   appList: document.getElementById("app-list-container"),
+  applicationForm: document.getElementById("application-form"),
+  applicationProduct: document.getElementById("application-product"),
+  applicationSubmit: document.getElementById("application-submit"),
   loanList: document.getElementById("loan-list-container"),
   documentList: document.getElementById("document-list-container"),
   complaintList: document.getElementById("complaint-list-container"),
@@ -213,6 +217,10 @@ function renderApplications() {
   dom.appList.innerHTML = state.applications.map(application => {
     const [heading, description] = applicationGuidance(application);
     const amount = application.amount ?? application.requestedAmount ?? application.product?.requestedAmount ?? application.kfs?.principalAmount;
+    const readiness = application.origination;
+    const documentProgress = readiness?.documentRequirements?.length
+      ? `${readiness.documents?.filter(document => ["verified", "waived"].includes(document.status)).length || 0}/${readiness.documentRequirements.filter(requirement => requirement.required).length} required documents cleared`
+      : null;
     return `
       <article class="application-card">
         <div class="application-card-top">
@@ -225,7 +233,7 @@ function renderApplications() {
         </div>
         <div class="application-progress">${renderApplicationProgress(application)}</div>
         <div class="application-card-footer">
-          <p>${escapeHtml(description)}</p>
+          <p>${escapeHtml(description)}${documentProgress ? `<br><strong>${escapeHtml(documentProgress)}</strong>` : ""}</p>
           <div class="card-actions">${applicationAction(application)}</div>
         </div>
       </article>
@@ -243,6 +251,20 @@ function renderApplications() {
       </article>
     `;
   }).join("");
+}
+
+async function loadApplicationOptions() {
+  try {
+    const data = await jsonFetch("/borrower/application-options");
+    state.applicationOptions = data.products || [];
+    dom.applicationProduct.innerHTML = state.applicationOptions.length
+      ? '<option value="">Choose a product</option>' + state.applicationOptions.map(product => `<option value="${escapeHtml(product.productId)}">${escapeHtml(product.productName || product.productCode)} · ${money(product.minAmount)}–${money(product.maxAmount)}</option>`).join("")
+      : '<option value="">No digital products are available</option>';
+    dom.applicationSubmit.disabled = state.applicationOptions.length === 0;
+  } catch {
+    dom.applicationProduct.innerHTML = '<option value="">Products temporarily unavailable</option>';
+    dom.applicationSubmit.disabled = true;
+  }
 }
 
 function principalOutstanding(loan) {
@@ -396,7 +418,7 @@ async function loadComplaints() {
 }
 
 async function loadData() {
-  await Promise.all([loadApplications(), loadLoans(), loadComplaints()]);
+  await Promise.all([loadApplications(), loadApplicationOptions(), loadLoans(), loadComplaints()]);
   renderDocuments();
   renderNextAction();
 }
@@ -533,6 +555,63 @@ document.addEventListener("click", event => {
   if (action?.dataset.action === "view-schedule") viewRepaymentSchedule(action.dataset.id, action);
 });
 
+dom.applicationProduct.addEventListener("change", () => {
+  const product = state.applicationOptions.find(item => item.productId === dom.applicationProduct.value);
+  if (!product) return;
+  const amount = document.getElementById("application-amount");
+  const tenor = document.getElementById("application-tenor");
+  amount.min = product.minAmount;
+  amount.max = product.maxAmount;
+  amount.value = product.minAmount;
+  tenor.min = product.minTenorMonths;
+  tenor.max = product.maxTenorMonths;
+  tenor.value = product.minTenorMonths;
+});
+
+dom.applicationForm.addEventListener("submit", async event => {
+  event.preventDefault();
+  const product = state.applicationOptions.find(item => item.productId === dom.applicationProduct.value);
+  const language = document.getElementById("application-language").value;
+  if (!product) {
+    showToast("Choose an available loan product.", "warning");
+    return;
+  }
+  try {
+    setButtonBusy(dom.applicationSubmit, true, "Submitting securely…");
+    const declarationRef = `borrower:${state.auth.borrowerId}:${Date.now()}`;
+    await jsonFetch("/borrower/applications", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        regulatedEntityId: product.regulatedEntityId,
+        productId: product.productId,
+        requestedAmount: Number(document.getElementById("application-amount").value),
+        requestedTenorMonths: Number(document.getElementById("application-tenor").value),
+        preferredLanguage: language,
+        languageUnderstood: true,
+        languageConfirmationRef: language === "en" ? null : declarationRef,
+        informationAccurate: document.getElementById("application-declaration").checked,
+        applicationDeclarationRef: declarationRef,
+        destinationAccount: {
+          ifsc: document.getElementById("application-ifsc").value.trim().toUpperCase(),
+          accountNumberLast4: document.getElementById("application-account-last4").value.trim()
+        },
+        purpose: "personal_expenses",
+        repaymentMechanism: "nach",
+        source: "borrower_portal"
+      })
+    });
+    dom.applicationForm.reset();
+    await loadApplications();
+    renderNextAction();
+    showToast("Your application was submitted and its document checklist is ready.", "success");
+  } catch (error) {
+    showToast(error.message, "danger");
+  } finally {
+    setButtonBusy(dom.applicationSubmit, false);
+  }
+});
+
 dom.navItems.forEach((item, index) => {
   item.addEventListener("click", () => openPanel(item.dataset.panel));
   item.addEventListener("keydown", event => {
@@ -557,10 +636,14 @@ document.getElementById("btn-kfs-accept").addEventListener("click", async event 
   const button = event.currentTarget;
   try {
     setButtonBusy(button, true, "Recording acceptance…");
+    const application = state.applications.find(item => item.applicationId === state.activeApplicationId);
     await jsonFetch(`/loans/applications/${encodeURIComponent(state.activeApplicationId)}/kfs/accept`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: "{}"
+      body: JSON.stringify({
+        understoodLanguage: application?.kfs?.language ?? application?.preferredLanguage ?? "en",
+        languageConfirmationRef: application?.origination?.languageConfirmationRef ?? undefined
+      })
     });
     dom.dialogKfs.close();
     await loadApplications();
