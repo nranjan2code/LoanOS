@@ -20,7 +20,7 @@ The current implementation is intentionally small:
 - Public platform website in `apps/web/`.
 - Tenant-branded landing template in `apps/tenant/`.
 - Internal staff workspace in `apps/dashboard/`.
-- Borrower customer portal in `apps/customer/`.
+- Borrower customer portal in `apps/customer/`: a responsive, white-labelled journey home with prioritised next actions, visual application milestones, repayment schedules, a document centre, guided media, grievance tracking, and DPDP access/correction/erasure controls.
 - Shared design system tokens in `apps/shared/`.
 - Automated tests in `tests/`: 167 file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
 
@@ -66,7 +66,10 @@ npm run dev:api
 | `apps/shared/design-tokens.css` | Shared CSS variables and styling presets (typography, neobrutalist buttons, forms, status tags, alerts, toasts). |
 | `apps/web/index.html` | Public SaaS landing page for LoanOS. |
 | `apps/tenant/index.html` | Dynamic template for a tenant's own landing page (white-labeled via `/t/{tenantId}/branding`). |
-| `apps/customer/index.html` | Dynamic template for a borrower/customer self-service portal (white-labeled). |
+| `apps/customer/index.html` | Accessible page structure for the white-labelled borrower portal: secure sign-in, journey home, applications, repayments, documents, help, privacy, and compliant customer dialogs. |
+| `apps/customer/assets/portal.css` | Responsive customer-experience design system and layouts, including mobile navigation, application milestones, media surfaces, documents, support, privacy, dialogs, and reduced-motion handling. |
+| `apps/customer/assets/portal.js` | Borrower portal controller: one-time-code sign-in, tenant branding, prioritised next-action guidance, API-backed application/loan/complaint/document views, KFS acceptance, eSign, grievances, and DPDP rights. |
+| `apps/customer/assets/images/customer-welcome.jpg` | Customer-facing editorial welcome media used by the secure sign-in experience. |
 | `apps/dashboard/index.html` | Tenant staff workspace dashboard. |
 | `apps/api/src/identity.js` | Local IAM helpers for tenant/platform users, PBKDF2 password hashes, HTTP session records, tenant access reviews, and role checks. `resolveSession` splits into `resolveSessionRecord` (control-plane only — session lookup and tenant validation) and `resolveSessionUser` (given one tenant's already-fetched data, validates the login record), so a caller that doesn't have every tenant's data loaded can still resolve a session. |
 | `apps/api/src/file-store.js` | Local JSON state load/save helpers; control-plane tenant registry (api-key hashing, tenant resolution), sub-processor register, and break-glass grants; per-tenant data partitions and tenant-scoped accessors; `buildTenantExport`/`offboardTenant` for portability and evidenced deletion; targeted `loadControlPlaneOnly`/`loadTenantDataOnly`/`saveTenantDataOnly`/`saveControlPlaneOnly` accessors (thin wrappers here — the file driver can't do partial I/O — but a real optimization on the Postgres driver). `ensureBootstrapTenants` accepts injectable `loadStateFn`/`saveStateFn` so the Postgres driver can reuse its seeding logic. |

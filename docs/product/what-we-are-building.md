@@ -156,6 +156,7 @@ The current codebase contains Phase 0 executable controls:
 - Staff actor registry with role, queue, assignment-authority, and India-operations controls.
 - Complaint registry with acknowledgement evidence, grievance-officer workflow, 30-day RBI clock, and RBI CMS escalation evidence.
 - Borrower-backed applications that can inherit borrower/KYC/consent/economic facts by reference.
+- White-labelled borrower journey portal with one-time-code access, a prioritised next action, visual application milestones, repayment schedules, a document centre, short educational media, grievance tracking, and DPDP access/correction/erasure controls.
 - LOS workflow state machine with KFS readiness, material-AI human review, decision proposal, maker-checker approval, and disbursement transition.
 - LWS derived task queues for compliance exceptions, KFS evidence, credit decisions, AI human review, checker approval, disbursement, collections, NPA review, grievance resolution, and RBI CMS escalation, with SLA clocks, role checks, and assignment/start/release/comment audit.
 - LMS loan account model that opens on disbursement, generates a repayment schedule, records ledger events, reconstructs balance, accrues interest, posts payments, supports part-prepayment, foreclosure, closure NOC, borrower statements and statement documents, controls charges/waivers/reversals, computes delinquency, classifies assets, generates CIC-ready snapshots, and enforces noticed recovery plus same-day cash posting.
