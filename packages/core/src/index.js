@@ -661,6 +661,10 @@ export { HttpsProviderClient, PortalProviderClient, SftpProviderClient } from ".
 export { registerCryptographicKey, executeCryptographicOperation, rotateCryptographicKey } from "./cryptographic-execution-ports.js";
 export { IntegrationWorkerRuntime, createIntegrationWorkerHandlers } from "./integration-worker-runtime.js";
 export { VENDOR_MAPPING_TRANSFORMS, VENDOR_UAT_SCENARIOS, registerVendorMapping, mapVendorPayload, certifyVendorUat, assessVendorActivation } from "./vendor-payload-mapping.js";
+export { emptyIntegrationWorkerState, integrationPayloadChecksum, createIntegrationJob, acquireIntegrationJobLease, heartbeatIntegrationJobLease, completeIntegrationJob, failIntegrationJob, replayDeadLetterJob, integrationWorkerHealth, runIntegrationWorkerOnce } from "./integration-worker-operations.js";
+export { registerSecurityAdapterProfile, createSecurityProviderPort, recordSecurityCompromiseExercise } from "./production-security-adapters.js";
+export { registerProviderMappingPack, recordSandboxCertificationCampaign, createVendorRfqComparison, approveVendorActivation, projectVendorActivationDashboard } from "./vendor-onboarding-operations.js";
+export { scheduleWorkflowTimer, claimDueWorkflowTimers, completeWorkflowTimer, routeWorkflowTask, pauseWorkflowCase, resumeWorkflowCase, migrateWorkflowCase, executeTransactionalBulkAction } from "./workflow-runtime-operations.js";
 
 export {
   ASSET_TYPES,

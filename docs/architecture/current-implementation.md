@@ -23,7 +23,7 @@ The current implementation is intentionally small:
 - Internal staff workspace in `apps/dashboard/`.
 - Borrower customer portal in `apps/customer/`: a responsive, white-labelled journey home with prioritised next actions, visual application milestones, repayment schedules, a document centre, guided media, grievance tracking, and DPDP access/correction/erasure controls.
 - Shared design system tokens in `apps/shared/`.
-- Automated tests in `tests/`: 414 tracked file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
+- Automated tests in `tests/`: 430 tracked file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
 
 Run it:
 
@@ -75,6 +75,10 @@ npm run dev:api
 | `packages/core/src/provider-transport-clients.js` | Executable HTTPS transport with mTLS evidence, bounded retries/timeouts, stable idempotency and response-contract/checksum validation; injected SFTP and portal drivers require host/session evidence and exact transfer acknowledgements. |
 | `packages/core/src/cryptographic-execution-ports.js` | Injected KMS/HSM/PGP ports for non-exportable attested keys, envelope encryption, signing/verification and rotation with tenant/purpose/version isolation and metadata-only evidence. |
 | `packages/core/src/integration-worker-runtime.js` | Lease-fenced, bounded run-once worker for callback dispatch and signed-file poll/process jobs with retry/dead-letter state, evidence-required completion, timeout handling, health metrics and graceful stop. |
+| `packages/core/src/integration-worker-operations.js` | Revision/CAS-safe persistent job state for callback and signed-file workers, including tenant idempotency, expiring fenced leases, heartbeat, bounded retry, DLQ, four-eyes replay, health projection and injected run-once composition. |
+| `packages/core/src/production-security-adapters.js` | Governed India-resident profiles and injected SDK ports for cloud KMS/HSM, vault workload identity, PGP custody and SIEM/WORM export, with non-exportable attestations, purpose isolation and compromise exercises. |
+| `packages/core/src/vendor-onboarding-operations.js` | Tenant-scoped provider mapping packs, adverse sandbox certification campaigns, exact-paise three-year RFQ comparisons, contract/SLA/residency/DR/exit activation gates and module-category readiness projection. |
+| `packages/core/src/workflow-runtime-operations.js` | Durable workflow timers with fencing, deterministic capacity routing, evidenced pause/resume, version migration with rollback snapshots, and preflighted bounded bulk execution. |
 | `apps/api/src/provider-callback-dispatcher.js` | Bounded executable callback worker with tenant lease claims, exact-body HMAC delivery, HTTPS/timeout/Retry-After handling, response classification, per-provider circuit breaker and queue/run health. Scheduler/target/KMS resolvers remain deployment-owned. |
 | `packages/core/src/provider-governance.js` | Fifteen-family provider certification registry: production/India/time/evidence scope, four-eyes approval, suspension, expiry assessment, and live-readiness authority. |
 | `packages/core/src/data-governance.js` | Verified audit anchoring, source-to-event completeness reconciliation, immutable evidence custody/legal hold/deletion proof, field lineage, and declarative data-quality assessment/certification. |

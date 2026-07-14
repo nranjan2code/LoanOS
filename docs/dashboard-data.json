@@ -1,68 +1,68 @@
 {
-  "generated": "2026-07-14T20:22:20.621Z",
+  "generated": "2026-07-14T20:38:33.720Z",
   "git": {
     "branch": "main",
-    "count": 179,
+    "count": 180,
     "commits": [
+      {
+        "hash": "5d36a8c",
+        "subject": "feat(governance): complete capability evidence trace",
+        "when": "15 minutes ago"
+      },
       {
         "hash": "647c86c",
         "subject": "fix(dashboard): make capability metrics auditable",
-        "when": "4 minutes ago"
+        "when": "21 minutes ago"
       },
       {
         "hash": "ce1aacb",
         "subject": "fix(web): serve product journeys publicly",
-        "when": "6 minutes ago"
+        "when": "22 minutes ago"
       },
       {
         "hash": "0848776",
         "subject": "feat(integrations): complete deployment execution ports",
-        "when": "14 minutes ago"
+        "when": "30 minutes ago"
       },
       {
         "hash": "5f992d0",
         "subject": "feat(integrations): complete adapter execution baseline",
-        "when": "18 minutes ago"
+        "when": "35 minutes ago"
       },
       {
         "hash": "3037e82",
         "subject": "chore: sync and update workspace files",
-        "when": "26 minutes ago"
+        "when": "42 minutes ago"
       },
       {
         "hash": "81f7941",
         "subject": "docs(dashboard): refresh integration wave metadata",
-        "when": "26 minutes ago"
+        "when": "43 minutes ago"
       },
       {
         "hash": "73efaa1",
         "subject": "feat(integrations): persist delivery and file conformance",
-        "when": "28 minutes ago"
+        "when": "44 minutes ago"
       },
       {
         "hash": "9603764",
         "subject": "feat(integrations): add adverse provider simulation",
-        "when": "34 minutes ago"
+        "when": "50 minutes ago"
       },
       {
         "hash": "35c274b",
         "subject": "docs(integrations): map APIs by platform module",
-        "when": "50 minutes ago"
+        "when": "66 minutes ago"
       },
       {
         "hash": "9faac39",
         "subject": "docs(integrations): add vendor procurement catalogue",
-        "when": "62 minutes ago"
+        "when": "79 minutes ago"
       },
       {
         "hash": "7c24518",
         "subject": "feat(web): add governed product journey library",
-        "when": "68 minutes ago"
-      },
-      {
-        "hash": "391c6e2",
-        "subject": "feat(system): eliminate unstarted capability gaps",
-        "when": "70 minutes ago"
+        "when": "84 minutes ago"
       }
     ]
   },
@@ -14050,10 +14050,10 @@
     }
   ],
   "tests": {
-    "pass": 414,
+    "pass": 430,
     "fail": 0,
     "skipped": 5,
-    "total": 419,
+    "total": 435,
     "ran": true,
     "source": "live"
   }
