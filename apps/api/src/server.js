@@ -751,6 +751,20 @@ async function route(req, res, dataDir, platformAdminKey, observability) {
     if (publicPageMatch && publicWebPages.has(publicPageMatch[1])) {
       return serveStaticFile(res, appsRoot, "web", `/${publicPageMatch[1]}/index.html`, "/");
     }
+
+    // Individual product journeys are public website pages. Keep the matcher
+    // deliberately limited to one safe slug below /loan-types so arbitrary
+    // API paths or deeper filesystem paths cannot become static mounts.
+    const productJourneyMatch = path.match(/^\/loan-types\/([a-z0-9-]+)(?:\/|\/index\.html)?$/);
+    if (productJourneyMatch) {
+      return serveStaticFile(
+        res,
+        appsRoot,
+        "web",
+        `/loan-types/${productJourneyMatch[1]}/index.html`,
+        "/"
+      );
+    }
   }
 
   // --- Backward compatibility: /dashboard/ → /t/dev/staff/ ---
