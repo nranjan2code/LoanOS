@@ -376,6 +376,28 @@ export {
 } from "./platform-delivery.js";
 
 export {
+  DEFAULT_SLA_MINUTES,
+  PROBLEM_STATUSES,
+  SUPPORT_CATEGORIES,
+  SUPPORT_SEVERITIES,
+  SUPPORT_STATUSES,
+  VENDOR_TIERS,
+  VENDOR_TYPES,
+  assessDependencyConcentration,
+  assessVendorSla,
+  assignSupportCase,
+  completeVendorReview,
+  createProblemRecord,
+  createSupportCase,
+  createVendorProfile,
+  enrichSupportCase,
+  escalateSupportCase,
+  projectServiceOperations,
+  transitionProblemRecord,
+  transitionSupportCase
+} from "./service-operations.js";
+
+export {
   validateMarketplaceNeutrality,
   rankMarketplaceOffers
 } from "./offer-marketplace.js";

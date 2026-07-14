@@ -67,9 +67,9 @@ Composite labels such as `Partial/Mock` identify a mixed capability: some intern
 
 LoanOS currently has a strong compliance-first domain foundation and executable slices for amortising, bullet, moratorium, step-up, and revolving facilities. Its best-developed capabilities are tenant isolation, KFS and fund-flow gates, policy/evidence lineage, maker-checker, audit integrity, borrower privacy rights, model governance, deterministic decision-engine infrastructure, and finance controls.
 
-The principal gaps before bank production are live integrations, downstream GL certification, regulatory submission formats, product-specific lending depth, repossession/auction and legal-expense depth, enterprise IAM and key management, external observability/SIEM operations, production HA/PITR and multi-region infrastructure, and bank-assurance evidence. Bounded observability, encrypted recovery, governed release, configuration drift/parity, and concurrent HTTP resilience-probe slices now provide local operational evidence; durable telemetry, managed backup/PITR, deployment-controller integration, production-scale soak/chaos testing, real failover/failback, on-call operations, and exercised business continuity remain open. Collections and legal recovery have a controlled first slice, but dialer integration, route/capacity optimization, track-specific pleadings, court integration, possession, auction, and recovery accounting remain open. Public product positioning must remain narrower than this catalogue until each advertised journey reaches an agreed maturity level.
+The principal gaps before bank production are live integrations, downstream GL certification, regulatory submission formats, product-specific lending depth, repossession/auction and legal-expense depth, enterprise IAM and key management, external observability/SIEM operations, production HA/PITR and multi-region infrastructure, and bank-assurance evidence. Bounded observability, encrypted recovery, governed release, configuration drift/parity, concurrent HTTP resilience probes, support/problem evidence, and vendor SLA/concentration controls now provide local operational evidence; durable telemetry, managed backup/PITR, deployment-controller integration, ITSM/paging/status communication, tested 24x7 staffing, production-scale soak/chaos testing, contract enforcement, full fourth-party/portfolio/regional concentration, real failover/failback, and exercised business continuity remain open. Collections and legal recovery have a controlled first slice, but dialer integration, route/capacity optimization, track-specific pleadings, court integration, possession, auction, and recovery accounting remain open. Public product positioning must remain narrower than this catalogue until each advertised journey reaches an agreed maturity level.
 
-The detailed register contains **452 individually identified capabilities**. At this snapshot, 87 are classified `Implemented`, 189 `Partial`, 150 `Missing`, and 26 are mock, partner, external, or composite-status obligations. These counts measure scope coverage, not delivery percentage: a single missing ledger, reconciliation, security, or recovery control can block production even if many smaller capabilities exist.
+The detailed register contains **452 individually identified capabilities**. At this snapshot, 87 are classified `Implemented`, 191 `Partial`, 148 `Missing`, and 26 are mock, partner, external, or composite-status obligations. These counts measure scope coverage, not delivery percentage: a single missing ledger, reconciliation, security, or recovery control can block production even if many smaller capabilities exist.
 
 ## Capability Index
 
@@ -685,8 +685,8 @@ The detailed register contains **452 individually identified capabilities**. At 
 | OPS-011 | Release management, canary, rollback, and change approval | Core | Partial |
 | OPS-012 | Configuration drift, environment parity, and audit | Core | Partial |
 | OPS-013 | Performance, soak, concurrency, volume, and resilience tests | Core | Partial |
-| OPS-014 | Support desk, runbooks, on-call, escalation, and problem management | Core | Missing |
-| OPS-015 | Vendor SLA and dependency concentration monitoring | Core | Missing |
+| OPS-014 | Support desk, runbooks, on-call, escalation, and problem management | Core | Partial |
+| OPS-015 | Vendor SLA and dependency concentration monitoring | Core | Partial |
 
 ### 32. Borrower, Staff, Branch, Partner, and Field Experiences
 

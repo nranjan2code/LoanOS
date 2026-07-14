@@ -18,8 +18,11 @@ import {
   applyKfsWorkflow,
   assignComplaint,
   assignRecoveryAgent,
+  assignSupportCase,
   assignWorkflowTask,
   assessChargeToLoanAccount,
+  assessDependencyConcentration,
+  assessVendorSla,
   buildAiDisclosure,
   buildKeyFactStatement,
   buildLoanJournalEntries,
@@ -40,9 +43,13 @@ import {
   clearGlobalKillSwitch,
   commentOnWorkflowTask,
   completeWorkflowTask,
+  completeVendorReview,
   createLoanAccountFromApplication,
   createConfigurationBaseline,
   createPlatformRelease,
+  createProblemRecord,
+  createSupportCase,
+  createVendorProfile,
   createLegalRecoveryCase,
   createPromiseToPay,
   drawRevolvingCredit,
@@ -130,12 +137,14 @@ import {
   prepayLoanAccount,
   proposeDecision,
   projectPlatformDelivery,
+  projectServiceOperations,
   promotePlatformRelease,
   recordCollectionsReminder,
   recordCollectionContact,
   recordLegalRecoveryEvent,
   reviewRevolvingFacility,
   rollbackPlatformRelease,
+  escalateSupportCase,
   restructureLoanAccount,
   resetFloatingRate,
   settleLoanAccount,
@@ -150,6 +159,8 @@ import {
   startComplaintReview,
   startWorkflowTask,
   transitionModel,
+  transitionProblemRecord,
+  transitionSupportCase,
   triggerKillSwitch,
   upsertBeneficialOwner,
   upsertDigitalLendingApp,
@@ -8204,6 +8215,203 @@ async function routePlatform(req, res, { dataDir, platformAdminKey, method, path
   }
   const authContext = platformAuth.authContext;
 
+  if (method === "GET" && path === "/platform/service-operations") {
+    if (!hasPlatformRole(authContext, ["platform_admin", "security_admin", "auditor"])) {
+      sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } });
+      return;
+    }
+    const state = await loadWholeState(dataDir);
+    sendJson(res, 200, projectServiceOperations(state.controlPlane.platformEvents ?? []));
+    return;
+  }
+
+  if (method === "POST" && path === "/platform/support/cases") {
+    if (!hasPlatformRole(authContext, ["platform_admin", "security_admin"])) {
+      sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } });
+      return;
+    }
+    const body = await readJson(req);
+    const actor = authActor(authContext);
+    if (body.openedBy !== actor) {
+      sendJson(res, 403, { error: { code: "operations_actor_mismatch", message: "openedBy must be the authenticated platform actor." } });
+      return;
+    }
+    try {
+      const state = await loadWholeState(dataDir);
+      const projection = projectServiceOperations(state.controlPlane.platformEvents ?? []);
+      const supportCase = createSupportCase(body, projection.supportCases);
+      const nextState = appendPlatformEvent(state, { type: "platform.operations.support_created", supportCase }, { actor });
+      await saveWholeState(nextState, dataDir);
+      sendJson(res, 201, { supportCase });
+    } catch (error) { sendOperationsError(res, error); }
+    return;
+  }
+
+  const supportActionMatch = path.match(/^\/platform\/support\/cases\/([^/]+)\/(assignment|escalation|transition)$/);
+  if (method === "POST" && supportActionMatch) {
+    if (!hasPlatformRole(authContext, ["platform_admin", "security_admin"])) {
+      sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } });
+      return;
+    }
+    const body = await readJson(req);
+    const actor = authActor(authContext);
+    const action = supportActionMatch[2];
+    const actorField = action === "assignment" ? "assignedBy" : action === "escalation" ? "escalatedBy" : "updatedBy";
+    if (body[actorField] !== actor) {
+      sendJson(res, 403, { error: { code: "operations_actor_mismatch", message: `${actorField} must be the authenticated platform actor.` } });
+      return;
+    }
+    try {
+      const state = await loadWholeState(dataDir);
+      const projection = projectServiceOperations(state.controlPlane.platformEvents ?? []);
+      const caseId = decodeURIComponent(supportActionMatch[1]);
+      const current = projection.supportCases.find((item) => item.caseId === caseId);
+      if (!current) {
+        sendJson(res, 404, { error: { code: "support_case_not_found", message: "Support case not found." } });
+        return;
+      }
+      const transition = action === "assignment" ? assignSupportCase : action === "escalation" ? escalateSupportCase : transitionSupportCase;
+      const supportCase = transition(current, body);
+      const nextState = appendPlatformEvent(state, { type: `platform.operations.support_${action}`, supportCase }, { actor });
+      await saveWholeState(nextState, dataDir);
+      sendJson(res, 200, { supportCase });
+    } catch (error) { sendOperationsError(res, error); }
+    return;
+  }
+
+  if (method === "POST" && path === "/platform/support/problems") {
+    if (!hasPlatformRole(authContext, ["platform_admin", "security_admin"])) {
+      sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } });
+      return;
+    }
+    const body = await readJson(req);
+    const actor = authActor(authContext);
+    if (body.createdBy !== actor) {
+      sendJson(res, 403, { error: { code: "operations_actor_mismatch", message: "createdBy must be the authenticated platform actor." } });
+      return;
+    }
+    try {
+      const state = await loadWholeState(dataDir);
+      const projection = projectServiceOperations(state.controlPlane.platformEvents ?? []);
+      const problem = createProblemRecord(body, projection.supportCases, projection.problems);
+      const nextState = appendPlatformEvent(state, { type: "platform.operations.problem_created", problem }, { actor });
+      await saveWholeState(nextState, dataDir);
+      sendJson(res, 201, { problem });
+    } catch (error) { sendOperationsError(res, error); }
+    return;
+  }
+
+  const problemActionMatch = path.match(/^\/platform\/support\/problems\/([^/]+)\/transition$/);
+  if (method === "POST" && problemActionMatch) {
+    if (!hasPlatformRole(authContext, ["platform_admin", "security_admin"])) {
+      sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } });
+      return;
+    }
+    const body = await readJson(req);
+    const actor = authActor(authContext);
+    if (body.updatedBy !== actor) {
+      sendJson(res, 403, { error: { code: "operations_actor_mismatch", message: "updatedBy must be the authenticated platform actor." } });
+      return;
+    }
+    try {
+      const state = await loadWholeState(dataDir);
+      const projection = projectServiceOperations(state.controlPlane.platformEvents ?? []);
+      const problemId = decodeURIComponent(problemActionMatch[1]);
+      const current = projection.problems.find((item) => item.problemId === problemId);
+      if (!current) {
+        sendJson(res, 404, { error: { code: "problem_not_found", message: "Problem record not found." } });
+        return;
+      }
+      const problem = transitionProblemRecord(current, body);
+      const nextState = appendPlatformEvent(state, { type: "platform.operations.problem_transitioned", problem }, { actor });
+      await saveWholeState(nextState, dataDir);
+      sendJson(res, 200, { problem });
+    } catch (error) { sendOperationsError(res, error); }
+    return;
+  }
+
+  if (method === "POST" && path === "/platform/vendor-controls") {
+    if (!hasPlatformRole(authContext, ["platform_admin", "security_admin"])) {
+      sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } });
+      return;
+    }
+    const body = await readJson(req);
+    try {
+      const state = await loadWholeState(dataDir);
+      const projection = projectServiceOperations(state.controlPlane.platformEvents ?? []);
+      const vendor = createVendorProfile(body, projection.vendors, listSubProcessors(state), Object.keys(state.controlPlane.tenants ?? {}));
+      const nextState = appendPlatformEvent(state, { type: "platform.operations.vendor_created", vendor }, { actor: authActor(authContext) });
+      await saveWholeState(nextState, dataDir);
+      sendJson(res, 201, { vendor });
+    } catch (error) { sendOperationsError(res, error); }
+    return;
+  }
+
+  const vendorActionMatch = path.match(/^\/platform\/vendor-controls\/([^/]+)\/(reviews|sla-assessments)$/);
+  if (method === "POST" && vendorActionMatch) {
+    if (!hasPlatformRole(authContext, ["platform_admin", "security_admin"])) {
+      sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } });
+      return;
+    }
+    const body = await readJson(req);
+    const actor = authActor(authContext);
+    const actorField = vendorActionMatch[2] === "reviews" ? "reviewedBy" : "assessedBy";
+    if (body[actorField] !== actor) {
+      sendJson(res, 403, { error: { code: "operations_actor_mismatch", message: `${actorField} must be the authenticated platform actor.` } });
+      return;
+    }
+    try {
+      const state = await loadWholeState(dataDir);
+      const projection = projectServiceOperations(state.controlPlane.platformEvents ?? []);
+      const vendorId = decodeURIComponent(vendorActionMatch[1]);
+      const current = projection.vendors.find((item) => item.vendorId === vendorId);
+      if (!current) {
+        sendJson(res, 404, { error: { code: "vendor_not_found", message: "Vendor control profile not found." } });
+        return;
+      }
+      let event;
+      let response;
+      if (vendorActionMatch[2] === "reviews") {
+        if (projection.vendorReviews.some((item) => item.reviewId === body.reviewId)) throw Object.assign(new Error("reviewId already exists."), { code: "vendor_review_duplicate" });
+        const result = completeVendorReview(current, body);
+        event = { type: "platform.operations.vendor_reviewed", vendor: result.profile, review: result.review };
+        response = result;
+      } else {
+        if (projection.vendorSlaAssessments.some((item) => item.assessmentId === body.assessmentId)) throw Object.assign(new Error("assessmentId already exists."), { code: "vendor_assessment_duplicate" });
+        const assessment = assessVendorSla(current, body);
+        event = { type: "platform.operations.vendor_sla_assessed", assessment };
+        response = { assessment };
+      }
+      const nextState = appendPlatformEvent(state, event, { actor });
+      await saveWholeState(nextState, dataDir);
+      sendJson(res, 201, response);
+    } catch (error) { sendOperationsError(res, error); }
+    return;
+  }
+
+  if (method === "POST" && path === "/platform/vendor-controls/concentration-assessments") {
+    if (!hasPlatformRole(authContext, ["platform_admin", "security_admin"])) {
+      sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } });
+      return;
+    }
+    const body = await readJson(req);
+    const actor = authActor(authContext);
+    if (body.assessedBy !== actor) {
+      sendJson(res, 403, { error: { code: "operations_actor_mismatch", message: "assessedBy must be the authenticated platform actor." } });
+      return;
+    }
+    try {
+      const state = await loadWholeState(dataDir);
+      const projection = projectServiceOperations(state.controlPlane.platformEvents ?? []);
+      if (projection.concentrationAssessments.some((item) => item.assessmentId === body.assessmentId)) throw Object.assign(new Error("assessmentId already exists."), { code: "vendor_assessment_duplicate" });
+      const assessment = assessDependencyConcentration(projection.vendors, body);
+      const nextState = appendPlatformEvent(state, { type: "platform.operations.concentration_assessed", assessment }, { actor });
+      await saveWholeState(nextState, dataDir);
+      sendJson(res, 201, { assessment });
+    } catch (error) { sendOperationsError(res, error); }
+    return;
+  }
+
   if (method === "GET" && path === "/platform/delivery/controls") {
     if (!hasPlatformRole(authContext, ["platform_admin", "security_admin", "auditor"])) {
       sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } });
@@ -9133,6 +9341,14 @@ function sendDeliveryError(res, error) {
   const conflictCodes = new Set(["release_duplicate", "configuration_baseline_duplicate", "delivery_assessment_duplicate"]);
   sendJson(res, conflictCodes.has(code) ? 409 : 422, {
     error: { code, message: error?.message ?? "Delivery control failed closed." }
+  });
+}
+
+function sendOperationsError(res, error) {
+  const code = error?.code ?? "service_operations_failed";
+  const conflictCodes = new Set(["support_case_duplicate", "problem_duplicate", "vendor_duplicate", "vendor_review_duplicate", "vendor_assessment_duplicate"]);
+  sendJson(res, conflictCodes.has(code) ? 409 : 422, {
+    error: { code, message: error?.message ?? "Service operation failed closed." }
   });
 }
 
