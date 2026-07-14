@@ -171,7 +171,64 @@ Expected results are API status `ok` and website HTTP `200`. A `HEAD` request
 (`curl -I`) is not a substitute for the website GET test because static routes
 are GET routes.
 
-## 7. Retrieve credentials and sign in
+## 7. Optional custom domain with external DNS (GoDaddy)
+
+Prefer a dedicated subdomain such as `demo.example.com`. It keeps the apex
+domain independent and can be routed to CloudFront with a standard CNAME.
+
+1. Open the distribution in **CloudFront → General → Add domain** and enter the
+   complete hostname, for example `demo.example.com`.
+2. Select or create an ACM certificate. A certificate used by CloudFront must
+   be in **US East (N. Virginia), `us-east-1`**, even when the stack and origin
+   are in another region. A wildcard such as `*.example.com` covers subdomains
+   but does not cover the apex `example.com`.
+3. In GoDaddy DNS, create the CNAME shown by ACM for domain validation:
+   - **Name**: enter only ACM's host portion, such as `_validation-token`;
+     GoDaddy appends the zone name;
+   - **Value**: enter the complete `*.acm-validations.aws` target; and
+   - **TTL**: the default value is suitable.
+4. Keep that validation CNAME permanently. ACM uses it for automatic
+   certificate renewal. Wait for ACM status `Issued`, refresh the certificate
+   list in CloudFront, select it, and finish the distribution update.
+5. Wait until the CloudFront distribution reports `Deployed`.
+6. Add the traffic-routing CNAME in GoDaddy:
+   - **Name**: `demo` (or the chosen subdomain);
+   - **Value**: the distribution hostname, for example
+     `d123example.cloudfront.net`; and
+   - do not include `https://`, a path, or the custom hostname itself.
+
+The ACM-validation and traffic-routing CNAMEs are separate records and both
+must remain present. Verify public DNS and HTTPS after propagation:
+
+```bash
+dig +short demo.example.com @8.8.8.8
+curl -fsS -o /dev/null -w '%{http_code}\n' https://demo.example.com/
+curl -fsS https://demo.example.com/health | jq
+```
+
+If public DNS works but a Mac still reports that it cannot find the server,
+wait for its negative cache to expire or flush the local cache:
+
+```bash
+sudo dscacheutil -flushcache
+sudo killall -HUP mDNSResponder
+```
+
+GoDaddy cannot place a conventional CNAME at the zone apex. Keep
+`example.com`/`www` separate, or move authoritative DNS to Route 53 and use an
+Alias record if the apex must serve this distribution.
+
+### CloudFormation ownership and drift
+
+Adding the alternate hostname and certificate in the CloudFront console is an
+operator-managed demo customization. The current template does not own those
+settings, so it creates CloudFormation drift and a later distribution
+replacement can remove them. For a repeatable environment, add explicit
+certificate-ARN and alias parameters to the template, deploy a replacement
+stack, and move the routing CNAME only after it passes smoke tests. Never embed
+GoDaddy credentials or certificate-validation tokens in the source archive.
+
+## 8. Retrieve credentials and sign in
 
 Open **Systems Manager → Parameter Store**, select the `SecureString` named by
 the stack's `CredentialsParameter` output, and choose **Show decrypted value**.
@@ -187,7 +244,7 @@ Tenant staff login:
 The same parameter contains synthetic-demo API and platform credentials for
 automated testing. Treat them as secrets even though the data is synthetic.
 
-## 8. Service layout and operations
+## 9. Service layout and operations
 
 Use **Systems Manager → Session Manager**, not SSH. Important paths and units:
 
@@ -217,7 +274,7 @@ The rules health response must report `kill_switch_fresh: true`. A stale or
 unreachable rules engine is not a permissive condition; decision paths fail
 closed.
 
-## 9. Updating application code
+## 10. Updating application code
 
 ### Recommended: replacement stack (blue/green demo update)
 
@@ -263,7 +320,7 @@ Use only for a disposable synthetic demo when replacement is impractical:
 Do not automate this path by sourcing or printing secret environment files.
 For repeatable updates, create a replacement stack instead.
 
-## 10. Troubleshooting
+## 11. Troubleshooting
 
 ### CloudFormation fails or rolls back
 
@@ -310,7 +367,7 @@ Do not discard or replace the active master-key ring for any environment with
 data. For this synthetic disposable demo, prefer creating a replacement stack.
 Never apply a synthetic-data reset procedure to real or production data.
 
-## 11. Cost controls and teardown
+## 12. Cost controls and teardown
 
 Confirm the AWS Budget email subscription. Review **Billing → Bills** and the
 Free Tier/credit pages regularly. The stack intentionally creates no NAT
@@ -318,18 +375,22 @@ Gateway, load balancer, Elastic IP, RDS database, or Route 53 hosted zone.
 
 To remove the demo:
 
-1. Delete the CloudFormation stack and wait for `DELETE_COMPLETE`. The root EBS
+1. If a custom domain was configured, delete its traffic-routing CNAME before
+   deleting the distribution. Detach the ACM certificate from all CloudFront
+   distributions before deleting it. Remove the ACM-validation CNAME only when
+   the certificate is no longer required anywhere.
+2. Delete the CloudFormation stack and wait for `DELETE_COMPLETE`. The root EBS
    volume has `DeleteOnTermination: true`.
-2. Manually delete the two instance-created parameters:
+3. Manually delete the two instance-created parameters:
 
    ```text
    /loanos-demo/<stack-name>/credentials
    /loanos-demo/<stack-name>/status
    ```
 
-3. Delete the versioned source object and private S3 bucket when no longer
+4. Delete the versioned source object and private S3 bucket when no longer
    needed.
-4. Check EC2 Global View, CloudFront, S3, Systems Manager Parameter Store, and
+5. Check EC2 Global View, CloudFront, S3, Systems Manager Parameter Store, and
    Billing for leftovers.
-5. Retain only non-secret deployment evidence: commit SHA, template version,
+6. Retain only non-secret deployment evidence: commit SHA, template version,
    archive SHA-256, stack timestamps, and smoke-test results.
