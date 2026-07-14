@@ -1,104 +1,335 @@
-# AWS synthetic demo deployment
+# AWS synthetic demo deployment runbook
 
-This package deploys a **synthetic-data demonstration**, not a production
-lending system. It preserves the important executable shape—PostgreSQL,
-the Node control/data plane, and one tenant-bound active Rust rules-engine
-runtime—but keeps all external providers in mock mode and runs the services
-on one encrypted EC2 host to control cost.
+This runbook deploys the complete LoanOS India **synthetic-data demo** to AWS:
 
-Do not use borrower data, PAN/Aadhaar values, bureau files, bank details, or
-real regulated submissions in this environment.
+- the public platform website (`apps/web`);
+- the tenant landing page (`apps/tenant`);
+- the staff workspace (`apps/dashboard`);
+- the borrower portal (`apps/customer`);
+- the Node control/data-plane API;
+- PostgreSQL with the repository schema and tenant RLS roles; and
+- one active, tenant-bound Rust decision-engine runtime for tenant `dev`.
+
+It is deliberately a low-cost demonstration topology. The services are
+co-located on one encrypted EC2 host, external providers run in mock mode, and
+CloudFront is the HTTPS entry point. It is **not** a production topology and
+must never contain borrower data, PAN/Aadhaar values, bureau files, bank data,
+or real regulated submissions.
+
+## Repository deployment files
+
+| File | Purpose |
+| --- | --- |
+| `cloudformation-demo.yaml` | VPC, EC2, IAM, CloudFront, and AWS Budget infrastructure |
+| `bootstrap-demo.sh` | Host installation, database setup, service units, credentials, and health gates |
+| `package-demo.sh` | Reproducible archive of committed repository source |
+| `README.md` | This operator runbook |
+
+`package-demo.sh` packages `HEAD`, not uncommitted working-tree changes. This
+keeps the deployed revision attributable to a commit. Commit and validate the
+intended code before packaging it.
 
 ## What the stack creates
 
-- one encrypted Ubuntu EC2 instance;
-- one security group exposing HTTP port 80 only;
-- one CloudFront distribution providing the user-facing HTTPS endpoint and a
-  stack-specific origin header; direct requests to EC2 receive HTTP 403;
-- an IAM role for Systems Manager Session Manager (no SSH port or key pair);
+- one VPC, public subnet, route table, and internet gateway;
+- one encrypted Ubuntu EC2 instance (`t3.small` by default) with a 24 GB `gp3`
+  root volume and public IPv4 address;
+- one security group exposing only origin HTTP port 80;
+- one CloudFront distribution providing the public HTTPS endpoint, disabling
+  caching for the dynamic application, and adding a stack-specific secret
+  origin header;
+- Nginx rejecting direct EC2 requests that do not contain that origin header;
+- one IAM instance role and profile for private S3 download, Parameter Store,
+  and Systems Manager Session Manager—there is no SSH key or port 22;
 - an AWS Budget with forecasted 50%, actual 80%, and actual 100% alerts;
-- local PostgreSQL with the repository schema and RLS role model;
-- one active, tenant-bound Rust runtime for tenant `dev`;
-- generated credentials stored in an SSM Parameter Store `SecureString`.
+- local PostgreSQL, Node, Nginx, and systemd services;
+- one active Rust runtime bound to tenant `dev`, plus a periodic kill-switch
+  freshness job; and
+- generated credentials in an SSM Parameter Store `SecureString`.
 
-The default `t3.small`, 24 GB encrypted `gp3` volume, public IPv4 address, and
-CloudFront traffic consume AWS credits.
-Budget notifications are alerts, not a hard spending cap. Delete the stack
-before credits expire if continued paid usage is not acceptable.
+AWS credits are still consumed. EC2, EBS, public IPv4, S3, and CloudFront may
+all be billable. A Budget sends alerts; it is not a hard spending cap.
 
-## Package and upload the private source
+## 1. Prerequisites and safety controls
 
-The repository is private. Do not put a GitHub token in CloudFormation or EC2
-user data. Generate a tracked-source archive locally:
+Before creating resources:
+
+1. Sign in to the intended AWS account and choose one region. The tested
+   deployment used **Asia Pacific (Mumbai), `ap-south-1`**.
+2. In **Billing and Cost Management**, confirm credits/free-tier eligibility.
+3. Create an AWS Budget or use the stack's `MonthlyBudgetUsd` parameter. Use a
+   real monitored email and confirm its subscription email.
+4. Keep screenshots free of account IDs, decrypted parameters, passwords,
+   tokens, API keys, and session cookies.
+5. Run the repository checks appropriate to the revision being deployed:
+
+   ```bash
+   npm test
+   (cd rules && cargo test --workspace)
+   (cd rules && cargo clippy --workspace --all-targets -- -D warnings)
+   bash -n deploy/aws/bootstrap-demo.sh deploy/aws/package-demo.sh
+   cfn-lint deploy/aws/cloudformation-demo.yaml
+   ```
+
+## 2. Package the committed source
+
+From the repository root:
 
 ```bash
 ./deploy/aws/package-demo.sh
 ```
 
-Create a private, general-purpose S3 bucket in the same AWS region as the
-stack and upload `loanos-demo-source.tar.gz`. Keep **Block all public access**
-enabled. The instance role receives permission to read only the exact bucket
-and object key entered as stack parameters.
+The command creates `loanos-demo-source.tar.gz`, mode `0600`, and prints its
+SHA-256 digest. Record the commit SHA and archive digest in the deployment
+ticket or release note; do not commit the archive.
 
-## Create the stack in the AWS console
+The repository may be private. Never put a GitHub token in CloudFormation,
+EC2 user data, or the archive. The private S3 handoff avoids that requirement.
+
+## 3. Create the private source bucket
+
+In the same region as the stack:
+
+1. Open **S3 → Create bucket**.
+2. Select **General purpose** and keep **Block all public access** enabled.
+3. Use a globally unique name, for example `loanos-demo-source-<random>`.
+4. Create the bucket and upload `loanos-demo-source.tar.gz` at its root.
+5. Keep default server-side encryption enabled.
+
+The stack grants its instance read access only to the exact bucket and object
+key supplied as parameters. The bucket itself remains private.
+
+## 4. Create the CloudFormation stack
 
 1. Open **CloudFormation → Stacks → Create stack → With new resources**.
-2. Choose **Upload a template file** and upload `cloudformation-demo.yaml`.
+2. Choose **Upload a template file** and select
+   `deploy/aws/cloudformation-demo.yaml`.
 3. Use a stack name such as `loanos-demo`.
-4. Enter the private S3 bucket and object key, plus the billing-alert email.
-   Keep `t3.small` for the first build.
-5. Confirm the IAM-resource acknowledgement and create the stack.
-6. Confirm the AWS Budget subscription email when it arrives.
+4. Enter the parameters:
 
-The CloudFormation resource can reach `CREATE_COMPLETE` before the host build
-finishes. The initial Rust release build commonly takes 15–25 minutes. Check
-the output named `BootstrapStatusParameter` in Systems Manager Parameter
-Store; it moves from `STARTED` to `COMPLETE` or `FAILED`.
+   | Parameter | Recommended demo value |
+   | --- | --- |
+   | `AlertEmail` | monitored operator email |
+   | `SourceBucket` | private bucket created above |
+   | `SourceKey` | `loanos-demo-source.tar.gz` |
+   | `InstanceType` | `t3.small` |
+   | `MonthlyBudgetUsd` | `25` or a lower operator-approved threshold |
+   | `LatestUbuntuAmi` | keep the supplied SSM public-parameter default |
 
-## Retrieve credentials
+5. Leave stack options at their defaults unless the account has a required
+   tagging or CloudFormation service-role policy.
+6. On review, acknowledge creation of named/managed IAM resources and create
+   the stack.
+7. Wait for `CREATE_COMPLETE`. CloudFront is global and is expected to take
+   several minutes.
 
-Open **Systems Manager → Parameter Store**, select the parameter shown in the
-stack's `CredentialsParameter` output, and choose **Show decrypted value**.
-Do not paste that value into tickets, source control, screenshots, or chat.
+CloudFormation completion means the AWS resources exist; it does not mean the
+host bootstrap has completed.
 
-The tenant staff login is:
+## 5. Verify bootstrap completion
+
+Open the stack's **Outputs** tab and record:
+
+- `DemoUrl`;
+- `InstanceId`;
+- `CredentialsParameter`;
+- `BootstrapStatusParameter`; and
+- `BootstrapLogCommand`.
+
+Then open **Systems Manager → Parameter Store** in the stack region and inspect
+the parameter named by `BootstrapStatusParameter`:
+
+- `STARTED`: installation is still running;
+- `COMPLETE`: both services passed their fail-closed health gates and the
+  encrypted credentials parameter was written;
+- `FAILED at bootstrap line ...`: use the diagnostics section below.
+
+The first Rust release build can take 15–25 minutes. Do not rerun the bootstrap
+while it is still active.
+
+## 6. Application URLs and smoke tests
+
+All applications share the CloudFront hostname:
+
+| Application | URL path |
+| --- | --- |
+| Public platform website | `/` |
+| Tenant landing page | `/t/dev/` |
+| Tenant staff workspace | `/t/dev/staff/` |
+| Borrower/customer portal | `/t/dev/portal/` |
+| API health | `/health` |
+
+After status is `COMPLETE`, open `DemoUrl` and each application path. A CLI
+smoke test can be run from any trusted machine:
+
+```bash
+curl -fsS "${DEMO_URL}health" | jq
+curl -fsS -o /dev/null -w '%{http_code}\n' "$DEMO_URL"
+```
+
+Expected results are API status `ok` and website HTTP `200`. A `HEAD` request
+(`curl -I`) is not a substitute for the website GET test because static routes
+are GET routes.
+
+## 7. Retrieve credentials and sign in
+
+Open **Systems Manager → Parameter Store**, select the `SecureString` named by
+the stack's `CredentialsParameter` output, and choose **Show decrypted value**.
+Do this privately. Never paste the JSON into chat, tickets, logs, or screenshots.
+
+Tenant staff login:
 
 - scope: tenant;
-- tenant id: `dev`;
+- tenant ID: `dev`;
 - email: `admin@dev.loanos.local`;
-- password: generated in the secure parameter.
+- password: `tenantAdminPassword` from the secure parameter.
 
-## Troubleshooting
+The same parameter contains synthetic-demo API and platform credentials for
+automated testing. Treat them as secrets even though the data is synthetic.
 
-Use **Systems Manager → Session Manager → Start session**, select the instance
-from the stack output, and inspect:
+## 8. Service layout and operations
+
+Use **Systems Manager → Session Manager**, not SSH. Important paths and units:
+
+| Item | Location |
+| --- | --- |
+| Application source | `/opt/loanos/app` |
+| API environment | `/etc/loanos/api.env` (root-readable only) |
+| Rules environment | `/etc/loanos/rules.env` (root-readable only) |
+| Bootstrap log | `/var/log/loanos-bootstrap.log` |
+| API service | `loanos-api.service` |
+| Rules service | `loanos-rules.service` |
+| Kill-switch timer | `loanos-kill-switch.timer` |
+| Reverse proxy | `nginx.service` |
+| Database | `postgresql.service` |
+
+Health and status commands:
+
+```bash
+sudo systemctl --no-pager --full status \
+  loanos-api loanos-rules loanos-kill-switch.timer nginx postgresql
+curl -fsS http://127.0.0.1:3040/health | jq
+curl -fsS http://127.0.0.1:47311/health | jq
+sudo tail -n 200 /var/log/loanos-bootstrap.log
+```
+
+The rules health response must report `kill_switch_fresh: true`. A stale or
+unreachable rules engine is not a permissive condition; decision paths fail
+closed.
+
+## 9. Updating application code
+
+### Recommended: replacement stack (blue/green demo update)
+
+This demo is disposable and its bootstrap generates database, encryption, API,
+and login secrets. The safest update is immutable replacement:
+
+1. Complete and validate the code change locally.
+2. Commit it; record the commit SHA.
+3. Run `package-demo.sh` to produce a new archive and digest.
+4. Upload it under a versioned S3 key, for example
+   `releases/<commit-sha>/loanos-demo-source.tar.gz`.
+5. Create a second stack such as `loanos-demo-<short-sha>` using that key.
+6. Wait for bootstrap `COMPLETE` and smoke-test all URLs.
+7. Retrieve the new credentials privately and verify staff login.
+8. Share/switch to the new `DemoUrl`.
+9. Delete the old stack and its two SSM parameters after acceptance.
+
+This gives a clean rollback: keep using the old URL until the replacement has
+passed. It also avoids mixing old encrypted rows with new key material.
+
+### Do not rerun bootstrap as an upgrade
+
+`bootstrap-demo.sh` is first-boot installation, not a migration runner. It
+generates new encryption and authentication material. Rerunning it against an
+existing database can make existing encrypted tenant envelopes unreadable.
+Never run it to deploy a code update.
+
+### Emergency in-place demo patch
+
+Use only for a disposable synthetic demo when replacement is impractical:
+
+1. Preserve `/etc/loanos/api.env`, `/etc/loanos/rules.env`, and the database.
+2. Back up the current `/opt/loanos/app` and record its commit.
+3. Copy a reviewed archive to a staging directory.
+4. Run schema changes explicitly as the database owner and review grants/RLS.
+5. Build/install dependencies in staging.
+6. Atomically switch the application directory.
+7. Restart rules first, refresh the kill switch, then restart the API and
+   Nginx.
+8. Run all local and CloudFront smoke tests. Restore the prior directory on
+   failure.
+
+Do not automate this path by sourcing or printing secret environment files.
+For repeatable updates, create a replacement stack instead.
+
+## 10. Troubleshooting
+
+### CloudFormation fails or rolls back
+
+Open **Events → View root cause** and capture the first `CREATE_FAILED` status
+reason. Fix the template, delete the rolled-back disposable stack, and create a
+new one. Do not infer the root cause from the final rollback event.
+
+### Bootstrap status is `FAILED`
+
+Start an SSM session using the stack's `InstanceId`, then run:
 
 ```bash
 sudo tail -n 200 /var/log/loanos-bootstrap.log
-sudo systemctl status loanos-api loanos-rules loanos-kill-switch.timer nginx postgresql
-curl -fsS http://127.0.0.1:3040/health
-curl -fsS http://127.0.0.1:47311/health | jq
 ```
 
-The bootstrap is idempotent for a fresh stack, but it is not an in-place
-production upgrade mechanism. Recreate this disposable demo when changing
-infrastructure assumptions.
+Inspect the service associated with the final error:
 
-## Teardown
-
-Delete the CloudFormation stack. Its EBS volume has
-`DeleteOnTermination: true`. CloudFormation also deletes the instance role,
-profile, security group, and budget. The two SSM parameters written by the
-instance are not CloudFormation resources, so delete this path afterward:
-
-```text
-/loanos-demo/<stack-name>/credentials
-/loanos-demo/<stack-name>/status
+```bash
+sudo journalctl -u loanos-api.service -n 80 --no-pager
+sudo journalctl -u loanos-rules.service -n 80 --no-pager
 ```
 
-Also check **EC2 Global View** and **Billing → Bills** after teardown. This
-stack intentionally creates no NAT Gateway, load balancer, Elastic IP, RDS
-database, or Route 53 hosted zone.
+Redact secrets before sharing logs. Older application revisions printed the
+development API key at startup; current code logs only that the key was loaded.
+Rotate any credential that appears in a log or screenshot.
 
-Delete the uploaded source archive and its S3 bucket after the stack is
-healthy, or retain the private archive only if you need reproducible rebuilds.
+### Website returns JSON `internal_error`
+
+Test `/health`, then inspect the API journal for the matching request ID. A
+healthy CloudFront response carrying application JSON means TLS and origin
+routing work; diagnose the application rather than recreating networking.
+
+### PostgreSQL permission errors
+
+Use `db/schema.sql` as the source of truth. The tenant hot-path role remains
+RLS-constrained; the control-plane role alone has the cross-tenant cleanup
+privilege needed for explicit offboarding/whole-state synchronization. Do not
+solve permission errors with superuser application credentials or by disabling
+RLS.
+
+### Encrypted tenant data cannot be authenticated
+
+Do not discard or replace the active master-key ring for any environment with
+data. For this synthetic disposable demo, prefer creating a replacement stack.
+Never apply a synthetic-data reset procedure to real or production data.
+
+## 11. Cost controls and teardown
+
+Confirm the AWS Budget email subscription. Review **Billing → Bills** and the
+Free Tier/credit pages regularly. The stack intentionally creates no NAT
+Gateway, load balancer, Elastic IP, RDS database, or Route 53 hosted zone.
+
+To remove the demo:
+
+1. Delete the CloudFormation stack and wait for `DELETE_COMPLETE`. The root EBS
+   volume has `DeleteOnTermination: true`.
+2. Manually delete the two instance-created parameters:
+
+   ```text
+   /loanos-demo/<stack-name>/credentials
+   /loanos-demo/<stack-name>/status
+   ```
+
+3. Delete the versioned source object and private S3 bucket when no longer
+   needed.
+4. Check EC2 Global View, CloudFront, S3, Systems Manager Parameter Store, and
+   Billing for leftovers.
+5. Retain only non-secret deployment evidence: commit SHA, template version,
+   archive SHA-256, stack timestamps, and smoke-test results.
