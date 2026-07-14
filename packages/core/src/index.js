@@ -397,12 +397,17 @@ export {
 
 export {
   CTR_THRESHOLD_INR,
+  FINNET_REPORTING_FORMATS,
+  FINNET_XML_PROFILE,
   REPORT_STATUSES,
   REPORT_TYPES,
+  acknowledgeFiuReport,
+  buildFinnetXml,
   createFiuReport,
   enrichFiuReport,
   fileFiuReport,
   isTippingOffRisk,
   listFiuReports,
+  repairFiuReport,
   reviewFiuReport
 } from "./fiu-str.js";

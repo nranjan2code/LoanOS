@@ -42,7 +42,7 @@ cite the ID in commits and PRs.
 | REV-51 | Field-collections / telecalling operational layer (dialer, feet-on-street, PTP) | F | P2 | DONE |
 | REV-60 | CIC submission in Uniform Credit Reporting Format, fortnightly cadence | G | P2 | PARTIAL |
 | REV-61 | CKYC real file format (14-digit CKYC number, CKYCRR download/upload) | G | P2 | PARTIAL |
-| REV-62 | FIU-IND FINnet 2.0 XML STR/CTR format | G | P2 | TODO |
+| REV-62 | FIU-IND FINnet 2.0 XML STR/CTR format | G | P2 | PARTIAL |
 | REV-63 | CERSAI real submission format | G | P2 | TODO |
 | REV-64 | Live integrations to replace mock providers (bureau, bank-verify, eSign, NACH, comms, V-CIP) | G | P2 | TODO |
 | REV-70 | Split `server.js` (20,415 lines / 212 handlers) into per-resource routers | H | P2 | TODO |
@@ -274,8 +274,8 @@ The platform now emits versioned consumer/commercial canonical UCRF JSONL from l
 ### REV-61 — CKYC real file format · P2 · PARTIAL
 Direct mock upload no longer fabricates identifiers. LoanOS now builds checksum-sealed canonical individual/legal-entity packets from verified KYC; validates required identity/address fields and official scan, photograph, MIME, size, resolution, and checksum constraints; enforces maker-checker approval and digital-signature/SFTP-or-portal evidence; records accepted/rejected/probable-match responses; withdraws overdue seven-day reconciliation; assigns identifiers only from CKYCRR responses; notifies the customer; and gates downloads on explicit CKYC consent plus authentication-factor evidence. The remaining production boundary is byte-for-byte serialization against the institution's current CKYCRR bulk workbook/API package and live CERSAI certification/credentials. **Internal lifecycle acceptance achieved; certified wire conformance remains under REV-64.**
 
-### REV-62 — FIU-IND FINnet 2.0 XML · P2 · TODO
-STR/CTR in FINnet 2.0 XML (lifecycle already exists). **Acceptance:** a filed STR emits schema-valid FINnet XML.
+### REV-62 — FIU-IND FINnet 2.0 XML · P2 · PARTIAL
+STR, CTR, and CCR now produce checksum-sealed canonical FINnet XML with ARF/TRF/CRF selection, validated reporting-entity/reference/KYC/transaction/CCR fields, XML escaping, Principal Officer gates, India-resident provider submission evidence, exact accepted/rejected acknowledgement reconciliation, and independently approved rejected-report repair lineage. The remaining certification boundary is validation against FIU-IND's current XSD plus preliminary-rule/data-quality files and successful live FINGate submission. **Internal XML and lifecycle acceptance achieved; FIU-certified wire conformance remains under REV-64.**
 
 ### REV-63 — CERSAI real submission format · P2 · TODO
 Real CERSAI security-interest submission format (lifecycle already exists). **Acceptance:** a registration emits the CERSAI-accepted payload.

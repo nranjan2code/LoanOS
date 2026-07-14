@@ -548,7 +548,7 @@ The detailed register contains **453 individually identified capabilities**. At 
 | RPT-004 | Fortnightly CIC schedule, acknowledgement, rejects, repair, and resubmission | Institution | Implemented |
 | RPT-005 | CIC dispute/correction and borrower communication | Institution | Partial |
 | RPT-006 | CKYCRR production upload/download format and acknowledgement | Institution | Partial |
-| RPT-007 | FIU FINnet 2.0 STR/CTR/CCR XML and acknowledgement | Institution | Missing |
+| RPT-007 | FIU FINnet 2.0 STR/CTR/CCR XML and acknowledgement | Institution | Partial |
 | RPT-008 | CERSAI production payload, payment, response, and certificate | Product | Missing |
 | RPT-009 | CRILC/SMA and large-exposure reporting | Institution | Missing |
 | RPT-010 | XBRL/CIMS statutory returns | Institution | Missing |

@@ -90,6 +90,7 @@ import {
   createFiuReport,
   reviewFiuReport,
   fileFiuReport,
+  acknowledgeFiuReport,
   isTippingOffRisk,
   CTR_THRESHOLD_INR
 } from "../packages/core/src/index.js";
@@ -7564,7 +7565,7 @@ test("DPDP correction request applies a field change and rejects without a reaso
 });
 
 test("FIU-IND STR requires Principal Officer review before filing and blocks tipping-off", () => {
-  const context = { regulatedEntities: { re_1: { regulatedEntityId: "re_1" } } };
+  const context = { regulatedEntities: { re_1: { regulatedEntityId: "re_1" } }, borrowerProfiles: { bor_1: { borrowerId: "bor_1", borrowerType: "individual", fullName: "Asha Sharma", contact: { mobile: "+919999999999", email: "asha@example.in" } } } };
   const created = createFiuReport(
     {},
     {
@@ -7573,7 +7574,9 @@ test("FIU-IND STR requires Principal Officer review before filing and blocks tip
       subjectBorrowerId: "bor_1",
       createdBy: "aml-analyst-1",
       suspicionGrounds: "structuring below CTR threshold",
-      transactionDetails: [{ amountInr: 900000, mode: "cash" }]
+      reportingEntityCode: "RE001",
+      reportReference: "STR001",
+      transactionDetails: [{ transactionRef: "TXN001", transactionDate: "2026-07-01", amountInr: 900000, mode: "cash" }]
     },
     context
   );
@@ -7599,9 +7602,12 @@ test("FIU-IND STR requires Principal Officer review before filing and blocks tip
 
   const filed = fileFiuReport(reviewed.report, { actor: "po-1" }, context);
   assert.equal(filed.report.status, "filed");
-  assert.ok(filed.report.fiuAcknowledgementId);
+  assert.match(filed.report.finnetPacket.xml, /FINnetReport/);
+  assert.ok(filed.report.finnetPacket.checksumSha256);
+  const acknowledged = acknowledgeFiuReport(filed.report, { status: "accepted", acknowledgementRef: "FIU-ACK-1", checksumSha256: filed.report.finnetPacket.checksumSha256, receivedBy: "po-1" });
+  assert.equal(acknowledged.report.status, "acknowledged");
 
-  const registry = { [filed.report.reportId]: filed.report };
+  const registry = { [acknowledged.report.reportId]: acknowledged.report };
   assert.equal(isTippingOffRisk(registry, "bor_1"), true);
   assert.equal(isTippingOffRisk(registry, "bor_other"), false);
 });
@@ -8970,7 +8976,10 @@ test("API CERSAI and FIU filing enforce residency checks", async (t) => {
     regulatedEntityId: application.regulatedEntityId,
     subjectBorrowerId: application.borrowerId,
     totalAmountInr: 1500000,
-    createdBy: "credit-officer-1"
+    createdBy: "credit-officer-1",
+    reportingEntityCode: "RE001",
+    reportReference: "CTR001",
+    transactionDetails: [{ transactionRef: "TXN001", transactionDate: "2026-07-01", amountInr: 1500000, mode: "cash" }]
   });
   assert.equal(createRep.status, 201);
   const reportId = createRep.body.report.reportId;

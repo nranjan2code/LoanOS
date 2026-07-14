@@ -631,7 +631,8 @@ export class ExternalServiceManager {
       return {
         success: true,
         provider: "mock",
-        fiuAcknowledgementId: `FIU-ACK-MOCK-${Date.now()}`,
+        providerSubmissionRef: `FIU-SUB-MOCK-${Date.now()}`,
+        checksumSha256: reportData.checksumSha256 ?? null,
         dataResidencyCountry: this.config.fiuDataResidencyCountry,
         filedAt: new Date().toISOString()
       };

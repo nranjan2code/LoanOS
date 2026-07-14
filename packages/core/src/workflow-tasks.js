@@ -5,6 +5,7 @@ import { classifyLoanAsset, computeDelinquency } from "./loan-account.js";
 import { createLoanId } from "./loan-policy.js";
 import { enrichLegalRecoveryCase, evaluatePromisesToPay } from "./collections-recovery.js";
 import { enrichCicCorrection } from "./cic-reporting.js";
+import { REPORT_STATUSES, REPORT_TYPES, enrichFiuReport } from "./fiu-str.js";
 
 export const WORKFLOW_TASK_STATUSES = {
   OPEN: "open",
@@ -39,7 +40,11 @@ const TASK_SLA_HOURS = {
   "cic.correction_review": 504,
   "ckycrr.submission": 24,
   "ckycrr.response_repair": 24,
-  "ckycrr.probable_match": 168
+  "ckycrr.probable_match": 168,
+  "fiu.str_review": 24,
+  "fiu.filing": 24,
+  "fiu.acknowledgement": 24,
+  "fiu.repair": 24
 };
 
 export function normalizeWorkflowTaskStore(store = {}) {
@@ -59,12 +64,25 @@ export function deriveWorkflowTasks(state, options = {}) {
     ...deriveComplaintTasks(Object.values(state?.complaints ?? {}), asOf),
     ...deriveDataPrincipalTasks(state, asOf),
     ...deriveCicTasks(state, asOf),
-    ...deriveCkycrrTasks(state, asOf)
+    ...deriveCkycrrTasks(state, asOf),
+    ...deriveFiuTasks(state, asOf)
   ]
     .map((task) => applyTaskRecord(task, taskStore.records[task.taskId]))
     .map((task) => withTaskSla(task, asOf));
 
   return tasks.filter((task) => matchesTaskFilters(task, options.filters ?? {}));
+}
+
+function deriveFiuTasks(state, asOf) {
+  return Object.values(state?.fiuReports ?? {}).flatMap((report) => {
+    if (!report?.reportId || report.status === REPORT_STATUSES.ACKNOWLEDGED) return [];
+    const enriched = enrichFiuReport(report, asOf); const base = { entityType: "fiu_report", entityId: report.reportId, queue: "aml_ops", regulatoryRefs: ["PMLA-2002"], openedAt: report.updatedAt ?? report.createdAt };
+    if (report.reportType === REPORT_TYPES.SUSPICIOUS_TRANSACTION && report.status === REPORT_STATUSES.DRAFT) return [{ ...base, taskId: `task_fiu_review_${report.reportId}`, type: "fiu.str_review", title: "Principal Officer review of STR", description: "Review the suspicious transaction report before FINnet filing. Do not disclose the report to the subject.", role: "principal_officer", priority: enriched.filingOverdue ? "critical" : "high", dueAt: enriched.filingDeadline ?? null, action: { method: "POST", path: `/fiu/reports/${report.reportId}/review`, description: "Record Principal Officer review." }, context: { reportType: report.reportType, filingDeadline: enriched.filingDeadline } }];
+    if ([REPORT_STATUSES.DRAFT, REPORT_STATUSES.REVIEWED].includes(report.status)) return [{ ...base, taskId: `task_fiu_filing_${report.reportId}`, type: "fiu.filing", title: "Submit FINnet report", description: "File the checksum-sealed FINnet XML packet through the FIU-IND provider boundary.", role: "principal_officer", priority: enriched.filingOverdue ? "critical" : "high", dueAt: enriched.filingDeadline ?? null, action: { method: "POST", path: `/fiu/reports/${report.reportId}/filing`, description: "Submit FINnet XML." }, context: { reportType: report.reportType } }];
+    if (report.status === REPORT_STATUSES.FILED) return [{ ...base, taskId: `task_fiu_ack_${report.reportId}`, type: "fiu.acknowledgement", title: "Reconcile FIU-IND acknowledgement", description: "Record the accepted or rejected provider response against the exact FINnet XML checksum.", role: "principal_officer", priority: "high", action: { method: "POST", path: `/fiu/reports/${report.reportId}/acknowledgement`, description: "Record FIU-IND acknowledgement." }, context: { checksumSha256: report.finnetPacket?.checksumSha256 ?? null, providerSubmissionRef: report.providerSubmissionRef ?? null } }];
+    if (report.status === REPORT_STATUSES.REJECTED) return [{ ...base, taskId: `task_fiu_repair_${report.reportId}`, type: "fiu.repair", title: "Repair rejected FINnet report", description: "Correct source data and create an independently approved replacement report.", role: "aml_analyst", priority: "critical", action: { method: "POST", path: `/fiu/reports/${report.reportId}/repairs`, description: "Create repaired FINnet report." }, context: { errorCode: report.acknowledgement?.errorCode ?? null, errorMessage: report.acknowledgement?.errorMessage ?? null } }];
+    return [];
+  });
 }
 
 function deriveCkycrrTasks(state, asOf) {

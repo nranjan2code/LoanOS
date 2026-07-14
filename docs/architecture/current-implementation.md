@@ -69,7 +69,7 @@ npm run dev:api
 | `packages/core/src/workflow-tasks.js` | LWS task derivation from LOS/LMS state (including pending DPDP access/correction requests) plus task assignment, start, release, and comment lifecycle. |
 | `packages/core/src/cersai.js` | CERSAI security-interest lifecycle (draft → filed → registered → modified → satisfied): maker-checker modification, closure-gated satisfaction, prior-encumbrance search, and a `securedLoan` disbursement gate (SARFAESI Act). |
 | `packages/core/src/data-principal-rights.js` | DPDP data-principal access requests (portable data pack assembly) and correction requests (apply/reject with profile propagation), both under a 30-day SLA clock with overdue detection. |
-| `packages/core/src/fiu-str.js` | FIU-IND STR/CTR/CCR lifecycle (draft → reviewed → filed → acknowledged): Principal Officer review gate, ₹10 lakh CTR threshold, and a tipping-off guard (PMLA). |
+| `packages/core/src/fiu-str.js` | FIU-IND STR/CTR/CCR lifecycle with canonical FINnet XML (ARF/TRF/CRF) packets, Principal Officer review, ₹10 lakh CTR threshold, source-field validation, checksum-sealed filing, exact acknowledgement/reject handling, independent repair lineage, and a tipping-off guard (PMLA). Certified FIU XSD/rules validation remains the provider adapter boundary. |
 | `packages/core/src/external-services.js` | Switchable `ExternalServiceManager` for external integrations (SMS, email, WhatsApp, credit bureau, V-CIP, bank-account verification, NACH/UPI payment rails, eSign, CERSAI, FIU-IND) with mock/real providers selected per integration and India data-residency checks enforced across all external services. |
 | `packages/core/src/audit.js` | Tenant-scoped, append-only audit hash chain: tenant-bound genesis, canonical hashing, `sealAuditChain`/`verifyAuditChain`/`buildAuditEvidencePack`, plus uniform `stampAuditEvents`/`classifyAuditDataClass` actor/data-class provenance. |
 | `packages/core/src/index.js` | Public exports for core domain modules. |
@@ -240,7 +240,9 @@ npm run dev:api
 | `POST /fiu/reports` | Creates an STR or CTR (CTR enforces the ₹10 lakh threshold). |
 | `GET /fiu/reports/:id` | Reads one FIU-IND report. |
 | `POST /fiu/reports/:id/review` | Records the designated Principal Officer's review of an STR. |
-| `POST /fiu/reports/:id/filing` | Files the report with FIU-IND and records the acknowledgement. |
+| `POST /fiu/reports/:id/filing` | Builds and submits a checksum-sealed canonical FINnet XML packet through the FIU-IND provider boundary. |
+| `POST /fiu/reports/:id/acknowledgement` | Records an accepted/rejected FIU response only when its checksum exactly matches the filed packet. |
+| `POST /fiu/reports/:id/repairs` | Creates a source-correction-evidenced, independently approved replacement for a rejected FIU report. |
 | `GET /data-disclosures` | Lists third-party data-disclosure records (filterable by `borrowerId`). |
 | `POST /data-disclosures` | Records a third-party data disclosure, gated on active consent or a cited legal reference. |
 | `GET /regulated-entities` | Lists regulated entities. |

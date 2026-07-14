@@ -46,6 +46,8 @@ Date of research baseline: 2026-07-08.
 - CKYCRR, `Revised Template for Individual KYC` communique and bulk/API file references: https://iat.ckycindia.in/ckyc/assets/doc/Communique_2020-01_-_CKYC_Individual_Template_Revision.pdf
 - CKYCRR, `KYC Template for Legal Entities`, January 4, 2021: https://iat.ckycindia.in/ckyc/assets/doc/Communique%202020-11%20-%20Legal%20Entity%20KYC%20Template.pdf
 - RBI, KYC frequently asked questions, including CKYC identifier download consent and customer notification: https://www.rbi.org.in/SCRIPTs/FAQView.aspx?Id=173
+- FIU-IND, FINnet Gateway User Guide, version 1.2: https://www.fiuindia.gov.in/pdfs/downloads/FINnet%20Gateway%20User%20Guide%20Version%201.2.pdf
+- FIU-IND, FINnet 2.0 reporting resources: https://fiuindia.gov.in/files/misc/finnet2.html
 - RBI, `Master Direction on Information Technology Governance, Risk, Controls and Assurance Practices`, 2023: https://www.rbi.org.in/Scripts/BS_ViewMasDirections.aspx?id=12562
 - RBI, `Directions on Managing Risks and Code of Conduct in Outsourcing of Financial Services by NBFCs`, November 9, 2017: https://www.rbi.org.in/commonman/english/scripts/Notification.aspx?Id=2646
 - RBI, `Master Direction on Outsourcing of Information Technology Services` (RBI/2023-24/102), April 10, 2023: https://www.rbi.org.in/Scripts/BS_ViewMasDirections.aspx?id=12486

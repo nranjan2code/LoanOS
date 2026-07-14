@@ -201,6 +201,8 @@ import {
   reviewCorrectionRequest,
   enrichCorrectionRequest,
   createFiuReport,
+  acknowledgeFiuReport,
+  repairFiuReport,
   reviewFiuReport,
   fileFiuReport,
   enrichFiuReport,
@@ -6603,7 +6605,7 @@ async function route(req, res, dataDir, platformAdminKey) {
     return;
   }
 
-  const fiuReportActionMatch = path.match(/^\/fiu\/reports\/([^/]+)\/(review|filing)$/);
+  const fiuReportActionMatch = path.match(/^\/fiu\/reports\/([^/]+)\/(review|filing|acknowledgement|repairs)$/);
   if (method === "POST" && fiuReportActionMatch) {
     const body = await readJson(req);
     const state = await store.load();
@@ -6614,16 +6616,37 @@ async function route(req, res, dataDir, platformAdminKey) {
       sendJson(res, 404, { error: { code: "not_found", message: "FIU report not found." } });
       return;
     }
-    let externalResult = {};
+    const now = new Date();
+    let result = null;
+    if (action === "review") {
+      result = reviewFiuReport(report, body, state, now);
+    } else if (action === "acknowledgement") {
+      result = acknowledgeFiuReport(report, body, now);
+    } else if (action === "repairs") {
+      result = repairFiuReport(state.fiuReports, reportId, body, state, now);
+    } else {
+      result = fileFiuReport(report, body, state, now);
+    }
+    if (result.summary.status === "blocked") {
+      sendJson(res, 422, {
+        error: { code: "fiu_report_action_blocked", message: "FIU report action is blocked." },
+        findings: result.findings
+      });
+      return;
+    }
+    let stored = result.report;
     if (action === "filing") {
       const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox });
       try {
-        externalResult = await manager.fileFiuReport({
+        const externalResult = await manager.fileFiuReport({
           reportId: report.reportId,
           reportType: report.reportType,
-          subjectBorrowerId: report.subjectBorrowerId,
-          totalAmountInr: report.totalAmountInr
+          checksumSha256: stored.finnetPacket.checksumSha256,
+          contentType: stored.finnetPacket.contentType,
+          xml: stored.finnetPacket.xml
         });
+        if (externalResult.checksumSha256 && externalResult.checksumSha256 !== stored.finnetPacket.checksumSha256) throw new Error("FIU-IND provider submission checksum did not match FINnet XML packet.");
+        stored = { ...stored, providerSubmissionRef: externalResult.providerSubmissionRef ?? externalResult.providerReference ?? null, providerSubmittedAt: externalResult.filedAt ?? now.toISOString() };
       } catch (err) {
         sendJson(res, 422, {
           error: {
@@ -6634,21 +6657,9 @@ async function route(req, res, dataDir, platformAdminKey) {
         return;
       }
     }
-
-    const now = new Date();
-    const result = action === "review"
-      ? reviewFiuReport(report, body, state, now)
-      : fileFiuReport(report, { ...body, fiuAcknowledgementId: externalResult.fiuAcknowledgementId }, state, now);
-    if (result.summary.status === "blocked") {
-      sendJson(res, 422, {
-        error: { code: "fiu_report_action_blocked", message: "FIU report action is blocked." },
-        findings: result.findings
-      });
-      return;
-    }
-    const stored = result.report;
+    const fiuReports = action === "repairs" ? result.registry : { ...state.fiuReports, [stored.reportId]: stored };
     const nextState = appendEvent(
-      { ...state, fiuReports: { ...state.fiuReports, [stored.reportId]: stored } },
+      { ...state, fiuReports },
       {
         type: result.event.type,
         reportId: stored.reportId,
