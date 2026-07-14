@@ -33,6 +33,8 @@ const PROVIDER_CIRCUITS = new Map();
  */
 export class ExternalServiceManager {
   constructor(config = {}) {
+    this.simulator = config.simulator ?? null;
+    this.simulatorTenantId = config.simulatorTenantId ?? null;
     this.config = {
       smsProvider: config.smsProvider ?? (typeof process !== "undefined" ? process.env.LOANOS_SMS_PROVIDER : "mock") ?? "mock",
       smsApiUrl: config.smsApiUrl ?? (typeof process !== "undefined" ? process.env.LOANOS_SMS_API_URL : "") ?? "",
@@ -147,6 +149,15 @@ export class ExternalServiceManager {
     return assessment.certification;
   }
 
+  simulateMockProvider({ provider, operation, idempotencyKey, scenario, payload = {} } = {}) {
+    if (!this.simulator) throw new Error("A tenant-local provider simulator is not configured.");
+    const providerPrefixes = { bureau: "bureau", vcip: "vcip", bank_account: "bankAccount", payment_rail: "paymentRail", esign: "esign", ckycrr: "ckycrr", account_aggregator: "accountAggregator", sms: "sms", email: "email", whatsapp: "whatsapp" };
+    const prefix = providerPrefixes[provider];
+    if (!prefix) throw new Error(`Provider simulator does not support ${provider}.`);
+    if (this.config[`${prefix}Provider`] === "real") throw new Error("Provider simulator cannot execute for a real provider configuration.");
+    return this.simulator.submit({ tenantId: this.simulatorTenantId, provider, operation, idempotencyKey, scenario, payload });
+  }
+
   verifyProviderCallback(provider, eventId, payload, signature) {
     if (!/^[a-z_]{2,40}$/.test(String(provider ?? "")) || !eventId || !signature) throw new Error("Provider callback requires a valid provider, eventId, and signature.");
     const secret = this.config.providerCallbackSecrets?.[provider];
@@ -155,6 +166,21 @@ export class ExternalServiceManager {
     const supplied = String(signature).replace(/^sha256=/i, "");
     if (supplied.length !== expected.length || !timingSafeEqual(Buffer.from(supplied, "hex"), Buffer.from(expected, "hex"))) throw new Error("Provider callback signature is invalid.");
     return { provider, eventId, payloadHash: createHmac("sha256", secret).update(JSON.stringify(payload ?? {})).digest("hex") };
+  }
+
+  verifyPaymentSettlementCallback(eventId, payload, signature, timestamp, now = new Date()) {
+    if (!timestamp) throw new Error("Payment callback timestamp is required.");
+    const timestampMs = Date.parse(timestamp);
+    if (!Number.isFinite(timestampMs)) throw new Error("Payment callback timestamp is invalid.");
+    const toleranceMs = 5 * 60 * 1000;
+    if (Math.abs(now.getTime() - timestampMs) > toleranceMs) throw new Error("Payment callback timestamp is outside the replay-protection window.");
+    const provider = "payment_rail";
+    const secret = this.config.providerCallbackSecrets?.[provider];
+    if (!eventId || !signature || !secret) throw new Error("Payment callback signature configuration and event identity are required.");
+    const expected = createHmac("sha256", secret).update(`${provider}.${timestamp}.${eventId}.${JSON.stringify(payload ?? {})}`).digest("hex");
+    const supplied = String(signature).replace(/^sha256=/i, "");
+    if (!/^[a-f0-9]{64}$/i.test(supplied) || supplied.length !== expected.length || !timingSafeEqual(Buffer.from(supplied, "hex"), Buffer.from(expected, "hex"))) throw new Error("Payment callback signature is invalid.");
+    return { provider, eventId, timestamp: new Date(timestampMs).toISOString(), payloadHash: createHmac("sha256", secret).update(JSON.stringify(payload ?? {})).digest("hex") };
   }
 
   /**

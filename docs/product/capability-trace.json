@@ -2918,7 +2918,7 @@
     "lastReviewed": ""
   },
   "INT-009": {
-    "capability": "Bureau, AA, CKYC, V-CIP, eSign, bank verify, payment, comms, CERSAI, and FIU providers",
+    "capability": "Bureau, AA, CKYC, V-CIP, eSign, bank verify, payment, comms, CERSAI, and FIU providers; deterministic adverse simulator/conformance baseline",
     "category": "30. Integrations, APIs, Events, and Data Platform",
     "plane": "Data & Integration",
     "applicability": "Product",

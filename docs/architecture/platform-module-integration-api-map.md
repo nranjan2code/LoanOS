@@ -35,7 +35,7 @@ Every `BOTH` integration requires idempotent commands, status/read, authenticate
 
 | ID | Needed at | External operations | Direction / response | Current state | Also used by |
 | --- | --- | --- | --- | --- | --- |
-| INT-CUS-01 | Registration and contact verification | SMS/email/WhatsApp OTP send/validate, DLT/template/sender sync, delivery and opt-out | BOTH; accepted → delivered/read/failed/bounced | Bound/Mock; acceptance only | LOS, LMS, LWS, collections |
+| INT-CUS-01 | Registration and contact verification | SMS/email/WhatsApp OTP send/validate, DLT/template/sender sync, delivery and opt-out | BOTH; accepted → delivered/read/failed/bounced | Bound/Mock; core signed delivery lifecycle and reconciliation complete, API persistence/worker pending | LOS, LMS, LWS, collections |
 | INT-CUS-02 | Lead capture and dedupe | CRM lead/party/activity/case upsert/search, attribution, merge event and delta | BOTH; source event/version, merge lineage | Internal only | LOS, partner |
 | INT-CUS-03 | Branch/partner acquisition | Agent/branch/territory/credential/capacity master sync | BOTH; change/revoke and control totals | Internal only | LWS, partner |
 | INT-CUS-04 | Document collection | DMS/object upload, malware/DLP/OCR, download/version, hold and deletion proof | BOTH; content hash, scan callback, manifest | Internal only | LOS, LMS, LWS, compliance |
@@ -99,7 +99,7 @@ The deterministic rules engine never calls an external system during evaluation.
 | INT-LMS-01 | Account boarding/posting | CBS customer/facility sync; GL submit/ack/reject/reverse; totals | BOTH/file | CBS checksum mock; GL transport missing | Finance |
 | INT-LMS-02 | Mandates | NACH/eNACH create/amend/cancel/status and UMRN | BOTH/file; sponsor/NPCI acknowledgement | Bound/Mock; immediate registration | LOS, succession |
 | INT-LMS-03 | Scheduled collection | NACH presentment/return; UPI collect/status/expiry; recurring instruction | BOTH/file; return/reversal/settlement | Bound/Mock; no lifecycle driver | Collections, finance |
-| INT-LMS-04 | Receipt/reconciliation | Rail callback/file, bank statement, UTR match and reversal | IN/file; signed event/totals/exceptions | Strong internal flow; callback-auth gap | Finance |
+| INT-LMS-04 | Receipt/reconciliation | Rail callback/file, bank statement, UTR match and reversal | IN/file; signed event/totals/exceptions | Timestamp-bound HMAC API, replay fingerprint and linked return/reversal complete; live certification/file signatures pending | Finance |
 | INT-LMS-05 | Refunds/payouts | Cooling-off/excess/failed-disbursement refund and reversal | BOTH; exact amount, UTR, settlement | Missing | LOS, finance |
 | INT-LMS-06 | Servicing notices | EMI/rate/schedule/penal/statement/closure notifications | BOTH; template/delivery evidence | Acceptance-only mock | LWS, complaints |
 | INT-LMS-07 | Statements/vault | DMS render/store/version/download, hold and deletion | BOTH; document/manifest hashes | Local metadata; DMS missing | Channels, compliance |

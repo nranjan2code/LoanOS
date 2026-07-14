@@ -1,8 +1,9 @@
 import { createFinding, summarizeFindings } from "./compliance-controls.js";
 import { createLoanId } from "./loan-policy.js";
-import { postPaymentToLoanAccount } from "./loan-account.js";
+import { postPaymentToLoanAccount, reverseLoanAccountEvent } from "./loan-account.js";
+import { createHash } from "node:crypto";
 
-const SETTLEMENT_STATUSES = new Set(["settled", "failed", "returned"]);
+const SETTLEMENT_STATUSES = new Set(["settled", "failed", "returned", "reversed"]);
 
 // Reconciles one immutable provider callback to one initiated UPI collect and,
 // only after a full match, posts the repayment to the loan ledger. Unmatched
@@ -15,15 +16,20 @@ export function reconcilePaymentRailSettlement(state, input, now = new Date()) {
   const loanAccounts = state.loanAccounts ?? {};
   const providerEventRef = String(input?.providerEventRef ?? "").trim();
   const status = String(input?.status ?? "").trim().toLowerCase();
+  const callbackFingerprintSha256 = createHash("sha256").update(JSON.stringify({ providerRef: input?.providerRef ?? null, paymentRailId: input?.paymentRailId ?? null, providerEventRef, status, amount: input?.amount ?? null, currency: input?.currency ?? "INR", bankReference: input?.bankReference ?? null, settledAt: input?.settledAt ?? null, failureReason: input?.failureReason ?? null })).digest("hex");
 
   if (!providerEventRef) {
     findings.push(createFinding("error", "RBI-IT-GRC", "Provider event reference is required for idempotent reconciliation.", "providerEventRef"));
   }
   if (!SETTLEMENT_STATUSES.has(status)) {
-    findings.push(createFinding("error", "RBI-IT-GRC", "Settlement status must be settled, failed, or returned.", "status"));
+    findings.push(createFinding("error", "RBI-IT-GRC", "Settlement status must be settled, failed, returned, or reversed.", "status"));
   }
   const existing = Object.values(reconciliations).find((record) => record.providerEventRef === providerEventRef);
   if (existing) {
+    if (existing.callbackFingerprintSha256 !== callbackFingerprintSha256) {
+      findings.push(createFinding("error", "RBI-IT-GRC", "Provider event reference was replayed with different callback content.", "providerEventRef"));
+      return { paymentRails, reconciliations, loanAccounts, reconciliation: null, findings, summary: summarizeFindings(findings), duplicate: false, replayConflict: true };
+    }
     return { paymentRails, reconciliations, loanAccounts, reconciliation: existing, findings, summary: summarizeFindings(findings), duplicate: true };
   }
 
@@ -50,7 +56,10 @@ export function reconcilePaymentRailSettlement(state, input, now = new Date()) {
     failureReason: input.failureReason ?? null,
     loanAccountId: paymentRail?.loanAccountId ?? null,
     outcome: "exception",
-    paymentEventId: null
+    paymentEventId: null,
+    callbackFingerprintSha256,
+    callbackVerification: input.callbackVerification ?? null,
+    late: Boolean(input.callbackVerification?.timestamp && now.getTime() - new Date(input.callbackVerification.timestamp).getTime() > 60 * 1000)
   };
 
   if (!paymentRail || !["upi_collect", "nach_presentment"].includes(paymentRail.type)) {
@@ -79,6 +88,22 @@ export function reconcilePaymentRailSettlement(state, input, now = new Date()) {
       summary: summarizeFindings(findings),
       duplicate: false
     };
+  }
+
+  if (["returned", "reversed"].includes(status) && paymentRail.paymentEventId) {
+    const account = loanAccounts[paymentRail.loanAccountId];
+    if (!account) {
+      reconciliation.exceptionCode = "loan_account_not_found";
+      return { paymentRails, reconciliations: { ...reconciliations, [reconciliation.reconciliationId]: reconciliation }, loanAccounts, reconciliation, findings, summary: summarizeFindings(findings), duplicate: false };
+    }
+    const reversal = reverseLoanAccountEvent(account, { eventId: paymentRail.paymentEventId, reason: input.failureReason ?? "Provider reported payment return/reversal", reversalRef: providerEventRef, proposedBy: "payment_rail_provider", approvedBy: "payment_rail_reconciliation", approvalRef: input.callbackVerification?.payloadHash ?? providerEventRef, reversedAt: reconciliation.settledAt }, now);
+    if (reversal.summary.status === "blocked") {
+      reconciliation.exceptionCode = "payment_reversal_blocked"; findings.push(...reversal.findings.map((item) => ({ ...item, severity: "warning" })));
+      return { paymentRails, reconciliations: { ...reconciliations, [reconciliation.reconciliationId]: reconciliation }, loanAccounts, reconciliation, findings, summary: summarizeFindings(findings), duplicate: false };
+    }
+    const updatedRail = { ...paymentRail, status, settlementRef: providerEventRef, settledAt: reconciliation.settledAt, failureReason: reconciliation.failureReason, reversalEventId: reversal.reversalEvent.eventId };
+    reconciliation.outcome = "matched_reversed"; reconciliation.reversalEventId = reversal.reversalEvent.eventId; reconciliation.paymentEventId = paymentRail.paymentEventId;
+    return { paymentRails: { ...paymentRails, [updatedRail.paymentRailId]: updatedRail }, reconciliations: { ...reconciliations, [reconciliation.reconciliationId]: reconciliation }, loanAccounts: { ...loanAccounts, [account.loanAccountId]: reversal.loanAccount }, reconciliation, reversalEvent: reversal.reversalEvent, findings, summary: summarizeFindings(findings), duplicate: false };
   }
 
   if (status !== "settled") {

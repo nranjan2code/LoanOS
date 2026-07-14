@@ -1,8 +1,8 @@
 {
-  "generated": "2026-07-14T19:11:46.169Z",
+  "generated": "2026-07-14T19:47:25.565Z",
   "git": {
     "branch": "main",
-    "count": 167,
+    "count": 171,
     "commits": []
   },
   "overall": {
@@ -6646,7 +6646,7 @@
         },
         {
           "id": "INT-009",
-          "name": "Bureau, AA, CKYC, V-CIP, eSign, bank verify, payment, comms, CERSAI, and FIU providers",
+          "name": "Bureau, AA, CKYC, V-CIP, eSign, bank verify, payment, comms, CERSAI, and FIU providers; deterministic adverse simulator/conformance baseline",
           "applicability": "Product",
           "status": "Partial/Mock",
           "raw": "Partial/Mock",
@@ -7494,9 +7494,9 @@
     }
   ],
   "tests": {
-    "pass": 352,
+    "pass": 370,
     "fail": 0,
-    "total": 357,
+    "total": 375,
     "ran": true
   }
 }

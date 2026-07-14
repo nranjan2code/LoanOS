@@ -1457,7 +1457,16 @@ async function route(req, res, dataDir, platformAdminKey, observability) {
   if (method === "POST" && path === "/integrations/payment-rails/settlements") {
     const body = await readJson(req);
     const state = await store.load();
-    const result = reconcilePaymentRailSettlement(state, body);
+    let callbackVerification = null;
+    const callbackManager = new ExternalServiceManager({ isSandbox: tenant.isSandbox, providerCertifications: state.providerCertifications });
+    if (callbackManager.config.providerCallbackSecrets?.payment_rail || callbackManager.config.paymentRailProvider === "real") {
+      try {
+        const signature = Array.isArray(req.headers["x-provider-signature"]) ? req.headers["x-provider-signature"][0] : req.headers["x-provider-signature"];
+        const timestamp = Array.isArray(req.headers["x-provider-timestamp"]) ? req.headers["x-provider-timestamp"][0] : req.headers["x-provider-timestamp"];
+        callbackVerification = callbackManager.verifyPaymentSettlementCallback(body.providerEventRef, body, signature, timestamp);
+      } catch (error) { sendJson(res, 401, { error: { code: "payment_callback_unauthenticated", message: error.message } }); return; }
+    }
+    const result = reconcilePaymentRailSettlement(state, { ...body, callbackVerification });
     if (result.summary.status === "blocked") {
       sendJson(res, 422, {
         error: { code: "payment_reconciliation_blocked", message: "Payment reconciliation is blocked by invalid callback data." },
@@ -1492,6 +1501,7 @@ async function route(req, res, dataDir, platformAdminKey, observability) {
     sendJson(res, result.reconciliation.outcome === "matched_posted" ? 200 : 202, {
       reconciliation: result.reconciliation,
       paymentEvent: result.paymentEvent ?? null,
+      reversalEvent: result.reversalEvent ?? null,
       findings: result.findings
     });
     return;

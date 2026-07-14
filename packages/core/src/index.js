@@ -596,6 +596,29 @@ export {
 } from "./external-services.js";
 
 export {
+  ORIGINATION_PROVIDER_CONFORMANCE_PACKS,
+  ORIGINATION_PROVIDER_FAMILIES,
+  REQUIRED_CONFORMANCE_CLASSES,
+  assessOriginationConformancePack,
+  assessOriginationConformanceSuite,
+  buildOriginationSimulatorScenarios
+} from "./origination-provider-conformance.js";
+
+export {
+  DeterministicProviderSimulator,
+  createProviderSimulator,
+  verifySimulatedProviderCallback
+} from "./provider-simulator.js";
+
+export {
+  createCommunicationDelivery,
+  projectCommunicationDeliveryReconciliation,
+  recordCommunicationCallback,
+  signCommunicationCallback,
+  verifyCommunicationCallback
+} from "./communication-delivery-lifecycle.js";
+
+export {
   ASSET_TYPES,
   CHARGE_TYPES,
   SECURITY_INTEREST_STATUSES,

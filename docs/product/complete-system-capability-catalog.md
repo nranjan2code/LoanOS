@@ -69,7 +69,7 @@ LoanOS currently has a strong compliance-first domain foundation and executable 
 
 The principal gaps before bank production are live integrations, downstream GL certification, regulatory submission formats, product-specific lending depth, repossession/auction and legal-expense depth, live IdP/KMS/SIEM/database/deployment infrastructure, and independent bank-assurance evidence. The product now governs federation/SCIM state, purpose-attested keys, security-log custody, PostgreSQL HA/PITR/capacity dependencies, API/event/webhook contracts and deployment readiness alongside bounded observability, encrypted recovery, governed release, security assurance, SOC investigation and compliance evidence. Actual token/signature validation, KMS grants, SIEM/WORM/NTP/collectors, managed replication/WAL/PITR, queue/dispatch/replay workers, cloud rollout controllers, institutional control methodology, pen tests, ITSM/paging, 24x7 staffing, production-scale soak/chaos, contract enforcement, real failover/failback and exercised continuity remain open. Collections/legal recovery also retains partner depth for dialers, route/capacity optimization, court integration, possession, auction and recovery accounting. Public positioning must remain narrower than this catalogue until each advertised journey reaches agreed maturity.
 
-The detailed register contains **453 individually identified capabilities**. At this snapshot, 87 are classified `Implemented`, 271 `Partial`, 68 `Missing`, and 27 are mock, partner, external, or composite-status obligations. These counts measure scope coverage, not delivery percentage: a single missing ledger, reconciliation, security, or recovery control can block production even if many smaller capabilities exist.
+The detailed register contains **453 individually identified capabilities**. At this snapshot, 87 are `Implemented`, 339 `Partial`, 11 `Partial/Mock`, 7 `Mock`, 0 `Missing`, 3 `Partner`, and 6 `External`. These counts measure scope coverage, not delivery percentage: a single partial ledger, reconciliation, security, integration or recovery control can block production even when no capability remains unclassified as missing.
 
 ## Capability Index
 
@@ -661,7 +661,7 @@ The detailed register contains **453 individually identified capabilities**. At 
 | INT-006 | Callback correlation, acknowledgement, and reconciliation | Core | Partial |
 | INT-007 | API catalogue, OpenAPI, examples, SDK, and sandbox | Core | Partial |
 | INT-008 | Core banking, GL, CRM, DMS, data warehouse, and identity connectors | Institution | Partial |
-| INT-009 | Bureau, AA, CKYC, V-CIP, eSign, bank verify, payment, comms, CERSAI, and FIU providers | Product | Partial/Mock |
+| INT-009 | Bureau, AA, CKYC, V-CIP, eSign, bank verify, payment, comms, CERSAI, and FIU providers; deterministic adverse simulator/conformance baseline | Product | Partial/Mock |
 | INT-010 | Event schema registry, lineage, backward compatibility, and deprecation | Core | Partial |
 | INT-011 | Operational and analytical data models separated by purpose | Core | Partial |
 | INT-012 | Data-quality rules, profiling, exception queue, and certification | Core | Partial |
