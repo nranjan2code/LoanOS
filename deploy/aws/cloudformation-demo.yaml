@@ -1,0 +1,232 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  LoanOS India synthetic-data demo host. Creates one encrypted EC2 instance,
+  Systems Manager access, an HTTP security group, and a cost budget. This is
+  not a production or real-borrower-data deployment.
+
+Parameters:
+  AlertEmail:
+    Type: String
+    Description: Email address that receives AWS Budget notifications.
+    AllowedPattern: "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
+  SourceRepository:
+    Type: String
+    Default: https://github.com/nranjan2code/LoanOS.git
+    Description: Public Git repository cloned onto the demo host.
+  SourceRef:
+    Type: String
+    Default: codex/aws-demo-deployment
+    AllowedPattern: "^[A-Za-z0-9._/-]+$"
+    Description: Git branch or tag to deploy.
+  BootstrapScriptUrl:
+    Type: String
+    Default: https://raw.githubusercontent.com/nranjan2code/LoanOS/refs/heads/codex/aws-demo-deployment/deploy/aws/bootstrap-demo.sh
+    AllowedPattern: "^https://.*$"
+    Description: HTTPS URL of the reviewed bootstrap-demo.sh script.
+  InstanceType:
+    Type: String
+    Default: t3.small
+    AllowedValues: [t3.micro, t3.small]
+    Description: t3.small is recommended while compiling the Rust engine.
+  MonthlyBudgetUsd:
+    Type: Number
+    Default: 25
+    MinValue: 1
+    MaxValue: 100
+  LatestUbuntuAmi:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id
+
+Resources:
+  DemoBudget:
+    Type: AWS::Budgets::Budget
+    Properties:
+      Budget:
+        BudgetName: !Sub "${AWS::StackName}-monthly-cost"
+        BudgetLimit:
+          Amount: !Ref MonthlyBudgetUsd
+          Unit: USD
+        BudgetType: COST
+        TimeUnit: MONTHLY
+      NotificationsWithSubscribers:
+        - Notification:
+            ComparisonOperator: GREATER_THAN
+            NotificationType: FORECASTED
+            Threshold: 50
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - Address: !Ref AlertEmail
+              SubscriptionType: EMAIL
+        - Notification:
+            ComparisonOperator: GREATER_THAN
+            NotificationType: ACTUAL
+            Threshold: 80
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - Address: !Ref AlertEmail
+              SubscriptionType: EMAIL
+        - Notification:
+            ComparisonOperator: GREATER_THAN
+            NotificationType: ACTUAL
+            Threshold: 100
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - Address: !Ref AlertEmail
+              SubscriptionType: EMAIL
+
+  DemoInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: PublishDemoBootstrapStatus
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:PutParameter
+                  - ssm:AddTagsToResource
+                Resource: !Sub "arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/loanos-demo/${AWS::StackName}/*"
+
+  DemoInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [!Ref DemoInstanceRole]
+
+  DemoVpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.42.0.0/24
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-vpc"
+
+  DemoInternetGateway:
+    Type: AWS::EC2::InternetGateway
+
+  DemoGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref DemoInternetGateway
+      VpcId: !Ref DemoVpc
+
+  DemoSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      CidrBlock: 10.42.0.0/26
+      MapPublicIpOnLaunch: true
+      VpcId: !Ref DemoVpc
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-public"
+
+  DemoRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref DemoVpc
+
+  DemoDefaultRoute:
+    Type: AWS::EC2::Route
+    DependsOn: DemoGatewayAttachment
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref DemoInternetGateway
+      RouteTableId: !Ref DemoRouteTable
+
+  DemoSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref DemoRouteTable
+      SubnetId: !Ref DemoSubnet
+
+  DemoSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: LoanOS demo HTTP access; administration uses SSM, not SSH
+      VpcId: !Ref DemoVpc
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+          Description: Synthetic demo web traffic
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-web"
+        - Key: LoanOS-Environment
+          Value: demo
+
+  DemoInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref LatestUbuntuAmi
+      InstanceType: !Ref InstanceType
+      IamInstanceProfile: !Ref DemoInstanceProfile
+      SecurityGroupIds: [!GetAtt DemoSecurityGroup.GroupId]
+      SubnetId: !Ref DemoSubnet
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            DeleteOnTermination: true
+            Encrypted: true
+            VolumeSize: 24
+            VolumeType: gp3
+      MetadataOptions:
+        HttpEndpoint: enabled
+        HttpTokens: required
+        HttpPutResponseHopLimit: 1
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-host"
+        - Key: LoanOS-Environment
+          Value: demo
+        - Key: DataClassification
+          Value: synthetic-only
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -euo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y ca-certificates curl
+          install -d -m 0755 /opt/loanos-bootstrap
+          curl --fail --show-error --silent --location \
+            "${BootstrapScriptUrl}" -o /opt/loanos-bootstrap/bootstrap-demo.sh
+          chmod 0755 /opt/loanos-bootstrap/bootstrap-demo.sh
+          export LOANOS_SOURCE_REPOSITORY='${SourceRepository}'
+          export LOANOS_SOURCE_REF='${SourceRef}'
+          export LOANOS_STACK_NAME='${AWS::StackName}'
+          export LOANOS_AWS_REGION='${AWS::Region}'
+          /opt/loanos-bootstrap/bootstrap-demo.sh \
+            > /var/log/loanos-bootstrap.log 2>&1
+
+Outputs:
+  DemoUrl:
+    Description: HTTP demo URL. Wait 15-25 minutes for the first Rust build.
+    Value: !Sub "http://${DemoInstance.PublicDnsName}/"
+  InstanceId:
+    Description: Instance identifier for Systems Manager Session Manager.
+    Value: !Ref DemoInstance
+  CredentialsParameter:
+    Description: >-
+      SecureString parameter containing generated demo credentials. Retrieve
+      it through Systems Manager Parameter Store after bootstrap completes.
+    Value: !Sub "/loanos-demo/${AWS::StackName}/credentials"
+  BootstrapStatusParameter:
+    Description: Parameter reporting STARTED, COMPLETE, or FAILED.
+    Value: !Sub "/loanos-demo/${AWS::StackName}/status"
+  BootstrapLogCommand:
+    Description: Run inside an SSM session if bootstrap troubleshooting is needed.
+    Value: sudo tail -n 200 /var/log/loanos-bootstrap.log
