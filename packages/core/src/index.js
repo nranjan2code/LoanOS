@@ -267,6 +267,23 @@ export {
   reviewHypercare,
   validateOpeningBalances
 } from "./implementation-governance.js";
+
+export {
+  createComplianceObligationCalendar,
+  createConfiguredWorkflowCase,
+  createRegulatoryApplicabilityProfile,
+  planBulkAction,
+  recordOperationalException,
+  registerApprovalMatrix,
+  registerBusinessCalendar,
+  registerExceptionTaxonomy,
+  registerLendingProgramme,
+  registerOperatingUnit,
+  registerWorkflowDefinition,
+  registerWorkforcePolicy,
+  resolveApprovalRequirement,
+  transitionConfiguredWorkflowCase
+} from "./institutional-operations.js";
 export {
   PROVIDER_INTEGRATIONS,
   assessProviderCertification,

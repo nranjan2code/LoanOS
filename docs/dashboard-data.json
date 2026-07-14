@@ -1,22 +1,22 @@
 {
-  "generated": "2026-07-14T17:14:52.486Z",
+  "generated": "2026-07-14T17:27:21.208Z",
   "git": {
     "branch": "main",
-    "count": 155,
+    "count": 156,
     "commits": []
   },
   "overall": {
     "counts": {
       "Implemented": 87,
-      "Partial": 247,
+      "Partial": 257,
       "Partial/Mock": 11,
       "Mock": 7,
-      "Missing": 92,
+      "Missing": 82,
       "Partner": 3,
       "External": 6
     },
     "total": 453,
-    "pct": 43
+    "pct": 44
   },
   "planes": [
     {
@@ -159,7 +159,7 @@
         {
           "n": 22,
           "name": "Workflow, Maker-Checker, and Operations",
-          "pct": 40,
+          "pct": 57,
           "total": 14
         },
         {
@@ -171,15 +171,15 @@
       ],
       "counts": {
         "Implemented": 14,
-        "Partial": 20,
+        "Partial": 26,
         "Partial/Mock": 1,
         "Mock": 0,
-        "Missing": 14,
+        "Missing": 8,
         "Partner": 1,
         "External": 0
       },
       "total": 50,
-      "pct": 46
+      "pct": 51
     },
     {
       "name": "Compliance OS",
@@ -187,7 +187,7 @@
         {
           "n": 2,
           "name": "Regulated Entity, Programme, DLA, and Policy Governance",
-          "pct": 36,
+          "pct": 52,
           "total": 10
         },
         {
@@ -217,15 +217,15 @@
       ],
       "counts": {
         "Implemented": 16,
-        "Partial": 35,
+        "Partial": 39,
         "Partial/Mock": 0,
         "Mock": 0,
-        "Missing": 13,
+        "Missing": 9,
         "Partner": 0,
         "External": 1
       },
       "total": 65,
-      "pct": 47
+      "pct": 49
     },
     {
       "name": "Platform & Tenancy",
@@ -680,8 +680,8 @@
           "id": "REG-003",
           "name": "Lending programme and scheme configuration beneath an RE",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -693,8 +693,8 @@
           "id": "REG-004",
           "name": "Branch, region, business unit, and legal-entity operating hierarchy",
           "applicability": "Institution",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -758,8 +758,8 @@
           "id": "REG-009",
           "name": "Regulatory applicability profile by RE type and product",
           "applicability": "Institution",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -771,8 +771,8 @@
           "id": "REG-010",
           "name": "Compliance-obligation calendar with owner, due date, and evidence",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -783,15 +783,15 @@
       ],
       "counts": {
         "Implemented": 2,
-        "Partial": 4,
+        "Partial": 8,
         "Partial/Mock": 0,
         "Mock": 0,
-        "Missing": 4,
+        "Missing": 0,
         "Partner": 0,
         "External": 0
       },
       "total": 10,
-      "pct": 36
+      "pct": 52
     },
     {
       "n": 3,
@@ -4690,8 +4690,8 @@
           "id": "LWS-005",
           "name": "Configurable workflow and state-machine designer",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -4703,8 +4703,8 @@
           "id": "LWS-006",
           "name": "Configurable approval matrix by amount, product, risk, and deviation",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -4729,8 +4729,8 @@
           "id": "LWS-008",
           "name": "Escalation, delegation, substitution, leave, and workload balancing",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -4742,8 +4742,8 @@
           "id": "LWS-009",
           "name": "Bulk action with limits, approval, and audit",
           "applicability": "Optional",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -4794,8 +4794,8 @@
           "id": "LWS-013",
           "name": "Operational exception taxonomy and root-cause reporting",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -4807,8 +4807,8 @@
           "id": "LWS-014",
           "name": "Business-calendar and SLA pause/resume policy",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
+          "status": "Partial",
+          "raw": "Partial",
           "evidence": [],
           "owner": "",
           "acceptance": "",
@@ -4819,15 +4819,15 @@
       ],
       "counts": {
         "Implemented": 4,
-        "Partial": 4,
+        "Partial": 10,
         "Partial/Mock": 0,
         "Mock": 0,
-        "Missing": 6,
+        "Missing": 0,
         "Partner": 0,
         "External": 0
       },
       "total": 14,
-      "pct": 40
+      "pct": 57
     },
     {
       "n": 23,
@@ -7063,9 +7063,9 @@
     }
   ],
   "tests": {
-    "pass": 277,
+    "pass": 284,
     "fail": 0,
-    "total": 282,
+    "total": 289,
     "ran": true
   }
 }

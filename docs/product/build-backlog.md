@@ -17,6 +17,7 @@ capability rows remain the source of truth for individual features.
 | E | Enterprise security and scale: federation, SCIM, KMS/HSM, SIEM custody, HA/PITR, Postgres scale, event/API governance, and deployment automation | Product control plane complete — certified tenant federation/SCIM state, managed-key and log-custody attestations, dependency-linked PostgreSQL HA/PITR/capacity, OpenAPI/event/webhook governance and automation readiness are executable. Live IdP/KMS/SIEM/database/queue/deployment controllers remain external deployment work. |
 | F | Risk, AML, and fraud depth: ongoing CDD, transaction monitoring, fraud signals, portfolio analytics, limits, stress, RCSA, and recurring model monitoring | Product control plane complete — current-list CDD, exact-paise monitoring, deterministic fraud policy, exposure/limit/stress, RCSA, recurring model reports and sealed committee evidence are executable; live feeds and institutional operations remain external. |
 | G | Migration and go-live: mapping, conversion, balance validation, parallel run, UAT, training, readiness, cutover, and hypercare | Product control plane complete — approved configuration/mapping, exact count/paise conversion reconciliation, account balance/schedule validation, parallel/UAT/training gates, joined readiness, cutover rollback and hypercare exit are executable; source ETL and production command execution remain external. |
+| H | Institutional operating model and configurable workflow: programmes, organisation, applicability, obligation calendars, state machines, approval matrices, delegation, bulk action, exception taxonomy, and business calendars | Product control plane complete — tenant-scoped policy records and executable configured-case/approval resolution are audit-sealed and fail closed; enterprise feeds, timer/routing workers, transactional bulk execution and institution-wide operating methodology remain deployment depth. |
 
 ## Epic 1: Tenant and Regulated Entity Setup
 
@@ -28,6 +29,8 @@ Tasks:
 
 - Create tenant/RE data model. Done.
 - Add supported RE categories and license metadata. Done: validateRegulatedEntity checks licenseMetadata (category, issueDate, status, licenseNumber, issuingAuthority) and preflight evaluates them.
+- Add lending programme/scheme and operating hierarchy. Governed first slice done: programmes bind one RE to product policies, active legal-entity/region/business-unit/branch nodes, channels, segments, exact-paise portfolio limit and effective dates. Organisation-master feeds and full commercial administration remain planned.
+- Add regulatory applicability and obligation calendar. Governed first slice done: known controls receive approved applicable/not-applicable/conditional determinations; only applicable controls can schedule owner/reviewer/evidence/escalation obligations. Regulatory-content feeds, recurring execution and notification workers remain planned.
 - Add RE public website disclosure fields. Done.
 - Add grievance officer registry. Done.
 - Add board-approved policy references. Done.
@@ -201,6 +204,11 @@ Goal: compliance work is native workflow, not spreadsheets.
 Tasks:
 
 - Workflow engine with queues, tasks, SLA, assignment, status. Derived queues, SLA clocks, and assignment/start/release/comment first slice done.
+- Configurable workflow/state-machine definitions. Governed first slice done: reachable state graphs with pinned versions, queue/SLA policy, role/evidence/condition/four-eyes transitions and executable cases. BPMN authoring, migration/retirement and timer workers remain planned.
+- Configurable approval matrices. Governed first slice done: exact-paise amount/product/risk/deviation rules resolve required roles/count/unanimity and unmatched facts fail to human review or deny.
+- Workforce, delegation and escalation. Governed policy first slice done for capacity, leave/substitution, ageing escalation and balancing method; live task routing and HR feeds remain planned.
+- Bulk action. Approved-plan first slice done with 100-task bound, separate >25 approval, idempotency and checksum/audit evidence; transactional execution remains planned.
+- Business calendar and operational exception taxonomy. Governed first slice done for India work calendars/pause policy and version-pinned severity/root-cause/remediation-SLA exceptions. Applying pause/resume across every derived task and analytics remain planned.
 - Staff actor registry and role/queue policy. First slice done.
 - Maker-checker approvals. First slice done for credit decision approval task with `credit_checker` enforcement.
 - Collections workflow queue. First slice done for delinquent recovery-assignment task.

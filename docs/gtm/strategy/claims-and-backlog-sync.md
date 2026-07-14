@@ -99,6 +99,13 @@ node docs/gtm/automation/gtm-backlog-sync.mjs
 | C-66 | UAT covers product, role, exception and regulatory controls while severe defects block and role training expires | Partial | architecture/implementation-migration-go-live.md; customer testing and training delivery remain external |
 | C-67 | Go-live readiness joins migration, balances, parallel run, UAT, role training, DR, security, providers and three-function sign-off | Partial | architecture/implementation-migration-go-live.md; production switching remains external |
 | C-68 | Cutover records five controlled steps, requires rollback proof on failure, and gates hypercare exit on time, severity and SLA | Partial | architecture/implementation-migration-go-live.md; command-centre operation remains external |
+| C-69 | Lending programmes bind an RE to approved products, operating units, channels, segments, exact-paise limits and effective dates | Partial | architecture/institutional-operations.md; organisation-master and commercial operation remain deployment-specific |
+| C-70 | Regulatory applicability determines canonical controls and drives owner/reviewer/evidence-bound obligation calendars | Partial | architecture/institutional-operations.md; regulatory-content feeds and scheduling workers remain external |
+| C-71 | Configurable workflow cases pin a reachable state-machine version and enforce role, evidence, condition and four-eyes transitions | Partial | architecture/institutional-operations.md; BPMN UI, timer workers and definition migration remain planned |
+| C-72 | Approval matrices resolve exact-paise amount, product, risk and deviation facts to roles, approval count and unanimity | Partial | architecture/institutional-operations.md; institution delegated-authority administration remains external |
+| C-73 | Workforce policy retains capacity, leave substitution, queue escalation and balancing rules | Partial | architecture/institutional-operations.md; HR feeds and runtime routing remain deployment-specific |
+| C-74 | Bulk task plans are idempotent, checksum-bound, capped at 100 and require separate approval above 25 | Partial | architecture/institutional-operations.md; transactional task execution remains planned |
+| C-75 | India business-calendar pause policy and versioned exception taxonomy retain root cause, ownership and remediation SLA | Partial | architecture/institutional-operations.md; runtime timer application and analytics remain planned |
 
 ## Change process
 

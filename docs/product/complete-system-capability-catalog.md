@@ -69,7 +69,7 @@ LoanOS currently has a strong compliance-first domain foundation and executable 
 
 The principal gaps before bank production are live integrations, downstream GL certification, regulatory submission formats, product-specific lending depth, repossession/auction and legal-expense depth, live IdP/KMS/SIEM/database/deployment infrastructure, and independent bank-assurance evidence. The product now governs federation/SCIM state, purpose-attested keys, security-log custody, PostgreSQL HA/PITR/capacity dependencies, API/event/webhook contracts and deployment readiness alongside bounded observability, encrypted recovery, governed release, security assurance, SOC investigation and compliance evidence. Actual token/signature validation, KMS grants, SIEM/WORM/NTP/collectors, managed replication/WAL/PITR, queue/dispatch/replay workers, cloud rollout controllers, institutional control methodology, pen tests, ITSM/paging, 24x7 staffing, production-scale soak/chaos, contract enforcement, real failover/failback and exercised continuity remain open. Collections/legal recovery also retains partner depth for dialers, route/capacity optimization, court integration, possession, auction and recovery accounting. Public positioning must remain narrower than this catalogue until each advertised journey reaches agreed maturity.
 
-The detailed register contains **453 individually identified capabilities**. At this snapshot, 87 are classified `Implemented`, 247 `Partial`, 92 `Missing`, and 27 are mock, partner, external, or composite-status obligations. These counts measure scope coverage, not delivery percentage: a single missing ledger, reconciliation, security, or recovery control can block production even if many smaller capabilities exist.
+The detailed register contains **453 individually identified capabilities**. At this snapshot, 87 are classified `Implemented`, 257 `Partial`, 82 `Missing`, and 27 are mock, partner, external, or composite-status obligations. These counts measure scope coverage, not delivery percentage: a single missing ledger, reconciliation, security, or recovery control can block production even if many smaller capabilities exist.
 
 ## Capability Index
 
@@ -136,14 +136,14 @@ The detailed register contains **453 individually identified capabilities**. At 
 | --- | --- | --- | --- |
 | REG-001 | RE legal identity, licence, category, office, and public website | Core | Implemented |
 | REG-002 | Board-approved policy register with owners and effective dates | Core | Partial |
-| REG-003 | Lending programme and scheme configuration beneath an RE | Core | Missing |
-| REG-004 | Branch, region, business unit, and legal-entity operating hierarchy | Institution | Missing |
+| REG-003 | Lending programme and scheme configuration beneath an RE | Core | Partial |
+| REG-004 | Branch, region, business unit, and legal-entity operating hierarchy | Institution | Partial |
 | REG-005 | DLA registry for RE and LSP-operated surfaces | Channel | Implemented |
 | REG-006 | Public disclosure publishing for products, DLAs, LSPs, grievance, CMS, and Sachet | Channel | Partial |
 | REG-007 | CCO certification workflow and evidence pack | Institution | Partial |
 | REG-008 | Policy exception, waiver, and temporary dispensation governance | Core | Partial |
-| REG-009 | Regulatory applicability profile by RE type and product | Institution | Missing |
-| REG-010 | Compliance-obligation calendar with owner, due date, and evidence | Core | Missing |
+| REG-009 | Regulatory applicability profile by RE type and product | Institution | Partial |
+| REG-010 | Compliance-obligation calendar with owner, due date, and evidence | Core | Partial |
 
 ### 3. Product, Pricing, and Policy Configuration
 
@@ -511,16 +511,16 @@ The detailed register contains **453 individually identified capabilities**. At 
 | LWS-002 | Task SLA, priority, due time, and breach status | Core | Implemented |
 | LWS-003 | Role/queue visibility and server-side action authorization | Core | Implemented |
 | LWS-004 | Assignment, start, release, comment, and audit | Core | Implemented |
-| LWS-005 | Configurable workflow and state-machine designer | Core | Missing |
-| LWS-006 | Configurable approval matrix by amount, product, risk, and deviation | Core | Missing |
+| LWS-005 | Configurable workflow and state-machine designer | Core | Partial |
+| LWS-006 | Configurable approval matrix by amount, product, risk, and deviation | Core | Partial |
 | LWS-007 | Maker-checker/four-eyes policy library | Core | Partial |
-| LWS-008 | Escalation, delegation, substitution, leave, and workload balancing | Core | Missing |
-| LWS-009 | Bulk action with limits, approval, and audit | Optional | Missing |
+| LWS-008 | Escalation, delegation, substitution, leave, and workload balancing | Core | Partial |
+| LWS-009 | Bulk action with limits, approval, and audit | Optional | Partial |
 | LWS-010 | Queue dashboards, ageing, throughput, and productivity | Core | Partial |
 | LWS-011 | Case timeline combining data, decisions, documents, and communications | Core | Partial |
 | LWS-012 | Committee agenda, circulation, decision, minutes, and conditions | Institution | Partial |
-| LWS-013 | Operational exception taxonomy and root-cause reporting | Core | Missing |
-| LWS-014 | Business-calendar and SLA pause/resume policy | Core | Missing |
+| LWS-013 | Operational exception taxonomy and root-cause reporting | Core | Partial |
+| LWS-014 | Business-calendar and SLA pause/resume policy | Core | Partial |
 
 ### 23. Grievance, Conduct, and Customer Protection
 

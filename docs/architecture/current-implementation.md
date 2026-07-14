@@ -23,7 +23,7 @@ The current implementation is intentionally small:
 - Internal staff workspace in `apps/dashboard/`.
 - Borrower customer portal in `apps/customer/`: a responsive, white-labelled journey home with prioritised next actions, visual application milestones, repayment schedules, a document centre, guided media, grievance tracking, and DPDP access/correction/erasure controls.
 - Shared design system tokens in `apps/shared/`.
-- Automated tests in `tests/`: 277 file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
+- Automated tests in `tests/`: 284 file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
 
 Run it:
 
@@ -103,6 +103,8 @@ npm run dev:api
 | `apps/api/src/routes/risk-aml-controls.js` | Tenant-authenticated persistence and audit projection for the risk, AML, fraud, and recurring model-monitoring control plane. |
 | `packages/core/src/implementation-governance.js` | Pure implementation controls for project configuration, mapping, conversion and balance reconciliation, parallel/UAT/training gates, joined readiness, cutover/rollback, and hypercare exit. |
 | `apps/api/src/routes/implementation-controls.js` | Tenant-authenticated persistence and audit projection for implementation, migration, go-live and hypercare records. |
+| `packages/core/src/institutional-operations.js` | Pure institutional controls for RE programme/hierarchy, applicability/obligations, business calendars, configurable workflows and approvals, workforce/delegation, bulk plans, and exception taxonomy. |
+| `apps/api/src/routes/institutional-operations.js` | Tenant-authenticated persistence and audit projection for institutional governance and configured operations. |
 | `apps/api/src/observability.js` | Bounded process-local HTTP telemetry registry: normalized route/status aggregates, availability and latency SLIs, configurable SLO/error-budget state, in-flight/capacity signals, tenant-scoped snapshots, and Prometheus text output without tenant labels. |
 | `apps/api/src/recovery.js` | Encrypted platform recovery-package format and fail-closed validator: domain-separated AES-256-GCM encryption, authenticated India-resident manifest, package/content checksums, state/audit-chain verification, RTO/RPO evaluation, and governed exercise evidence. |
 | `apps/api/src/resilience-probe.js` | Dependency-free bounded concurrent HTTP probe with per-request timeout, status/error counts, p50/p95/p99 latency, throughput, duration, and concurrency evidence. |
@@ -127,6 +129,7 @@ npm run dev:api
 | `tests/enterprise-platform.test.js` | Federation/SCIM, managed keys/log custody, PostgreSQL HA/PITR/capacity, deployment readiness, API/event compatibility, webhooks, and HTTP persistence. |
 | `tests/risk-aml-governance.test.js` | Current-list CDD, exact-paise transaction alerts, deterministic fraud scoring, exposure/stress controls, RCSA/model reports, evidence packs, and tenant API persistence. |
 | `tests/implementation-governance.test.js` | Configuration/mapping lineage, exact-paise migration/balance failures, parallel/UAT/training readiness, rollback/hypercare gates, and tenant API persistence. |
+| `tests/institutional-operations.test.js` | RE hierarchy/programme lineage, applicability obligations, configured transitions, exact-paise approval rules, workforce/bulk controls, exception taxonomy, and tenant API persistence. |
 
 ## Implemented API Endpoints
 
@@ -135,6 +138,11 @@ npm run dev:api
 | `GET /health` | Service and bounded runtime SLI health. Open route, no tenant context. |
 | `GET /risk/controls` | Role-gated tenant projection of screening/CDD/TM, fraud, portfolio/stress, RCSA, model-report and risk-pack records. |
 | `GET /implementation/controls` | Role-gated tenant projection of implementation projects through hypercare reviews. |
+| `GET /institution/operations` | Role-gated projection of institutional hierarchy/programmes, applicability/obligations, workflow/approval, workforce/bulk, calendar and exception records. |
+| `POST /institution/operations/units`, `/programmes`, `/applicability-profiles`, `/obligation-calendars` | Governs same-RE operating structure/programmes and canonical applicability-driven compliance schedules. |
+| `POST /institution/operations/business-calendars`, `/workflow-definitions`, `/workflow-cases`, `/workflow-cases/:id/transitions` | Governs India calendar policy and executable pinned state/role/evidence/condition/four-eyes workflows. |
+| `POST /institution/operations/approval-matrices`, `/approval-resolutions` | Approves and resolves exact-paise product/risk/deviation delegated-authority policy. |
+| `POST /institution/operations/workforce-policies`, `/bulk-actions`, `/exception-taxonomies`, `/exceptions` | Records capacity/substitution/escalation, bounded bulk plans and versioned root-cause/SLA exceptions. |
 | `POST /implementation/projects`, `/implementation/mappings`, `/implementation/migration-runs` | Approves configuration/source-transform lineage and records mock/dress/final count and exact-paise conversion reconciliation. |
 | `POST /implementation/opening-balance-validations`, `/implementation/parallel-runs` | Compares account balances/schedules and finance/regulatory/portfolio parallel outputs fail-closed. |
 | `POST /implementation/uat-campaigns`, `/implementation/training-certifications` | Records complete control UAT and score/expiry-bound role certification. |
@@ -632,6 +640,7 @@ npm run dev:api
 
 ## Known Limitations
 
+- Institutional operations are governed policy/evidence records plus a configured-case transition authority, not a BPMN/HR/GRC platform. Organisation/content feeds, calendar/timer schedulers, task pause/resume migration, workload routers, workflow version retirement/migration, delegated-authority administration, transactional bulk execution and exception analytics remain external or planned. See [institutional governance and configurable operations](institutional-operations.md).
 - Implementation governance validates submitted source, migration, UAT, training and cutover evidence but does not discover legacy systems, run ETL/cleansing, transfer binaries, operate customer UAT/training, execute production commands or witness continuity. Source-specific packs, scale validation and command-centre operation remain customer/vendor work. See [implementation, migration, and go-live governance](implementation-migration-go-live.md).
 - Control assurance is a governed record slice, not a full GRC, workpaper, regulator-portal or board-management system. It lacks granular obligation/control hierarchy, policy/risk mapping, recurring campaigns, statistical sampling, evidence connectors, document retention/e-signature, materiality methodology, automated issue escalation/risk acceptance, confidential auditor spaces, regulator correspondence, rendered papers/minutes/actions, trend/KRI dashboards, WORM timestamps, audit-universe planning and independent operating-effectiveness execution. See [compliance control assurance and audit workspace](control-assurance.md).
 - SOC operations retain governed references and checksums, and Bundle E can certify authenticated schema-bound collectors, trusted time and searchable immutable India custody for supported source families. LoanOS still does not operate the SIEM/log lake, WORM vault, NTP, collectors, correlation/UEBA/threat-intelligence feeds, SOAR, forensic tooling, SOC roster/quality management, hunting, purple-team exercises, or independent effectiveness tests. See [enterprise security and scale](enterprise-security-and-scale.md).
