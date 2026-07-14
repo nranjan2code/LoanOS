@@ -42,6 +42,10 @@ Date of research baseline: 2026-07-08.
 - RBI, `Reset of Floating Interest Rate on Equated Monthly Instalments (EMI) based Personal Loans` FAQ, updated October 1, 2025: https://www.rbi.org.in/commonman/english/scripts/FAQs.aspx?Id=3687
 - RBI, `Reserve Bank of India (Commercial Banks – Credit Information Reporting) Directions, 2025`, November 28, 2025: https://rbidocs.rbi.org.in/rdocs/notification/PDFs/156MD.PDF (other regulated-entity directions must be selected according to the tenant's licence type)
 - RBI, UCRF consumer, commercial, and MFI annex to the Credit Information Reporting Directions, November 28, 2025: https://rbidocs.rbi.org.in/rdocs/content/pdfs/156MD28112025_AN1.pdf
+- CKYCRR, `Operating Guidelines`, version 1.2.1: https://iat.ckycindia.in/ckyc/assets/doc/Operating_Guidelines_version_1.2.1.pdf
+- CKYCRR, `Revised Template for Individual KYC` communique and bulk/API file references: https://iat.ckycindia.in/ckyc/assets/doc/Communique_2020-01_-_CKYC_Individual_Template_Revision.pdf
+- CKYCRR, `KYC Template for Legal Entities`, January 4, 2021: https://iat.ckycindia.in/ckyc/assets/doc/Communique%202020-11%20-%20Legal%20Entity%20KYC%20Template.pdf
+- RBI, KYC frequently asked questions, including CKYC identifier download consent and customer notification: https://www.rbi.org.in/SCRIPTs/FAQView.aspx?Id=173
 - RBI, `Master Direction on Information Technology Governance, Risk, Controls and Assurance Practices`, 2023: https://www.rbi.org.in/Scripts/BS_ViewMasDirections.aspx?id=12562
 - RBI, `Directions on Managing Risks and Code of Conduct in Outsourcing of Financial Services by NBFCs`, November 9, 2017: https://www.rbi.org.in/commonman/english/scripts/Notification.aspx?Id=2646
 - RBI, `Master Direction on Outsourcing of Information Technology Services` (RBI/2023-24/102), April 10, 2023: https://www.rbi.org.in/Scripts/BS_ViewMasDirections.aspx?id=12486

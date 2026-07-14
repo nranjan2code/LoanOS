@@ -36,7 +36,10 @@ const TASK_SLA_HOURS = {
   "data_principal.correction_request": 720,
   "cic.submission": 168,
   "cic.rejected_record_repair": 168,
-  "cic.correction_review": 504
+  "cic.correction_review": 504,
+  "ckycrr.submission": 24,
+  "ckycrr.response_repair": 24,
+  "ckycrr.probable_match": 168
 };
 
 export function normalizeWorkflowTaskStore(store = {}) {
@@ -55,12 +58,24 @@ export function deriveWorkflowTasks(state, options = {}) {
     ...deriveLegalRecoveryTasks(Object.values(state?.legalRecoveryCases ?? {}), asOf),
     ...deriveComplaintTasks(Object.values(state?.complaints ?? {}), asOf),
     ...deriveDataPrincipalTasks(state, asOf),
-    ...deriveCicTasks(state, asOf)
+    ...deriveCicTasks(state, asOf),
+    ...deriveCkycrrTasks(state, asOf)
   ]
     .map((task) => applyTaskRecord(task, taskStore.records[task.taskId]))
     .map((task) => withTaskSla(task, asOf));
 
   return tasks.filter((task) => matchesTaskFilters(task, options.filters ?? {}));
+}
+
+function deriveCkycrrTasks(state, asOf) {
+  return Object.values(state?.ckycrrSubmissions ?? {}).flatMap((submission) => {
+    if (!submission?.submissionId) return [];
+    const base = { entityType: "ckycrr_submission", entityId: submission.submissionId, regulatoryRefs: ["CERSAI-CKYC", "RBI-KYC-2016"] };
+    if (submission.status === "ready") return [{ ...base, taskId: `task_ckycrr_submit_${submission.submissionId}`, type: "ckycrr.submission", title: submission.probableMatchDecision === "no_match" ? "Resubmit CKYCRR no-match record" : "Submit approved CKYCRR packet", description: "Digitally sign and transmit the checksum-sealed CKYCRR packet using SFTP or the permitted portal channel.", queue: "kyc_ops", role: "kyc_officer", priority: "high", openedAt: submission.createdAt, action: { method: "POST", path: `/reporting/ckycrr/submissions/${submission.submissionId}/submit`, description: "Record signed CKYCRR transmission." }, context: { borrowerId: submission.borrowerId, operation: submission.operation, checksumSha256: submission.packet.checksumSha256 } }];
+    if (submission.status === "rejected") return [{ ...base, taskId: `task_ckycrr_repair_${submission.submissionId}`, type: "ckycrr.response_repair", title: "Repair rejected CKYCRR record", description: "Correct the source KYC data and prepare a new independently approved packet.", queue: "kyc_ops", role: "kyc_officer", priority: "high", openedAt: submission.respondedAt, action: { method: "POST", path: "/reporting/ckycrr/submissions", description: "Create corrected CKYCRR submission." }, context: { errorCode: submission.errorCode, errorMessage: submission.errorMessage } }];
+    if (submission.status === "probable_match") return [{ ...base, taskId: `task_ckycrr_match_${submission.submissionId}`, type: "ckycrr.probable_match", title: "Resolve CKYCRR probable match", description: "Select an exact existing customer or confirm no match before CKYCRR withdraws the record after seven calendar days.", queue: "kyc_ops", role: "kyc_checker", priority: "critical", openedAt: submission.respondedAt, dueAt: `${submission.reconciliationDueDate}T23:59:59.999Z`, action: { method: "POST", path: `/reporting/ckycrr/submissions/${submission.submissionId}/probable-match-resolution`, description: "Record independent probable-match decision." }, context: { probableMatches: submission.probableMatches } }];
+    return [];
+  });
 }
 
 function deriveCicTasks(state, asOf) {

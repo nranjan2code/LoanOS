@@ -216,6 +216,17 @@ export {
 } from "./cic-reporting.js";
 
 export {
+  CKYCRR_PACKET_VERSION,
+  CKYCRR_STATUSES,
+  buildCkycrrPacket,
+  createCkycrrSubmission,
+  recordCkycrrResponse,
+  resolveCkycrrProbableMatch,
+  submitCkycrrSubmission,
+  validateCkycrrDownload
+} from "./ckyc-reporting.js";
+
+export {
   normalizeRecoveryAgent,
   upsertRecoveryAgent,
   validateRecoveryAgent

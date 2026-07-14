@@ -222,7 +222,7 @@ The detailed register contains **453 individually identified capabilities**. At 
 | --- | --- | --- | --- |
 | KYC-001 | Customer acceptance policy checks | Core | Partial |
 | KYC-002 | PAN and officially valid document capture/verification | Core | Mock |
-| KYC-003 | CKYC search, download, update, and upload | Core | Mock |
+| KYC-003 | CKYC search, download, update, and upload | Core | Partial/Mock |
 | KYC-004 | V-CIP evidence, liveness, location, and official approval | Channel | Partial/Mock |
 | KYC-005 | Aadhaar boundary with prohibited-data controls | Core | Implemented |
 | KYC-006 | Risk categorisation and periodic-review cycle | Core | Partial |
@@ -547,7 +547,7 @@ The detailed register contains **453 individually identified capabilities**. At 
 | RPT-003 | CIC consumer/commercial Uniform Credit Reporting Format | Institution | Partial |
 | RPT-004 | Fortnightly CIC schedule, acknowledgement, rejects, repair, and resubmission | Institution | Implemented |
 | RPT-005 | CIC dispute/correction and borrower communication | Institution | Partial |
-| RPT-006 | CKYCRR production upload/download format and acknowledgement | Institution | Missing |
+| RPT-006 | CKYCRR production upload/download format and acknowledgement | Institution | Partial |
 | RPT-007 | FIU FINnet 2.0 STR/CTR/CCR XML and acknowledgement | Institution | Missing |
 | RPT-008 | CERSAI production payload, payment, response, and certificate | Product | Missing |
 | RPT-009 | CRILC/SMA and large-exposure reporting | Institution | Missing |

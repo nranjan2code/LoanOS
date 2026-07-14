@@ -8686,11 +8686,24 @@ test("CKYC Search, Download, and Upload flow", async (t) => {
   assert.equal(searchRes.status, 200);
   assert.equal(searchRes.body.results.length, 1);
   assert.equal(searchRes.body.results[0].ckycNumber, "99999999999999");
-  assert.equal(searchRes.body.results[0].fullName, "Aaditya Patel");
+  assert.equal(searchRes.body.results[0].fullName, "A****** P****");
+  assert.equal(searchRes.body.results[0].idNumber, "******234F");
 
   // 3. Download the record and sync it
+  const ckycConsent = await postJson(`${base}/borrowers/bor_001/consents`, {
+    ...validConsentRecord(),
+    consentId: "consent_ckyc_download",
+    purpose: "ckyc",
+    purposeDescription: "Download the customer's KYC record from CKYCRR.",
+    dataCategories: ["identity", "contact", "kyc"]
+  });
+  assert.equal(ckycConsent.status, 201);
   const downloadRes = await postJson(`${base}/borrowers/bor_001/ckyc/download`, {
-    ckycNumber: "99999999999999"
+    ckycNumber: "99999999999999",
+    consentId: "consent_ckyc_download",
+    authenticationFactor: { type: "date_of_birth", evidenceRef: "DOB-MATCH-001" },
+    downloadRef: "CKYC-DL-001",
+    downloadedBy: "kyc-officer-1"
   });
   assert.equal(downloadRes.status, 200);
   assert.equal(downloadRes.body.status, "verified");
@@ -8726,22 +8739,13 @@ test("CKYC Search, Download, and Upload flow", async (t) => {
   const seedKyc = await postJson(`${base}/borrowers/bor_002/kyc-records`, kycInput);
   assert.equal(seedKyc.status, 201);
 
-  // Upload to CKYC
+  // Direct upload is fail-closed: CKYCRR identifiers are never generated
+  // locally and the governed reporting submission lifecycle must be used.
   const uploadRes = await postJson(`${base}/borrowers/bor_002/ckyc/upload`, {
     kycRecordId: seedKyc.body.kycRecord.kycRecordId
   });
-  assert.equal(uploadRes.status, 200);
-  assert.equal(uploadRes.body.success, true);
-  assert.ok(uploadRes.body.ckycNumber);
-  assert.equal(uploadRes.body.kycRecord.ckycRef, uploadRes.body.ckycNumber);
-
-  // Verify that we can search for the uploaded record in CKYC
-  const searchRes2 = await postJson(`${base}/borrowers/bor_002/ckyc/search`, {
-    idType: "pan",
-    idNumber: "IDbor_002"
-  });
-  assert.equal(searchRes2.status, 200);
-  assert(searchRes2.body.results.some(r => r.fullName === "Karan Johar"));
+  assert.equal(uploadRes.status, 422);
+  assert(uploadRes.body.findings.some((finding) => finding.message.includes("governed")));
 });
 
 test("V-CIP Evidence Vault and validation checks", async (t) => {

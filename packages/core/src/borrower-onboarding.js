@@ -824,11 +824,11 @@ export function searchCkyc(ckycRegistry, query) {
     ) {
       results.push({
         ckycNumber: record.ckycNumber,
-        fullName: record.fullName,
-        dateOfBirth: record.dateOfBirth,
+        fullName: maskCkycName(record.fullName),
+        yearOfBirth: record.dateOfBirth?.slice(0, 4) ?? null,
         gender: record.gender,
         idType: record.idType,
-        idNumber: record.idNumber
+        idNumber: maskCkycIdentifier(record.idNumber)
       });
     }
   }
@@ -838,6 +838,15 @@ export function searchCkyc(ckycRegistry, query) {
     findings,
     summary: summarizeFindings(findings)
   };
+}
+
+function maskCkycName(value) {
+  return String(value ?? "").split(/\s+/).filter(Boolean).map((part) => part.length <= 1 ? "*" : `${part[0]}${"*".repeat(Math.max(1, part.length - 1))}`).join(" ");
+}
+
+function maskCkycIdentifier(value) {
+  const text = String(value ?? "");
+  return text.length <= 4 ? "*".repeat(text.length) : `${"*".repeat(text.length - 4)}${text.slice(-4)}`;
 }
 
 /**
@@ -875,46 +884,7 @@ export function downloadCkycRecord(ckycRegistry, ckycNumber) {
  * @returns {Object} The result of upload including success status and generated ckycNumber.
  */
 export function uploadCkycRecord(ckycRegistry, borrower, kycRecord, now = new Date()) {
-  const findings = [];
-
-  if (!borrower || !kycRecord) {
-    findings.push(createFinding("error", "RBI-KYC-2016", "borrower and kycRecord are required for CKYC upload.", "upload"));
-    return { success: false, findings, summary: summarizeFindings(findings) };
-  }
-
-  if (kycRecord.status !== VERIFIED_KYC_STATUS) {
-    findings.push(createFinding("error", "RBI-KYC-2016", "Only verified KYC records can be uploaded to CKYC.", "kycRecord.status"));
-    return { success: false, findings, summary: summarizeFindings(findings) };
-  }
-
-  // Generate a random 14-digit CKYC number that is unique
-  let ckycNumber;
-  do {
-    ckycNumber = "9" + Math.floor(1000000000000 + Math.random() * 9000000000000).toString();
-  } while (ckycRegistry?.[ckycNumber]);
-
-  const newCkycRecord = {
-    ckycNumber,
-    fullName: borrower.fullName || borrower.legalName,
-    dateOfBirth: borrower.dateOfBirth || null,
-    gender: borrower.gender || "U",
-    idType: kycRecord.method === "aadhaar" ? "aadhaar" : "pan",
-    idNumber: kycRecord.aadhaar?.maskedNumber || borrower.pan || "ID" + borrower.borrowerId,
-    contact: {
-      mobile: borrower.contact?.mobile || null,
-      email: borrower.contact?.email || null
-    },
-    address: borrower.primaryAddress || { country: "IN" },
-    uploadedAt: now.toISOString()
-  };
-
-  ckycRegistry[ckycNumber] = newCkycRecord;
-
-  return {
-    success: true,
-    ckycNumber,
-    record: newCkycRecord,
-    findings,
-    summary: summarizeFindings(findings)
-  };
+  void ckycRegistry; void borrower; void kycRecord; void now;
+  const findings = [createFinding("error", "CERSAI-CKYC", "Direct CKYC upload is disabled. Create a governed /reporting/ckycrr/submissions packet and record the CKYCRR response; identifiers are assigned only by CKYCRR.", "upload")];
+  return { success: false, findings, summary: summarizeFindings(findings) };
 }

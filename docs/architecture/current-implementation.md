@@ -55,6 +55,7 @@ npm run dev:api
 | `packages/core/src/repayment-schedule.js` | Shared KFS/LMS paise-exact schedule engine for weekly, fortnightly, monthly, and quarterly amortising, bullet, moratorium, and step-up structures. |
 | `packages/core/src/loan-account.js` | LMS term and revolving account creation, ledger reconstruction, scheduled/daily-utilisation interest, bounded drawdowns, facility reviews, payment posting, part-prepayment, foreclosure, statements, charges, recovery controls, restructure/reset, resolution, classification, and CIC snapshots. |
 | `packages/core/src/cic-reporting.js` | Versioned consumer/commercial canonical UCRF records, 15th/month-end reporting calendar, checksum-sealed maker-checker batches, default-reporting alert evidence, bureau acknowledgement reconciliation, rejected-row repair/resubmission, and 21/30-day CIC correction controls. Provider-specific proprietary files and transport are adapter responsibilities. |
+| `packages/core/src/ckyc-reporting.js` | Versioned individual/legal-entity CKYCRR canonical packets, scan/photo/document-manifest constraints, checksum and maker-checker controls, signed SFTP/portal transmission evidence, accepted/rejected/probable-match responses, seven-day reconciliation, provider-only identifier assignment, customer notification, and consent/authentication-gated downloads. |
 | `packages/core/src/finance-accounting.js` | Governed ECL assessment and allowance movements, including co-lender entity allocation, finance-only journal projection, IRAC income-reversal journals, TDS journals/return extracts, and GST invoice/credit-note return aggregation. |
 | `packages/core/src/payment-operations.js` | Suspense-receipt creation, partial loan allocation, and independently approved residual write-off; all amounts remain exact to paise and resolutions post through the canonical loan-payment function. |
 | `packages/core/src/finance-management.js` | EIR fee-amortisation journals, funding-cost attribution, ALM maturity buckets, profitability, economic-capital, and RAROC reporting. |
@@ -273,9 +274,14 @@ npm run dev:api
 | `POST /borrowers/:id/consents` | Creates or updates a borrower consent record. |
 | `GET /borrowers/:id/kyc-records` | Lists borrower KYC records. |
 | `POST /borrowers/:id/kyc-records` | Creates or updates a borrower KYC record. |
-| `POST /borrowers/:id/ckyc/search` | Searches the CKYC registry by identifier (PAN). |
-| `POST /borrowers/:id/ckyc/download` | Downloads and syncs a verified record from CKYC to borrower profile. |
-| `POST /borrowers/:id/ckyc/upload` | Uploads a local verified KYC record to CKYC registry. |
+| `POST /borrowers/:id/ckyc/search` | Searches the CKYC registry by identifier and returns only masked name/identifier plus year-of-birth match data. |
+| `POST /borrowers/:id/ckyc/download` | Downloads and syncs a verified record only with explicit active CKYC consent, an allowed authentication factor, provider reference, and actor evidence. |
+| `POST /borrowers/:id/ckyc/upload` | Legacy direct upload is fail-closed because CKYC identifiers cannot be generated locally; callers use the governed CKYCRR submission lifecycle. |
+| `GET/POST /reporting/ckycrr/submissions` | Lists tenant-local submissions or creates a checksum-sealed individual/legal-entity canonical CKYCRR packet under maker-checker approval. |
+| `GET /reporting/ckycrr/submissions/:id` | Reads packet, document manifest, checksum, response, notification, and reconciliation lineage. |
+| `POST /reporting/ckycrr/submissions/:id/submit` | Records digital-signature and SFTP/portal transport evidence; portal bulk files at or above 20 MB are rejected. |
+| `POST /reporting/ckycrr/submissions/:id/response` | Records accepted, rejected, or probable-match provider response; only an accepted response can assign the returned identifier to KYC. |
+| `POST /reporting/ckycrr/submissions/:id/probable-match-resolution` | Records an independent exact/no-match decision within seven calendar days, including customer notification for a selected identifier. |
 | `POST /borrowers/:id/vcip/evidence` | Records V-CIP evidence (video recording hash, India GPS coordinates, liveness confirmation, face match score >=0.8, official digital signature) and updates borrower KYC record. |
 | `GET /borrowers/:id/vcip/evidence` | Retrieves V-CIP evidence details for the borrower's V-CIP KYC record. |
 | `GET /borrowers/:id/beneficial-owners` | Lists a legal-entity borrower's declared beneficial owners. |

@@ -42,6 +42,7 @@ import {
   createCicCorrectionRequest,
   createCicResubmission,
   createCicSubmissionBatch,
+  createCkycrrSubmission,
   createErasureRequest,
   createFraudCase,
   createIncident,
@@ -90,6 +91,7 @@ import {
   recordDocumentPacketDelivery,
   recordDocumentPacketGenerated,
   recordPostIncidentReview,
+  recordCkycrrResponse,
   requestHumanHandoff,
   resolveHumanHandoff,
   listHumanHandoffRequests,
@@ -97,11 +99,14 @@ import {
   renderLoanStatementDocument,
   resolveComplaint,
   resolveCicCorrectionRequest,
+  resolveCkycrrProbableMatch,
   selectProductPolicyVersion,
   resolveBorrowerApplicationReferences,
   resolveLoanApplicationReferences,
   summarizeFindings,
   submitCicBatch,
+  submitCkycrrSubmission,
+  validateCkycrrDownload,
   markDisbursed,
   postCashRecoveryToLoanAccount,
   postPaymentToLoanAccount,
@@ -4019,6 +4024,8 @@ async function route(req, res, dataDir, platformAdminKey) {
 
     if (method === "POST") {
       const body = await readJson(req);
+      const downloadValidation = validateCkycrrDownload({ ...body, borrowerId, ckycIdentifier: body.ckycNumber }, state.consentRecords);
+      if (downloadValidation.summary.status === "blocked") { sendJson(res, 422, downloadValidation); return; }
       const result = downloadCkycRecord(currentControlPlaneState.controlPlane.ckycRegistry, body.ckycNumber);
       if (result.summary.status === "blocked") {
         sendJson(res, 422, result);
@@ -4053,7 +4060,11 @@ async function route(req, res, dataDir, platformAdminKey) {
         {
           ...state,
           borrowerProfiles: syncProfileResult.registry,
-          kycRecords: syncKycResult.registry
+          kycRecords: syncKycResult.registry,
+          ckycrrDownloads: {
+            ...(state.ckycrrDownloads ?? {}),
+            [body.downloadRef]: { downloadRef: body.downloadRef, borrowerId, ckycIdentifier: body.ckycNumber, consentId: body.consentId, authenticationFactor: body.authenticationFactor, downloadedBy: body.downloadedBy, downloadedAt: new Date().toISOString(), providerRecordChecksumSha256: createHash("sha256").update(JSON.stringify(record)).digest("hex") }
+          }
         },
         {
           type: "borrower.kyc_synced_from_ckyc",
@@ -5062,6 +5073,37 @@ async function route(req, res, dataDir, platformAdminKey) {
       snapshots: Object.values(state.loanAccounts).map((loanAccount) => generateCicSnapshot(loanAccount, asOf))
     });
     return;
+  }
+
+  if (method === "GET" && path === "/reporting/ckycrr/submissions") {
+    const state = await store.load(); const status = url.searchParams.get("status"); const borrowerId = url.searchParams.get("borrowerId");
+    sendJson(res, 200, { submissions: Object.values(state.ckycrrSubmissions ?? {}).filter((item) => (!status || item.status === status) && (!borrowerId || item.borrowerId === borrowerId)) }); return;
+  }
+  if (method === "POST" && path === "/reporting/ckycrr/submissions") {
+    const body = await readJson(req); const state = await store.load();
+    const result = createCkycrrSubmission(state.ckycrrSubmissions, { borrowerProfiles: state.borrowerProfiles, kycRecords: state.kycRecords }, body, new Date());
+    if (result.summary.status === "blocked") { sendJson(res, 422, { error: { code: "ckycrr_submission_blocked", message: "CKYCRR packet creation failed closed.", findings: result.findings } }); return; }
+    if (!result.idempotent) await store.save(appendEvent({ ...state, ckycrrSubmissions: result.registry }, { type: "ckycrr.submission.created", submissionId: result.submission.submissionId, borrowerId: result.submission.borrowerId, operation: result.submission.operation, checksumSha256: result.submission.packet.checksumSha256, actor: result.submission.approvedBy }));
+    sendJson(res, result.idempotent ? 200 : 201, { submission: result.submission, idempotent: result.idempotent }); return;
+  }
+  const ckycrrSubmissionMatch = path.match(/^\/reporting\/ckycrr\/submissions\/([^/]+)$/);
+  if (method === "GET" && ckycrrSubmissionMatch) {
+    const state = await store.load(); const submission = state.ckycrrSubmissions?.[decodeURIComponent(ckycrrSubmissionMatch[1])];
+    if (!submission) { sendJson(res, 404, { error: { code: "not_found", message: "CKYCRR submission not found." } }); return; }
+    sendJson(res, 200, submission); return;
+  }
+  const ckycrrActionMatch = path.match(/^\/reporting\/ckycrr\/submissions\/([^/]+)\/(submit|response|probable-match-resolution)$/);
+  if (method === "POST" && ckycrrActionMatch) {
+    const body = await readJson(req); const state = await store.load(); const submissionId = decodeURIComponent(ckycrrActionMatch[1]); const action = ckycrrActionMatch[2];
+    const result = action === "submit" ? submitCkycrrSubmission(state.ckycrrSubmissions, submissionId, body, new Date()) : action === "response" ? recordCkycrrResponse(state.ckycrrSubmissions, submissionId, body, new Date()) : resolveCkycrrProbableMatch(state.ckycrrSubmissions, submissionId, body, new Date());
+    if (result.summary.status === "blocked") { sendJson(res, 422, { error: { code: `ckycrr_${action}_blocked`, message: "CKYCRR action failed closed.", findings: result.findings } }); return; }
+    let kycRecords = state.kycRecords;
+    if (result.submission.status === "accepted" && result.submission.ckycIdentifier) {
+      const kyc = state.kycRecords[result.submission.kycRecordId]; kycRecords = { ...state.kycRecords, [kyc.kycRecordId]: { ...kyc, ckycRef: result.submission.ckycIdentifier, updatedAt: new Date().toISOString() } };
+    }
+    const ckycrrEventType = action === "submit" ? "ckycrr.submission.submitted" : action === "response" ? `ckycrr.submission.${result.submission.status}` : result.submission.status === "withdrawn" ? "ckycrr.probable_match.withdrawn" : `ckycrr.probable_match.${result.submission.probableMatchDecision}`;
+    await store.save(appendEvent({ ...state, ckycrrSubmissions: result.registry, kycRecords }, { type: ckycrrEventType, submissionId, borrowerId: result.submission.borrowerId, ckycIdentifier: result.submission.ckycIdentifier, actor: body.transmittedBy ?? body.receivedBy ?? body.approvedBy }));
+    sendJson(res, 200, { submission: result.submission, kycRecord: kycRecords[result.submission.kycRecordId] }); return;
   }
 
   if (method === "GET" && path === "/reporting/cic/submissions") {
