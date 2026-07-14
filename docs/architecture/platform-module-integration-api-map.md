@@ -35,7 +35,7 @@ Every `BOTH` integration requires idempotent commands, status/read, authenticate
 
 | ID | Needed at | External operations | Direction / response | Current state | Also used by |
 | --- | --- | --- | --- | --- | --- |
-| INT-CUS-01 | Registration and contact verification | SMS/email/WhatsApp OTP send/validate, DLT/template/sender sync, delivery and opt-out | BOTH; accepted → delivered/read/failed/bounced | Bound/Mock; core signed delivery lifecycle and reconciliation complete, API persistence/worker pending | LOS, LMS, LWS, collections |
+| INT-CUS-01 | Registration and contact verification | SMS/email/WhatsApp OTP send/validate, DLT/template/sender sync, delivery and opt-out | BOTH; accepted → delivered/read/failed/bounced | Bound/Mock; persistent signed delivery API, reconciliation and shared retry/DLQ queue complete; live sync/dispatcher pending | LOS, LMS, LWS, collections |
 | INT-CUS-02 | Lead capture and dedupe | CRM lead/party/activity/case upsert/search, attribution, merge event and delta | BOTH; source event/version, merge lineage | Internal only | LOS, partner |
 | INT-CUS-03 | Branch/partner acquisition | Agent/branch/territory/credential/capacity master sync | BOTH; change/revoke and control totals | Internal only | LWS, partner |
 | INT-CUS-04 | Document collection | DMS/object upload, malware/DLP/OCR, download/version, hold and deletion proof | BOTH; content hash, scan callback, manifest | Internal only | LOS, LMS, LWS, compliance |
@@ -90,7 +90,7 @@ The deterministic rules engine never calls an external system during evaluation.
 | INT-LWS-05 | External work orders | Valuer/advocate/agency/custodian/insurer order/status/report | BOTH; certification/SLA events | Missing | LOS, recovery |
 | INT-LWS-06 | Complaints/Ombudsman | Complaint intake/export, RBI CMS reference/status/closure evidence | BOTH/file/portal; correlation/ack | Internal only | Compliance |
 | INT-LWS-07 | Court/regulator tasks | Filing accepted/rejected, hearing/order, response and due date | IN/BOTH; signed/portal evidence | Missing | Recovery, compliance |
-| INT-LWS-08 | Workflow workers | Timer, queue/event bus, retry/DLQ, replay and webhook delivery | BOTH; offset/checkpoint/idempotency | Records only; no broker workers | Whole platform |
+| INT-LWS-08 | Workflow workers | Timer, queue/event bus, retry/DLQ, replay and webhook delivery | BOTH; offset/checkpoint/idempotency | Persistent callback delivery queue, lease/retry/DLQ/four-eyes replay API complete; scheduled background/broker workers pending | Whole platform |
 
 ## 5. LMS — boarding, servicing, collection and closure
 
@@ -138,7 +138,7 @@ The deterministic rules engine never calls an external system during evaluation.
 
 | ID | Needed at | External operations | Direction / response | Current state | Also used by |
 | --- | --- | --- | --- | --- | --- |
-| INT-FIN-01 | CBS/GL | Master/chart sync, journal, ack/reject, reversal, trial-balance totals | BOTH/file | CBS mock; GL transport missing | LOS, LMS |
+| INT-FIN-01 | CBS/GL | Master/chart sync, journal, ack/reject, reversal, trial-balance totals | BOTH/file | CBS mock plus signed/encrypted exact-paise file conformance harness; binary/vendor transport missing | LOS, LMS |
 | INT-FIN-02 | Bank reconciliation | Statement API or MT940/BAI/CSV, balance, UTR and totals | IN/file | Reconciliation exists; feed missing | LMS, payments |
 | INT-FIN-03 | Rail settlement | Settlement, fees/tax, refund/chargeback/return, payout and invoices | IN/BOTH/file | Internal strong; callbacks incomplete | LMS, collections |
 | INT-FIN-04 | Escrow/co-lender | Balance/statement, funding/settlement/split, invoice, partner GL and ack | BOTH/file | Exact mocks partial | LOS, partner |
@@ -155,8 +155,8 @@ The deterministic rules engine never calls an external system during evaluation.
 | INT-REG-02 | CIC furnishing | Submission, row reject, correction/resubmit and ack | BOTH/file | Bound/Mock; internal strong | LMS |
 | INT-REG-03 | FIU-IND FINnet | STR/CTR XML/XSD validate/sign/submit/poll/repair/ack | BOTH/file/portal | Bound/Mock packet; cert missing | AML |
 | INT-REG-04 | CERSAI | Search/file/amend/satisfy, fee, reject/correct/certificate | BOTH/file | Bound/Mock | Collateral |
-| INT-REG-05 | RBI CRILC/SMA | Extract/validate/sign/transmit/ack/amend | BOTH/file/portal | Domain governance only | LMS, risk |
-| INT-REG-06 | CIMS/XBRL/PSL/DLA | Taxonomy sync, generate/validate/sign/submit/reject/ack | BOTH/file/portal | DLA local export; transport missing | Finance, platform |
+| INT-REG-05 | RBI CRILC/SMA | Extract/validate/sign/transmit/ack/amend | BOTH/file/portal | Domain governance plus signed/encrypted row-level file conformance harness; transport missing | LMS, risk |
+| INT-REG-06 | CIMS/XBRL/PSL/DLA | Taxonomy sync, generate/validate/sign/submit/reject/ack | BOTH/file/portal | DLA export plus signed/encrypted CIMS/XBRL/PSL conformance harness; transport missing | Finance, platform |
 | INT-REG-07 | Complaints/Ombudsman | RBI CMS reference/status/response pack/closure | BOTH/file/portal | Internal only | LWS |
 | INT-REG-08 | Evidence anchoring | WORM/object-lock, hold, external timestamp/anchor and verify | BOTH | Attestation only | Platform security |
 | INT-REG-09 | Regulatory change | Circular/legal update feed and obligation mapping evidence | IN | Manual register | Product/compliance |

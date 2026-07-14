@@ -1,5 +1,5 @@
 import { createFinding } from "./compliance-controls.js";
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { assessProviderCertification } from "./provider-governance.js";
 
 // Mock pre-seeded data for Credit Bureau (CIBIL equivalent)
@@ -35,6 +35,7 @@ export class ExternalServiceManager {
   constructor(config = {}) {
     this.simulator = config.simulator ?? null;
     this.simulatorTenantId = config.simulatorTenantId ?? null;
+    this.simulatorScenarios = config.simulatorScenarios ?? {};
     this.config = {
       smsProvider: config.smsProvider ?? (typeof process !== "undefined" ? process.env.LOANOS_SMS_PROVIDER : "mock") ?? "mock",
       smsApiUrl: config.smsApiUrl ?? (typeof process !== "undefined" ? process.env.LOANOS_SMS_API_URL : "") ?? "",
@@ -158,6 +159,14 @@ export class ExternalServiceManager {
     return this.simulator.submit({ tenantId: this.simulatorTenantId, provider, operation, idempotencyKey, scenario, payload });
   }
 
+  simulatedMock(provider, operation, idempotencyKey, payload = {}) {
+    if (!this.simulator) return null;
+    const scenario = this.simulatorScenarios[`${provider}.${operation}`] ?? this.simulatorScenarios[provider] ?? "success";
+    const result = this.simulateMockProvider({ provider, operation, idempotencyKey, scenario, payload });
+    if (!result?.success) throw new Error(`Simulated ${provider} provider rejected ${operation}${result?.responseCode ? `: ${result.responseCode}` : "."}`);
+    return result;
+  }
+
   verifyProviderCallback(provider, eventId, payload, signature) {
     if (!/^[a-z_]{2,40}$/.test(String(provider ?? "")) || !eventId || !signature) throw new Error("Provider callback requires a valid provider, eventId, and signature.");
     const secret = this.config.providerCallbackSecrets?.[provider];
@@ -214,6 +223,8 @@ export class ExternalServiceManager {
       };
     } else {
       // Mock provider
+      const simulated = this.simulatedMock("sms", "send", mockIdempotencyKey("sms", phone, message), { phone, message });
+      if (simulated) return { success: true, channel: "sms", provider: "mock", ref: simulated.providerReference, dataResidencyCountry: this.config.smsDataResidencyCountry, ...simulated.response };
       console.log(`[MOCK SMS] To: ${phone} | Message: ${message}`);
       return {
         success: true,
@@ -258,6 +269,8 @@ export class ExternalServiceManager {
       };
     }
 
+    const simulated = this.simulatedMock("email", "send", mockIdempotencyKey("email", to, subject, message), { to, subject, message });
+    if (simulated) return { success: true, channel: "email", provider: "mock", ref: simulated.providerReference, dataResidencyCountry: this.config.emailDataResidencyCountry, ...simulated.response };
     console.log(`[MOCK EMAIL] To: ${to} | Subject: ${subject} | Message: ${message}`);
     return {
       success: true,
@@ -298,6 +311,8 @@ export class ExternalServiceManager {
       };
     }
 
+    const simulated = this.simulatedMock("whatsapp", "send", mockIdempotencyKey("whatsapp", phone, message), { phone, message });
+    if (simulated) return { success: true, channel: "whatsapp", provider: "mock", ref: simulated.providerReference, dataResidencyCountry: this.config.whatsappDataResidencyCountry, ...simulated.response };
     console.log(`[MOCK WHATSAPP] To: ${phone} | Message: ${message}`);
     return {
       success: true,
@@ -342,15 +357,16 @@ export class ExternalServiceManager {
       return await res.json();
     } else {
       // Mock provider
+      const simulated = this.simulatedMock("bureau", "query", mockIdempotencyKey("bureau", panNumber), { panNumber });
       const match = MOCK_BUREAU_SCORES[panNumber] || { score: 700, activeAccounts: 1, defaultAccounts: 0, enquiries30Days: 0 };
       return {
         success: true,
         provider: "mock",
         pan: panNumber,
-        score: match.score,
-        activeAccounts: match.activeAccounts,
-        defaultAccounts: match.defaultAccounts,
-        enquiries30Days: match.enquiries30Days,
+        score: simulated?.response?.score ?? match.score,
+        activeAccounts: simulated?.response?.activeAccounts ?? match.activeAccounts,
+        defaultAccounts: simulated?.response?.defaultAccounts ?? match.defaultAccounts,
+        enquiries30Days: simulated?.response?.enquiries30Days ?? match.enquiries30Days,
         dataResidencyCountry: this.config.bureauDataResidencyCountry,
         timestamp: new Date().toISOString()
       };
@@ -381,14 +397,15 @@ export class ExternalServiceManager {
       return await res.json();
     } else {
       // Mock provider
+      const simulated = this.simulatedMock("vcip", "analyze", mockIdempotencyKey("vcip", borrowerId, videoHash), { borrowerId, videoHash });
       const match = MOCK_VCIP_RECORDS[borrowerId] || { faceMatchScore: 0.85, livenessConfirmed: true, location: { lat: 28.6139, lng: 77.2090, country: "IN" } };
       return {
         success: true,
         provider: "mock",
         borrowerId,
-        faceMatchScore: match.faceMatchScore,
-        livenessConfirmed: match.livenessConfirmed,
-        gps: match.location,
+        faceMatchScore: simulated?.response?.faceMatchScore ?? match.faceMatchScore,
+        livenessConfirmed: simulated?.response?.livenessConfirmed ?? match.livenessConfirmed,
+        gps: simulated?.response?.gps ?? simulated?.response?.location ?? match.location,
         dataResidencyCountry: this.config.vcipDataResidencyCountry,
         verifiedAt: new Date().toISOString()
       };
@@ -434,6 +451,11 @@ export class ExternalServiceManager {
     }
 
     const accountNumberLast4 = normalizedAccountNumber.slice(-4);
+    const simulated = this.simulatedMock("bank_account", "verify", mockIdempotencyKey("bank_account", normalizedIfsc, normalizedAccountNumber, expectedHolderName ?? ""), { accountNumber: normalizedAccountNumber, ifsc: normalizedIfsc, expectedHolderName });
+    if (simulated) {
+      const response = simulated.response ?? {}; const status = response.status ?? "verified";
+      return { success: response.success ?? status === "verified", provider: "mock", verificationRef: response.verificationRef ?? simulated.providerReference, status, accountStatus: response.accountStatus ?? (status === "not_found" ? null : "active"), bankName: response.bankName ?? null, ifsc: normalizedIfsc, accountNumberLast4, accountHolderName: response.accountHolderName ?? null, expectedHolderName: expectedHolderName ?? null, nameMatch: response.nameMatch ?? status === "verified", dataResidencyCountry: this.config.bankAccountDataResidencyCountry, verifiedAt: simulated.respondedAt };
+    }
     const match = MOCK_BANK_ACCOUNTS[`${normalizedIfsc}:${normalizedAccountNumber}`] ?? null;
     if (!match) {
       return {
@@ -608,6 +630,11 @@ export class ExternalServiceManager {
       return await res.json();
     } else {
       // Mock provider
+      const simulated = this.simulatedMock("esign", "verify_otp", mockIdempotencyKey("esign", aadhaarNumber, payloadHash), { aadhaarNumber, otp, payloadHash });
+      if (simulated) {
+        const envelopeId = simulated.response?.envelopeId ?? simulated.providerReference;
+        return { success: true, provider: "mock", signatureRef: simulated.response?.signatureRef ?? simulated.providerReference, signedAt: simulated.respondedAt, esignProvider: "mock", dataResidencyCountry: this.config.esignDataResidencyCountry, envelopeId, externalEnvelopeStorageUrl: simulated.response?.externalEnvelopeStorageUrl ?? `https://esign-provider.mock/envelopes/${envelopeId}` };
+      }
       if (otp !== "123456") {
         throw new Error("Invalid eSign OTP. Mock provider expects OTP '123456'.");
       }
@@ -724,6 +751,8 @@ export class ExternalServiceManager {
       this.assertCertified("ckycrr");
       return postProviderJson(`${this.config.ckycrrApiUrl}/submissions`, submission, this.config.ckycrrApiKey, submission.packet.checksumSha256, "CKYCRR", this.config);
     }
+    const simulated = this.simulatedMock("ckycrr", "submit", `ckycrr:${submission.submissionId}:${submission.packet.checksumSha256}`, submission);
+    if (simulated) return { success: true, provider: "mock", providerSubmissionRef: simulated.response?.providerSubmissionRef ?? simulated.providerReference, transportRef: simulated.response?.transportRef ?? simulated.providerReference, digitalSignatureRef: simulated.response?.digitalSignatureRef ?? `CKYCRR-DSC-${simulated.providerReference}`, fileName: simulated.response?.fileName ?? `${submission.submissionId}.zip`, fileSizeBytes: simulated.response?.fileSizeBytes ?? Buffer.byteLength(submission.packet.canonicalContent ?? "{}"), submittedAt: simulated.respondedAt, dataResidencyCountry: "IN" };
     return { success: true, provider: "mock", providerSubmissionRef: `CKYCRR-MOCK-${submission.submissionId}`, transportRef: `CKYCRR-TRANSPORT-MOCK-${submission.packet.checksumSha256}`, digitalSignatureRef: `CKYCRR-DSC-MOCK-${submission.submissionId}`, fileName: `${submission.submissionId}.zip`, fileSizeBytes: Buffer.byteLength(submission.packet.canonicalContent ?? "{}"), submittedAt: new Date().toISOString(), dataResidencyCountry: "IN" };
   }
 
@@ -735,6 +764,9 @@ export class ExternalServiceManager {
       this.assertCertified("account_aggregator");
       return postProviderJson(`${this.config.accountAggregatorApiUrl}/fi/fetch`, { consentHandle: consent.aaConsentHandle, ...request }, this.config.accountAggregatorApiKey, request.fetchId ?? `${consent.consentId}:${(consent.fetches ?? []).length + 1}`, "Account Aggregator", this.config);
     }
+    const idempotencyKey = request.fetchId ?? `${consent.consentId}:${(consent.fetches ?? []).length + 1}`;
+    const simulated = this.simulatedMock("account_aggregator", "fetch", idempotencyKey, { consentHandle: consent.aaConsentHandle, ...request });
+    if (simulated) return { success: true, provider: "mock_aa", providerFetchRef: simulated.response?.providerFetchRef ?? simulated.providerReference, recordCount: simulated.response?.recordCount ?? request.recordCount ?? consent.fiTypes?.length ?? 0, payloadHash: simulated.response?.payloadHash ?? request.payloadHash ?? null, dataResidencyCountry: "IN", fetchedAt: simulated.respondedAt };
     return { success: true, provider: "mock_aa", providerFetchRef: `AA-MOCK-${consent.consentId}-${(consent.fetches ?? []).length + 1}`, recordCount: request.recordCount ?? consent.fiTypes?.length ?? 0, payloadHash: request.payloadHash ?? null, dataResidencyCountry: "IN", fetchedAt: new Date().toISOString() };
   }
 
@@ -767,6 +799,10 @@ export class ExternalServiceManager {
     }
     return { status: "accepted", provider: "mock", providerReference: `CBS-MOCK-${batch.batchId}`, checksumSha256: batch.checksumSha256, lineCount: batch.lineCount, acceptedAt: new Date().toISOString(), dataResidencyCountry: this.config.coreBankingDataResidencyCountry };
   }
+}
+
+function mockIdempotencyKey(provider, ...values) {
+  return `${provider}:${createHash("sha256").update(JSON.stringify(values)).digest("hex")}`;
 }
 
 function normalizeName(value) {

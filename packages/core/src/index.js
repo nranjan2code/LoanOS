@@ -619,6 +619,23 @@ export {
 } from "./communication-delivery-lifecycle.js";
 
 export {
+  claimDueProviderCallbacks,
+  enqueueProviderCallback,
+  projectProviderCallbackQueue,
+  recordProviderCallbackAttempt,
+  replayDeadLetterCallback
+} from "./provider-callback-delivery.js";
+
+export {
+  SIGNED_FILE_SYSTEMS,
+  buildSignedFileManifest,
+  createSignedFileCorrection,
+  recordSignedFileAcknowledgement,
+  registerSignedFileSchemaProfile,
+  signedFileExportHooks
+} from "./signed-file-conformance.js";
+
+export {
   ASSET_TYPES,
   CHARGE_TYPES,
   SECURITY_INTEREST_STATUSES,

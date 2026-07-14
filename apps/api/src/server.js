@@ -13,6 +13,8 @@ import { createObservabilityRegistry } from "./observability.js";
 import { readFile } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createCommunicationDelivery, projectCommunicationDeliveryReconciliation, recordCommunicationCallback, signCommunicationCallback } from "../../../packages/core/src/communication-delivery-lifecycle.js";
+import { claimDueProviderCallbacks, enqueueProviderCallback, projectProviderCallbackQueue, recordProviderCallbackAttempt, replayDeadLetterCallback } from "../../../packages/core/src/provider-callback-delivery.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -1235,6 +1237,45 @@ async function route(req, res, dataDir, platformAdminKey, observability) {
     return;
   }
 
+  if (method === "GET" && path === "/integrations/communications/reconciliation") {
+    const state = await store.load();
+    sendJson(res, 200, projectCommunicationDeliveryReconciliation(state.communicationDeliveries, { tenantId: tenant.tenantId }));
+    return;
+  }
+
+  if (method === "GET" && path === "/integrations/callback-deliveries/queue") {
+    const state = await store.load(); sendJson(res, 200, projectProviderCallbackQueue(state.providerCallbackDeliveries, { tenantId: tenant.tenantId })); return;
+  }
+  if (method === "POST" && path === "/integrations/callback-deliveries") {
+    const body = await readJson(req); const state = await store.load();
+    try { const result = enqueueProviderCallback(state.providerCallbackDeliveries, { ...body, tenantId: tenant.tenantId }); if (!result.idempotent) await store.save(appendEvent({ ...state, providerCallbackDeliveries: result.registry }, { type: "integration.callback_delivery.enqueued", deliveryId: result.delivery.deliveryId, provider: result.delivery.provider, eventId: result.delivery.eventId, actor: body.actor ?? "integration_worker" })); sendJson(res, result.idempotent ? 200 : 201, { delivery: result.delivery, idempotent: result.idempotent }); }
+    catch (error) { sendJson(res, 422, { error: { code: error.code ?? "callback_delivery_invalid", message: error.message } }); } return;
+  }
+  if (method === "POST" && path === "/integrations/callback-deliveries/claim") {
+    const body = await readJson(req); const state = await store.load();
+    try { const result = claimDueProviderCallbacks(state.providerCallbackDeliveries, { ...body, tenantId: tenant.tenantId }); if (result.claimed.length) await store.save({ ...state, providerCallbackDeliveries: result.registry }); sendJson(res, 200, { claimed: result.claimed }); }
+    catch (error) { sendJson(res, 422, { error: { code: error.code ?? "callback_delivery_claim_invalid", message: error.message } }); } return;
+  }
+  const callbackDeliveryAction = path.match(/^\/integrations\/callback-deliveries\/([^/]+)\/(attempt|replay)$/);
+  if (method === "POST" && callbackDeliveryAction) {
+    const body = await readJson(req); const state = await store.load(); const deliveryId = decodeURIComponent(callbackDeliveryAction[1]);
+    try { const result = callbackDeliveryAction[2] === "attempt" ? recordProviderCallbackAttempt(state.providerCallbackDeliveries, deliveryId, body, { tenantId: tenant.tenantId }) : replayDeadLetterCallback(state.providerCallbackDeliveries, deliveryId, body, { tenantId: tenant.tenantId }); if (!result.idempotent) await store.save(appendEvent({ ...state, providerCallbackDeliveries: result.registry }, { type: `integration.callback_delivery.${result.delivery.status}`, deliveryId, provider: result.delivery.provider, eventId: result.delivery.eventId, actor: body.workerId ?? body.approvedBy })); sendJson(res, 200, { delivery: result.delivery, idempotent: result.idempotent ?? false }); }
+    catch (error) { sendJson(res, 422, { error: { code: error.code ?? "callback_delivery_action_invalid", message: error.message } }); } return;
+  }
+
+  const communicationCallback = path.match(/^\/integrations\/communications\/callbacks\/([^/]+)$/);
+  if (method === "POST" && communicationCallback) {
+    const provider = decodeURIComponent(communicationCallback[1]); const body = await readJson(req); const state = await store.load();
+    const secret = communicationCallbackSecret(provider, tenant);
+    if (!secret) { sendJson(res, 503, { error: { code: "communication_callback_secret_missing", message: "Communication callback secret is not configured." } }); return; }
+    try {
+      const rawBody = JSON.stringify(body.payload ?? {});
+      const result = recordCommunicationCallback(state.communicationDeliveries, { provider, eventId: body.eventId, timestamp: body.timestamp, signature: body.signature, rawBody }, secret, { tenantId: tenant.tenantId });
+      if (!result.idempotent) await store.save(appendEvent({ ...state, communicationDeliveries: result.registry }, { type: `integration.communication.${result.delivery.status}`, communicationId: result.delivery.deliveryId, channel: result.delivery.channel, provider, providerRef: result.delivery.providerMessageId, actor: "provider_callback" }));
+      sendJson(res, 200, { delivery: result.delivery, idempotent: result.idempotent }); return;
+    } catch (err) { sendJson(res, 422, { error: { code: err.code ?? "communication_callback_invalid", message: err.message } }); return; }
+  }
+
   if (await routeIntegrationControls({ method, path, req, res, tenant, store, readJson, sendJson, appendEvent, acknowledgeCersaiSubmission, acknowledgeFiuReport, acknowledgeCicBatch, recordCkycrrResponse })) return;
   if (await routeCersaiSearch({ method, path, url, res, store, sendJson })) return;
 
@@ -1269,9 +1310,18 @@ async function route(req, res, dataDir, platformAdminKey, observability) {
 
     const state = await store.load();
     const record = buildCommunicationRecord(body, payload, dispatch);
+    let lifecycle;
+    try {
+      lifecycle = createCommunicationDelivery(state.communicationDeliveries, { tenantId: tenant.tenantId, deliveryId: record.communicationId, channel: record.channel, recipientRef: body.borrowerId ?? `recipient:${hashString(payload.to)}`, templateId: body.templateId ?? "adhoc", templateVersion: body.templateVersion ?? "1", dltTemplateId: payload.dlt?.templateId, dltEntityId: payload.dlt?.entityId, idempotencyKey: body.idempotencyKey ?? record.communicationId, provider: dispatch.provider });
+      const secret = communicationCallbackSecret(dispatch.provider, tenant);
+      if (!secret && dispatch.provider !== "mock" && !tenant.isSandbox) throw Object.assign(new Error("Communication callback secret is required for a real provider."), { code: "communication_callback_secret_missing" });
+      const callbackSecret = secret ?? "sandbox-communication-callback-secret"; const timestamp = new Date().toISOString(); const callbackPayload = { deliveryId: record.communicationId, status: dispatch.success ? "submitted" : "failed", providerMessageId: dispatch.ref, failureCode: dispatch.success ? undefined : "DISPATCH_FAILED", failureReason: dispatch.success ? undefined : "Provider rejected dispatch." }; const rawBody = JSON.stringify(callbackPayload); const eventId = `dispatch:${record.communicationId}`;
+      lifecycle = recordCommunicationCallback(lifecycle.registry, { provider: dispatch.provider, eventId, timestamp, rawBody, signature: signCommunicationCallback({ provider: dispatch.provider, eventId, timestamp, rawBody }, callbackSecret) }, callbackSecret, { tenantId: tenant.tenantId });
+    } catch (err) { sendJson(res, 422, { error: { code: err.code ?? "communication_lifecycle_failed", message: err.message } }); return; }
     const nextState = appendEvent(
       {
         ...state,
+        communicationDeliveries: lifecycle.registry,
         communications: {
           ...(state.communications ?? {}),
           [record.communicationId]: record
@@ -1290,7 +1340,7 @@ async function route(req, res, dataDir, platformAdminKey, observability) {
       }
     );
     await store.save(nextState);
-    sendJson(res, 201, { communication: record });
+    sendJson(res, 201, { communication: record, delivery: lifecycle.delivery });
     return;
   }
 
@@ -10363,6 +10413,12 @@ function buildCommunicationRecord(input, payload, dispatch, now = new Date()) {
     status: dispatch.success ? "sent" : "failed",
     sentAt: now.toISOString()
   };
+}
+
+function communicationCallbackSecret(provider, tenant) {
+  let configured = {};
+  try { configured = JSON.parse(process.env.LOANOS_PROVIDER_CALLBACK_SECRETS ?? "{}"); } catch { configured = {}; }
+  return configured[`communications_${provider}`] ?? configured[provider] ?? (tenant?.isSandbox || provider === "mock" ? "sandbox-communication-callback-secret" : null);
 }
 
 function buildNachMandateRecord(input, providerResult, now = new Date()) {

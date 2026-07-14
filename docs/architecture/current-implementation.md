@@ -23,7 +23,7 @@ The current implementation is intentionally small:
 - Internal staff workspace in `apps/dashboard/`.
 - Borrower customer portal in `apps/customer/`: a responsive, white-labelled journey home with prioritised next actions, visual application milestones, repayment schedules, a document centre, guided media, grievance tracking, and DPDP access/correction/erasure controls.
 - Shared design system tokens in `apps/shared/`.
-- Automated tests in `tests/`: 352 file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
+- Automated tests in `tests/`: 381 file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
 
 Run it:
 
@@ -66,7 +66,9 @@ npm run dev:api
 | `packages/core/src/external-services.js` | India-resident mock-or-real external provider boundary, including fail-closed checksum-bound co-lending escrow instructions and core-banking journal batches. |
 | `packages/core/src/provider-simulator.js` | Tenant-local deterministic provider simulator with seeded clock/identifiers, payload-hash request journal, idempotent replay, scheduled HMAC callbacks, duplicate/out-of-order/tamper scenarios, timeout, rate-limit and provider failure. Simulator execution is prohibited for real-provider configuration. |
 | `packages/core/src/origination-provider-conformance.js` | Eight-family, 72-scenario origination conformance registry covering success, validation/business reject, delay, timeout, duplicate, correction, tamper and outage, with fail-closed completeness assessment and simulator compilation. |
-| `packages/core/src/communication-delivery-lifecycle.js` | Tenant-scoped SMS/email/WhatsApp delivery lifecycle with DLT/template controls, timestamp-bound signed callback verification, channel-valid transitions, idempotency conflict detection and reconciliation projection. Dispatch/callback API persistence remains to be wired. |
+| `packages/core/src/communication-delivery-lifecycle.js` | Tenant-scoped SMS/email/WhatsApp delivery lifecycle with DLT/template controls, timestamp-bound signed callback verification, channel-valid transitions, idempotency conflict detection and reconciliation projection, now persisted through dispatch/callback/reconciliation APIs. |
+| `packages/core/src/provider-callback-delivery.js` | Durable provider-neutral callback queue contract with tenant-scoped idempotent enqueue, due claiming, expiring worker leases, exponential retry, bounded attempts, DLQ evidence, four-eyes replay and reconciliation projection. File-store-backed APIs persist the queue. |
+| `packages/core/src/signed-file-conformance.js` | Eleven-system CBS/GL/tax/regulatory file harness with versioned tenant schema profiles, canonical manifests, exact-paise totals, per-row checksums/results, HSM/KMS evidence, acknowledgement/polling, correction coverage and replay conflict controls. Live transport remains adapter-owned. |
 | `packages/core/src/provider-governance.js` | Fifteen-family provider certification registry: production/India/time/evidence scope, four-eyes approval, suspension, expiry assessment, and live-readiness authority. |
 | `packages/core/src/data-governance.js` | Verified audit anchoring, source-to-event completeness reconciliation, immutable evidence custody/legal hold/deletion proof, field lineage, and declarative data-quality assessment/certification. |
 | `packages/core/src/enterprise-identity.js` | Certified OIDC/SAML tenant policy, domain/group mapping, idempotent SCIM provisioning/deactivation, and federation readiness. |
@@ -140,6 +142,9 @@ npm run dev:api
 | `tests/origination-provider-conformance.test.js` | Complete adverse-class coverage, stable scenario identifiers, deterministic simulator compilation and real-provider simulator prohibition. |
 | `tests/communication-delivery-lifecycle.test.js` | Signed/replay-bounded callbacks, valid channel transitions, DLT/template failure, tenant isolation, idempotency and delivery reconciliation. |
 | `tests/payment-callback-security.test.js` | Timestamp-bound payment callback HMAC, changed-content replay rejection, late evidence, fail-closed mismatch, returns/reversals and linked ledger reversal. |
+| `tests/provider-callback-delivery.test.js`, `tests/provider-callback-delivery-api.test.js` | Queue idempotency/isolation, lease recovery, retry/DLQ, four-eyes replay, terminal delivery and persistent tenant API coverage. |
+| `tests/communication-delivery-api.test.js` | Persistent dispatch lifecycle, hashed recipient reference, signed callback, duplicate replay, reconciliation and cross-tenant isolation. |
+| `tests/signed-file-conformance.test.js` | All eleven schema families, canonical exact-paise manifest, signing/encryption evidence, row acknowledgement, correction, polling, replay and isolation. |
 | `tests/postgres-store.test.js` | Integration tests for the Postgres storage driver — RLS enforcement (direct and via the two-role model), advisory-lock serialization (same key) and non-serialization (different keys), and a full multi-tenant HTTP round-trip. Self-skips unless `DATABASE_URL_TEST` is set; not part of the default `npm test` gate but part of the `tests/*.test.js` glob it runs. |
 | `tests/observability.test.js` | Deterministic SLI/SLO, route-cardinality, tenant-label privacy, provider/stuck-work alert, metrics-token, role-gated tenant health, and cross-scope platform health tests. |
 | `tests/recovery.test.js` | Recovery-package encryption/round-trip, ciphertext and key tamper rejection, corrupt audit-chain rejection, RTO/RPO measurement, authenticated four-eyes restore, drill, validation, and history API tests. |
@@ -331,7 +336,9 @@ npm run dev:api
 | `GET /document-vault/:id` | Reads a document-vault receipt by id. |
 | `GET /document-vault/:id/documents/:docId` | Downloads a specific document from the vault by ID, supporting content negotiation (JSON, HTML, or binary PDF). |
 | `GET /communications` | Lists tenant communication dispatch receipts, filterable by channel, purpose, borrower, application, or loan account. |
-| `POST /integrations/communications` | Dispatches SMS/email/WhatsApp through `ExternalServiceManager`, stores a masked/hash-only communication receipt, and seals the attempt into the tenant audit chain. |
+| `POST /integrations/communications` | Dispatches SMS/email/WhatsApp through `ExternalServiceManager`, stores masked/hash-only receipt and persistent submitted delivery state, and seals the attempt into the tenant audit chain. Real providers require a callback secret. |
+| `POST /integrations/communications/callbacks/:provider`, `GET /integrations/communications/reconciliation` | Verifies timestamp-bound provider HMAC, applies channel-valid idempotent delivery transitions, persists/audits them and exposes tenant-scoped unresolved/provider-correlation reconciliation. |
+| `POST /integrations/callback-deliveries`, `/claim`, `/:id/attempt`, `/:id/replay`; `GET /integrations/callback-deliveries/queue` | Persists provider-neutral delivery work, expiring claims, retry/DLQ outcomes and independently approved replay while withholding every other tenant's queue. |
 | `GET /payment-rails` | Lists NACH/UPI payment rail initiation receipts, filterable by type, channel, status, borrower, application, loan account, or provider reference. |
 | `POST /integrations/payment-rails/nach-mandates` | Registers a NACH mandate through `ExternalServiceManager`, stores sanitized mandate evidence (account last-four/hash, provider ref, amount/frequency, consent/bank-verification refs), and seals the initiation into the tenant audit chain. |
 | `POST /integrations/payment-rails/nach-presentments` | Creates a single NACH debit presentment against a registered mandate; initiation itself cannot credit a loan account. |

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createProviderSimulator, verifySimulatedProviderCallback } from "../packages/core/src/provider-simulator.js";
+import { ExternalServiceManager } from "../packages/core/src/external-services.js";
 
 const config = { tenantId: "tenant-a", seed: "suite-seed", callbackSecret: "callback-secret", startAt: "2026-07-15T10:00:00.000Z", scenarios: {
   success: { outcome: "success", response: { score: 780 }, callbacks: [{ eventType: "report.ready", delayMs: 1000 }] },
@@ -14,3 +15,25 @@ test("idempotency returns the original response and journals duplicate attempts"
 test("scheduled callbacks can be duplicated, delivered out of order and signature verified", () => { const duplicate = createProviderSimulator(config); duplicate.submit({ tenantId: "tenant-a", provider: "payment_rail", operation: "collect", idempotencyKey: "p1", scenario: "duplicate", payload: {} }); const callbacks = duplicate.drainCallbacks(); assert.equal(callbacks.length, 2); assert.equal(callbacks[1].duplicate, true); assert.equal(callbacks.every((item) => duplicate.verify(item) && verifySimulatedProviderCallback(item, "callback-secret")), true); const unordered = createProviderSimulator(config); unordered.submit({ tenantId: "tenant-a", provider: "payment_rail", operation: "mandate", idempotencyKey: "m1", scenario: "out_of_order", payload: {} }); assert.deepEqual(unordered.drainCallbacks().map((item) => item.payload.eventType), ["mandate.activated", "mandate.created"]); });
 test("tamper, timeout, rate-limit and provider failure scenarios fail safely", () => { const sim = createProviderSimulator(config); sim.submit({ tenantId: "tenant-a", provider: "esign", operation: "sign", idempotencyKey: "s1", scenario: "tamper", payload: {} }); assert.equal(sim.verify(sim.drainCallbacks()[0]), false); assert.throws(() => sim.submit({ tenantId: "tenant-a", provider: "vcip", operation: "analyze", idempotencyKey: "v1", scenario: "timeout", payload: {} }), (error) => error.code === "provider_simulator_timeout"); assert.throws(() => sim.submit({ tenantId: "tenant-a", provider: "sms", operation: "send", idempotencyKey: "c1", scenario: "rate_limit", payload: {} }), (error) => error.code === "provider_simulator_rate_limited" && error.retryAfterMs === 30000); const failed = sim.submit({ tenantId: "tenant-a", provider: "ckycrr", operation: "submit", idempotencyKey: "k1", scenario: "failure", payload: {} }); assert.equal(failed.success, false); assert.equal(failed.responseCode, "SCHEMA_INVALID"); });
 test("tenant mismatch and unknown scenarios fail closed", () => { const sim = createProviderSimulator(config); assert.throws(() => sim.submit({ tenantId: "tenant-b", provider: "bureau", operation: "query", idempotencyKey: "q", scenario: "success" }), (error) => error.code === "provider_simulator_tenant_mismatch"); assert.throws(() => sim.submit({ tenantId: "tenant-a", provider: "bureau", operation: "query", idempotencyKey: "q", scenario: "missing" }), (error) => error.code === "provider_simulator_scenario_missing"); });
+
+test("ExternalServiceManager maps simulator responses into existing mock contracts", async () => {
+  const simulator = createProviderSimulator({ tenantId: "tenant-a", seed: "adapters", callbackSecret: "secret", startAt: "2026-07-15T10:00:00.000Z", scenarios: {
+    bureau_ok: { outcome: "success", response: { score: 812, activeAccounts: 3, defaultAccounts: 0, enquiries30Days: 2 } }, vcip_ok: { outcome: "success", response: { faceMatchScore: 0.97, livenessConfirmed: true, gps: { country: "IN" } } }, bank_ok: { outcome: "success", response: { status: "verified", bankName: "Test Bank", accountHolderName: "Asha Sharma", nameMatch: true } }, esign_ok: { outcome: "success", response: { signatureRef: "sig-1", envelopeId: "env-1" } }, ckycrr_ok: { outcome: "success", response: { transportRef: "transport-1", digitalSignatureRef: "dsc-1" } }, aa_ok: { outcome: "success", response: { providerFetchRef: "fetch-1", recordCount: 4, payloadHash: "hash-1" } }, communication_ok: { outcome: "success" }
+  } });
+  const manager = new ExternalServiceManager({ simulator, simulatorTenantId: "tenant-a", simulatorScenarios: { "bureau.query": "bureau_ok", "vcip.analyze": "vcip_ok", "bank_account.verify": "bank_ok", "esign.verify_otp": "esign_ok", "ckycrr.submit": "ckycrr_ok", "account_aggregator.fetch": "aa_ok", sms: "communication_ok", email: "communication_ok", whatsapp: "communication_ok" } });
+  assert.equal((await manager.queryCreditBureau("ABCDE1234F")).score, 812);
+  assert.equal((await manager.analyzeVcipVideo("borrower-1", "video-hash")).faceMatchScore, 0.97);
+  assert.equal((await manager.verifyBankAccount({ accountNumber: "123456789012", ifsc: "HDFC0000001", expectedHolderName: "Asha Sharma" })).bankName, "Test Bank");
+  assert.equal((await manager.verifyEsignOtp("123456789012", "not-the-default", "payload-hash")).signatureRef, "sig-1");
+  assert.equal((await manager.submitCkycrrPacket({ submissionId: "sub-1", packet: { checksumSha256: "a".repeat(64), canonicalContent: "{}" } })).transportRef, "transport-1");
+  assert.equal((await manager.fetchAccountAggregatorData({ consentId: "consent-1", aaConsentHandle: "handle-1", fiTypes: ["deposit"] }, { fetchId: "fetch-id" })).recordCount, 4);
+  assert.match((await manager.sendSms("9876543210", "hello")).ref, /^provider_ref_/); assert.match((await manager.sendEmail("a@example.in", "Subject", "hello")).ref, /^provider_ref_/); assert.match((await manager.sendWhatsApp("9876543210", "hello")).ref, /^provider_ref_/);
+  assert.equal(simulator.requestJournal().length, 9);
+});
+
+test("ExternalServiceManager propagates simulated provider failures and preserves default mocks", async () => {
+  const simulator = createProviderSimulator({ tenantId: "tenant-a", seed: "failures", callbackSecret: "secret", scenarios: { timeout: { outcome: "timeout" } } });
+  const manager = new ExternalServiceManager({ simulator, simulatorTenantId: "tenant-a", simulatorScenarios: { "bureau.query": "timeout" } });
+  await assert.rejects(() => manager.queryCreditBureau("ABCDE1234F"), (error) => error.code === "provider_simulator_timeout");
+  const defaultResult = await new ExternalServiceManager().queryCreditBureau("ABCDE1234F"); assert.equal(defaultResult.score, 750); assert.equal(defaultResult.provider, "mock");
+});
