@@ -47,6 +47,8 @@ Bundle L status: succession servicing first slice is complete for independently 
 
 Bundle M status: succession downstream execution first slice is complete for fresh authority/scope revalidation, four-eyes effect approval, idempotent LMS repayment posting with bank/reconciliation lineage, zero-dues checksum-sealed closure NOC, evidence-bound downstream completion for other action families, and mandatory legal-review, notification and reversal-plan references. Native settlement/ownership-transfer/mandate adapters and staffed legal queues remain.
 
+Bundle N status: succession legal operations and native-effects first slice is complete for assigned/due legal review, checklist/basis evidence, information requests and independent decisions; native LMS compromise settlement; non-novating claimant servicing transfer that preserves the original debtor; and same-account migration from an old mandate to a registered claimant mandate. External court/registrar/legal-document connectors, provider cancellation confirmation and workforce/SLA dashboards remain.
+
 ## Cross-Cutting Workstream: SaaS Tenancy and Vendor Posture
 
 Status: S1–S9 first slice complete for every task (tenant partitioning, tenant-scoped service auth, tenant/platform human sessions, tenant user admin, access reviews, service-key rotation, isolation suite, hash-chained audit spine + evidence export, tenant portability export + evidenced offboarding, disclosed sub-processor register, 6-hour incident-notification workflow, audited platform-staff break-glass access, uniform audit provenance stamping, artifact-bound security assurance, governed SOC investigation records, and compliance-control assurance/audit evidence).

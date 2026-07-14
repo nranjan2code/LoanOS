@@ -1,8 +1,8 @@
 {
-  "generated": "2026-07-14T18:39:37.921Z",
+  "generated": "2026-07-14T18:45:43.230Z",
   "git": {
     "branch": "main",
-    "count": 162,
+    "count": 163,
     "commits": []
   },
   "overall": {
@@ -1404,7 +1404,7 @@
             {
               "type": "code",
               "ref": "packages/core/src/customer-channel-operations.js",
-              "note": "manual restriction, expiring scoped authority, servicing requests, and controlled downstream execution"
+              "note": "manual restriction, expiring scoped authority, legal-review queue, and native controlled servicing effects"
             },
             {
               "type": "endpoint",
@@ -1419,12 +1419,17 @@
             {
               "type": "endpoint",
               "ref": "POST /customers/succession-service-actions/:id/execute",
-              "note": "fresh four-eyes LMS repayment/NOC effect or evidence-bound downstream completion"
+              "note": "fresh four-eyes LMS repayment, settlement, NOC, servicing-transfer, or mandate-migration effect"
+            },
+            {
+              "type": "endpoint",
+              "ref": "POST /customers/succession-legal-reviews",
+              "note": "assigned legal work queue and independent action-linked decision gate"
             },
             {
               "type": "test",
               "ref": "tests/customer-channel-operations.test.js",
-              "note": "nominee approval, authority scope, expiry/revocation, exact money, idempotent repayment, NOC, and four-eyes effects"
+              "note": "authority and legal gates plus exact repayment, settlement, NOC, servicing transfer, and mandate migration"
             }
           ],
           "owner": "",
@@ -7301,9 +7306,9 @@
     }
   ],
   "tests": {
-    "pass": 295,
+    "pass": 296,
     "fail": 0,
-    "total": 300,
+    "total": 301,
     "ran": true
   }
 }

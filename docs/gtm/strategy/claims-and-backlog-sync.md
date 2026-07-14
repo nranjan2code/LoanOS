@@ -112,7 +112,7 @@ node docs/gtm/automation/gtm-backlog-sync.mjs
 | C-79 | Customer party relationships, accessibility/contact intent, succession restrictions and exact related exposure join into customer-360 | Partial | architecture/customer-channel-experiences.md; external identity reconciliation and downstream servicing execution remain planned |
 | C-80 | Tenant-branded channel workspace is accessible, installable and caches only its static shell—not customer or lead API data | Partial | architecture/customer-channel-experiences.md; production assistive/device certification and encrypted field-offline queues remain planned |
 | C-81 | Converted-lead commission is calculated in exact paise, independently approved, payment-reconciled and clawed back only inside policy | Partial | architecture/customer-channel-experiences.md; invoice/GST/TDS/GL/bank-file/dispute depth remains planned |
-| C-82 | Completed succession cases issue expiring account/action-scoped claimant authority; repayment execution is reconciled and idempotent, while material effects and revocation require four eyes | Partial | architecture/customer-channel-experiences.md; native settlement/transfer/mandate adapters and staffed legal queues remain planned |
+| C-82 | Succession uses expiring scoped authority, assigned independent legal review, LMS repayment/settlement/NOC, non-novating servicing transfer and same-account mandate migration | Partial | architecture/customer-channel-experiences.md; external court/registrar/provider confirmations and workforce/SLA depth remain planned |
 
 ## Change process
 

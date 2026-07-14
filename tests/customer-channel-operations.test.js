@@ -10,6 +10,7 @@ import {
   createChannelLead,
   createCustomerMergePlan,
   createSuccessionCase,
+  createSuccessionLegalReview,
   executeCustomerMerge,
   executeSuccessionServiceAction,
   issueSuccessionAuthority,
@@ -21,6 +22,7 @@ import {
   transitionChannelLead,
   transitionPartnerCommission,
   transitionSuccessionCase,
+  transitionSuccessionLegalReview,
   revokeSuccessionAuthority
 } from "../packages/core/src/index.js";
 import { createLoanOsServer } from "../apps/api/src/server.js";
@@ -74,11 +76,12 @@ test("succession servicing is limited by account, action, expiry, exact money, a
   assert.throws(() => recordSuccessionServiceAction({}, serviceState, { actionId: "same-actor", authorityId: "authority1", loanAccountId: "loan1", actionType: "closure_request", requestRef: "closure/1", evidenceRefs: ["closure/evidence-1"], actor: "checker", proposedBy: "checker", approvedBy: "checker", approvalRef: "approval/same" }, NOW), /Independent/);
   const closure = recordSuccessionServiceAction({}, serviceState, { actionId: "action2", authorityId: "authority1", loanAccountId: "loan1", actionType: "closure_request", requestRef: "closure/2", evidenceRefs: ["closure/evidence-2"], actor: "checker", ...approval }, NOW).action;
   assert.equal(closure.status, "approved_request");
-  const executableState = { ...serviceState, successionServiceActions: { action1: repayment, action2: closure }, successionServiceExecutions: {} };
-  const execution = executeSuccessionServiceAction({}, executableState, { executionId: "execution1", actionId: "action1", paymentRef: "payment/succession-1", paymentReconciliationRef: "reconciliation/1", bankReference: "UTR-1", legalReviewRef: "legal/execution-1", notificationRef: "notification/1", reversalPlanRef: "reversal/1", evidenceRefs: ["execution/evidence-1"], ...approval }, NOW);
+  let executableState = { ...serviceState, successionServiceActions: { action1: repayment, action2: closure }, successionServiceExecutions: {}, successionLegalReviews: {} };
+  for (const [reviewId, actionId] of [["review1", "action1"], ["review2", "action2"]]) { let review = createSuccessionLegalReview(executableState.successionLegalReviews, executableState, { reviewId, actionId, assignedTo: "legal-maker", assignedBy: "legal-lead", dueAt: "2026-07-20T00:00:00.000Z", checklistEvidenceRefs: [`checklist/${reviewId}`], legalBasisRef: "legal/basis" }, NOW).review; review = transitionSuccessionLegalReview(review, { action: "approve", actor: "legal-checker", reason: "legally valid", opinionRef: `opinion/${reviewId}`, evidenceRefs: [`opinion/evidence/${reviewId}`], proposedBy: "legal-maker", approvedBy: "legal-checker", approvalRef: `approval/${reviewId}` }, NOW); executableState = { ...executableState, successionLegalReviews: { ...executableState.successionLegalReviews, [reviewId]: review } }; }
+  const execution = executeSuccessionServiceAction({}, executableState, { executionId: "execution1", actionId: "action1", legalReviewId: "review1", paymentRef: "payment/succession-1", paymentReconciliationRef: "reconciliation/1", bankReference: "UTR-1", notificationRef: "notification/1", reversalPlanRef: "reversal/1", evidenceRefs: ["execution/evidence-1"], ...approval }, NOW);
   assert.equal(execution.execution.effect.amountPaise, "100000"); assert.equal(execution.state.loanAccounts.loan1.status, "closed"); assert.equal(execution.state.successionServiceActions.action1.status, "executed");
-  assert.throws(() => executeSuccessionServiceAction(execution.state.successionServiceExecutions, execution.state, { executionId: "execution2", actionId: "action1", paymentRef: "payment/succession-2", paymentReconciliationRef: "reconciliation/2", bankReference: "UTR-2", legalReviewRef: "legal/execution-2", notificationRef: "notification/2", reversalPlanRef: "reversal/2", evidenceRefs: ["execution/evidence-2"], ...approval }, NOW), /pending succession/);
-  const closureExecution = executeSuccessionServiceAction(execution.state.successionServiceExecutions, execution.state, { executionId: "execution3", actionId: "action2", legalReviewRef: "legal/execution-3", notificationRef: "notification/3", reversalPlanRef: "reversal/3", evidenceRefs: ["execution/evidence-3"], ...approval }, NOW);
+  assert.throws(() => executeSuccessionServiceAction(execution.state.successionServiceExecutions, execution.state, { executionId: "execution2", actionId: "action1", legalReviewId: "review1", paymentRef: "payment/succession-2", paymentReconciliationRef: "reconciliation/2", bankReference: "UTR-2", notificationRef: "notification/2", reversalPlanRef: "reversal/2", evidenceRefs: ["execution/evidence-2"], ...approval }, NOW), /pending succession/);
+  const closureExecution = executeSuccessionServiceAction(execution.state.successionServiceExecutions, execution.state, { executionId: "execution3", actionId: "action2", legalReviewId: "review2", notificationRef: "notification/3", reversalPlanRef: "reversal/3", evidenceRefs: ["execution/evidence-3"], ...approval }, NOW);
   assert.equal(closureExecution.execution.effect.type, "closure_certificate"); assert.equal(closureExecution.state.loanAccounts.loan1.closureCertificate.documentType, "no_objection_certificate");
   const revoked = revokeSuccessionAuthority(authority, { reason: "claimant requested revocation", evidenceRefs: ["revocation/1"], ...approval }, NOW);
   assert.throws(() => recordSuccessionServiceAction({}, { ...serviceState, successionAuthorities: { authority1: revoked } }, { actionId: "after-revoke", authorityId: "authority1", loanAccountId: "loan1", actionType: "communication", requestRef: "contact/1", evidenceRefs: ["contact/evidence-1"], actor: "agent" }, NOW), /active unexpired/);
@@ -86,6 +89,21 @@ test("succession servicing is limited by account, action, expiry, exact money, a
 
 test("customer 360 aggregates related-party exact exposure and lifecycle records", () => {
   const state = baseState(); const relationship = registerCustomerRelationship({}, state, { relationshipId: "household1", fromBorrowerId: "b1", toBorrowerId: "b2", relationshipType: "household", evidenceRef: "household/1", ...approval }, NOW).relationship; const view = buildCustomer360({ ...state, customerRelationships: { household1: relationship }, loanAccounts: { l1: { loanAccountId: "l1", borrowerId: "b1", status: "active", ledger: [{ eventDate: NOW.toISOString(), principalDebit: 1000 }] }, l2: { loanAccountId: "l2", borrowerId: "b2", status: "active", ledger: [{ eventDate: NOW.toISOString(), principalDebit: 500 }] } }, loanApplications: { a1: { applicationId: "a1", borrowerId: "b1" } }, complaints: {}, consentRecords: {}, documentVault: {}, successionCases: {} }, "b1", NOW); assert.equal(view.aggregateExposurePaise, "150000"); assert.equal(view.loanAccounts.length, 2); assert.equal(view.relatedBorrowers[0].borrowerId, "b2");
+});
+
+test("succession legal approval executes native settlement, servicing transfer, and mandate migration", () => {
+  const authority = { authorityId: "authority-native", caseId: "case-native", borrowerId: "b1", claimantBorrowerId: "b2", loanAccountIds: ["loan-settle", "loan-transfer", "loan-mandate"], permittedActions: ["settlement_request", "transfer_request", "mandate_change_request"], status: "active", validUntil: "2026-08-14T00:00:00.000Z" };
+  const account = (loanAccountId) => ({ loanAccountId, borrowerId: "b1", status: "active", paymentAllocationWaterfall: ["principal"], ledger: [{ eventId: `disbursement-${loanAccountId}`, type: "disbursement", eventDate: NOW.toISOString(), principalDebit: 1000 }] });
+  let state = { ...baseState(), successionAuthorities: { [authority.authorityId]: authority }, successionServiceActions: {}, successionServiceExecutions: {}, successionLegalReviews: {}, loanAccounts: { "loan-settle": account("loan-settle"), "loan-transfer": account("loan-transfer"), "loan-mandate": account("loan-mandate") }, paymentRails: { old: { paymentRailId: "old", type: "nach_mandate", loanAccountId: "loan-mandate", borrowerId: "b1", status: "active" }, replacement: { paymentRailId: "replacement", type: "nach_mandate", loanAccountId: "loan-mandate", borrowerId: "b2", status: "registered" } } };
+  const inputs = [
+    { actionId: "settle", loanAccountId: "loan-settle", actionType: "settlement_request", amountPaise: "60000", settlementReason: "estate compromise", settlementTermsRef: "terms/settlement" },
+    { actionId: "transfer", loanAccountId: "loan-transfer", actionType: "transfer_request", targetBorrowerId: "b2", transferScope: ["communications", "documents"], legalTransferRef: "legal/transfer" },
+    { actionId: "mandate", loanAccountId: "loan-mandate", actionType: "mandate_change_request", oldMandateId: "old", newMandateId: "replacement" }
+  ];
+  for (const input of inputs) { const action = recordSuccessionServiceAction(state.successionServiceActions, state, { ...input, authorityId: authority.authorityId, requestRef: `request/${input.actionId}`, evidenceRefs: [`evidence/${input.actionId}`], actor: "ops", ...approval }, NOW).action; const reviewId = `review-${input.actionId}`; state = { ...state, successionServiceActions: { ...state.successionServiceActions, [action.actionId]: action }, successionLegalReviews: { ...state.successionLegalReviews, [reviewId]: { reviewId, actionId: action.actionId, status: "approved", decisionRef: `opinion/${input.actionId}` } } }; const result = executeSuccessionServiceAction(state.successionServiceExecutions, state, { executionId: `execution-${input.actionId}`, actionId: action.actionId, legalReviewId: reviewId, paymentRef: input.actionId === "settle" ? "payment/settle" : undefined, paymentReconciliationRef: input.actionId === "settle" ? "reconciliation/settle" : undefined, bankReference: input.actionId === "settle" ? "UTR-SETTLE" : undefined, notificationRef: `notification/${input.actionId}`, reversalPlanRef: `reversal/${input.actionId}`, evidenceRefs: [`execution/${input.actionId}`], ...approval }, NOW); state = result.state; }
+  assert.equal(state.loanAccounts["loan-settle"].closureType, "settled"); assert.equal(state.loanAccounts["loan-settle"].settlement.settlementAmount, 600);
+  assert.equal(state.loanAccounts["loan-transfer"].borrowerId, "b1"); assert.equal(state.loanAccounts["loan-transfer"].servicingSuccessor.borrowerId, "b2");
+  assert.equal(state.paymentRails.old.status, "superseded"); assert.equal(state.paymentRails.replacement.status, "active");
 });
 
 test("customer channel APIs persist preferences and expose customer 360", async (t) => {

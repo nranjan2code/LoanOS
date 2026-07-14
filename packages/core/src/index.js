@@ -292,6 +292,7 @@ export {
   createChannelLead,
   createCustomerMergePlan,
   createSuccessionCase,
+  createSuccessionLegalReview,
   executeCustomerMerge,
   executeSuccessionServiceAction,
   issueSuccessionAuthority,
@@ -303,6 +304,7 @@ export {
   transitionChannelLead,
   transitionPartnerCommission,
   transitionSuccessionCase,
+  transitionSuccessionLegalReview,
   revokeSuccessionAuthority
 } from "./customer-channel-operations.js";
 export {
