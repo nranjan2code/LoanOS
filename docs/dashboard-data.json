@@ -1,8 +1,8 @@
 {
-  "generated": "2026-07-14T18:34:31.766Z",
+  "generated": "2026-07-14T18:39:37.921Z",
   "git": {
     "branch": "main",
-    "count": 161,
+    "count": 162,
     "commits": []
   },
   "overall": {
@@ -1404,7 +1404,7 @@
             {
               "type": "code",
               "ref": "packages/core/src/customer-channel-operations.js",
-              "note": "manual restriction plus expiring account/action-scoped claimant authority and servicing requests"
+              "note": "manual restriction, expiring scoped authority, servicing requests, and controlled downstream execution"
             },
             {
               "type": "endpoint",
@@ -1417,9 +1417,14 @@
               "note": "exact repayment and evidence-bound servicing requests within authority"
             },
             {
+              "type": "endpoint",
+              "ref": "POST /customers/succession-service-actions/:id/execute",
+              "note": "fresh four-eyes LMS repayment/NOC effect or evidence-bound downstream completion"
+            },
+            {
               "type": "test",
               "ref": "tests/customer-channel-operations.test.js",
-              "note": "nominee approval, authority scope, expiry/revocation, exact money, and four-eyes material requests"
+              "note": "nominee approval, authority scope, expiry/revocation, exact money, idempotent repayment, NOC, and four-eyes effects"
             }
           ],
           "owner": "",

@@ -293,6 +293,7 @@ export {
   createCustomerMergePlan,
   createSuccessionCase,
   executeCustomerMerge,
+  executeSuccessionServiceAction,
   issueSuccessionAuthority,
   recordCustomerPreferences,
   recordSuccessionServiceAction,
