@@ -706,7 +706,7 @@ The detailed register contains **453 individually identified capabilities**. At 
 | UX-012 | Compliance, CCO, risk, finance, and audit dashboards | Institution | Missing |
 | UX-013 | Platform/tenant administration | Core | Partial |
 | UX-014 | Branch, DSA, BC, dealer, merchant, LSP, and partner portals | Channel | Partial |
-| UX-015 | Multilingual Indian-language content and templates | Core | Missing |
+| UX-015 | Multilingual Indian-language content and templates | Core | Partial |
 | UX-016 | Accessibility testing, assisted journeys, and reduced-motion support | Core | Partial |
 | UX-017 | Mobile/PWA/offline capability | Channel | Partial |
 

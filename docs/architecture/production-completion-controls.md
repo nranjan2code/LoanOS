@@ -1,0 +1,12 @@
+# Production Completion Controls
+
+This wave makes four remaining readiness areas executable at the control-plane layer.
+
+| Area | Executable boundary | External boundary still required |
+| --- | --- | --- |
+| Indian-language and offline UX | Four-eyes versioned language packs and templates, checksum integrity, explicit approved fallback, device security/accessibility certification, AES-256-GCM envelope metadata, plaintext rejection, tenant/expiry/idempotency/version-conflict controls. | Institution-authored translations, linguistic/legal validation, real device lab certification, MDM/key delivery and field pilots. |
+| Production infrastructure | Evidence-expiring attestations for IdP, SCIM, KMS/HSM, SIEM/WORM, trusted time, PostgreSQL HA/PITR, queue and deployment controller; dependency graph; witnessed RTO/RPO drills; fail-closed go-live assessment. | Actual managed services, authenticated telemetry, real failover/PITR execution and cloud deployment authority. |
+| Bank assurance | Approved institution policy/methodology/matrix, exact ETL certification, UAT/training/cutover/DR readiness, independent security/model/compliance/control-effectiveness testing, independently verified remediation, certification/committee signoff and fail-closed release decision. | Bank-owned evidence, external assessors, staff participation, witnessed exercises and regulator/provider decisions. |
+| Live integrations | India-resident contract/credential/allow-list/schema governance, complete adverse conformance, security/load/reconciliation proof, activation evidence and required-family readiness. | Provider contracts, secrets, regulator certification, real endpoints and operational health are external facts and cannot be manufactured by the product. |
+
+These controls intentionally distinguish product capability from a bank's executed production evidence. A release remains blocked until every required component, drill, assurance domain and provider family has current evidence.

@@ -117,6 +117,10 @@ node docs/gtm/automation/gtm-backlog-sync.mjs
 | C-84 | Partner commission finance validates GST/TDS evidence and exact balanced payables through bank reconciliation, statements, disputes and reversals | Partial | architecture/completion-workstreams.md; live GSTN/bank/CBS adapters and statutory filing remain planned |
 | C-85 | Customer identity merge requires explicit field decisions, provider-link reconciliation, checksum/version guards, outbox lineage and executable rollback | Partial | architecture/completion-workstreams.md; operator UI, certified provider adapters and durable broker dispatch remain planned |
 | C-86 | Succession external actions require certified connector scope, checksum/idempotency lineage and verified callbacks with SLA/capacity escalation | Partial | architecture/completion-workstreams.md; live court/registrar/provider connectivity and workforce feeds remain planned |
+| C-87 | Indian-language packs and field-offline work require approved versions, checksums, certified devices and plaintext-free encrypted envelopes | Partial | architecture/production-completion-controls.md; institution translations, MDM/key delivery and field certification remain external |
+| C-88 | Production go-live requires current evidence for eight infrastructure families plus witnessed RTO/RPO drills and dependency readiness | Partial | architecture/production-completion-controls.md; actual managed services and real failover evidence remain external |
+| C-89 | Bank release fails closed without exact ETL, UAT/training/cutover/DR, four independent assurance domains and governance signoff | Partial | architecture/production-completion-controls.md; bank-owned and independent-assessor evidence remains external |
+| C-90 | Live provider activation requires India residency, contracts, vaulted credentials, allow-list/schema controls and complete adverse conformance | Partial | architecture/production-completion-controls.md; real contracts, credentials, endpoints and certification remain external |
 
 ## Change process
 

@@ -6273,13 +6273,24 @@
     "category": "32. Borrower, Staff, Branch, Partner, and Field Experiences",
     "plane": "Experience & Adoption",
     "applicability": "Core",
-    "status": "Missing",
+    "status": "Partial",
     "owner": "",
-    "evidence": [],
+    "evidence": [
+      {
+        "type": "code",
+        "ref": "packages/core/src/customer-experience-completion.js",
+        "note": "approved versioned/checksummed Indian-language packs and localized templates"
+      },
+      {
+        "type": "test",
+        "ref": "tests/customer-experience-completion.test.js",
+        "note": "four-eyes translation and approved fallback controls"
+      }
+    ],
     "acceptance": "",
     "dependencies": [],
     "notes": "",
-    "lastReviewed": ""
+    "lastReviewed": "2026-07-15"
   },
   "UX-016": {
     "capability": "Accessibility testing, assisted journeys, and reduced-motion support",
@@ -6316,6 +6327,16 @@
         "type": "test",
         "ref": "tests/customer-channel-operations.test.js",
         "note": "manifest and service-worker delivery"
+      },
+      {
+        "type": "code",
+        "ref": "packages/core/src/customer-experience-completion.js",
+        "note": "certified devices and plaintext-free AES-256-GCM offline queue envelopes"
+      },
+      {
+        "type": "test",
+        "ref": "tests/customer-experience-completion.test.js",
+        "note": "expiry, tenant scope, replay, idempotency and conflict handling"
       }
     ],
     "acceptance": "",

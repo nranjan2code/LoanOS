@@ -311,6 +311,10 @@ export { allocateTerritoryCapacity, approvePartnerOnboarding, certifyPartnerAcce
 export { approvePartnerFinanceReversal, buildPartnerStatement, createPartnerBankPaymentFile, createPartnerPayableInstruction, openPartnerFinanceDispute, reconcilePartnerPayment, validatePartnerCommissionInvoice } from "./partner-finance.js";
 export { executeCustomerIdentityMerge, prepareCustomerIdentityMerge, reconcileExternalIdentity, rollbackCustomerIdentityMerge } from "./customer-identity-operations.js";
 export { buildSuccessionOperationsQueue, reconcileSuccessionExternalInstruction, registerSuccessionOperationsPolicy, submitSuccessionExternalInstruction } from "./succession-operations.js";
+export { approveLanguagePack, approveLocalizedTemplate, certifyFieldDevice, enqueueEncryptedOfflineWork, reconcileEncryptedOfflineWork, resolveLocalizedTemplate } from "./customer-experience-completion.js";
+export { REQUIRED_PRODUCTION_COMPONENTS, assessProductionGoLive, attestProductionComponent, evaluateProductionDependencyGraph, recordProductionResilienceDrill } from "./production-infrastructure.js";
+export { assessProductionRelease, recordGovernanceSignoff, recordIndependentAssuranceTest, recordOperationalReadiness, recordSourceEtlRun, registerInstitutionConfiguration, remediateAssuranceFinding } from "./bank-assurance-operations.js";
+export { activateLiveIntegration, approveLiveIntegrationOnboarding, assessLiveIntegrationReadiness, recordLiveIntegrationConformance } from "./live-integration-operations.js";
 export {
   PROVIDER_INTEGRATIONS,
   assessProviderCertification,

@@ -23,7 +23,7 @@ The current implementation is intentionally small:
 - Internal staff workspace in `apps/dashboard/`.
 - Borrower customer portal in `apps/customer/`: a responsive, white-labelled journey home with prioritised next actions, visual application milestones, repayment schedules, a document centre, guided media, grievance tracking, and DPDP access/correction/erasure controls.
 - Shared design system tokens in `apps/shared/`.
-- Automated tests in `tests/`: 310 file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
+- Automated tests in `tests/`: 322 file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
 
 Run it:
 
@@ -110,6 +110,10 @@ npm run dev:api
 | `packages/core/src/partner-finance.js` | Exact integer-paise GST/TDS invoice, balanced payable/GL, bank-file, reconciliation, statement, dispute and reversal controls. |
 | `packages/core/src/customer-identity-operations.js` | Per-field merge decisions, external identity reconciliation, checksum/version-bound execution, outbox lineage and executable snapshot rollback. |
 | `packages/core/src/succession-operations.js` | Certified checksum/idempotency-bound external succession instructions, verified callback reconciliation and SLA/capacity queue projection. |
+| `packages/core/src/customer-experience-completion.js` | Approved Indian-language packs/templates, explicit fallback, certified field devices and plaintext-free encrypted offline envelope reconciliation. |
+| `packages/core/src/production-infrastructure.js` | Evidence-expiring live-component attestations, dependency graph, witnessed resilience drills and go-live assessment. |
+| `packages/core/src/bank-assurance-operations.js` | Institution configuration, exact ETL, operational readiness, independent assurance/remediation, governance signoff and release decision. |
+| `packages/core/src/live-integration-operations.js` | India-resident provider onboarding, adverse conformance, activation evidence and required-family live-readiness assessment. |
 | `apps/api/src/routes/customer-channel-controls.js` | Tenant-authenticated persistence, role gates and audit projection for customer/channel operations. |
 | `apps/partner/` | Tenant-branded responsive branch/channel lead workspace with consent-led intake, matching review, evidence-bound actions, accessible/reduced-motion UI, and a static-shell-only PWA that never caches business API data. |
 | `apps/api/src/observability.js` | Bounded process-local HTTP telemetry registry: normalized route/status aggregates, availability and latency SLIs, configurable SLO/error-budget state, in-flight/capacity signals, tenant-scoped snapshots, and Prometheus text output without tenant labels. |

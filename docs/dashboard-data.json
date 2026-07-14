@@ -1,17 +1,17 @@
 {
-  "generated": "2026-07-14T18:55:12.807Z",
+  "generated": "2026-07-14T18:59:40.454Z",
   "git": {
     "branch": "main",
-    "count": 164,
+    "count": 165,
     "commits": []
   },
   "overall": {
     "counts": {
       "Implemented": 87,
-      "Partial": 272,
+      "Partial": 273,
       "Partial/Mock": 11,
       "Mock": 7,
-      "Missing": 67,
+      "Missing": 66,
       "Partner": 3,
       "External": 6
     },
@@ -387,7 +387,7 @@
         {
           "n": 32,
           "name": "Borrower, Staff, Branch, Partner, and Field Experiences",
-          "pct": 38,
+          "pct": 40,
           "total": 17
         },
         {
@@ -399,15 +399,15 @@
       ],
       "counts": {
         "Implemented": 2,
-        "Partial": 21,
+        "Partial": 22,
         "Partial/Mock": 0,
         "Mock": 0,
-        "Missing": 4,
+        "Missing": 3,
         "Partner": 0,
         "External": 3
       },
       "total": 30,
-      "pct": 39
+      "pct": 40
     }
   ],
   "categories": [
@@ -7078,14 +7078,25 @@
           "id": "UX-015",
           "name": "Multilingual Indian-language content and templates",
           "applicability": "Core",
-          "status": "Missing",
-          "raw": "Missing",
-          "evidence": [],
+          "status": "Partial",
+          "raw": "Partial",
+          "evidence": [
+            {
+              "type": "code",
+              "ref": "packages/core/src/customer-experience-completion.js",
+              "note": "approved versioned/checksummed Indian-language packs and localized templates"
+            },
+            {
+              "type": "test",
+              "ref": "tests/customer-experience-completion.test.js",
+              "note": "four-eyes translation and approved fallback controls"
+            }
+          ],
           "owner": "",
           "acceptance": "",
           "dependencies": [],
           "notes": "",
-          "lastReviewed": ""
+          "lastReviewed": "2026-07-15"
         },
         {
           "id": "UX-016",
@@ -7121,6 +7132,16 @@
               "type": "test",
               "ref": "tests/customer-channel-operations.test.js",
               "note": "manifest and service-worker delivery"
+            },
+            {
+              "type": "code",
+              "ref": "packages/core/src/customer-experience-completion.js",
+              "note": "certified devices and plaintext-free AES-256-GCM offline queue envelopes"
+            },
+            {
+              "type": "test",
+              "ref": "tests/customer-experience-completion.test.js",
+              "note": "expiry, tenant scope, replay, idempotency and conflict handling"
             }
           ],
           "owner": "",
@@ -7132,15 +7153,15 @@
       ],
       "counts": {
         "Implemented": 2,
-        "Partial": 11,
+        "Partial": 12,
         "Partial/Mock": 0,
         "Mock": 0,
-        "Missing": 4,
+        "Missing": 3,
         "Partner": 0,
         "External": 0
       },
       "total": 17,
-      "pct": 38
+      "pct": 40
     },
     {
       "n": 33,
@@ -7385,9 +7406,9 @@
     }
   ],
   "tests": {
-    "pass": 310,
+    "pass": 322,
     "fail": 0,
-    "total": 315,
+    "total": 327,
     "ran": true
   }
 }
