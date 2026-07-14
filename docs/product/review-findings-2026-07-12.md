@@ -45,7 +45,7 @@ cite the ID in commits and PRs.
 | REV-62 | FIU-IND FINnet 2.0 XML STR/CTR format | G | P2 | PARTIAL |
 | REV-63 | CERSAI real submission format | G | P2 | PARTIAL |
 | REV-64 | Live integrations to replace mock providers (bureau, bank-verify, eSign, NACH, comms, V-CIP) | G | P2 | PARTIAL |
-| REV-70 | Split `server.js` (20,415 lines / 212 handlers) into per-resource routers | H | P2 | TODO |
+| REV-70 | Split `server.js` (20,415 lines / 212 handlers) into per-resource routers | H | P2 | PARTIAL |
 | REV-71 | Storage scale: control-plane/sandbox off whole-state on Postgres; PG per-tenant encryption | H | P2 | TODO |
 | REV-72 | LMS co-lending economics in the loan-account ledger (split servicing by legs) | H | P2 | DONE |
 | REV-80 | Positioning: lead with compliance & AI-governance control plane | I | P3 | DECIDE |
@@ -289,10 +289,10 @@ provider per category behind the existing `ExternalServiceManager` boundary. The
 
 ## WS-H — Architecture and scale
 
-### REV-70 — Split `server.js` · P2 · TODO
+### REV-70 — Split `server.js` · P2 · PARTIAL
 `server.js` is 20,415 lines with 212 hand-rolled route handlers in one file. Split into per-resource
 routers behind the existing dispatch seam — no framework dependency (preserves the one-dep posture).
-**Acceptance:** routing is modular; no single router file exceeds a few hundred lines.
+The integration-control router is now extracted into `apps/api/src/routes/integration-controls.js`, covering provider readiness and signed callback reconciliation behind an explicit context contract; its CERSAI/FIU suites remain green. The remaining domain-resource handlers still require extraction. **Acceptance:** routing is modular; no single router file exceeds a few hundred lines.
 
 ### REV-71 — Storage scale · P2 · TODO
 The file store serializes all writes behind one whole-state lock; the Postgres driver still whole-state
