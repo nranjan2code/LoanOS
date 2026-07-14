@@ -228,6 +228,7 @@ import {
   ensureBootstrapTenants,
   generateApiKey,
   generateBreakGlassKey,
+  hashApiKey,
   getTenantData,
   grantBreakGlass,
   listBreakGlassGrants,
@@ -248,6 +249,11 @@ import {
   registerTenant,
   resolveBreakGlass,
   resolveTenantByApiKey,
+  resolveTenantServiceCredential,
+  createServiceCredential,
+  revokeServiceCredential,
+  rotateServiceCredential,
+  publicServiceCredential,
   revokeBreakGlass,
   saveControlPlaneOnly,
   saveState as saveWholeState,
@@ -777,13 +783,15 @@ async function route(req, res, dataDir, platformAdminKey) {
   // credential scoped to exactly one tenant.
   if (!tenant) {
     const apiKey = tenantApiKeyFromRequest(req);
-    tenant = resolveTenantByApiKey(controlPlaneState, apiKey);
+    const resolvedService = resolveTenantServiceCredential(controlPlaneState, apiKey);
+    tenant = resolvedService?.tenant ?? null;
     if (tenant) {
       authContext = {
         principalType: "tenant_service",
         tenantId: tenant.tenantId,
         roles: ["tenant_service"],
-        actor: tenant.tenantId
+        actor: tenant.tenantId,
+        serviceCredential: resolvedService.credential
       };
     }
   }
@@ -849,6 +857,10 @@ async function route(req, res, dataDir, platformAdminKey) {
         message: `The "${requiredModule}" module is not enabled for this tenant.`
       }
     });
+    return;
+  }
+  if (requiredModule && authContext?.principalType === "tenant_service" && !authContext.serviceCredential.scopes.includes("*") && !authContext.serviceCredential.scopes.includes(`module:${requiredModule}`)) {
+    sendJson(res, 403, { error: { code: "service_scope_forbidden", message: `Service credential is not scoped for module:${requiredModule}.` } });
     return;
   }
 
@@ -7947,6 +7959,13 @@ async function routeTenantAdmin(req, res, { dataDir, method, path, tenant, authC
     }, now);
     rotatedState.controlPlane.tenants[tenant.tenantId] = {
       ...rotatedState.controlPlane.tenants[tenant.tenantId],
+      serviceCredentials: {
+        ...(rotatedState.controlPlane.tenants[tenant.tenantId].serviceCredentials ?? {}),
+        svc_default: {
+          ...(rotatedState.controlPlane.tenants[tenant.tenantId].serviceCredentials?.svc_default ?? { credentialId: "svc_default", name: "Default service credential", scopes: ["*"], status: "active", expiresAt: null, createdAt: now.toISOString() }),
+          secretHash: hashApiKey(apiKey), status: "active", lastRotatedAt: now.toISOString(), lastRotatedBy: authActor(authContext)
+        }
+      },
       apiKeyRotatedAt: now.toISOString(),
       apiKeyRotatedBy: authActor(authContext)
     };
@@ -7962,6 +7981,49 @@ async function routeTenantAdmin(req, res, { dataDir, method, path, tenant, authC
       tenant: publicTenant(stateRef.get().controlPlane.tenants[tenant.tenantId]),
       apiKey
     });
+    return;
+  }
+
+  if (method === "GET" && path === "/admin/service-credentials") {
+    sendJson(res, 200, { serviceCredentials: Object.values(tenant.serviceCredentials ?? {}).map(publicServiceCredential) });
+    return;
+  }
+
+  if (method === "POST" && path === "/admin/service-credentials") {
+    if (!hasTenantAdminRole(authContext, ["tenant_admin", "security_admin"])) { sendJson(res, 403, { error: { code: "service_credential_forbidden", message: "Tenant admin or security admin role is required." } }); return; }
+    const body = await readJson(req); const secret = generateApiKey(tenant.isSandbox); const now = new Date();
+    try {
+      const result = createServiceCredential(tenant, { ...body, createdBy: authActor(authContext) }, secret, now); const wholeState = stateRef.get();
+      await stateRef.set({ ...wholeState, controlPlane: { ...wholeState.controlPlane, tenants: { ...wholeState.controlPlane.tenants, [tenant.tenantId]: result.tenant } } });
+      const state = await store.load(); await store.save(appendEvent(state, { type: "tenant.service_credential.created", credentialId: result.credential.credentialId, scopes: result.credential.scopes, expiresAt: result.credential.expiresAt, actor: authActor(authContext) }));
+      sendJson(res, 201, { serviceCredential: result.credential, secret });
+    } catch (error) { sendJson(res, 422, { error: { code: "service_credential_invalid", message: error.message } }); }
+    return;
+  }
+
+  const serviceCredentialRevokeMatch = path.match(/^\/admin\/service-credentials\/([^/]+)\/revocation$/);
+  if (method === "POST" && serviceCredentialRevokeMatch) {
+    if (!hasTenantAdminRole(authContext, ["tenant_admin", "security_admin"])) { sendJson(res, 403, { error: { code: "service_credential_forbidden", message: "Tenant admin or security admin role is required." } }); return; }
+    const body = await readJson(req); const credentialId = decodeURIComponent(serviceCredentialRevokeMatch[1]);
+    try {
+      const result = revokeServiceCredential(tenant, credentialId, { ...body, revokedBy: authActor(authContext) }); const wholeState = stateRef.get();
+      await stateRef.set({ ...wholeState, controlPlane: { ...wholeState.controlPlane, tenants: { ...wholeState.controlPlane.tenants, [tenant.tenantId]: result.tenant } } });
+      const state = await store.load(); await store.save(appendEvent(state, { type: "tenant.service_credential.revoked", credentialId, reason: body.reason ?? null, actor: authActor(authContext) }));
+      sendJson(res, 200, { serviceCredential: result.credential });
+    } catch (error) { sendJson(res, 422, { error: { code: "service_credential_invalid", message: error.message } }); }
+    return;
+  }
+
+  const serviceCredentialRotateMatch = path.match(/^\/admin\/service-credentials\/([^/]+)\/rotation$/);
+  if (method === "POST" && serviceCredentialRotateMatch) {
+    if (!hasTenantAdminRole(authContext, ["tenant_admin", "security_admin"])) { sendJson(res, 403, { error: { code: "service_credential_forbidden", message: "Tenant admin or security admin role is required." } }); return; }
+    const credentialId = decodeURIComponent(serviceCredentialRotateMatch[1]); const secret = generateApiKey(tenant.isSandbox);
+    try {
+      const result = rotateServiceCredential(tenant, credentialId, secret, { rotatedBy: authActor(authContext) }); const wholeState = stateRef.get();
+      await stateRef.set({ ...wholeState, controlPlane: { ...wholeState.controlPlane, tenants: { ...wholeState.controlPlane.tenants, [tenant.tenantId]: result.tenant } } });
+      const state = await store.load(); await store.save(appendEvent(state, { type: "tenant.service_credential.rotated", credentialId, actor: authActor(authContext) }));
+      sendJson(res, 200, { serviceCredential: result.credential, secret });
+    } catch (error) { sendJson(res, 422, { error: { code: "service_credential_invalid", message: error.message } }); }
     return;
   }
 

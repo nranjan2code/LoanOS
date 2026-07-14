@@ -160,6 +160,7 @@ function tenantRowToRecord(row) {
     tenantId: row.tenant_id,
     name: row.name,
     apiKeyHash: row.api_key_hash,
+    serviceCredentials: row.service_credentials ?? {},
     isolationTier: row.isolation_tier,
     status: row.status,
     isSandbox: row.is_sandbox,
@@ -177,6 +178,7 @@ function recordToTenantRow(record) {
     tenant_id: record.tenantId,
     name: record.name ?? record.tenantId,
     api_key_hash: record.apiKeyHash ?? null,
+    service_credentials: JSON.stringify(record.serviceCredentials ?? {}),
     isolation_tier: record.isolationTier ?? "pooled",
     status: record.status ?? "active",
     is_sandbox: Boolean(record.isSandbox),
@@ -340,11 +342,12 @@ async function persistControlPlane(client, controlPlane) {
   for (const record of Object.values(controlPlane.tenants)) {
     const row = recordToTenantRow(record);
     await client.query(
-      `INSERT INTO tenants (tenant_id, name, api_key_hash, isolation_tier, status, is_sandbox, parent_tenant_id, sandbox_name, onboarding, offboarding, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb, $11, $12)
+      `INSERT INTO tenants (tenant_id, name, api_key_hash, service_credentials, isolation_tier, status, is_sandbox, parent_tenant_id, sandbox_name, onboarding, offboarding, created_at, updated_at)
+       VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, $8, $9, $10::jsonb, $11::jsonb, $12, $13)
        ON CONFLICT (tenant_id) DO UPDATE SET
          name = EXCLUDED.name,
          api_key_hash = EXCLUDED.api_key_hash,
+         service_credentials = EXCLUDED.service_credentials,
          isolation_tier = EXCLUDED.isolation_tier,
          status = EXCLUDED.status,
          is_sandbox = EXCLUDED.is_sandbox,
@@ -357,6 +360,7 @@ async function persistControlPlane(client, controlPlane) {
         row.tenant_id,
         row.name,
         row.api_key_hash,
+        row.service_credentials,
         row.isolation_tier,
         row.status,
         row.is_sandbox,

@@ -127,6 +127,9 @@ npm run dev:api
 | `POST /admin/access-reviews` | Captures a point-in-time user access review snapshot. |
 | `POST /admin/access-reviews/:id/complete` | Completes an access review and can suspend users or remove admin roles. |
 | `POST /admin/api-key/rotation` | Rotates the tenant service api key, returns the one-time replacement, and seals an audit event. |
+| `GET/POST /admin/service-credentials` | Lists credential-safe metadata or creates a named, scoped, expiring service credential with its secret returned once. |
+| `POST /admin/service-credentials/:id/rotation` | Independently rotates one named service credential and invalidates its prior secret. |
+| `POST /admin/service-credentials/:id/revocation` | Revokes one named service credential with audit reason while leaving other integrations active. |
 | `GET /audit/events` | Lists the tenant's sealed audit chain (filterable by `type`/`subjectId`/`from`/`to`) with a chain-validity verdict. |
 | `GET /audit/export` | Produces an integrity-attested evidence pack from the tenant's audit chain; 409 if the chain fails verification. |
 | `GET /sub-processors` | Standing disclosure of the sub-processor register to every authenticated tenant, flagging cross-border processing. |
@@ -486,7 +489,7 @@ npm run dev:api
 - Persistence defaults to local JSON (tenant-partitioned); an optional Postgres/RLS driver exists (`LOANOS_STORAGE_DRIVER=postgres`, see the [Postgres migration doc](postgres-migration.md)) but sandbox management and the platform control plane (`routePlatform`/`routeAuth`) still use whole-state load/save even on that driver — genuinely cross-tenant by design and admin-frequency, not migrated to per-tenant fetching.
 - Per-tenant encryption at rest is implemented for the file store (opt-in via `LOANOS_MASTER_KEY`): each tenant's data-plane partition is sealed with a per-tenant AES-256-GCM key derived from the root key via HKDF-SHA256 (`apps/api/src/encryption.js`), so no two tenants share a key and purging a tenant's ciphertext makes its data unrecoverable. With no master key set, the store writes plaintext as before. The control plane stays plaintext (cross-tenant by construction), and wiring the same envelope into the Postgres driver's per-tenant rows is a follow-on.
 - Tenant human login/session auth is implemented locally, but external IAM/SSO, enforced MFA, SCIM, and production-grade password policy are still integration work.
-- Tenant service api keys are hashed at rest and rotatable, but there is still one active service key per tenant/environment rather than multiple named integration keys with independent scopes.
+- Tenant service credentials are hashed at rest, named, scoped by module, optionally expiring, independently rotatable/revocable, and returned in plaintext only at creation or rotation.
 - The platform admin key remains as a bootstrap/emergency secret; individual platform users and roles are implemented for normal platform administration.
 - No certified live KYC, CKYC, bureau, bank-account, payment settlement/reconciliation, eSign, SMS, email, WhatsApp, CERSAI, escrow, or core-banking provider onboarding yet; mock-or-real fail-closed adapter contracts exist for the latter two.
 - Registries are file-backed; tenant user administration and access reviews exist, but external IAM sync and maker-checker approval for admin changes are still planned.

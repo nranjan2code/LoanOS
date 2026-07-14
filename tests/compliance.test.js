@@ -95,7 +95,7 @@ import {
   CTR_THRESHOLD_INR
 } from "../packages/core/src/index.js";
 import { createLoanOsServer } from "../apps/api/src/server.js";
-import { loadState, saveState, createEmptyTenantData } from "../apps/api/src/file-store.js";
+import { loadState, saveState, createEmptyTenantData, registerTenant, createServiceCredential, revokeServiceCredential, resolveTenantServiceCredential } from "../apps/api/src/file-store.js";
 
 // Every data-plane request runs inside a tenant. Tests bootstrap a primary
 // tenant (A) and inject its api key by default; the isolation suite adds a
@@ -103,6 +103,30 @@ import { loadState, saveState, createEmptyTenantData } from "../apps/api/src/fil
 const TENANT_A = { tenantId: "tnt_test_a", name: "Test RE A", apiKey: "test-key-a" };
 const TENANT_B = { tenantId: "tnt_test_b", name: "Test RE B", apiKey: "test-key-b" };
 const DEFAULT_TEST_KEY = TENANT_A.apiKey;
+
+test("named service credentials enforce scope, expiry, and revocation", () => {
+  const now = new Date("2026-07-14T00:00:00.000Z");
+  let state = { version: 4, controlPlane: { tenants: {} }, tenants: {} };
+  state = registerTenant(state, { tenantId: "tnt_service", name: "Service Tenant", apiKey: "default-key" }, now);
+  const created = createServiceCredential(state.controlPlane.tenants.tnt_service, { credentialId: "svc_integrations", name: "Integration worker", scopes: ["module:integrations"], expiresAt: "2026-08-14T00:00:00.000Z", createdBy: "security-admin" }, "scoped-secret", now);
+  state.controlPlane.tenants.tnt_service = created.tenant;
+  const resolved = resolveTenantServiceCredential(state, "scoped-secret", now);
+  assert.deepEqual(resolved.credential.scopes, ["module:integrations"]); assert.equal(resolved.credential.secretHash, undefined);
+  assert.equal(resolveTenantServiceCredential(state, "scoped-secret", new Date("2026-09-01T00:00:00.000Z")), null);
+  state.controlPlane.tenants.tnt_service = revokeServiceCredential(created.tenant, "svc_integrations", { revokedBy: "security-admin", reason: "rotation" }, now).tenant;
+  assert.equal(resolveTenantServiceCredential(state, "scoped-secret", now), null);
+});
+
+test("API creates, scopes, and revokes independent service credentials", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-service-credentials-")); const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] }); await listen(server); t.after(async () => { await close(server); await rm(dataDir, { recursive: true, force: true }); }); const base = `http://127.0.0.1:${server.address().port}`;
+  const created = await postJson(`${base}/admin/service-credentials`, { credentialId: "svc_integrations", name: "Integration worker", scopes: ["module:integrations"], expiresAt: "2099-01-01T00:00:00.000Z" }, TENANT_A.apiKey); assert.equal(created.status, 201, JSON.stringify(created.body)); assert.ok(created.body.secret); assert.equal(created.body.serviceCredential.secretHash, undefined);
+  assert.equal((await apiFetch(`${base}/integrations/readiness`, {}, created.body.secret)).status, 200);
+  assert.equal((await apiFetch(`${base}/co-lending-arrangements`, {}, created.body.secret)).status, 403);
+  const deniedAdmin = await apiFetch(`${base}/admin/users`, {}, created.body.secret); assert.equal(deniedAdmin.status, 403);
+  const rotated = await postJson(`${base}/admin/service-credentials/svc_integrations/rotation`, {}, TENANT_A.apiKey); assert.equal(rotated.status, 200); assert.equal((await apiFetch(`${base}/integrations/readiness`, {}, created.body.secret)).status, 401); assert.equal((await apiFetch(`${base}/integrations/readiness`, {}, rotated.body.secret)).status, 200);
+  const revoked = await postJson(`${base}/admin/service-credentials/svc_integrations/revocation`, { reason: "rotation" }, TENANT_A.apiKey); assert.equal(revoked.status, 200);
+  assert.equal((await apiFetch(`${base}/integrations/readiness`, {}, rotated.body.secret)).status, 401);
+});
 
 function apiFetch(url, init = {}, apiKey = DEFAULT_TEST_KEY) {
   const headers = { ...(init.headers ?? {}) };

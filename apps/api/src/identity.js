@@ -521,7 +521,7 @@ export function completeAccessReview(reviews = {}, users = {}, reviewId, input =
 
 export function hasTenantAdminRole(authContext, roles = ["tenant_admin", "user_admin", "security_admin"]) {
   if (authContext?.principalType === "tenant_service") {
-    return true;
+    return authContext.serviceCredential?.scopes?.includes("*") === true;
   }
   if (authContext?.principalType !== "tenant_user") {
     return false;

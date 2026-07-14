@@ -414,6 +414,38 @@ export function generateApiKey(isSandbox = false) {
   return `${prefix}_${randomBytes(24).toString("hex")}`;
 }
 
+export function publicServiceCredential(record) {
+  if (!record) return null;
+  const { secretHash, ...publicRecord } = record;
+  return publicRecord;
+}
+
+export function createServiceCredential(record, input = {}, secret, now = new Date()) {
+  if (!input.credentialId || !/^[a-zA-Z0-9_-]{3,64}$/.test(input.credentialId)) throw new Error("credentialId must be 3-64 safe characters.");
+  if (!input.name) throw new Error("Service credential name is required.");
+  const scopes = [...new Set(Array.isArray(input.scopes) ? input.scopes : [])];
+  if (scopes.length === 0 || scopes.some((scope) => scope !== "*" && !/^module:[a-z_]+$/.test(scope))) throw new Error("Service credential requires valid scopes.");
+  const expiresAt = input.expiresAt ?? null;
+  if (expiresAt && (Number.isNaN(new Date(expiresAt).getTime()) || new Date(expiresAt).getTime() <= now.getTime())) throw new Error("Service credential expiry must be in the future.");
+  if (record.serviceCredentials?.[input.credentialId]) throw new Error("Service credential already exists.");
+  const credential = { credentialId: input.credentialId, name: input.name, secretHash: hashApiKey(secret), scopes, status: "active", expiresAt, createdAt: now.toISOString(), createdBy: input.createdBy ?? null, lastRotatedAt: now.toISOString(), lastRotatedBy: input.createdBy ?? null };
+  return { tenant: { ...record, serviceCredentials: { ...(record.serviceCredentials ?? {}), [credential.credentialId]: credential }, updatedAt: now.toISOString() }, credential: publicServiceCredential(credential) };
+}
+
+export function revokeServiceCredential(record, credentialId, input = {}, now = new Date()) {
+  const credential = record.serviceCredentials?.[credentialId];
+  if (!credential || credential.status !== "active") throw new Error("Active service credential not found.");
+  const revoked = { ...credential, status: "revoked", revokedAt: now.toISOString(), revokedBy: input.revokedBy ?? null, revocationReason: input.reason ?? null };
+  return { tenant: { ...record, serviceCredentials: { ...record.serviceCredentials, [credentialId]: revoked }, updatedAt: now.toISOString() }, credential: publicServiceCredential(revoked) };
+}
+
+export function rotateServiceCredential(record, credentialId, secret, input = {}, now = new Date()) {
+  const credential = record.serviceCredentials?.[credentialId];
+  if (!credential || credential.status !== "active") throw new Error("Active service credential not found.");
+  const rotated = { ...credential, secretHash: hashApiKey(secret), lastRotatedAt: now.toISOString(), lastRotatedBy: input.rotatedBy ?? null };
+  return { tenant: { ...record, serviceCredentials: { ...record.serviceCredentials, [credentialId]: rotated }, updatedAt: now.toISOString() }, credential: publicServiceCredential(rotated) };
+}
+
 function normalizeSelectionList(value, allowed, defaults) {
   const raw = Array.isArray(value) ? value : defaults;
   return [...new Set(raw.filter((item) => allowed.has(item)))];
@@ -537,6 +569,7 @@ export function registerTenant(state, tenant, now = new Date()) {
     createdAt: existing?.createdAt ?? now.toISOString(),
     updatedAt: now.toISOString()
   };
+  record.serviceCredentials = existing?.serviceCredentials ?? (record.apiKeyHash ? { svc_default: { credentialId: "svc_default", name: "Default service credential", secretHash: record.apiKeyHash, scopes: ["*"], status: "active", expiresAt: null, createdAt: existing?.createdAt ?? now.toISOString(), createdBy: "tenant_provisioning", lastRotatedAt: now.toISOString(), lastRotatedBy: "tenant_provisioning" } } : {});
   return {
     ...state,
     controlPlane: {
@@ -623,7 +656,7 @@ export function publicTenant(record) {
     return null;
   }
   const { apiKeyHash, ...rest } = record;
-  return rest;
+  return { ...rest, serviceCredentials: Object.fromEntries(Object.entries(rest.serviceCredentials ?? {}).map(([id, credential]) => [id, publicServiceCredential(credential)])) };
 }
 
 export function resolveTenantByApiKey(state, apiKey) {
@@ -631,11 +664,20 @@ export function resolveTenantByApiKey(state, apiKey) {
     return null;
   }
   const hash = hashApiKey(apiKey);
-  return (
-    Object.values(state.controlPlane.tenants).find(
-      (tenant) => tenant.apiKeyHash === hash && tenant.status === "active"
-    ) ?? null
-  );
+  return resolveTenantServiceCredential(state, apiKey)?.tenant ?? null;
+}
+
+export function resolveTenantServiceCredential(state, apiKey, now = new Date()) {
+  if (!apiKey) return null;
+  const hash = hashApiKey(apiKey);
+  for (const tenant of Object.values(state.controlPlane.tenants)) {
+    if (tenant.status !== "active") continue;
+    for (const credential of Object.values(tenant.serviceCredentials ?? {})) {
+      if (credential.secretHash === hash && credential.status === "active" && (!credential.expiresAt || new Date(credential.expiresAt).getTime() > now.getTime())) return { tenant, credential: publicServiceCredential(credential) };
+    }
+    if (tenant.apiKeyHash === hash) return { tenant, credential: { credentialId: "svc_legacy", name: "Legacy service credential", scopes: ["*"], status: "active", expiresAt: null } };
+  }
+  return null;
 }
 
 // --- Sub-processor register (control plane, disclosed to every tenant) -----

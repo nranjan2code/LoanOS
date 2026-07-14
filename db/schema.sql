@@ -82,6 +82,7 @@ CREATE TABLE IF NOT EXISTS tenants (
   tenant_id         TEXT PRIMARY KEY,
   name              TEXT NOT NULL,
   api_key_hash      TEXT,
+  service_credentials JSONB NOT NULL DEFAULT '{}'::jsonb,
   isolation_tier    TEXT NOT NULL DEFAULT 'pooled',
   status            TEXT NOT NULL DEFAULT 'active',
   is_sandbox        BOOLEAN NOT NULL DEFAULT FALSE,
@@ -92,6 +93,7 @@ CREATE TABLE IF NOT EXISTS tenants (
   created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS service_credentials JSONB NOT NULL DEFAULT '{}'::jsonb;
 CREATE INDEX IF NOT EXISTS tenants_api_key_hash_idx ON tenants (api_key_hash) WHERE api_key_hash IS NOT NULL;
 CREATE INDEX IF NOT EXISTS tenants_parent_tenant_id_idx ON tenants (parent_tenant_id) WHERE parent_tenant_id IS NOT NULL;
 
