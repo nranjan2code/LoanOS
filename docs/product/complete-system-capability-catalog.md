@@ -69,7 +69,7 @@ LoanOS currently has a strong compliance-first domain foundation and executable 
 
 The principal gaps before bank production are live integrations, downstream GL certification, regulatory submission formats, product-specific lending depth, repossession/auction and legal-expense depth, enterprise IAM and key management, observability/DR/BCP, and bank-assurance evidence. Collections and legal recovery now have a controlled first slice, but dialer integration, route/capacity optimization, track-specific pleadings, court integration, possession, auction, and recovery accounting remain open. Public product positioning must remain narrower than this catalogue until each advertised journey reaches an agreed maturity level.
 
-The detailed register contains **436 individually identified capabilities**. At this snapshot, 85 are classified `Implemented`, 170 `Partial`, 153 `Missing`, and 28 are mock, partner, external, or composite-status obligations. These counts measure scope coverage, not delivery percentage: a single missing ledger, reconciliation, security, or recovery control can block production even if many smaller capabilities exist.
+The detailed register contains **436 individually identified capabilities**. At this snapshot, 85 are classified `Implemented`, 171 `Partial`, 152 `Missing`, and 28 are mock, partner, external, or composite-status obligations. These counts measure scope coverage, not delivery percentage: a single missing ledger, reconciliation, security, or recovery control can block production even if many smaller capabilities exist.
 
 ## Capability Index
 
@@ -640,7 +640,7 @@ The detailed register contains **436 individually identified capabilities**. At 
 | SEC-007 | Named, scoped, expiring, and independently rotatable service credentials | Core | Implemented |
 | SEC-008 | KMS/HSM-backed key custody, rotation, and destruction | Core | Missing |
 | SEC-009 | Encryption in transit, at rest, field/object level, and backup | Core | Partial |
-| SEC-010 | Secrets management and credential-leak response | Core | Missing |
+| SEC-010 | Secrets management and credential-leak response | Core | Partial |
 | SEC-011 | CSRF, CSP, session, rate-limit, lockout, and abuse controls | Core | Partial |
 | SEC-012 | Secure SDLC, SAST, DAST, dependency, container, and IaC scanning | Core | Missing |
 | SEC-013 | SBOM, vulnerability SLA, patching, and exception governance | Core | Missing |

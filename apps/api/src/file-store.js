@@ -436,14 +436,66 @@ export function revokeServiceCredential(record, credentialId, input = {}, now = 
   const credential = record.serviceCredentials?.[credentialId];
   if (!credential || credential.status !== "active") throw new Error("Active service credential not found.");
   const revoked = { ...credential, status: "revoked", revokedAt: now.toISOString(), revokedBy: input.revokedBy ?? null, revocationReason: input.reason ?? null };
-  return { tenant: { ...record, serviceCredentials: { ...record.serviceCredentials, [credentialId]: revoked }, updatedAt: now.toISOString() }, credential: publicServiceCredential(revoked) };
+  return {
+    tenant: {
+      ...record,
+      ...(credentialId === "svc_default" ? { apiKeyHash: null } : {}),
+      serviceCredentials: { ...record.serviceCredentials, [credentialId]: revoked },
+      updatedAt: now.toISOString()
+    },
+    credential: publicServiceCredential(revoked)
+  };
 }
 
 export function rotateServiceCredential(record, credentialId, secret, input = {}, now = new Date()) {
   const credential = record.serviceCredentials?.[credentialId];
   if (!credential || credential.status !== "active") throw new Error("Active service credential not found.");
   const rotated = { ...credential, secretHash: hashApiKey(secret), lastRotatedAt: now.toISOString(), lastRotatedBy: input.rotatedBy ?? null };
-  return { tenant: { ...record, serviceCredentials: { ...record.serviceCredentials, [credentialId]: rotated }, updatedAt: now.toISOString() }, credential: publicServiceCredential(rotated) };
+  return {
+    tenant: {
+      ...record,
+      ...(credentialId === "svc_default" ? { apiKeyHash: rotated.secretHash } : {}),
+      serviceCredentials: { ...record.serviceCredentials, [credentialId]: rotated },
+      updatedAt: now.toISOString()
+    },
+    credential: publicServiceCredential(rotated)
+  };
+}
+
+export function containServiceCredentialCompromise(record, input = {}, now = new Date()) {
+  if (!input.incidentId) throw new Error("Compromise containment requires an incidentId.");
+  if (!input.reason || String(input.reason).trim().length < 8) throw new Error("Compromise containment requires a specific reason.");
+  const credentials = record.serviceCredentials ?? {};
+  const requestedIds = input.allActive === true
+    ? Object.values(credentials).filter((credential) => credential.status === "active").map((credential) => credential.credentialId)
+    : [...new Set(Array.isArray(input.credentialIds) ? input.credentialIds.map(String) : [])];
+  if (requestedIds.length === 0) throw new Error("At least one active service credential must be selected.");
+  const unavailable = requestedIds.filter((credentialId) => credentials[credentialId]?.status !== "active");
+  if (unavailable.length > 0) throw new Error(`Active service credential not found: ${unavailable.join(", ")}.`);
+
+  const compromisedAt = now.toISOString();
+  const nextCredentials = { ...credentials };
+  for (const credentialId of requestedIds) {
+    nextCredentials[credentialId] = {
+      ...credentials[credentialId],
+      status: "revoked",
+      revokedAt: compromisedAt,
+      revokedBy: input.actor ?? null,
+      revocationReason: input.reason,
+      compromiseIncidentId: input.incidentId,
+      compromisedAt,
+      compromisedBy: input.actor ?? null
+    };
+  }
+  return {
+    tenant: {
+      ...record,
+      ...(requestedIds.includes("svc_default") ? { apiKeyHash: null } : {}),
+      serviceCredentials: nextCredentials,
+      updatedAt: compromisedAt
+    },
+    credentials: requestedIds.map((credentialId) => publicServiceCredential(nextCredentials[credentialId]))
+  };
 }
 
 function normalizeSelectionList(value, allowed, defaults) {
@@ -675,7 +727,6 @@ export function resolveTenantServiceCredential(state, apiKey, now = new Date()) 
     for (const credential of Object.values(tenant.serviceCredentials ?? {})) {
       if (credential.secretHash === hash && credential.status === "active" && (!credential.expiresAt || new Date(credential.expiresAt).getTime() > now.getTime())) return { tenant, credential: publicServiceCredential(credential) };
     }
-    if (tenant.apiKeyHash === hash) return { tenant, credential: { credentialId: "svc_legacy", name: "Legacy service credential", scopes: ["*"], status: "active", expiresAt: null } };
   }
   return null;
 }

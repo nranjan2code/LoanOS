@@ -252,7 +252,7 @@ Tasks:
 - Authentication.
 - Role-based access control.
 - Maker-checker authorization policies.
-- Secrets management.
+- Secrets management. First containment slice done: named credentials can be declared compromised through `POST /admin/service-credential-compromises`; selected or all active credentials are revoked fail-closed, each revocation is linked to a high/critical tenant incident, and CERT-In/RBI clocks plus audit evidence start immediately. External secret-vault/KMS custody, workload identity, and automated leak detection/rotation remain planned.
 - Audit log hardening.
 - Encryption at rest and in transit.
 - Key management.

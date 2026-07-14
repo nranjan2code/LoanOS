@@ -95,7 +95,7 @@ import {
   CTR_THRESHOLD_INR
 } from "../packages/core/src/index.js";
 import { createLoanOsServer } from "../apps/api/src/server.js";
-import { loadState, saveState, createEmptyTenantData, registerTenant, createServiceCredential, revokeServiceCredential, resolveTenantServiceCredential } from "../apps/api/src/file-store.js";
+import { loadState, saveState, createEmptyTenantData, registerTenant, createServiceCredential, revokeServiceCredential, resolveTenantServiceCredential, containServiceCredentialCompromise } from "../apps/api/src/file-store.js";
 
 // Every data-plane request runs inside a tenant. Tests bootstrap a primary
 // tenant (A) and inject its api key by default; the isolation suite adds a
@@ -117,6 +117,20 @@ test("named service credentials enforce scope, expiry, and revocation", () => {
   assert.equal(resolveTenantServiceCredential(state, "scoped-secret", now), null);
 });
 
+test("credential compromise containment revokes selected credentials and default-key fallback", () => {
+  const now = new Date("2026-07-14T00:00:00.000Z");
+  let state = registerTenant({ version: 4, controlPlane: { tenants: {} }, tenants: {} }, { tenantId: "tnt_service", name: "Service Tenant", apiKey: "default-key" }, now);
+  const created = createServiceCredential(state.controlPlane.tenants.tnt_service, { credentialId: "svc_worker", name: "Worker", scopes: ["module:integrations"] }, "worker-key", now);
+  state.controlPlane.tenants.tnt_service = created.tenant;
+  const contained = containServiceCredentialCompromise(state.controlPlane.tenants.tnt_service, { incidentId: "inc_1", credentialIds: ["svc_default", "svc_worker"], reason: "Secrets found in public build log", actor: "ciso" }, now);
+  state.controlPlane.tenants.tnt_service = contained.tenant;
+  assert.equal(contained.tenant.apiKeyHash, null);
+  assert.equal(contained.tenant.serviceCredentials.svc_worker.compromiseIncidentId, "inc_1");
+  assert.equal(resolveTenantServiceCredential(state, "default-key", now), null);
+  assert.equal(resolveTenantServiceCredential(state, "worker-key", now), null);
+  assert.throws(() => containServiceCredentialCompromise(contained.tenant, { incidentId: "inc_2", credentialIds: ["svc_worker"], reason: "Repeated containment attempt", actor: "ciso" }, now), /not found/);
+});
+
 test("API creates, scopes, and revokes independent service credentials", async (t) => {
   const dataDir = await mkdtemp(join(tmpdir(), "loanos-service-credentials-")); const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] }); await listen(server); t.after(async () => { await close(server); await rm(dataDir, { recursive: true, force: true }); }); const base = `http://127.0.0.1:${server.address().port}`;
   const created = await postJson(`${base}/admin/service-credentials`, { credentialId: "svc_integrations", name: "Integration worker", scopes: ["module:integrations"], expiresAt: "2099-01-01T00:00:00.000Z" }, TENANT_A.apiKey); assert.equal(created.status, 201, JSON.stringify(created.body)); assert.ok(created.body.secret); assert.equal(created.body.serviceCredential.secretHash, undefined);
@@ -126,6 +140,21 @@ test("API creates, scopes, and revokes independent service credentials", async (
   const rotated = await postJson(`${base}/admin/service-credentials/svc_integrations/rotation`, {}, TENANT_A.apiKey); assert.equal(rotated.status, 200); assert.equal((await apiFetch(`${base}/integrations/readiness`, {}, created.body.secret)).status, 401); assert.equal((await apiFetch(`${base}/integrations/readiness`, {}, rotated.body.secret)).status, 200);
   const revoked = await postJson(`${base}/admin/service-credentials/svc_integrations/revocation`, { reason: "rotation" }, TENANT_A.apiKey); assert.equal(revoked.status, 200);
   assert.equal((await apiFetch(`${base}/integrations/readiness`, {}, rotated.body.secret)).status, 401);
+});
+
+test("API contains a credential compromise and opens a reportable incident", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-credential-compromise-")); const server = createLoanOsServer({ dataDir, bootstrapTenants: [TENANT_A] }); await listen(server); t.after(async () => { await close(server); await rm(dataDir, { recursive: true, force: true }); }); const base = `http://127.0.0.1:${server.address().port}`;
+  const worker = await postJson(`${base}/admin/service-credentials`, { credentialId: "svc_worker", name: "Worker", scopes: ["module:integrations"] }, TENANT_A.apiKey); assert.equal(worker.status, 201);
+  const contained = await postJson(`${base}/admin/service-credential-compromises`, { credentialIds: ["svc_worker"], reason: "Credential exposed in deployment output", severity: "critical", summary: "Integration worker credential exposed" }, TENANT_A.apiKey);
+  assert.equal(contained.status, 201, JSON.stringify(contained.body));
+  assert.deepEqual(contained.body.incident.containment.credentialIds, ["svc_worker"]);
+  assert.equal(contained.body.revokedCredentials[0].secretHash, undefined);
+  assert.equal((await apiFetch(`${base}/integrations/readiness`, {}, worker.body.secret)).status, 401);
+  const incident = await (await apiFetch(`${base}/incidents/${contained.body.incident.incidentId}`)).json();
+  assert.equal(incident.category, "unauthorized_access");
+  assert.equal(incident.containment.status, "contained");
+  const events = await (await apiFetch(`${base}/audit/events`)).json();
+  assert.ok(events.events.some((event) => event.type === "tenant.service_credentials.compromise_contained" && event.incidentId === incident.incidentId));
 });
 
 function apiFetch(url, init = {}, apiKey = DEFAULT_TEST_KEY) {

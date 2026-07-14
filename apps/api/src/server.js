@@ -251,6 +251,7 @@ import {
   resolveTenantByApiKey,
   resolveTenantServiceCredential,
   createServiceCredential,
+  containServiceCredentialCompromise,
   revokeServiceCredential,
   rotateServiceCredential,
   publicServiceCredential,
@@ -7998,6 +7999,80 @@ async function routeTenantAdmin(req, res, { dataDir, method, path, tenant, authC
       const state = await store.load(); await store.save(appendEvent(state, { type: "tenant.service_credential.created", credentialId: result.credential.credentialId, scopes: result.credential.scopes, expiresAt: result.credential.expiresAt, actor: authActor(authContext) }));
       sendJson(res, 201, { serviceCredential: result.credential, secret });
     } catch (error) { sendJson(res, 422, { error: { code: "service_credential_invalid", message: error.message } }); }
+    return;
+  }
+
+  if (method === "POST" && path === "/admin/service-credential-compromises") {
+    if (!hasTenantAdminRole(authContext, ["tenant_admin", "security_admin"])) {
+      sendJson(res, 403, { error: { code: "credential_compromise_forbidden", message: "Tenant admin or security admin role is required." } });
+      return;
+    }
+    const body = await readJson(req);
+    if (!body.reason || !["high", "critical"].includes(body.severity)) {
+      sendJson(res, 422, { error: { code: "credential_compromise_invalid", message: "A specific reason and high or critical severity are required." } });
+      return;
+    }
+    const actor = authActor(authContext);
+    const state = await store.load();
+    const incidentResult = createIncident(state.incidents, {
+      category: "unauthorized_access",
+      severity: body.severity,
+      summary: body.summary ?? `Service credential compromise: ${body.reason}`,
+      description: body.description ?? body.reason,
+      affectedSystems: body.affectedSystems ?? ["loanos_api"],
+      detectedAt: body.detectedAt,
+      reportableTo: body.reportableTo,
+      actor
+    });
+    if (incidentResult.findings.length > 0) {
+      sendJson(res, 422, { error: { code: "credential_compromise_invalid", message: "Credential compromise incident is invalid." }, findings: incidentResult.findings });
+      return;
+    }
+    try {
+      const containment = containServiceCredentialCompromise(tenant, {
+        incidentId: incidentResult.incident.incidentId,
+        credentialIds: body.credentialIds,
+        allActive: body.allActive,
+        reason: body.reason,
+        actor
+      });
+
+      // Containment is persisted before evidence. If the second write fails,
+      // credentials remain revoked rather than failing open.
+      const wholeState = stateRef.get();
+      await stateRef.set({
+        ...wholeState,
+        controlPlane: {
+          ...wholeState.controlPlane,
+          tenants: { ...wholeState.controlPlane.tenants, [tenant.tenantId]: containment.tenant }
+        }
+      });
+      const credentialIds = containment.credentials.map((credential) => credential.credentialId);
+      const incident = {
+        ...incidentResult.incident,
+        containment: {
+          status: "contained",
+          action: "service_credentials_revoked",
+          credentialIds,
+          containedAt: new Date().toISOString(),
+          containedBy: actor
+        }
+      };
+      const nextState = appendEvent(
+        { ...state, incidents: { ...incidentResult.registry, [incident.incidentId]: incident } },
+        {
+          type: "tenant.service_credentials.compromise_contained",
+          incidentId: incident.incidentId,
+          credentialIds,
+          reason: body.reason,
+          actor
+        }
+      );
+      await store.save(nextState);
+      sendJson(res, 201, { incident, revokedCredentials: containment.credentials });
+    } catch (error) {
+      sendJson(res, 422, { error: { code: "credential_compromise_invalid", message: error.message } });
+    }
     return;
   }
 

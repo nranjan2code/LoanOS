@@ -130,6 +130,7 @@ npm run dev:api
 | `GET/POST /admin/service-credentials` | Lists credential-safe metadata or creates a named, scoped, expiring service credential with its secret returned once. |
 | `POST /admin/service-credentials/:id/rotation` | Independently rotates one named service credential and invalidates its prior secret. |
 | `POST /admin/service-credentials/:id/revocation` | Revokes one named service credential with audit reason while leaving other integrations active. |
+| `POST /admin/service-credential-compromises` | Emergency-compromise workflow: validates a high/critical incident, revokes selected or all active credentials before evidence persistence, links each revocation to the statutory incident, and starts CERT-In/RBI reporting clocks. |
 | `GET /audit/events` | Lists the tenant's sealed audit chain (filterable by `type`/`subjectId`/`from`/`to`) with a chain-validity verdict. |
 | `GET /audit/export` | Produces an integrity-attested evidence pack from the tenant's audit chain; 409 if the chain fails verification. |
 | `GET /sub-processors` | Standing disclosure of the sub-processor register to every authenticated tenant, flagging cross-border processing. |
@@ -490,6 +491,7 @@ npm run dev:api
 - Per-tenant encryption at rest is implemented for the file store (opt-in via `LOANOS_MASTER_KEY`): each tenant's data-plane partition is sealed with a per-tenant AES-256-GCM key derived from the root key via HKDF-SHA256 (`apps/api/src/encryption.js`), so no two tenants share a key and purging a tenant's ciphertext makes its data unrecoverable. With no master key set, the store writes plaintext as before. The control plane stays plaintext (cross-tenant by construction), and wiring the same envelope into the Postgres driver's per-tenant rows is a follow-on.
 - Tenant human login/session auth is implemented locally, but external IAM/SSO, enforced MFA, SCIM, and production-grade password policy are still integration work.
 - Tenant service credentials are hashed at rest, named, scoped by module, optionally expiring, independently rotatable/revocable, and returned in plaintext only at creation or rotation.
+- Credential-leak containment is fail closed: the compromise endpoint revokes selected or all active service credentials before persisting the linked incident/audit evidence, invalidates the default credential without a legacy-key fallback, stores no secret material in the incident, and starts the existing CERT-In/RBI notification clocks. External secret-vault/KMS integration and automated repository/runtime secret detection remain production gaps.
 - The platform admin key remains as a bootstrap/emergency secret; individual platform users and roles are implemented for normal platform administration.
 - No certified live KYC, CKYC, bureau, bank-account, payment settlement/reconciliation, eSign, SMS, email, WhatsApp, CERSAI, escrow, or core-banking provider onboarding yet; mock-or-real fail-closed adapter contracts exist for the latter two.
 - Registries are file-backed; tenant user administration and access reviews exist, but external IAM sync and maker-checker approval for admin changes are still planned.

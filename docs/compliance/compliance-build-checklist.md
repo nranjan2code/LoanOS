@@ -223,7 +223,7 @@ Before production, the platform needs:
 1. Legal and compliance review of control interpretation.
 2. Board-approved policies for products, penal charges, LSP, DLG, outsourcing, model risk, data retention, and recovery.
 3. Authentication, authorization, maker-checker, and audit hardening.
-4. Secure secrets management.
+4. Secure secrets management. Partial: service secrets are one-time/hash-only with independent rotation and fail-closed compromise containment linked to incident reporting; production vault/KMS custody, workload identity, and automated leak detection remain required.
 5. India-hosted production database and object storage.
 6. Observability, SIEM, incident response, backup, DR, and BCP.
 7. Vendor due diligence and contracts with audit rights and data residency obligations.
