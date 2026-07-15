@@ -10,6 +10,7 @@ This document defines how LoanOS keeps human guidance and AI-agent context align
 | Borrowers | Tenant customer portal | Plain-language application, document, repayment, grievance and privacy guidance |
 | Product, implementation and compliance teams | `docs/README.md` | Product scope, maturity, architecture, controls, operations and delivery evidence |
 | Engineers and AI coding agents | `AGENTS.md` | Repository map, load-bearing sources, invariants, commands and conventions |
+| Demo operators and solution consultants | `docs/operations/demo-handbook.md` | Synthetic-only showcase/workshop preparation, claims boundaries, release, recovery and teardown |
 | Sales, marketing and customer success | `docs/gtm/README.md` | Approved claims, playbooks, onboarding and customer-success operations |
 
 When sources disagree, executable policy and load-bearing architecture/control documents take precedence. The Guide and Academy explains how to operate the system; it cannot grant authority, change a policy outcome or establish production readiness.
@@ -25,6 +26,7 @@ When sources disagree, executable policy and load-bearing architecture/control d
 | Irreversible technical decision | ADR |
 | Public capability claim | Claims/backlog register and relevant public content |
 | Repository layout, command or agent rule | `AGENTS.md` |
+| Demo seed, deployment, mock, persona or operating flow | Demo handbook, AWS runbook, current implementation map and sales demo script |
 | Tenant/RE customization | Help-centre architecture, authorization model, audit lineage and isolation tests |
 
 ## Audit record — 2026-07-15
@@ -40,6 +42,7 @@ Checks completed:
 - platform navigation exposes the guide from the public resource room, public navigation, tenant landing and authenticated staff workspace;
 - product maturity remains conservative: the guide does not promote any lending journey to production-ready;
 - tenant/RE customization is explicitly future work and cannot yet introduce unreviewed content.
+- the synthetic showcase/workshop operating model is documented separately from production operations, with explicit mock, tenant-engine, credential, DNS, cost and teardown boundaries.
 
 Result: the repository documentation set is structurally aligned for the current Guide and Academy slice. This is not a permanent certification that every statement will remain current. Currency is maintained through the change matrix, automated integrity/evidence checks and named verification dates on user guidance.
 

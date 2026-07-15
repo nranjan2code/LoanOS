@@ -312,6 +312,7 @@ import {
 } from "../../../packages/core/src/index.js";
 import {
   AUDIT_ACTOR_TYPES,
+  DEMO_SHOWCASE_PROFILE_ID,
   buildAuditEvidencePack,
   sealAuditChain,
   stampAuditEvents
@@ -10563,6 +10564,15 @@ async function routePlatform(req, res, {
       });
       return;
     }
+    if ((body.syntheticOnly === true || body.demoProfile) && body.isSandbox !== true) {
+      sendJson(res, 422, {
+        error: {
+          code: "demo_tenant_requires_sandbox",
+          message: "A synthetic demo profile must be created as an explicit sandbox tenant."
+        }
+      });
+      return;
+    }
     const state = await loadWholeState(dataDir);
     if (state.controlPlane.tenants[body.tenantId]) {
       sendJson(res, 409, {
@@ -10577,13 +10587,16 @@ async function routePlatform(req, res, {
       productIds
     });
     // The api key is returned once here and only ever stored as a hash.
-    const apiKey = body.apiKey ?? generateApiKey();
+    const apiKey = body.apiKey ?? generateApiKey(body.isSandbox === true);
     let nextState = registerTenant(state, {
       tenantId: body.tenantId,
       name: body.name,
       apiKey,
       isolationTier: body.isolationTier,
       status: body.status,
+      isSandbox: body.isSandbox,
+      syntheticOnly: body.syntheticOnly,
+      demoProfile: body.demoProfile,
       onboarding
     }, now);
     let ownerUser = null;
@@ -11314,7 +11327,14 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   // production; there, tenants are minted only through /platform/tenants.
   const devTenantKey = process.env.LOANOS_DEV_TENANT_KEY;
   const bootstrapTenants = devTenantKey
-    ? [{ tenantId: "dev", name: "Local Dev RE", apiKey: devTenantKey }]
+    ? [{
+        tenantId: "dev",
+        name: "LoanOS Showcase",
+        apiKey: devTenantKey,
+        isSandbox: true,
+        syntheticOnly: true,
+        demoProfile: DEMO_SHOWCASE_PROFILE_ID
+      }]
     : [];
   const server = createLoanOsServer({ bootstrapTenants });
   server.listen(DEFAULT_PORT, () => {

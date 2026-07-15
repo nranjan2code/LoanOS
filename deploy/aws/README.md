@@ -16,6 +16,10 @@ CloudFront is the HTTPS entry point. It is **not** a production topology and
 must never contain borrower data, PAN/Aadhaar values, bureau files, bank data,
 or real regulated submissions.
 
+For customer-facing preparation, personas, all 21 journeys, workshop tenants,
+mock boundaries, claims discipline, recovery and demo-day checklists, use the
+[synthetic demo operator handbook](../../docs/operations/demo-handbook.md).
+
 ## Repository deployment files
 
 | File | Purpose |
@@ -23,6 +27,7 @@ or real regulated submissions.
 | `cloudformation-demo.yaml` | VPC, EC2, IAM, CloudFront, and AWS Budget infrastructure |
 | `bootstrap-demo.sh` | Host installation, database setup, service units, credentials, and health gates |
 | `package-demo.sh` | Reproducible archive of committed repository source |
+| `release-demo.sh` | Versioned S3 upload, CloudFormation deploy, bootstrap wait, status, and smoke tests |
 | `README.md` | This operator runbook |
 
 `package-demo.sh` packages `HEAD`, not uncommitted working-tree changes. This
@@ -67,11 +72,43 @@ Before creating resources:
    npm test
    (cd rules && cargo test --workspace)
    (cd rules && cargo clippy --workspace --all-targets -- -D warnings)
-   bash -n deploy/aws/bootstrap-demo.sh deploy/aws/package-demo.sh
+   bash -n deploy/aws/bootstrap-demo.sh deploy/aws/package-demo.sh deploy/aws/release-demo.sh
    cfn-lint deploy/aws/cloudformation-demo.yaml
    ```
 
-## 2. Package the committed source
+## 2. Automated committed release (recommended)
+
+Configure the release environment and run the wrapper from the repository
+root. It packages committed `HEAD`, uploads a versioned source object, deploys
+the template, waits for the SSM bootstrap status, and runs GET-based health and
+website smoke tests.
+
+```bash
+export REGION=ap-south-1
+export STACK_NAME="loanos-demo-$(date +%Y%m%d)"
+export SOURCE_BUCKET="loanos-demo-source-<unique>"
+export ALERT_EMAIL="demo-ops@example.com"
+export MONTHLY_BUDGET_USD=25
+
+# Optional; both values must be supplied together.
+export ALTERNATE_DOMAIN_NAME="demo.example.com"
+export ACM_CERTIFICATE_ARN="arn:aws:acm:us-east-1:<account>:certificate/<id>"
+
+./deploy/aws/release-demo.sh deploy
+./deploy/aws/release-demo.sh status
+./deploy/aws/release-demo.sh smoke
+```
+
+Use a new `STACK_NAME` for the preferred blue/green update. `deploy` can also
+update an existing disposable stack, but infrastructure changes may replace
+the host and regenerate credentials. AWS CLI authentication, account/region
+selection, billing review, certificate validation, DNS cutover, and decrypted
+credential retrieval remain human-guarded actions.
+
+The remaining steps document the equivalent console/manual procedure and are
+also the troubleshooting reference for the automated path.
+
+## 3. Package the committed source manually
 
 From the repository root:
 
@@ -86,7 +123,7 @@ ticket or release note; do not commit the archive.
 The repository may be private. Never put a GitHub token in CloudFormation,
 EC2 user data, or the archive. The private S3 handoff avoids that requirement.
 
-## 3. Create the private source bucket
+## 4. Create the private source bucket
 
 In the same region as the stack:
 
@@ -99,7 +136,7 @@ In the same region as the stack:
 The stack grants its instance read access only to the exact bucket and object
 key supplied as parameters. The bucket itself remains private.
 
-## 4. Create the CloudFormation stack
+## 5. Create the CloudFormation stack
 
 1. Open **CloudFormation → Stacks → Create stack → With new resources**.
 2. Choose **Upload a template file** and select
@@ -115,6 +152,8 @@ key supplied as parameters. The bucket itself remains private.
    | `InstanceType` | `t3.small` |
    | `MonthlyBudgetUsd` | `25` or a lower operator-approved threshold |
    | `LatestUbuntuAmi` | keep the supplied SSM public-parameter default |
+   | `AlternateDomainName` | optional full hostname such as `demo.example.com`; leave empty when unused |
+   | `AcmCertificateArn` | optional `us-east-1` ACM certificate covering that hostname; must be paired with `AlternateDomainName` |
 
 5. Leave stack options at their defaults unless the account has a required
    tagging or CloudFormation service-role policy.
@@ -126,7 +165,7 @@ key supplied as parameters. The bucket itself remains private.
 CloudFormation completion means the AWS resources exist; it does not mean the
 host bootstrap has completed.
 
-## 5. Verify bootstrap completion
+## 6. Verify bootstrap completion
 
 Open the stack's **Outputs** tab and record:
 
@@ -147,7 +186,7 @@ the parameter named by `BootstrapStatusParameter`:
 The first Rust release build can take 15–25 minutes. Do not rerun the bootstrap
 while it is still active.
 
-## 6. Application URLs and smoke tests
+## 7. Application URLs and smoke tests
 
 All applications share the CloudFront hostname:
 
@@ -171,27 +210,30 @@ Expected results are API status `ok` and website HTTP `200`. A `HEAD` request
 (`curl -I`) is not a substitute for the website GET test because static routes
 are GET routes.
 
-## 7. Optional custom domain with external DNS (GoDaddy)
+## 8. Optional custom domain with external DNS (GoDaddy)
 
 Prefer a dedicated subdomain such as `demo.example.com`. It keeps the apex
 domain independent and can be routed to CloudFront with a standard CNAME.
 
-1. Open the distribution in **CloudFront → General → Add domain** and enter the
-   complete hostname, for example `demo.example.com`.
-2. Select or create an ACM certificate. A certificate used by CloudFront must
-   be in **US East (N. Virginia), `us-east-1`**, even when the stack and origin
-   are in another region. A wildcard such as `*.example.com` covers subdomains
-   but does not cover the apex `example.com`.
+1. In **AWS Certificate Manager**, switch to **US East (N. Virginia),
+   `us-east-1`** and request a public certificate covering the complete
+   hostname or wildcard. CloudFront requires its certificate in `us-east-1`
+   even when the stack and origin are elsewhere. A wildcard such as
+   `*.example.com` covers subdomains but not the apex `example.com`.
+2. Choose DNS validation and record the validation CNAME shown by ACM.
 3. In GoDaddy DNS, create the CNAME shown by ACM for domain validation:
    - **Name**: enter only ACM's host portion, such as `_validation-token`;
      GoDaddy appends the zone name;
    - **Value**: enter the complete `*.acm-validations.aws` target; and
    - **TTL**: the default value is suitable.
 4. Keep that validation CNAME permanently. ACM uses it for automatic
-   certificate renewal. Wait for ACM status `Issued`, refresh the certificate
-   list in CloudFront, select it, and finish the distribution update.
-5. Wait until the CloudFront distribution reports `Deployed`.
-6. Add the traffic-routing CNAME in GoDaddy:
+   certificate renewal. Wait for ACM status `Issued` and copy its ARN.
+5. Supply the hostname as `AlternateDomainName` and the ARN as
+   `AcmCertificateArn` when creating/updating the stack. With the release
+   wrapper, export both variables and run `release-demo.sh deploy`.
+6. Wait until CloudFormation completes and the distribution reports
+   `Deployed`.
+7. Add the traffic-routing CNAME in GoDaddy:
    - **Name**: `demo` (or the chosen subdomain);
    - **Value**: the distribution hostname, for example
      `d123example.cloudfront.net`; and
@@ -220,15 +262,12 @@ Alias record if the apex must serve this distribution.
 
 ### CloudFormation ownership and drift
 
-Adding the alternate hostname and certificate in the CloudFront console is an
-operator-managed demo customization. The current template does not own those
-settings, so it creates CloudFormation drift and a later distribution
-replacement can remove them. For a repeatable environment, add explicit
-certificate-ARN and alias parameters to the template, deploy a replacement
-stack, and move the routing CNAME only after it passes smoke tests. Never embed
-GoDaddy credentials or certificate-validation tokens in the source archive.
+The template owns the alternate hostname and certificate through explicit
+parameters. Do not add or change the alias only in the CloudFront console; that
+creates drift and can be removed by a later stack update. Never embed GoDaddy
+credentials or certificate-validation tokens in the source archive.
 
-## 8. Retrieve credentials and sign in
+## 9. Retrieve credentials and sign in
 
 Open **Systems Manager → Parameter Store**, select the `SecureString` named by
 the stack's `CredentialsParameter` output, and choose **Show decrypted value**.
@@ -244,7 +283,7 @@ Tenant staff login:
 The same parameter contains synthetic-demo API and platform credentials for
 automated testing. Treat them as secrets even though the data is synthetic.
 
-## 9. Service layout and operations
+## 10. Service layout and operations
 
 Use **Systems Manager → Session Manager**, not SSH. Important paths and units:
 
@@ -274,7 +313,7 @@ The rules health response must report `kill_switch_fresh: true`. A stale or
 unreachable rules engine is not a permissive condition; decision paths fail
 closed.
 
-## 10. Updating application code
+## 11. Updating application code
 
 ### Recommended: replacement stack (blue/green demo update)
 
@@ -283,14 +322,12 @@ and login secrets. The safest update is immutable replacement:
 
 1. Complete and validate the code change locally.
 2. Commit it; record the commit SHA.
-3. Run `package-demo.sh` to produce a new archive and digest.
-4. Upload it under a versioned S3 key, for example
-   `releases/<commit-sha>/loanos-demo-source.tar.gz`.
-5. Create a second stack such as `loanos-demo-<short-sha>` using that key.
-6. Wait for bootstrap `COMPLETE` and smoke-test all URLs.
-7. Retrieve the new credentials privately and verify staff login.
-8. Share/switch to the new `DemoUrl`.
-9. Delete the old stack and its two SSM parameters after acceptance.
+3. Set a new `STACK_NAME` and run `release-demo.sh deploy`. The script packages
+   `HEAD`, uploads under `releases/<commit-sha>/`, waits, and smoke-tests.
+4. Manually smoke-test all application and product-journey deep links.
+5. Retrieve the new credentials privately and verify staff login.
+6. Move the external-DNS CNAME only after the replacement is accepted.
+7. Delete the old stack and its two SSM parameters after the rollback window.
 
 This gives a clean rollback: keep using the old URL until the replacement has
 passed. It also avoids mixing old encrypted rows with new key material.
@@ -320,7 +357,7 @@ Use only for a disposable synthetic demo when replacement is impractical:
 Do not automate this path by sourcing or printing secret environment files.
 For repeatable updates, create a replacement stack instead.
 
-## 11. Troubleshooting
+## 12. Troubleshooting
 
 ### CloudFormation fails or rolls back
 
@@ -367,7 +404,7 @@ Do not discard or replace the active master-key ring for any environment with
 data. For this synthetic disposable demo, prefer creating a replacement stack.
 Never apply a synthetic-data reset procedure to real or production data.
 
-## 12. Cost controls and teardown
+## 13. Cost controls and teardown
 
 Confirm the AWS Budget email subscription. Review **Billing → Bills** and the
 Free Tier/credit pages regularly. The stack intentionally creates no NAT

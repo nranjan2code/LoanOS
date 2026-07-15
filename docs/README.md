@@ -13,7 +13,7 @@ This folder is the working documentation set for the LoanOS India build. It expl
 7. [Build backlog](product/build-backlog.md)
 8. [Documentation governance and audit](documentation-governance.md)
 
-Section indexes: [Architecture](architecture/README.md) · [Product](product/README.md) · [Compliance](compliance/README.md) · [Decision records](decisions/README.md) · [GTM](gtm/README.md)
+Section indexes: [Architecture](architecture/README.md) · [Product](product/README.md) · [Compliance](compliance/README.md) · [Decision records](decisions/README.md) · [Operations](operations/README.md) · [GTM](gtm/README.md)
 
 ## Documentation Map
 
@@ -47,6 +47,7 @@ Section indexes: [Architecture](architecture/README.md) · [Product](product/REA
 | [AI-agent platform operations](architecture/ai-agent-platform-operations.md) | Executable marketplace/pricing/install/approval/execution/usage/reporting lifecycle, incident procedure, API sequence and remaining AWS/provider production-admission evidence. |
 | [Decision engine operations](../rules/README.md) | Developer/operator guide: crate map, build and test, local fleet (sign/up/health/kill-switch), replay canary, API integration modes. |
 | [AWS synthetic demo deployment](../deploy/aws/README.md) | End-to-end disposable, credit-conscious CloudFormation demo: packaging, bootstrap, applications, updates, external-DNS custom domains, troubleshooting, and teardown; synthetic data only. |
+| [Synthetic demo operator handbook](operations/demo-handbook.md) | Canonical showcase/workshop field guide: automation boundary, 21 journeys, 14 personas, mocked integrations, release and DNS operation, smoke tests, troubleshooting, evidence, cost and teardown. |
 | [Agent guide](../AGENTS.md) | Orientation for AI coding agents and new engineers: architecture map, load-bearing documents, non-negotiable engineering rules, commands. (`CLAUDE.md` imports it.) |
 | [Current implementation map](architecture/current-implementation.md) | What code exists today, how it runs, and where each current control lives. |
 | [Governed digital origination journey](architecture/origination-journey.md) | Borrower self-service intake, product-driven document controls, conditions precedent, sanction validity, KFS language evidence, fail-closed gates, and production boundaries. |

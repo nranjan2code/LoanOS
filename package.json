@@ -14,6 +14,10 @@
     "dashboard:watch": "node scripts/watch-dashboard.mjs",
     "web:check": "node apps/web/scripts/validate-public-site.mjs",
     "web:content:check": "node docs/gtm/automation/gtm-backlog-sync.mjs && node apps/web/scripts/validate-public-site.mjs",
+    "demo:audit": "node scripts/demo-system.mjs audit",
+    "demo:showcase": "node scripts/demo-system.mjs showcase",
+    "demo:workshop": "node scripts/demo-system.mjs workshop",
+    "demo:create-workshop": "node scripts/demo-system.mjs create-workshop",
     "dev:api": "node apps/api/src/server.js",
     "start": "node apps/api/src/server.js"
   },

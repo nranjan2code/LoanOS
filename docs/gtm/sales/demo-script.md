@@ -6,10 +6,17 @@ each beat to a `Built` claim (IDs from `../strategy/claims-and-backlog-sync.md`)
 
 ## Pre-demo (do not skip)
 
+- Follow the [synthetic demo operator handbook](../../operations/demo-handbook.md)
+  for release, health, credentials, journey, evidence, rollback and teardown
+  checks. Use the preconfigured `dev` showcase tenant for a dependable broad
+  demonstration. Use a `workshop-*` tenant only when live tenant configuration
+  is part of the agreed narrative.
 - Confirm the persona-owned pain from discovery — open on it.
 - Load a sandbox tenant (synthetic borrowers only). Never demo on a real tenant.
 - Have the claims-sync matrix open; if asked "is this live?", answer honestly.
 - Decide the 2–3 beats that map to *their* pain; do not run all seven.
+- Confirm that a workshop tenant has its own tenant-bound business engine
+  before any decision execution. Never reuse the showcase engine.
 
 ## Opening (2 min)
 

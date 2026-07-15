@@ -3,7 +3,10 @@ import { createHash, randomBytes } from "node:crypto";
 import { dirname, join } from "node:path";
 import {
   AUDIT_ACTOR_TYPES,
+  DEMO_SHOWCASE_PROFILE_ID,
+  applyShowcaseDemoProfile,
   buildAuditEvidencePack,
+  buildShowcaseDemoProfile,
   createAiAgentPlatformState,
   createModelRegistryState,
   normalizeAiAgentPlatformState,
@@ -996,6 +999,8 @@ export function registerTenant(state, tenant, now = new Date()) {
     isolationTier: tenant.isolationTier ?? existing?.isolationTier ?? "pooled",
     status: tenant.status ?? existing?.status ?? "active",
     isSandbox: tenant.isSandbox ?? existing?.isSandbox ?? false,
+    syntheticOnly: tenant.syntheticOnly ?? existing?.syntheticOnly ?? false,
+    demoProfile: tenant.demoProfile ?? existing?.demoProfile ?? null,
     parentTenantId: tenant.parentTenantId ?? existing?.parentTenantId ?? null,
     sandboxName: tenant.sandboxName ?? existing?.sandboxName ?? null,
     organisationSignupId: tenant.organisationSignupId ?? existing?.organisationSignupId ?? null,
@@ -1409,7 +1414,14 @@ export async function ensureBootstrapTenants(
     const existing = state.controlPlane.tenants[tenant.tenantId];
     // Keep a bootstrap tenant idempotent, but (re)bind its api key each start so
     // a fresh local run always has working credentials.
-    if (!existing || existing.apiKeyHash !== (tenant.apiKey ? hashApiKey(tenant.apiKey) : existing?.apiKeyHash)) {
+    const bootstrapApiKeyHash = tenant.apiKey ? hashApiKey(tenant.apiKey) : existing?.apiKeyHash;
+    if (
+      !existing ||
+      existing.apiKeyHash !== bootstrapApiKeyHash ||
+      (tenant.isSandbox !== undefined && existing.isSandbox !== tenant.isSandbox) ||
+      (tenant.syntheticOnly !== undefined && existing.syntheticOnly !== tenant.syntheticOnly) ||
+      (tenant.demoProfile !== undefined && existing.demoProfile !== tenant.demoProfile)
+    ) {
       state = registerTenant(state, tenant);
       changed = true;
     }
@@ -1798,6 +1810,22 @@ export async function ensureBootstrapTenants(
             summary: "Loan approved yesterday but funds have not cleared in bank account.",
             status: "received",
             receivedAt: "2026-07-09T09:15:00.000Z"
+          }
+        };
+        changed = true;
+      }
+    }
+
+    if (tenant.demoProfile === DEMO_SHOWCASE_PROFILE_ID && state.tenants[tenant.tenantId]) {
+      const before = tenantContentDigest(state.tenants[tenant.tenantId]);
+      const profile = buildShowcaseDemoProfile({ tenantId: tenant.tenantId });
+      const profiledData = applyShowcaseDemoProfile(state.tenants[tenant.tenantId], profile);
+      if (tenantContentDigest(profiledData) !== before) {
+        state = {
+          ...state,
+          tenants: {
+            ...state.tenants,
+            [tenant.tenantId]: profiledData
           }
         };
         changed = true;

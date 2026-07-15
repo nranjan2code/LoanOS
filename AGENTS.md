@@ -11,6 +11,7 @@ packages/core     domain kernel: compliance controls, KYC, KFS, loan policy,
                   audit hash chain, model governance (kill-switch source of truth)
 db/               Postgres schema (optional driver; RLS per tenant)
 rules/            THE DECISION ENGINE (Rust cargo workspace) — see below
+deploy/aws/       disposable synthetic-demo infrastructure and release tooling
 docs/             product, architecture, compliance, decision records (ADRs)
 tests/            Node test suite (node:test): npm test
 ```
@@ -32,6 +33,7 @@ They meet at two deliberately isolated gateways: `apps/api/src/rules-engine.js` 
 | `docs/architecture/help-centre-and-academy.md` | Canonical human guidance contract, verification metadata and future tenant/RE overlay boundary. |
 | `docs/architecture/tenant-role-staffing-and-feature-gating.md` | Canonical roles, feature staffing, IdP/SCIM, agents, revocation/pause and activity-attribution source. |
 | `docs/compliance/india-regulatory-register.md` | Regulatory control families (RBI Digital Lending Directions 2025 etc.). |
+| `docs/operations/demo-handbook.md` | Canonical showcase/workshop demo operating model, AWS release, presentation, recovery and teardown guide. |
 | `docs/README.md` | Documentation map + definition of done: features are incomplete until the relevant docs are updated. |
 
 ## Non-negotiable engineering rules
@@ -51,6 +53,9 @@ They meet at two deliberately isolated gateways: `apps/api/src/rules-engine.js` 
 npm test                                   # Node suite (148+ tests)
 npm run dev:api                            # local API (file store)
 ./loanos.sh build|start|stop|clean         # orchestration
+npm run demo:audit                         # validate canonical synthetic showcase profile
+./deploy/aws/release-demo.sh status        # inspect AWS demo and bootstrap state
+./deploy/aws/release-demo.sh smoke         # GET-based public demo acceptance checks
 cd rules && cargo test --workspace         # engine suite (73+ tests)
 cd rules && cargo clippy --workspace --all-targets -- -D warnings
 node rules/tools/gen-eligibility-corpus.mjs  # regen differential corpus after JS policy changes

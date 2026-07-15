@@ -31,6 +31,30 @@ Parameters:
   LatestUbuntuAmi:
     Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
     Default: /aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id
+  AlternateDomainName:
+    Type: String
+    Default: ""
+    Description: Optional CloudFront alternate domain name, for example demo.example.com.
+  AcmCertificateArn:
+    Type: String
+    Default: ""
+    AllowedPattern: "^$|^arn:aws[a-zA-Z-]*:acm:us-east-1:[0-9]{12}:certificate/[A-Za-z0-9-]+$"
+    Description: Optional ACM certificate ARN from us-east-1 covering AlternateDomainName.
+
+Rules:
+  CustomDomainParametersMustBePaired:
+    Assertions:
+      - Assert: !Or
+          - !And
+            - !Equals [!Ref AlternateDomainName, ""]
+            - !Equals [!Ref AcmCertificateArn, ""]
+          - !And
+            - !Not [!Equals [!Ref AlternateDomainName, ""]]
+            - !Not [!Equals [!Ref AcmCertificateArn, ""]]
+        AssertDescription: AlternateDomainName and AcmCertificateArn must either both be supplied or both be empty.
+
+Conditions:
+  HasCustomDomain: !Not [!Equals [!Ref AlternateDomainName, ""]]
 
 Resources:
   DemoBudget:
@@ -219,6 +243,10 @@ Resources:
     Type: AWS::CloudFront::Distribution
     Properties:
       DistributionConfig:
+        Aliases: !If
+          - HasCustomDomain
+          - [!Ref AlternateDomainName]
+          - !Ref AWS::NoValue
         Comment: !Sub "${AWS::StackName} synthetic demo HTTPS entry point"
         Enabled: true
         HttpVersion: http2and3
@@ -241,11 +269,21 @@ Resources:
           OriginRequestPolicyId: 216adef6-5c7f-47e4-b989-5492eafa07d3
           Compress: true
         PriceClass: PriceClass_100
+        ViewerCertificate: !If
+          - HasCustomDomain
+          - AcmCertificateArn: !Ref AcmCertificateArn
+            MinimumProtocolVersion: TLSv1.2_2021
+            SslSupportMethod: sni-only
+          - CloudFrontDefaultCertificate: true
 
 Outputs:
   DemoUrl:
     Description: HTTPS demo URL. Wait for both bootstrap COMPLETE and CloudFront deployment.
     Value: !Sub "https://${DemoDistribution.DomainName}/"
+  CustomDemoUrl:
+    Condition: HasCustomDomain
+    Description: Custom HTTPS demo URL managed by this stack.
+    Value: !Sub "https://${AlternateDomainName}/"
   InstanceId:
     Description: Instance identifier for Systems Manager Session Manager.
     Value: !Ref DemoInstance
