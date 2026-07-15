@@ -213,6 +213,23 @@ CREATE TABLE IF NOT EXISTS ckyc_registry (
   record        JSONB NOT NULL
 );
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON sub_processors, break_glass_grants, ckyc_registry TO loanos_app;
+CREATE TABLE IF NOT EXISTS organisation_signups (
+  signup_id     TEXT PRIMARY KEY,
+  record        JSONB NOT NULL,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS organisation_signup_rate_limits (
+  email_hash    TEXT PRIMARY KEY,
+  record        JSONB NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS federation_login_challenges (
+  challenge_key TEXT PRIMARY KEY,
+  record        JSONB NOT NULL
+);
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON sub_processors, break_glass_grants, ckyc_registry, organisation_signups, organisation_signup_rate_limits, federation_login_challenges TO loanos_app;
 
 COMMIT;

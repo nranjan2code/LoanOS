@@ -217,6 +217,9 @@ async function loadControlPlane(client) {
   const subProcessorsResult = await client.query("SELECT * FROM sub_processors");
   const breakGlassResult = await client.query("SELECT * FROM break_glass_grants");
   const ckycResult = await client.query("SELECT * FROM ckyc_registry");
+  const signupsResult = await client.query("SELECT * FROM organisation_signups");
+  const signupRateLimitsResult = await client.query("SELECT * FROM organisation_signup_rate_limits");
+  const federationChallengesResult = await client.query("SELECT * FROM federation_login_challenges");
 
   const tenants = {};
   for (const row of tenantsResult.rows) {
@@ -262,6 +265,21 @@ async function loadControlPlane(client) {
     ckycRegistry[row.identifier] = row.record;
   }
 
+  const organisationSignups = {};
+  for (const row of signupsResult.rows) {
+    organisationSignups[row.signup_id] = row.record;
+  }
+
+  const organisationSignupRateLimits = {};
+  for (const row of signupRateLimitsResult.rows) {
+    organisationSignupRateLimits[row.email_hash] = row.record;
+  }
+
+  const federationLoginChallenges = {};
+  for (const row of federationChallengesResult.rows) {
+    federationLoginChallenges[row.challenge_key] = row.record;
+  }
+
   return {
     tenants,
     platformUsers,
@@ -270,7 +288,10 @@ async function loadControlPlane(client) {
     platformEvents,
     subProcessors,
     breakGlassGrants,
-    ckycRegistry
+    ckycRegistry,
+    organisationSignups,
+    organisationSignupRateLimits,
+    federationLoginChallenges
   };
 }
 
@@ -298,7 +319,10 @@ function assembleState(controlPlane, tenants) {
       sessions: controlPlane.sessions,
       loginAttempts: controlPlane.loginAttempts,
       platformEvents: controlPlane.platformEvents,
-      ckycRegistry: controlPlane.ckycRegistry
+      ckycRegistry: controlPlane.ckycRegistry,
+      organisationSignups: controlPlane.organisationSignups ?? {},
+      organisationSignupRateLimits: controlPlane.organisationSignupRateLimits ?? {},
+      federationLoginChallenges: controlPlane.federationLoginChallenges ?? {}
     },
     tenants
   });
@@ -407,6 +431,9 @@ async function persistControlPlane(client, controlPlane) {
     credential_hash: grant.credentialHash
   }));
   await upsertKeyedTable(client, "ckyc_registry", "identifier", controlPlane.ckycRegistry);
+  await upsertKeyedTable(client, "organisation_signups", "signup_id", controlPlane.organisationSignups ?? {});
+  await upsertKeyedTable(client, "organisation_signup_rate_limits", "email_hash", controlPlane.organisationSignupRateLimits ?? {});
+  await upsertKeyedTable(client, "federation_login_challenges", "challenge_key", controlPlane.federationLoginChallenges ?? {});
 
   // Platform audit events are append-only (the table itself enforces this
   // with a trigger — see db/schema.sql): only insert events not already
@@ -529,6 +556,17 @@ export function decodePostgresTenantData(tenantId, storedData, env = process.env
 export async function saveControlPlaneOnly(_dataDirIgnored, controlPlaneState) {
   const client = currentClient();
   await persistControlPlane(client, fileStoreNormalizeState(controlPlaneState).controlPlane);
+}
+
+// Purges a single tenant's data-plane row (used by offboarding to erase the
+// data plane while retaining the attestation record in the control plane).
+// Runs under the tenant's RLS context so the delete is database-enforced to
+// affect only that tenant's row.
+export async function deleteTenantDataOnly(_dataDirIgnored, tenantId) {
+  const client = currentClient();
+  await withTenantRole(client, tenantId, () =>
+    client.query("DELETE FROM tenant_data WHERE tenant_id = $1", [tenantId])
+  );
 }
 
 async function upsertKeyedTable(client, table, keyColumn, recordMap, extraColumns) {

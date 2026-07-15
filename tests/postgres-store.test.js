@@ -41,6 +41,9 @@ async function applySchema(pool) {
 // All tables in an order that respects foreign keys (children before
 // parents), so each test starts from a known-empty database.
 const TABLES_IN_TRUNCATE_ORDER = [
+  "organisation_signups",
+  "organisation_signup_rate_limits",
+  "federation_login_challenges",
   "tenant_data",
   "break_glass_grants",
   "sessions",
@@ -433,3 +436,70 @@ function rewriteRole(connectionString, role) {
   url.password = "";
   return url.toString();
 }
+
+test("organisation_signups and federation_login_challenges round-trip through loadState/saveState", { skip: describeSkip && skipReason }, async (t) => {
+  const postgresStore = await import("../apps/api/src/postgres-store.js");
+  await postgresStore.resetPoolForTests(DATABASE_URL_TEST);
+  const pg = await import("pg");
+  const { Pool } = pg.default;
+  const adminPool = new Pool({ connectionString: DATABASE_URL_TEST });
+  t.after(() => adminPool.end());
+  t.after(() => postgresStore.resetPoolForTests(DATABASE_URL_TEST));
+  await applySchema(adminPool);
+  await resetDatabase(adminPool);
+
+  const signupRecord = { signupId: "signup_test_1", status: "started", revision: 1, commandKeys: [], updatedAt: new Date().toISOString() };
+  const challengeRecord = { challengeKey: "chk_abc123", tenantId: "tnt_test", status: "pending", createdAt: new Date().toISOString() };
+  const rateLimitRecord = [new Date().toISOString()];
+
+  await postgresStore.withStateLock("ignored", postgresStore.GLOBAL_LOCK_LABEL, async () => {
+    const state = await postgresStore.loadState("ignored");
+    const nextState = {
+      ...state,
+      controlPlane: {
+        ...state.controlPlane,
+        organisationSignups: { signup_test_1: signupRecord },
+        organisationSignupRateLimits: { hash_abc: rateLimitRecord },
+        federationLoginChallenges: { chk_abc123: challengeRecord }
+      }
+    };
+    await postgresStore.saveState(nextState, "ignored");
+  });
+
+  await postgresStore.withStateLock("ignored", postgresStore.GLOBAL_LOCK_LABEL, async () => {
+    const reloaded = await postgresStore.loadState("ignored");
+    assert.deepEqual(reloaded.controlPlane.organisationSignups.signup_test_1, signupRecord);
+    assert.deepEqual(reloaded.controlPlane.federationLoginChallenges.chk_abc123, challengeRecord);
+    assert.deepEqual(reloaded.controlPlane.organisationSignupRateLimits.hash_abc, rateLimitRecord);
+  });
+});
+
+test("deleteTenantDataOnly erases only the target tenant row under RLS", { skip: describeSkip && skipReason }, async (t) => {
+  const postgresStore = await import("../apps/api/src/postgres-store.js");
+  await postgresStore.resetPoolForTests(DATABASE_URL_TEST);
+  const pg = await import("pg");
+  const { Pool } = pg.default;
+  const adminPool = new Pool({ connectionString: DATABASE_URL_TEST });
+  t.after(() => adminPool.end());
+  t.after(() => postgresStore.resetPoolForTests(DATABASE_URL_TEST));
+  await applySchema(adminPool);
+  await resetDatabase(adminPool);
+
+  // Seed two tenant rows directly.
+  await adminPool.query(
+    `INSERT INTO tenants (tenant_id, name, api_key_hash, onboarding) VALUES ($1, $2, $3, '{}'::jsonb), ($4, $5, $6, '{}'::jsonb)`,
+    ["tnt_del_a", "Del Tenant A", "hash_da", "tnt_del_b", "Del Tenant B", "hash_db"]
+  );
+  await adminPool.query(
+    `INSERT INTO tenant_data (tenant_id, data) VALUES ($1, $2::jsonb), ($3, $4::jsonb)`,
+    ["tnt_del_a", JSON.stringify({ events: [], secret: "A" }), "tnt_del_b", JSON.stringify({ events: [], secret: "B" })]
+  );
+
+  // deleteTenantDataOnly must remove exactly tenant A's row and leave B.
+  await postgresStore.withStateLock("ignored", "tnt_del_a", async () => {
+    await postgresStore.deleteTenantDataOnly("ignored", "tnt_del_a");
+  });
+
+  const remaining = await adminPool.query("SELECT tenant_id FROM tenant_data ORDER BY tenant_id");
+  assert.deepEqual(remaining.rows.map((row) => row.tenant_id), ["tnt_del_b"]);
+});

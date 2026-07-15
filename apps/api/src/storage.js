@@ -46,7 +46,8 @@ if (driver === "postgres") {
     loadControlPlaneOnly: postgresStore.loadControlPlaneOnly,
     loadTenantDataOnly: postgresStore.loadTenantDataOnly,
     saveTenantDataOnly: postgresStore.saveTenantDataOnly,
-    saveControlPlaneOnly: postgresStore.saveControlPlaneOnly
+    saveControlPlaneOnly: postgresStore.saveControlPlaneOnly,
+    deleteTenantDataOnly: postgresStore.deleteTenantDataOnly
   };
 } else if (driver !== "file") {
   throw new Error(`Unknown LOANOS_STORAGE_DRIVER "${driver}". Expected "file" or "postgres".`);
@@ -61,3 +62,4 @@ export const loadControlPlaneOnly = ioFunctions.loadControlPlaneOnly;
 export const loadTenantDataOnly = ioFunctions.loadTenantDataOnly;
 export const saveTenantDataOnly = ioFunctions.saveTenantDataOnly;
 export const saveControlPlaneOnly = ioFunctions.saveControlPlaneOnly;
+export const deleteTenantDataOnly = ioFunctions.deleteTenantDataOnly;

@@ -1366,6 +1366,21 @@ export async function saveControlPlaneOnly(dataDir, controlPlaneState) {
   await saveState({ ...state, controlPlane: controlPlaneState.controlPlane }, dataDir);
 }
 
+// File-driver stub: the file store doesn't support partial data-plane deletion
+// (tenant data lives in a single JSON blob alongside all other state). On the
+// file driver, offboarding is handled by offboardTenant() which zeros-out the
+// tenant's entry during the next whole-state saveState() call. This function
+// satisfies the shared storage interface so server.js and callers can import
+// deleteTenantDataOnly from storage.js without checking which driver is active.
+// The Postgres driver's version (postgres-store.js) actually issues a scoped
+// DELETE against tenant_data.
+// eslint-disable-next-line no-unused-vars
+export async function deleteTenantDataOnly(_dataDir, _tenantId) {
+  // no-op: file-store offboarding is driven by offboardTenant() which
+  // removes the key from state.tenants during the full saveState() call.
+}
+
+
 // loadStateFn/saveStateFn default to this module's own file-backed
 // loadState/saveState, so every existing caller (and every test) is
 // completely unaffected. A different storage driver (postgres-store.js)

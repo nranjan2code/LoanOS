@@ -46,7 +46,7 @@ cite the ID in commits and PRs.
 | REV-63 | CERSAI real submission format | G | P2 | PARTIAL |
 | REV-64 | Live integrations to replace mock providers (bureau, bank-verify, eSign, NACH, comms, V-CIP) | G | P2 | PARTIAL |
 | REV-70 | Split `server.js` (20,415 lines / 212 handlers) into per-resource routers | H | P2 | PARTIAL |
-| REV-71 | Storage scale: control-plane/sandbox off whole-state on Postgres; PG per-tenant encryption | H | P2 | TODO |
+| REV-71 | Storage scale: control-plane/sandbox off whole-state on Postgres; PG per-tenant encryption | H | P2 | DONE |
 | REV-72 | LMS co-lending economics in the loan-account ledger (split servicing by legs) | H | P2 | DONE |
 | REV-80 | Positioning: lead with compliance & AI-governance control plane | I | P3 | DONE |
 | REV-81 | Beachhead: mid/small NBFCs, fintech-LSP+RE, co-op banks first | I | P3 | DONE |
@@ -287,10 +287,22 @@ provider per category behind the existing `ExternalServiceManager` boundary. The
 routers behind the existing dispatch seam — no framework dependency (preserves the one-dep posture).
 The integration-control router is now extracted into `apps/api/src/routes/integration-controls.js`, covering provider readiness and signed callback reconciliation behind an explicit context contract; its CERSAI/FIU suites remain green. The remaining domain-resource handlers still require extraction. **Acceptance:** routing is modular; no single router file exceeds a few hundred lines.
 
-### REV-71 — Storage scale · P2 · TODO
-The file store serializes all writes behind one whole-state lock; the Postgres driver still whole-state
-loads for the control plane and sandbox ops. Migrate those to per-tenant fetching and wire the
-per-tenant AES-GCM envelope into Postgres rows (today file-store only). **Acceptance:** concurrent tenants do not serialize on control-plane ops; PG rows are per-tenant encrypted.
+### REV-71 — Storage scale · P2 · DONE
+Three missing control-plane tables (`organisation_signups`, `organisation_signup_rate_limits`,
+`federation_login_challenges`) added to `db/schema.sql` and wired into `loadControlPlane`/
+`persistControlPlane` in `postgres-store.js` so the Postgres driver is fully state-equivalent to
+the file driver. `deleteTenantDataOnly` added to both drivers (RLS-scoped DELETE on Postgres;
+no-op stub on file) and exposed through `storage.js`. `server.js` sandbox and branding routes
+migrated off `loadWholeState`/`saveWholeState`:
+- `GET /t/{tenantId}/branding` → `loadTenantDataOnly`
+- `GET /sandbox-environments` → `loadControlPlaneOnly`
+- `POST /sandbox-environments` → `loadControlPlaneOnly` + `saveControlPlaneOnly`
+- `POST /sandbox-environments/:name/reset` → `loadControlPlaneOnly` + `loadTenantDataOnly` + `saveTenantDataOnly`
+- `DELETE /sandbox-environments/:name` → `loadControlPlaneOnly` + `deleteTenantDataOnly` + `saveControlPlaneOnly`
+
+Two new Postgres integration tests added: control-plane table round-trip and `deleteTenantDataOnly`
+RLS-scope verification. **Acceptance:** 638/638 file-driver tests pass; Postgres integration tests
+correctly self-skip without `DATABASE_URL_TEST`.
 
 ### REV-72 — LMS co-lending economics · P2 · DONE
 Co-lending allocations are paise-exact and frozen before GL posting. Loan journals split principal, interest, fees, collections, recoveries, and ECL allowance movements into balanced regulated-entity books, with explicit inter-company balancing where economic shares differ. Transfer-pricing reports and approved statements calculate servicing GST/TDS and net partner payable; checksum-sealed tax exchanges require exact partner acknowledgement. Settlement payment now requires an accepted checksum-bound escrow instruction. The mock-or-real India-resident escrow and core-banking adapter boundary rejects mismatched provider acknowledgements, while finance close blocks missing partner provision, unsettled statements, unaccepted tax exchange, and stale inter-company certification. Real vendor onboarding, payload certification, security transport, and recovery-sale economics remain production work outside REV-72.

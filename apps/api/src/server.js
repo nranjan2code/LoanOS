@@ -345,8 +345,6 @@ import {
   listSandboxes,
   loadControlPlaneOnly,
   loadTenantDataOnly,
-  resetSandbox,
-  deleteSandbox,
   loadState as loadWholeState,
   offboardTenant,
   peekControlPlaneState,
@@ -364,6 +362,7 @@ import {
   rotateServiceCredential,
   publicServiceCredential,
   revokeBreakGlass,
+  deleteTenantDataOnly,
   saveControlPlaneOnly,
   saveState as saveWholeState,
   saveTenantDataOnly,
@@ -870,8 +869,7 @@ async function route(req, res, dataDir, platformAdminKey, observability, allowDi
 
     // GET /t/{tenantId}/branding → Tenant identity for white-labeling
     if (subPath === "/branding") {
-      const state = await loadWholeState(dataDir);
-      const tenantData = state.tenants[tenantSlug] || {};
+      const tenantData = await loadTenantDataOnly(dataDir, tenantSlug);
       const reList = Object.values(tenantData.regulatedEntities || {});
       const primaryRe = reList[0] || {};
       sendJson(res, 200, {
@@ -2061,16 +2059,8 @@ async function route(req, res, dataDir, platformAdminKey, observability, allowDi
     return;
   }
 
-  // Sandbox management (create/list/reset/delete) intentionally keeps using
-  // whole-state loadWholeState/saveWholeState — NOT controlPlaneState — for
-  // two reasons: resetSandbox/deleteSandbox operate on the SANDBOX's own
-  // tenant_data (a different tenant from the one this request authenticated
-  // as), and saveWholeState's "delete tenant_data rows not present" cleanup
-  // (see persistAllTenantData in postgres-store.js) would silently destroy
-  // every OTHER tenant's data if called with controlPlaneState's empty
-  // `tenants: {}` — these routes are admin-ish/dev-tooling, not the hot
-  // path, so paying the whole-state-load cost here (matching v1/v2's
-  // still-current routePlatform/routeAuth behavior) is the safe choice.
+  // GET /sandbox-environments: list only needs control-plane tenant metadata,
+  // not any tenant data-plane document, so loadControlPlaneOnly is sufficient.
   if (method === "GET" && path === "/sandbox-environments") {
     if (tenant.isSandbox) {
       sendJson(res, 403, {
@@ -2078,7 +2068,7 @@ async function route(req, res, dataDir, platformAdminKey, observability, allowDi
       });
       return;
     }
-    const list = listSandboxes(await loadWholeState(dataDir), tenant.tenantId);
+    const list = listSandboxes(await loadControlPlaneOnly(dataDir), tenant.tenantId);
     sendJson(res, 200, { sandboxes: list });
     return;
   }
@@ -2102,8 +2092,10 @@ async function route(req, res, dataDir, platformAdminKey, observability, allowDi
       return;
     }
     const sandboxId = `${tenant.tenantId}_sandbox_${sandboxName}`;
-    const sandboxWholeState = await loadWholeState(dataDir);
-    if (sandboxWholeState.controlPlane.tenants[sandboxId]) {
+    // Sandbox creation only registers a control-plane tenant record; no
+    // tenant data-plane document needs to be read or written here.
+    const sandboxControlState = await loadControlPlaneOnly(dataDir);
+    if (sandboxControlState.controlPlane.tenants[sandboxId]) {
       sendJson(res, 409, {
         error: { code: "sandbox_exists", message: "A sandbox environment with this name already exists." }
       });
@@ -2111,7 +2103,7 @@ async function route(req, res, dataDir, platformAdminKey, observability, allowDi
     }
 
     const apiKey = generateApiKey(true);
-    const nextState = registerTenant(sandboxWholeState, {
+    const nextState = registerTenant(sandboxControlState, {
       tenantId: sandboxId,
       name: `${tenant.name} (${sandboxName} Sandbox)`,
       apiKey,
@@ -2121,7 +2113,7 @@ async function route(req, res, dataDir, platformAdminKey, observability, allowDi
       parentTenantId: tenant.tenantId,
       sandboxName
     });
-    await saveWholeState(nextState, dataDir);
+    await saveControlPlaneOnly(dataDir, nextState);
     sendJson(res, 201, {
       sandbox: publicTenant(nextState.controlPlane.tenants[sandboxId]),
       apiKey
@@ -2139,16 +2131,33 @@ async function route(req, res, dataDir, platformAdminKey, observability, allowDi
     }
     const sandboxName = decodeURIComponent(sandboxResetMatch[1]);
     const sandboxId = `${tenant.tenantId}_sandbox_${sandboxName}`;
-    const sandboxWholeState = await loadWholeState(dataDir);
-    const sandboxRecord = sandboxWholeState.controlPlane.tenants[sandboxId];
+    // Reset needs both the control plane record (to validate sandbox exists)
+    // and the sandbox's tenant data (to wipe/preserve config fields).
+    const sandboxControlState = await loadControlPlaneOnly(dataDir);
+    const sandboxRecord = sandboxControlState.controlPlane.tenants[sandboxId];
     if (!sandboxRecord || sandboxRecord.status === "offboarded") {
       sendJson(res, 404, { error: { code: "not_found", message: "Sandbox environment not found." } });
       return;
     }
     const body = await readJson(req);
     const preserveConfig = !!body.preserveConfig;
-    const nextState = resetSandbox(sandboxWholeState, sandboxId, preserveConfig);
-    await saveWholeState(nextState, dataDir);
+    const sandboxTenantData = await loadTenantDataOnly(dataDir, sandboxId);
+    let newTenantData;
+    if (preserveConfig) {
+      newTenantData = {
+        ...createEmptyTenantData(),
+        regulatedEntities: sandboxTenantData.regulatedEntities ?? {},
+        lendingServiceProviders: sandboxTenantData.lendingServiceProviders ?? {},
+        digitalLendingApps: sandboxTenantData.digitalLendingApps ?? {},
+        productPolicies: sandboxTenantData.productPolicies ?? {},
+        recoveryAgents: sandboxTenantData.recoveryAgents ?? {},
+        dlgArrangements: sandboxTenantData.dlgArrangements ?? {},
+        coLendingArrangements: sandboxTenantData.coLendingArrangements ?? {}
+      };
+    } else {
+      newTenantData = createEmptyTenantData();
+    }
+    await saveTenantDataOnly(dataDir, sandboxId, newTenantData);
     sendJson(res, 200, {
       message: `Sandbox environment "${sandboxName}" has been reset.`,
       preserveConfig
@@ -2166,14 +2175,28 @@ async function route(req, res, dataDir, platformAdminKey, observability, allowDi
     }
     const sandboxName = decodeURIComponent(sandboxDeleteMatch[1]);
     const sandboxId = `${tenant.tenantId}_sandbox_${sandboxName}`;
-    const sandboxWholeState = await loadWholeState(dataDir);
-    const sandboxRecord = sandboxWholeState.controlPlane.tenants[sandboxId];
+    // Delete: mark the sandbox control-plane record offboarded and purge its
+    // data-plane row. Fetching only the control plane avoids loading every
+    // tenant's data just to discard and delete one sandbox's row.
+    const sandboxControlState = await loadControlPlaneOnly(dataDir);
+    const sandboxRecord = sandboxControlState.controlPlane.tenants[sandboxId];
     if (!sandboxRecord || sandboxRecord.status === "offboarded") {
       sendJson(res, 404, { error: { code: "not_found", message: "Sandbox environment not found." } });
       return;
     }
-    const nextState = deleteSandbox(sandboxWholeState, sandboxId);
-    await saveWholeState(nextState, dataDir);
+    const now = new Date();
+    const nextControlState = {
+      ...sandboxControlState,
+      controlPlane: {
+        ...sandboxControlState.controlPlane,
+        tenants: {
+          ...sandboxControlState.controlPlane.tenants,
+          [sandboxId]: { ...sandboxRecord, status: "offboarded", updatedAt: now.toISOString() }
+        }
+      }
+    };
+    await deleteTenantDataOnly(dataDir, sandboxId);
+    await saveControlPlaneOnly(dataDir, nextControlState);
     sendJson(res, 200, {
       message: `Sandbox environment "${sandboxName}" has been deleted.`
     });
