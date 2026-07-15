@@ -86,18 +86,15 @@ generated encryption material with an older database. Set a new stack name,
 deploy, test, then move DNS only after acceptance.
 
 ```bash
-export REGION=ap-south-1
-export STACK_NAME="loanos-demo-$(date +%Y%m%d)"
-export SOURCE_BUCKET="loanos-demo-source-<unique>"
-export ALERT_EMAIL="demo-ops@example.com"
-export MONTHLY_BUDGET_USD=25
-export ALTERNATE_DOMAIN_NAME="demo.example.com"
-export ACM_CERTIFICATE_ARN="arn:aws:acm:us-east-1:<account>:certificate/<id>"
-
-./deploy/aws/release-demo.sh deploy
+./deploy/aws/release-demo.sh deploy --email demo-ops@example.com
 ./deploy/aws/release-demo.sh status
 ./deploy/aws/release-demo.sh smoke
 ```
+
+The wrapper generates the private source-bucket name and creates it with
+public access blocked. Optional `--region`, `--stack`, and `--bucket` flags can
+override defaults. For a custom domain, also provide the validated ACM
+certificate values as environment variables before running `deploy`.
 
 The certificate must be in `us-east-1`, even when the stack is in Mumbai. The
 script packages committed source, uploads it under

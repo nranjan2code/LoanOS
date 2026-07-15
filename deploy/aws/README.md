@@ -78,23 +78,30 @@ Before creating resources:
 
 ## 2. Automated committed release (recommended)
 
-Configure the release environment and run the wrapper from the repository
-root. It packages committed `HEAD`, uploads a versioned source object, deploys
+Run the wrapper from the repository root. It discovers the AWS account,
+generates an account/region-specific private source bucket when one is not
+provided, packages committed `HEAD`, uploads a versioned source object, deploys
 the template, waits for the SSM bootstrap status, and runs GET-based health and
-website smoke tests.
+website smoke tests. The budget-alert email is the only required deployment
+input.
 
 ```bash
-export REGION=ap-south-1
-export STACK_NAME="loanos-demo-$(date +%Y%m%d)"
-export SOURCE_BUCKET="loanos-demo-source-<unique>"
-export ALERT_EMAIL="demo-ops@example.com"
-export MONTHLY_BUDGET_USD=25
+./deploy/aws/release-demo.sh deploy --email demo-ops@example.com
+```
 
-# Optional; both values must be supplied together.
-export ALTERNATE_DOMAIN_NAME="demo.example.com"
-export ACM_CERTIFICATE_ARN="arn:aws:acm:us-east-1:<account>:certificate/<id>"
+Optional settings can be supplied as flags (`--region`, `--stack`, and
+`--bucket`) or environment variables. Custom-domain values remain environment
+variables because they are certificate and DNS-controlled:
 
-./deploy/aws/release-demo.sh deploy
+```bash
+ALTERNATE_DOMAIN_NAME="demo.example.com" \
+ACM_CERTIFICATE_ARN="arn:aws:acm:us-east-1:<account>:certificate/<id>" \
+./deploy/aws/release-demo.sh deploy --email demo-ops@example.com
+```
+
+After deployment, inspect or smoke-test the same stack with:
+
+```bash
 ./deploy/aws/release-demo.sh status
 ./deploy/aws/release-demo.sh smoke
 ```

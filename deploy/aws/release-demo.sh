@@ -5,8 +5,31 @@ ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 ACTION=${1:-deploy}
 REGION=${REGION:-ap-south-1}
 STACK_NAME=${STACK_NAME:-loanos-demo}
+ALERT_EMAIL=${ALERT_EMAIL:-}
+SOURCE_BUCKET=${SOURCE_BUCKET:-}
 TEMPLATE_FILE="$ROOT_DIR/deploy/aws/cloudformation-demo.yaml"
 ARCHIVE_PATH=""
+
+usage() {
+  echo "Usage: $0 deploy --email EMAIL [--region REGION] [--stack STACK] [--bucket BUCKET]"
+  echo "       $0 status|smoke [--region REGION] [--stack STACK]"
+}
+
+parse_args() {
+  shift || true
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --email) ALERT_EMAIL=${2:?--email requires a value}; shift 2 ;;
+      --region) REGION=${2:?--region requires a value}; shift 2 ;;
+      --stack) STACK_NAME=${2:?--stack requires a value}; shift 2 ;;
+      --bucket) SOURCE_BUCKET=${2:?--bucket requires a value}; shift 2 ;;
+      --help|-h) usage; exit 0 ;;
+      *) echo "Unknown option: $1" >&2; usage >&2; exit 2 ;;
+    esac
+  done
+}
+
+parse_args "$@"
 
 cleanup() {
   if [[ -n "$ARCHIVE_PATH" ]]; then
@@ -21,6 +44,27 @@ require_env() {
     echo "$name is required" >&2
     exit 2
   fi
+}
+
+ensure_source_bucket() {
+  if [[ -z "$SOURCE_BUCKET" ]]; then
+    local account_id
+    account_id=$(aws sts get-caller-identity --query Account --output text)
+    SOURCE_BUCKET="loanos-demo-source-${account_id}-${REGION}"
+  fi
+  if aws s3api head-bucket --bucket "$SOURCE_BUCKET" --region "$REGION" 2>/dev/null; then
+    return
+  fi
+  echo "Creating private source bucket: s3://${SOURCE_BUCKET}"
+  if [[ "$REGION" == "us-east-1" ]]; then
+    aws s3api create-bucket --bucket "$SOURCE_BUCKET" --region "$REGION" >/dev/null
+  else
+    aws s3api create-bucket --bucket "$SOURCE_BUCKET" --region "$REGION" \
+      --create-bucket-configuration LocationConstraint="$REGION" >/dev/null
+  fi
+  aws s3api put-public-access-block --bucket "$SOURCE_BUCKET" --region "$REGION" \
+    --public-access-block-configuration \
+    BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
 }
 
 stack_output() {
@@ -68,8 +112,8 @@ smoke() {
 }
 
 deploy() {
-  require_env SOURCE_BUCKET
   require_env ALERT_EMAIL
+  ensure_source_bucket
   if [[ -n "${ALTERNATE_DOMAIN_NAME:-}" || -n "${ACM_CERTIFICATE_ARN:-}" ]]; then
     require_env ALTERNATE_DOMAIN_NAME
     require_env ACM_CERTIFICATE_ARN
@@ -130,5 +174,5 @@ case "$ACTION" in
   deploy) deploy ;;
   status) status ;;
   smoke) smoke ;;
-  *) echo "Usage: $0 [deploy|status|smoke]" >&2; exit 2 ;;
+  *) usage >&2; exit 2 ;;
 esac
