@@ -5560,6 +5560,21 @@
         "type": "test",
         "ref": "tests/integration-worker-runtime.test.js",
         "note": "executable acceptance evidence for the currently tracked capability slice"
+      },
+      {
+        "type": "code",
+        "ref": "packages/core/src/organisation-admission-conformance.js",
+        "note": "153 stable deterministic simulator scenarios across INT-ADM-01 through INT-ADM-10."
+      },
+      {
+        "type": "test",
+        "ref": "tests/enterprise-platform-conformance.test.js",
+        "note": "85 deterministic enterprise-platform adverse scenarios with checksummed tenant-bound evidence."
+      },
+      {
+        "type": "test",
+        "ref": "tests/organisation-admission-conformance.test.js",
+        "note": "Admission source lineage, tenant/purpose isolation, replay conflict, compensation/rollback and no-live-claim evidence."
       }
     ],
     "acceptance": "Repository evidence must demonstrate the current controlled slice of external providers with deterministic simulation, schema-bound vendor mapping, executable https/sftp/portal and crypto ports, lease-fenced workers, signed-file transports, adverse uat gate and certified business-adapter baseline; production acceptance additionally requires closure of the stated remaining gap.",
@@ -7348,6 +7363,16 @@
         "type": "test",
         "ref": "tests/integration-worker-runtime.test.js",
         "note": "executable acceptance evidence for the currently tracked capability slice"
+      },
+      {
+        "type": "code",
+        "ref": "packages/core/src/identity-operational-automation.js",
+        "note": "Checksum-sealed run-once identity scheduler contract with containment as the only automatic mutation."
+      },
+      {
+        "type": "test",
+        "ref": "tests/identity-operational-automation.test.js",
+        "note": "Operational planning, unsafe-session containment and prohibited approval automation evidence."
       }
     ],
     "acceptance": "Repository evidence must demonstrate the current controlled slice of horizontal scale, stateless api, background workers, and schedulers; production acceptance additionally requires closure of the stated remaining gap.",
@@ -7429,6 +7454,11 @@
         "type": "test",
         "ref": "tests/service-operations.test.js",
         "note": "executable acceptance evidence for the currently tracked capability slice"
+      },
+      {
+        "type": "test",
+        "ref": "tests/identity-operational-automation.test.js",
+        "note": "Eight measured identity/custody resilience scenarios with independent witnessing and fail-closed evidence."
       }
     ],
     "acceptance": "Repository evidence must demonstrate the current controlled slice of bcp runbook and business/technology recovery exercises; production acceptance additionally requires closure of the stated remaining gap.",
@@ -7591,6 +7621,11 @@
         "type": "test",
         "ref": "tests/platform-delivery.test.js",
         "note": "executable acceptance evidence for the currently tracked capability slice"
+      },
+      {
+        "type": "test",
+        "ref": "tests/enterprise-platform-conformance.test.js",
+        "note": "Deployment partial-creation, compensation success/failure, rollback and controller-outage emulator evidence."
       }
     ],
     "acceptance": "Repository evidence must demonstrate the current controlled slice of release management, canary, rollback, and change approval; production acceptance additionally requires closure of the stated remaining gap.",
@@ -10827,6 +10862,16 @@
         "note": "Proves exhaustive family coverage, four-eyes campaigns and the prohibition on live-certification claims."
       },
       {
+        "type": "code",
+        "ref": "packages/core/src/identity-operational-automation.js",
+        "note": "Trusted-adapter-attested, fresh, issuer/audience/tenant/session-bound and replay-safe federated logout containment contract."
+      },
+      {
+        "type": "test",
+        "ref": "tests/federated-revocation-api.test.js",
+        "note": "Scoped tenant-service provider logout endpoint persists exact session revocation evidence and non-live status."
+      },
+      {
         "type": "doc",
         "ref": "docs/architecture/tenant-role-staffing-and-feature-gating.md",
         "note": "Provider trust, authentication-versus-authorization and commercial-integration boundary."
@@ -10968,6 +11013,11 @@
         "type": "test",
         "ref": "tests/identity-operations-api.test.js",
         "note": "Same-tenant human administration, actor binding, maker-checker and readiness API evidence."
+      },
+      {
+        "type": "test",
+        "ref": "tests/iam-administration-workspace.test.js",
+        "note": "Tenant-human IAM workspace covers effective access, approvals, staffing, agents, ownership and emergency access."
       }
     ],
     "acceptance": "Current scoped authority, hard SoD, distinct verified-human staffing and isolated control decisions gate every protected feature; access loss pauses unsafe work without delaying containment.",
@@ -11056,6 +11106,11 @@
         "type": "test",
         "ref": "tests/security-operations.test.js",
         "note": "Automated evidence covering the SEC-008 control family."
+      },
+      {
+        "type": "test",
+        "ref": "tests/enterprise-platform-conformance.test.js",
+        "note": "KMS/HSM/vault rotation, non-exportability, isolation, destruction, outage and recovery emulator evidence."
       },
       {
         "type": "doc",
@@ -11249,6 +11304,11 @@
         "note": "Automated evidence covering the SEC-014 control family."
       },
       {
+        "type": "test",
+        "ref": "tests/identity-operational-automation.test.js",
+        "note": "SIEM/WORM outage drill, uncustodied-activity findings and fail-closed/audit-complete witnessing contract."
+      },
+      {
         "type": "doc",
         "ref": "docs/architecture/current-implementation.md",
         "note": "Documented architecture or regulatory boundary for SEC-014."
@@ -11309,6 +11369,11 @@
         "type": "test",
         "ref": "tests/security-operations.test.js",
         "note": "Automated evidence covering the SEC-016 control family."
+      },
+      {
+        "type": "test",
+        "ref": "tests/enterprise-platform-conformance.test.js",
+        "note": "Trusted-time freshness, integrity, monotonicity, quorum, outage and recovery emulator evidence."
       },
       {
         "type": "doc",

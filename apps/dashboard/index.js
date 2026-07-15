@@ -19,7 +19,9 @@ let apiState = {
   autoRefreshEnabled: true,
   autoRefreshInterval: null,
   lastRefreshTime: null,
-  onboardingStep: 0
+  onboardingStep: 0,
+  iamWorkspace: null,
+  iamCatalogue: null
 };
 
 // ─── DOM Cache ──────────────────────────────────────────────────────────────
@@ -1962,11 +1964,12 @@ function setAdminTab(tabName) {
     loadPlatformUsers();
     loadBreakGlassGrants(document.getElementById('break-glass-tenant-id').value.trim());
   }
+  if (tabName === 'iam') loadIamWorkspace();
   if (tabName === 'identity-ops') loadIdentityOperations();
 }
 
 const PLATFORM_ONLY_ADMIN_TABS = new Set(['platform', 'platform-access']);
-const TENANT_ONLY_ADMIN_TABS = new Set(['users', 'reviews', 'service', 'identity-ops']);
+const TENANT_ONLY_ADMIN_TABS = new Set(['users', 'reviews', 'service', 'iam', 'identity-ops']);
 
 async function openAdminConsole() {
   if (!canOpenTenantAdmin()) {
@@ -2020,9 +2023,11 @@ async function renderTenantAdmin() {
 
 async function loadIdentityOperations() {
   try {
-    const [summaryResponse, campaignsResponse] = await Promise.all([
+    const [summaryResponse, campaignsResponse, automationResponse, drillsResponse] = await Promise.all([
       apiFetch('/admin/identity-operations/summary'),
-      apiFetch('/admin/identity-operations/conformance/campaigns')
+      apiFetch('/admin/identity-operations/conformance/campaigns'),
+      apiFetch('/admin/identity-operations/automation/runs'),
+      apiFetch('/admin/identity-operations/drills')
     ]);
     const summary = summaryResponse.summary;
     document.getElementById('identity-ops-summary').innerHTML = renderSummaryCards([
@@ -2040,9 +2045,133 @@ async function loadIdentityOperations() {
         <p>${escapeHtml(campaign.status)} · ${Object.keys(campaign.results || {}).length}/${campaign.scenarioIds.length} scenarios · ${campaign.commerciallyLive ? 'live' : 'simulated only'}</p>
         ${campaign.manifestChecksumSha256 ? `<code>${escapeHtml(campaign.manifestChecksumSha256)}</code>` : ''}
       </div>`).join('') : emptyAdminRow('No identity conformance campaigns yet.');
+    const automationRuns = automationResponse.runs || [];
+    const drills = drillsResponse.drills || [];
+    document.getElementById('identity-automation-list').innerHTML = [
+      ...automationRuns.map(run => `<div class="admin-row"><div class="admin-row-header"><div class="admin-row-title">Automation · ${escapeHtml(run.runId)}</div><span class="admin-pill">${escapeHtml(run.status)}</span></div><p>${escapeHtml(run.executionEvidenceRef || '')} · ${(run.findings || []).length} finding(s)</p></div>`),
+      ...drills.map(drill => `<div class="admin-row"><div class="admin-row-header"><div class="admin-row-title">Drill · ${escapeHtml(drill.drillId)}</div><span class="admin-pill">${escapeHtml(drill.status)}</span></div><p>${escapeHtml(drill.scenario)} · ${escapeHtml(drill.objective)}</p>${drill.status === 'pending_witness' ? `<button type="button" class="btn btn-primary btn-sm" data-identity-drill="${escapeHtml(drill.drillId)}">Load for witness</button>` : ''}</div>`)
+    ].join('') || emptyAdminRow('No readiness automation runs or resilience drills yet.');
   } catch (err) {
     showToast(`Identity control room load failed: ${err.message}`, 'error');
   }
+}
+
+async function loadIamWorkspace() {
+  try {
+    const [workspaceResponse, catalogue] = await Promise.all([
+      apiFetch('/admin/identity-governance/workspace'),
+      apiFetch('/admin/identity-governance/roles')
+    ]);
+    apiState.iamWorkspace = workspaceResponse.workspace;
+    apiState.iamCatalogue = catalogue;
+    const workspace = workspaceResponse.workspace;
+    document.getElementById('iam-summary').innerHTML = renderSummaryCards([
+      ['Principals', workspace.summary.principals],
+      ['Active humans', workspace.summary.activeHumans],
+      ['Active agents', workspace.summary.activeAgents],
+      ['Pending approvals', workspace.summary.pendingApprovals],
+      ['Open escalations', workspace.summary.openEscalations],
+      ['Launch coverage', workspace.launchCoverage.ready ? 'ready' : 'blocked']
+    ]);
+    populateIamSelectors(catalogue, workspace.tenantId);
+    renderIamRoleCatalogue();
+    renderIamPrincipals(workspace);
+    renderIamRoleRequests(workspace.roleRequests);
+    renderIamFeatureReadiness(workspace);
+    renderIamEscalations(workspace);
+    renderIamOwnership(workspace);
+    renderIamEmergencyAccess(workspace);
+  } catch (err) {
+    showToast(`Access-governance workspace load failed: ${err.message}`, 'error');
+  }
+}
+
+function populateIamSelectors(catalogue, tenantId) {
+  const roleSelect = document.getElementById('iam-grant-roles');
+  const selectedRoles = new Set(Array.from(roleSelect.selectedOptions).map(option => option.value));
+  roleSelect.innerHTML = (catalogue.roles || []).filter(role => role.assignable).map(role =>
+    `<option value="${escapeHtml(role.roleId)}" ${selectedRoles.has(role.roleId) ? 'selected' : ''}>${escapeHtml(role.displayName)} · ${escapeHtml(role.domain)}</option>`
+  ).join('');
+  const featureSelect = document.getElementById('iam-staffing-feature');
+  const selectedFeature = featureSelect.value;
+  featureSelect.innerHTML = (catalogue.featureStaffingPolicies || []).map(feature =>
+    `<option value="${escapeHtml(feature.featureId)}">${escapeHtml(feature.featureId)} · ${escapeHtml(feature.name)}</option>`
+  ).join('');
+  if (selectedFeature) featureSelect.value = selectedFeature;
+  ['iam-grant-scope-id', 'iam-staffing-scope-id'].forEach(id => {
+    const field = document.getElementById(id);
+    if (!field.value) field.placeholder = `Scope ID (tenant: ${tenantId})`;
+  });
+}
+
+function renderIamRoleCatalogue() {
+  const catalogue = apiState.iamCatalogue;
+  if (!catalogue) return;
+  const query = document.getElementById('iam-role-filter').value.trim().toLowerCase();
+  const roles = (catalogue.roles || []).filter(role => !query || [role.roleId, role.displayName, role.domain, ...(role.allowedActions || [])].join(' ').toLowerCase().includes(query));
+  document.getElementById('iam-role-catalogue').innerHTML = roles.map(role => `
+    <div class="admin-row iam-role-row">
+      <div class="admin-row-header"><div class="admin-row-title">${escapeHtml(role.displayName)}</div><span class="admin-pill">${escapeHtml(role.privilege)}</span></div>
+      <p><code>${escapeHtml(role.roleId)}</code> · ${escapeHtml(role.domain)} · ${role.assignable ? 'tenant assignable' : 'trusted boundary only'}</p>
+      <p>${(role.allowedActions || []).map(action => `<code>${escapeHtml(action)}</code>`).join(' ') || 'No direct action'}</p>
+    </div>`).join('') || emptyAdminRow('No canonical role matches this filter.');
+  document.getElementById('iam-sod-catalogue').innerHTML = (catalogue.segregationOfDutiesRules || []).map(rule => `
+    <div class="admin-row iam-readiness-blocked">
+      <div class="admin-row-title">${escapeHtml(rule.ruleId)}</div>
+      <p>${rule.roles.map(role => `<code>${escapeHtml(role)}</code>`).join(' cannot coexist with ')}</p>
+      <span class="admin-pill">hard enforcement</span>
+    </div>`).join('');
+}
+
+function renderIamPrincipals(workspace) {
+  document.getElementById('iam-principals-list').innerHTML = (workspace.principals || []).map(access => {
+    const principal = access.principal;
+    return `<div class="admin-row iam-principal-row">
+      <div class="admin-row-header"><div><div class="admin-row-title">${escapeHtml(principal.displayName)}</div><p><code>${escapeHtml(principal.principalId)}</code> · ${escapeHtml(principal.principalType)}</p></div><span class="admin-pill">${escapeHtml(principal.status)}</span></div>
+      <p>Effective roles: ${access.roleIds.map(role => `<code>${escapeHtml(role)}</code>`).join(' ') || 'none'}</p>
+      ${principal.sponsorPrincipalId ? `<p>Sponsor: <code>${escapeHtml(principal.sponsorPrincipalId)}</code>${principal.expiresAt ? ` · expires ${escapeHtml(principal.expiresAt)}` : ''}</p>` : ''}
+      ${access.sodViolations.length ? `<p class="admin-pill admin-pill-warning">SoD violations: ${access.sodViolations.map(item => escapeHtml(item.ruleId)).join(', ')}</p>` : ''}
+      <div class="op-buttons"><button class="btn btn-secondary btn-sm" type="button" data-iam-principal="${escapeHtml(principal.principalId)}">Manage / assess</button>${access.activeGrants.map(grant => `<button class="btn btn-secondary btn-sm" type="button" data-iam-grant="${escapeHtml(grant.grantId)}">Revoke ${escapeHtml(grant.roleId)}</button>`).join('')}</div>
+    </div>`;
+  }).join('') || emptyAdminRow('No canonical principals are registered yet. Bind verified tenant users first.');
+}
+
+function renderIamRoleRequests(requests) {
+  document.getElementById('iam-role-requests-list').innerHTML = (requests || []).map(request => `
+    <div class="admin-row">
+      <div class="admin-row-header"><div><div class="admin-row-title">${escapeHtml(request.requestType)} · ${escapeHtml(request.requestId)}</div><p>${escapeHtml(request.principalId)} · proposed by ${escapeHtml(request.proposedBy)}</p></div><span class="admin-pill">${escapeHtml(request.status)}</span></div>
+      <p>${request.requestType === 'grant' ? (request.roleIds || []).map(escapeHtml).join(', ') : (request.grantIds || []).map(escapeHtml).join(', ')} · ${escapeHtml(request.reason)}</p>
+      ${request.status === 'pending' ? `<button type="button" class="btn btn-primary btn-sm" data-iam-role-approval="${escapeHtml(request.requestId)}" data-request-kind="${escapeHtml(request.requestType)}">Load for independent approval</button>` : ''}
+    </div>`).join('') || emptyAdminRow('No role requests have been recorded.');
+}
+
+function renderIamFeatureReadiness(workspace) {
+  const requestRows = (workspace.staffingRequests || []).map(request => `
+    <div class="admin-row"><div class="admin-row-header"><div class="admin-row-title">Configuration · ${escapeHtml(request.requestId)}</div><span class="admin-pill">${escapeHtml(request.status)}</span></div><p>${(request.features || []).map(feature => escapeHtml(`${feature.featureId}:${feature.requestedStatus || 'enabled'}`)).join(', ')}</p>${request.status === 'pending' ? `<button type="button" class="btn btn-primary btn-sm" data-iam-staffing-approval="${escapeHtml(request.requestId)}">Load for approval</button>` : ''}</div>`);
+  const featureRows = (workspace.featureReadiness.features || []).map(feature => `
+    <div class="admin-row ${feature.ready ? 'iam-readiness-ready' : 'iam-readiness-blocked'}"><div class="admin-row-header"><div><div class="admin-row-title">${escapeHtml(feature.featureId)} · ${escapeHtml(feature.name)}</div><p>${escapeHtml(feature.scope.type)}:${escapeHtml(feature.scope.id)} · ${escapeHtml(feature.plane)}</p></div><span class="admin-pill">${feature.ready ? 'ready' : 'blocked'}</span></div><p>${feature.blockers.length ? feature.blockers.map(escapeHtml).join(', ') : `${feature.distinctPrincipalIds.length} distinct staffed principals`}</p></div>`);
+  document.getElementById('iam-feature-readiness-list').innerHTML = [...requestRows, ...featureRows].join('') || emptyAdminRow('No features are configured. Propose the first staffing configuration to enable one.');
+}
+
+function renderIamEscalations(workspace) {
+  const closureByEscalation = new Map((workspace.staffingClosureRequests || []).map(request => [request.escalationId, request]));
+  document.getElementById('iam-escalations-list').innerHTML = (workspace.staffingEscalations || []).map(escalation => {
+    const closure = closureByEscalation.get(escalation.escalationId);
+    return `<div class="admin-row ${escalation.status === 'open' ? 'iam-readiness-blocked' : 'iam-readiness-ready'}"><div class="admin-row-header"><div><div class="admin-row-title">${escapeHtml(escalation.featureId)}</div><p><code>${escapeHtml(escalation.escalationId)}</code></p></div><span class="admin-pill">${escapeHtml(escalation.status)}</span></div><p>${(escalation.blockers || []).map(escapeHtml).join(', ')}</p>${escalation.status === 'open' ? `<button type="button" class="btn btn-secondary btn-sm" data-iam-escalation="${escapeHtml(escalation.escalationId)}">Prepare closure</button>` : ''}${closure?.status === 'pending' ? `<button type="button" class="btn btn-primary btn-sm" data-iam-escalation-approval="${escapeHtml(closure.requestId)}">Load independent approval</button>` : ''}</div>`;
+  }).join('') || emptyAdminRow('No staffing escalations are open or retained.');
+}
+
+function renderIamOwnership(workspace) {
+  const ownership = workspace.ownership;
+  const current = ownership ? `<div class="admin-row"><div class="admin-row-header"><div class="admin-row-title">Current owner · ${escapeHtml(ownership.ownerPrincipalId)}</div><span class="admin-pill">${escapeHtml(ownership.status)}</span></div></div>` : emptyAdminRow('No tenant ownership has been activated.');
+  const requests = (workspace.ownershipTransferRequests || []).map(request => `<div class="admin-row"><div class="admin-row-header"><div class="admin-row-title">${escapeHtml(request.oldOwnerPrincipalId)} → ${escapeHtml(request.newOwnerPrincipalId)}</div><span class="admin-pill">${escapeHtml(request.status)}</span></div><p>${escapeHtml(request.requestId)} · ${escapeHtml(request.reason)}</p>${request.status === 'pending' ? `<button type="button" class="btn btn-primary btn-sm" data-iam-owner-approval="${escapeHtml(request.requestId)}">Load independent approval</button>` : ''}</div>`).join('');
+  document.getElementById('iam-ownership-list').innerHTML = current + requests;
+}
+
+function renderIamEmergencyAccess(workspace) {
+  const requests = (workspace.emergencyAccessRequests || []).map(request => `<div class="admin-row"><div class="admin-row-header"><div class="admin-row-title">Request · ${escapeHtml(request.requestId)}</div><span class="admin-pill">${escapeHtml(request.status)}</span></div><p>${escapeHtml(request.beneficiaryPrincipalId)} · ${(request.actions || []).map(escapeHtml).join(', ')} · expires ${escapeHtml(request.expiresAt)}</p>${request.status === 'pending' ? `<button type="button" class="btn btn-primary btn-sm" data-iam-emergency-approval="${escapeHtml(request.requestId)}">Load independent approval</button>` : ''}</div>`);
+  const grants = (workspace.emergencyAccessGrants || []).map(grant => `<div class="admin-row ${grant.effectiveStatus === 'active' ? 'iam-readiness-blocked' : ''}"><div class="admin-row-header"><div class="admin-row-title">Grant · ${escapeHtml(grant.emergencyGrantId)}</div><span class="admin-pill">${escapeHtml(grant.effectiveStatus)}</span></div><p>${escapeHtml(grant.principalId)} · ${(grant.actions || []).map(escapeHtml).join(', ')}</p>${grant.effectiveStatus === 'active' ? `<button type="button" class="btn btn-warning btn-sm" data-iam-emergency-grant="${escapeHtml(grant.emergencyGrantId)}">Prepare closure</button>` : ''}</div>`);
+  document.getElementById('iam-emergency-list').innerHTML = [...requests, ...grants].join('') || emptyAdminRow('No tenant emergency-access requests or grants.');
 }
 
 async function renderPlatformAdmin() {
@@ -2410,7 +2539,246 @@ dom.adminTabs.forEach(tab => {
   tab.addEventListener('click', () => setAdminTab(tab.dataset.adminTab));
 });
 
+document.getElementById('btn-iam-refresh').addEventListener('click', loadIamWorkspace);
+document.getElementById('iam-role-filter').addEventListener('input', renderIamRoleCatalogue);
+
+function selectedValues(id) {
+  return Array.from(document.getElementById(id).selectedOptions).map(option => option.value);
+}
+
+function isoFromLocalInput(id) {
+  const value = document.getElementById(id).value;
+  return value ? new Date(value).toISOString() : null;
+}
+
+document.getElementById('iam-principals-list').addEventListener('click', (event) => {
+  const principalButton = event.target.closest('[data-iam-principal]');
+  const grantButton = event.target.closest('[data-iam-grant]');
+  if (principalButton) {
+    document.getElementById('iam-status-principal').value = principalButton.dataset.iamPrincipal;
+    document.getElementById('iam-status-principal').focus();
+  }
+  if (grantButton) {
+    const field = document.getElementById('iam-revoke-grants');
+    field.value = [...new Set([...parseCommaList(field.value), grantButton.dataset.iamGrant])].join(', ');
+    field.focus();
+  }
+});
+
+document.getElementById('btn-iam-removal-impact').addEventListener('click', async () => {
+  try {
+    const principalId = document.getElementById('iam-status-principal').value.trim();
+    if (!principalId) throw new Error('Principal ID is required.');
+    const result = await apiFetch(`/admin/identity-governance/principals/${encodeURIComponent(principalId)}/removal-impact`);
+    showToast(result.impact.safeToRetire ? 'Retirement is currently staffing-safe.' : `Retirement blocked: ${result.impact.newlyDisabledFeatureIds.join(', ')} would be disabled.`, result.impact.safeToRetire ? 'success' : 'warning');
+  } catch (err) { showToast(`Removal-impact assessment failed: ${err.message}`, 'error'); }
+});
+
+document.getElementById('btn-iam-status').addEventListener('click', async () => {
+  try {
+    const principalId = document.getElementById('iam-status-principal').value.trim();
+    const status = document.getElementById('iam-principal-status').value;
+    const reason = document.getElementById('iam-status-reason').value.trim();
+    const evidenceRef = document.getElementById('iam-status-evidence').value.trim();
+    if (!principalId || !reason || (status !== 'active' && !evidenceRef)) throw new Error('Principal, reason and containment evidence are required.');
+    if (status !== 'active' && !confirm(`Set ${principalId} to ${status}? Access is contained immediately and affected work may be paused.`)) return;
+    await apiFetch(`/admin/identity-governance/principals/${encodeURIComponent(principalId)}/status`, { method: 'POST', body: JSON.stringify({ status, reason, evidenceRef }) });
+    showToast(`Principal is now ${status}.`, 'success');
+    await loadIamWorkspace();
+  } catch (err) { showToast(`Principal status change failed: ${err.message}`, 'error'); }
+});
+
+document.getElementById('btn-iam-grant-propose').addEventListener('click', async () => {
+  try {
+    const tenantId = apiState.iamWorkspace?.tenantId;
+    await apiFetch('/admin/identity-governance/role-grants/proposals', { method: 'POST', body: JSON.stringify({
+      requestId: document.getElementById('iam-grant-request').value.trim(),
+      principalId: document.getElementById('iam-grant-principal').value.trim(),
+      roleIds: selectedValues('iam-grant-roles'),
+      scope: { type: document.getElementById('iam-grant-scope-type').value, id: document.getElementById('iam-grant-scope-id').value.trim() || tenantId },
+      reason: document.getElementById('iam-grant-reason').value.trim()
+    }) });
+    showToast('Role grant proposed. A different access reviewer must approve it.', 'success'); await loadIamWorkspace();
+  } catch (err) { showToast(`Role grant proposal failed: ${err.message}`, 'error'); }
+});
+
+document.getElementById('btn-iam-revoke-propose').addEventListener('click', async () => {
+  try {
+    await apiFetch('/admin/identity-governance/role-revocations/proposals', { method: 'POST', body: JSON.stringify({ requestId: document.getElementById('iam-revoke-request').value.trim(), grantIds: parseCommaList(document.getElementById('iam-revoke-grants').value), reason: document.getElementById('iam-revoke-reason').value.trim() }) });
+    showToast('Role revocation proposed. Access remains unchanged until independent approval.', 'success'); await loadIamWorkspace();
+  } catch (err) { showToast(`Role revocation proposal failed: ${err.message}`, 'error'); }
+});
+
+document.getElementById('iam-role-requests-list').addEventListener('click', (event) => {
+  const button = event.target.closest('[data-iam-role-approval]');
+  if (!button) return;
+  document.getElementById('iam-approval-request').value = button.dataset.iamRoleApproval;
+  document.getElementById('iam-approval-kind').value = button.dataset.requestKind;
+});
+
+document.getElementById('btn-iam-role-approve').addEventListener('click', async () => {
+  try {
+    const requestId = document.getElementById('iam-approval-request').value.trim();
+    const kind = document.getElementById('iam-approval-kind').value;
+    const payload = { approvalRef: document.getElementById('iam-approval-ref').value.trim() };
+    if (kind === 'grant') {
+      payload.effectiveFrom = isoFromLocalInput('iam-grant-effective');
+      payload.validUntil = isoFromLocalInput('iam-grant-valid-until');
+    }
+    await apiFetch(`/admin/identity-governance/role-${kind === 'grant' ? 'grants' : 'revocations'}/${encodeURIComponent(requestId)}/approval`, { method: 'POST', body: JSON.stringify(payload) });
+    showToast(`Role ${kind} approved independently.`, 'success'); await loadIamWorkspace();
+  } catch (err) { showToast(`Role approval failed: ${err.message}`, 'error'); }
+});
+
+document.getElementById('btn-iam-staffing-propose').addEventListener('click', async () => {
+  try {
+    const tenantId = apiState.iamWorkspace?.tenantId;
+    const scope = { type: document.getElementById('iam-staffing-scope-type').value, id: document.getElementById('iam-staffing-scope-id').value.trim() || tenantId };
+    const selected = { featureId: document.getElementById('iam-staffing-feature').value, requestedStatus: document.getElementById('iam-staffing-status').value, scope };
+    const features = (apiState.iamWorkspace?.featureReadiness?.features || [])
+      .map(feature => ({ featureId: feature.featureId, requestedStatus: feature.requestedStatus, scope: feature.scope }))
+      .filter(feature => !(feature.featureId === selected.featureId && feature.scope.type === scope.type && feature.scope.id === scope.id));
+    features.push(selected);
+    await apiFetch('/admin/identity-governance/staffing-config/proposals', { method: 'POST', body: JSON.stringify({
+      requestId: document.getElementById('iam-staffing-request').value.trim(),
+      features,
+      reason: document.getElementById('iam-staffing-reason').value.trim()
+    }) });
+    showToast('Staffing configuration proposed. Independent control-engine approval is required.', 'success'); await loadIamWorkspace();
+  } catch (err) { showToast(`Staffing proposal failed: ${err.message}`, 'error'); }
+});
+
+document.getElementById('iam-feature-readiness-list').addEventListener('click', (event) => {
+  const button = event.target.closest('[data-iam-staffing-approval]');
+  if (button) document.getElementById('iam-staffing-approval-request').value = button.dataset.iamStaffingApproval;
+});
+
+document.getElementById('btn-iam-staffing-approve').addEventListener('click', async () => {
+  try {
+    const requestId = document.getElementById('iam-staffing-approval-request').value.trim();
+    await apiFetch(`/admin/identity-governance/staffing-config/${encodeURIComponent(requestId)}/approval`, { method: 'POST', body: JSON.stringify({ approvalRef: document.getElementById('iam-staffing-approval-ref').value.trim() }) });
+    showToast('Staffing configuration approved by the isolated control path.', 'success'); await loadIamWorkspace();
+  } catch (err) { showToast(`Staffing approval failed: ${err.message}`, 'error'); }
+});
+
+document.getElementById('iam-escalations-list').addEventListener('click', (event) => {
+  const prepare = event.target.closest('[data-iam-escalation]');
+  const approve = event.target.closest('[data-iam-escalation-approval]');
+  if (prepare) document.getElementById('iam-escalation-id').value = prepare.dataset.iamEscalation;
+  if (approve) document.getElementById('iam-escalation-approval-request').value = approve.dataset.iamEscalationApproval;
+});
+
+document.getElementById('btn-iam-escalation-propose').addEventListener('click', async () => {
+  try {
+    await apiFetch('/admin/identity-governance/staffing-escalations/closure-proposals', { method: 'POST', body: JSON.stringify({ requestId: document.getElementById('iam-escalation-request').value.trim(), escalationId: document.getElementById('iam-escalation-id').value.trim(), resolutionRef: document.getElementById('iam-escalation-resolution').value.trim() }) });
+    showToast('Escalation closure proposed. The operational pause remains active.', 'success'); await loadIamWorkspace();
+  } catch (err) { showToast(`Escalation closure proposal failed: ${err.message}`, 'error'); }
+});
+
+document.getElementById('btn-iam-escalation-approve').addEventListener('click', async () => {
+  try {
+    const requestId = document.getElementById('iam-escalation-approval-request').value.trim();
+    await apiFetch(`/admin/identity-governance/staffing-escalations/closure-proposals/${encodeURIComponent(requestId)}/approval`, { method: 'POST', body: JSON.stringify({ approvalRef: document.getElementById('iam-escalation-approval-ref').value.trim() }) });
+    showToast('Staffing escalation closed after readiness re-check.', 'success'); await loadIamWorkspace();
+  } catch (err) { showToast(`Escalation approval failed: ${err.message}`, 'error'); }
+});
+
+document.getElementById('btn-iam-agent-register').addEventListener('click', async () => {
+  try {
+    const principalType = document.getElementById('iam-agent-type').value;
+    await apiFetch('/admin/identity-governance/principals/agents', { method: 'POST', body: JSON.stringify({
+      principalId: document.getElementById('iam-agent-id').value.trim(), displayName: document.getElementById('iam-agent-name').value.trim(), principalType,
+      agentDefinitionRef: document.getElementById('iam-agent-definition').value.trim(), modelRef: document.getElementById('iam-agent-model').value.trim() || null,
+      workloadIdentityRef: document.getElementById('iam-agent-workload').value.trim(), workloadIdentityVerified: true,
+      identityEvidenceRef: document.getElementById('iam-agent-evidence').value.trim(), expiresAt: principalType === 'dynamic_agent' ? isoFromLocalInput('iam-agent-expires') : null
+    }) });
+    showToast('Governed agent registered. Grant a dedicated agent role through maker-checker next.', 'success'); await loadIamWorkspace();
+  } catch (err) { showToast(`Agent registration failed: ${err.message}`, 'error'); }
+});
+
+document.getElementById('btn-iam-owner-propose').addEventListener('click', async () => {
+  try {
+    await apiFetch('/admin/identity-governance/ownership-transfers/proposals', { method: 'POST', body: JSON.stringify({ requestId: document.getElementById('iam-owner-request').value.trim(), newOwnerPrincipalId: document.getElementById('iam-owner-target').value.trim(), targetAcceptanceRef: document.getElementById('iam-owner-acceptance').value.trim(), reason: document.getElementById('iam-owner-reason').value.trim() }) });
+    showToast('Ownership transfer proposed by the current owner.', 'success'); await loadIamWorkspace();
+  } catch (err) { showToast(`Ownership-transfer proposal failed: ${err.message}`, 'error'); }
+});
+
+document.getElementById('iam-ownership-list').addEventListener('click', (event) => {
+  const button = event.target.closest('[data-iam-owner-approval]');
+  if (button) document.getElementById('iam-owner-approval-request').value = button.dataset.iamOwnerApproval;
+});
+
+document.getElementById('btn-iam-owner-approve').addEventListener('click', async () => {
+  try {
+    const requestId = document.getElementById('iam-owner-approval-request').value.trim();
+    await apiFetch(`/admin/identity-governance/ownership-transfers/${encodeURIComponent(requestId)}/approval`, { method: 'POST', body: JSON.stringify({ approvalRef: document.getElementById('iam-owner-approval-ref').value.trim() }) });
+    showToast('Organisation ownership transferred with independent approval.', 'success'); await loadIamWorkspace();
+  } catch (err) { showToast(`Ownership-transfer approval failed: ${err.message}`, 'error'); }
+});
+
+document.getElementById('btn-iam-emergency-propose').addEventListener('click', async () => {
+  try {
+    await apiFetch('/admin/identity-governance/emergency-access/proposals', { method: 'POST', body: JSON.stringify({ requestId: document.getElementById('iam-emergency-request').value.trim(), beneficiaryPrincipalId: document.getElementById('iam-emergency-beneficiary').value.trim(), actions: selectedValues('iam-emergency-actions'), incidentRef: document.getElementById('iam-emergency-incident').value.trim(), reason: document.getElementById('iam-emergency-reason').value.trim(), expiresAt: isoFromLocalInput('iam-emergency-expires') }) });
+    showToast('Emergency access requested. No authority is active until independent approval.', 'success'); await loadIamWorkspace();
+  } catch (err) { showToast(`Emergency-access request failed: ${err.message}`, 'error'); }
+});
+
+document.getElementById('iam-emergency-list').addEventListener('click', (event) => {
+  const approval = event.target.closest('[data-iam-emergency-approval]');
+  const grant = event.target.closest('[data-iam-emergency-grant]');
+  if (approval) document.getElementById('iam-emergency-approval-request').value = approval.dataset.iamEmergencyApproval;
+  if (grant) document.getElementById('iam-emergency-grant').value = grant.dataset.iamEmergencyGrant;
+});
+
+document.getElementById('btn-iam-emergency-approve').addEventListener('click', async () => {
+  try {
+    const requestId = document.getElementById('iam-emergency-approval-request').value.trim();
+    await apiFetch(`/admin/identity-governance/emergency-access/${encodeURIComponent(requestId)}/approval`, { method: 'POST', body: JSON.stringify({ approvalRef: document.getElementById('iam-emergency-approval-ref').value.trim() }) });
+    showToast('Emergency access approved and is now visible in the active grant register.', 'warning'); await loadIamWorkspace();
+  } catch (err) { showToast(`Emergency-access approval failed: ${err.message}`, 'error'); }
+});
+
+document.getElementById('btn-iam-emergency-close').addEventListener('click', async () => {
+  try {
+    const grantId = document.getElementById('iam-emergency-grant').value.trim();
+    await apiFetch(`/admin/identity-governance/emergency-access/${encodeURIComponent(grantId)}/closure`, { method: 'POST', body: JSON.stringify({ closureEvidenceRef: document.getElementById('iam-emergency-closure-ref').value.trim() }) });
+    showToast('Emergency access closed with evidence retained.', 'success'); await loadIamWorkspace();
+  } catch (err) { showToast(`Emergency-access closure failed: ${err.message}`, 'error'); }
+});
+
 document.getElementById('btn-identity-ops-refresh').addEventListener('click', loadIdentityOperations);
+
+document.getElementById('btn-identity-automation-run').addEventListener('click', async () => {
+  try {
+    await apiFetch('/admin/identity-operations/automation/runs', { method: 'POST', body: JSON.stringify({ runId: document.getElementById('identity-automation-run').value.trim(), executionEvidenceRef: document.getElementById('identity-automation-evidence').value.trim() }) });
+    showToast('Identity readiness automation completed; findings and containment are retained.', 'success'); await loadIdentityOperations();
+  } catch (err) { showToast(`Readiness automation failed: ${err.message}`, 'error'); }
+});
+
+document.getElementById('btn-identity-drill-propose').addEventListener('click', async () => {
+  try {
+    await apiFetch('/admin/identity-operations/drills/proposals', { method: 'POST', body: JSON.stringify({
+      drillId: document.getElementById('identity-drill-id').value.trim(), scenario: document.getElementById('identity-drill-scenario').value.trim(), objective: document.getElementById('identity-drill-objective').value.trim(), runbookRef: document.getElementById('identity-drill-runbook').value.trim(),
+      targetDetectionMs: Number(document.getElementById('identity-drill-target-detection').value), targetContainmentMs: Number(document.getElementById('identity-drill-target-containment').value), targetRecoveryMs: Number(document.getElementById('identity-drill-target-recovery').value)
+    }) });
+    showToast('Resilience drill proposed and awaits witnessed execution evidence.', 'success'); await loadIdentityOperations();
+  } catch (err) { showToast(`Drill proposal failed: ${err.message}`, 'error'); }
+});
+
+document.getElementById('identity-automation-list').addEventListener('click', (event) => {
+  const button = event.target.closest('[data-identity-drill]');
+  if (button) document.getElementById('identity-drill-id').value = button.dataset.identityDrill;
+});
+
+document.getElementById('btn-identity-drill-witness').addEventListener('click', async () => {
+  try {
+    const drillId = document.getElementById('identity-drill-id').value.trim();
+    await apiFetch(`/admin/identity-operations/drills/${encodeURIComponent(drillId)}/witness`, { method: 'POST', body: JSON.stringify({
+      executionEvidenceRef: document.getElementById('identity-drill-execution').value.trim(), recoveryEvidenceRef: document.getElementById('identity-drill-recovery').value.trim(), detectionMs: Number(document.getElementById('identity-drill-detection').value), containmentMs: Number(document.getElementById('identity-drill-containment').value), recoveryMs: Number(document.getElementById('identity-drill-recovery-ms').value), failClosedObserved: document.getElementById('identity-drill-fail-closed').checked, auditComplete: document.getElementById('identity-drill-audit-complete').checked, observations: document.getElementById('identity-drill-observations').value.trim()
+    }) });
+    showToast('Witnessed drill outcome recorded against its objectives.', 'success'); await loadIdentityOperations();
+  } catch (err) { showToast(`Drill witness failed: ${err.message}`, 'error'); }
+});
 
 document.getElementById('btn-identity-revoke').addEventListener('click', async () => {
   try {

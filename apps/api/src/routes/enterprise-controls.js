@@ -1,5 +1,6 @@
 import {
   applyScimIdentityEvent,
+  applyFederatedRevocationEvent,
   assessFederationPolicy,
   assessPlatformCapacity,
   certifyFederationPolicy,
@@ -25,6 +26,7 @@ import {
 export async function routeEnterpriseTenantControls(context) {
   const { method, path, req, res, store, stateRef, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor, upsertFederatedTenantUser } = context;
   if (path === "/scim/v2" || path.startsWith("/scim/v2/")) return routeScimProtocol(context);
+  if (path === "/federation/v1/logout-events") return routeFederatedLogoutEvent(context);
   if (!path.startsWith("/admin/federation") && !path.startsWith("/admin/scim")) return false;
   const allowedTenantRoles = method === "GET" ? ["tenant_admin", "security_admin", "user_admin", "auditor"] : ["tenant_admin", "security_admin", "user_admin"];
   if (!hasTenantAdminRole(authContext, allowedTenantRoles)) { sendJson(res, 403, { error: { code: "enterprise_identity_forbidden", message: "Tenant identity administration access is required." } }); return true; }
@@ -76,6 +78,25 @@ export async function routeEnterpriseTenantControls(context) {
     } catch (error) { sendEnterpriseError(res, sendJson, error); } return true;
   }
   return false;
+}
+
+async function routeFederatedLogoutEvent(context) {
+  const { method, req, res, store, stateRef, readJson, sendJson, appendEvent, authContext, authActor } = context;
+  const scopes = authContext?.serviceCredential?.scopes ?? [];
+  if (method !== "POST") { sendJson(res, 405, { error: { code: "federated_logout_method_invalid", message: "Only POST is supported." } }); return true; }
+  if (authContext?.principalType !== "tenant_service" || (!scopes.includes("*") && !scopes.includes("federation:revoke"))) {
+    sendJson(res, 401, { error: { code: "federated_logout_credential_required", message: "A tenant federation-revocation service credential is required." } }); return true;
+  }
+  try {
+    const body = await readJson(req); const state = await store.load(); const whole = stateRef.get();
+    const result = applyFederatedRevocationEvent(state.federatedRevocationEvents, whole.controlPlane.sessions, state.federationPolicies, state.users, { ...body, tenantId: authContext.tenantId, commerciallyLive: false });
+    if (!result.idempotent) {
+      await stateRef.set({ ...whole, controlPlane: { ...whole.controlPlane, sessions: result.sessions } });
+      await store.save(appendEvent({ ...state, federatedRevocationEvents: result.events }, { type: "identity.federation.revocation_applied", eventId: result.event.eventId, policyId: result.event.policyId, protocol: result.event.protocol, revokedSessionIds: result.revokedSessionIds, evidenceChecksumSha256: result.event.evidenceChecksumSha256, actor: authActor(authContext) }));
+    }
+    sendJson(res, result.idempotent ? 200 : 201, { event: result.event, revokedSessionIds: result.revokedSessionIds, idempotent: result.idempotent });
+  } catch (error) { sendEnterpriseError(res, sendJson, error); }
+  return true;
 }
 
 async function routeScimProtocol(context) {
@@ -214,4 +235,4 @@ export async function routeEnterprisePlatformControls(context) {
   return false;
 }
 
-function sendEnterpriseError(res, sendJson, error) { sendJson(res, error.code?.includes("duplicate") ? 409 : 422, { error: { code: error.code ?? "enterprise_control_invalid", message: error.message } }); }
+function sendEnterpriseError(res, sendJson, error) { sendJson(res, /(duplicate|conflict|exists)/.test(error.code ?? "") ? 409 : 422, { error: { code: error.code ?? "enterprise_control_invalid", message: error.message } }); }

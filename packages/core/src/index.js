@@ -605,6 +605,18 @@ export {
 } from "./origination-provider-conformance.js";
 
 export {
+  ORGANISATION_ADMISSION_CONFORMANCE_PACKS,
+  ORGANISATION_ADMISSION_INTEGRATIONS,
+  ORGANISATION_ADMISSION_SOURCE_VERSION,
+  OrganisationAdmissionConformanceSimulator,
+  REQUIRED_ORGANISATION_ADMISSION_CLASSES,
+  assessOrganisationAdmissionConformancePack,
+  assessOrganisationAdmissionConformanceSuite,
+  buildOrganisationAdmissionSimulatorScenarios,
+  createOrganisationAdmissionConformanceSimulator
+} from "./organisation-admission-conformance.js";
+
+export {
   DeterministicProviderSimulator,
   createProviderSimulator,
   verifySimulatedProviderCallback
@@ -678,7 +690,9 @@ export { CANONICAL_ROLE_CATALOGUE, CANONICAL_ROLE_IDS, PRODUCT_TEMPLATE_REQUIRED
 export { verifyOidcIdToken, verifySamlValidationAttestation, evaluateAuthenticationAssurance, federatedPrincipalFromClaims, scimUserResourceToIdentityEvent, scimUserProjection, canonicalFederationEvidence } from "./federated-access-runtime.js";
 export { prepareAccessActivityExport, recordAccessActivityCustody, reconcileAccessActivityCustody } from "./access-activity-custody.js";
 export { IDENTITY_INTEGRATION_FAMILIES, IDENTITY_CONFORMANCE_CATALOG, createIdentityConformanceCampaign, approveIdentityConformanceCampaign, simulateIdentityConformanceScenario, recordIdentityConformanceResult, assessIdentityConformanceCampaign } from "./identity-integration-conformance.js";
+export { ENTERPRISE_PLATFORM_FAMILIES, REQUIRED_ENTERPRISE_SCENARIO_CLASSES, ENTERPRISE_PLATFORM_CONFORMANCE_PACKS, assessEnterprisePlatformConformancePack, assessEnterprisePlatformConformanceSuite, buildEnterprisePlatformSimulatorManifest, simulateEnterprisePlatformScenario, assessEnterprisePlatformSimulation } from "./enterprise-platform-conformance.js";
 export { proposeFederationRotation, approveFederationRotation, suspendFederationPolicy, revokePrincipalSessions, proposeAuthenticatorRecovery, approveAuthenticatorRecovery, reconcileFederatedDirectory, projectIdentityOperationalReadiness } from "./identity-operations.js";
+export { FEDERATED_REVOCATION_PROTOCOLS, IDENTITY_DRILL_SCENARIOS, applyFederatedRevocationEvent, planIdentityOperationalRun, executeIdentityOperationalRun, proposeIdentityOperationsDrill, witnessIdentityOperationsDrill } from "./identity-operational-automation.js";
 export { CONTACTS, LEGAL_ACCEPTANCES, REQUIRED_ADMISSION_CONTROLS, REQUIRED_ORGANISATION_EVIDENCE, startOrganisationSignup, verifySignupContact, submitOrganisationIdentity, recordCorporateDomainProof, recordAuthorisedRepresentativeProof, acceptSignupLegalDocuments, decideOrganisationAdmission, appealOrganisationRejection, decideOrganisationAppeal, resumeOrganisationReverification, issueFirstOwnerInvitation, activateFirstOwner, requestTenantProvisioning, cancelOrganisationSignup, resumeOrganisationSignup, projectOrganisationSignup } from "./organisation-signup.js";
 
 export {

@@ -1,18 +1,23 @@
 {
-  "generated": "2026-07-15T02:41:32.969Z",
+  "generated": "2026-07-15T03:02:51.446Z",
   "git": {
     "branch": "main",
-    "count": 186,
+    "count": 187,
     "commits": [
+      {
+        "hash": "5ae4e21",
+        "subject": "feat(identity): add tenant operations and conformance lab",
+        "when": "20 minutes ago"
+      },
       {
         "hash": "f9a7f90",
         "subject": "feat(identity): harden federation and universal access control",
-        "when": "20 minutes ago"
+        "when": "41 minutes ago"
       },
       {
         "hash": "061c783",
         "subject": "feat(identity): enforce tenant staffing and actor attribution",
-        "when": "4 hours ago"
+        "when": "5 hours ago"
       },
       {
         "hash": "b411a51",
@@ -22,7 +27,7 @@
       {
         "hash": "f0e72f7",
         "subject": "docs(ai): define governed digital-worker architecture",
-        "when": "5 hours ago"
+        "when": "6 hours ago"
       },
       {
         "hash": "876775d",
@@ -37,17 +42,17 @@
       {
         "hash": "5d36a8c",
         "subject": "feat(governance): complete capability evidence trace",
-        "when": "6 hours ago"
+        "when": "7 hours ago"
       },
       {
         "hash": "647c86c",
         "subject": "fix(dashboard): make capability metrics auditable",
-        "when": "6 hours ago"
+        "when": "7 hours ago"
       },
       {
         "hash": "ce1aacb",
         "subject": "fix(web): serve product journeys publicly",
-        "when": "6 hours ago"
+        "when": "7 hours ago"
       },
       {
         "hash": "0848776",
@@ -57,11 +62,6 @@
       {
         "hash": "5f992d0",
         "subject": "feat(integrations): complete adapter execution baseline",
-        "when": "7 hours ago"
-      },
-      {
-        "hash": "3037e82",
-        "subject": "chore: sync and update workspace files",
         "when": "7 hours ago"
       }
     ]
@@ -11843,6 +11843,16 @@
               "note": "Proves exhaustive family coverage, four-eyes campaigns and the prohibition on live-certification claims."
             },
             {
+              "type": "code",
+              "ref": "packages/core/src/identity-operational-automation.js",
+              "note": "Trusted-adapter-attested, fresh, issuer/audience/tenant/session-bound and replay-safe federated logout containment contract."
+            },
+            {
+              "type": "test",
+              "ref": "tests/federated-revocation-api.test.js",
+              "note": "Scoped tenant-service provider logout endpoint persists exact session revocation evidence and non-live status."
+            },
+            {
               "type": "doc",
               "ref": "docs/architecture/tenant-role-staffing-and-feature-gating.md",
               "note": "Provider trust, authentication-versus-authorization and commercial-integration boundary."
@@ -11984,6 +11994,11 @@
               "type": "test",
               "ref": "tests/identity-operations-api.test.js",
               "note": "Same-tenant human administration, actor binding, maker-checker and readiness API evidence."
+            },
+            {
+              "type": "test",
+              "ref": "tests/iam-administration-workspace.test.js",
+              "note": "Tenant-human IAM workspace covers effective access, approvals, staffing, agents, ownership and emergency access."
             }
           ],
           "owner": "Information Security",
@@ -12072,6 +12087,11 @@
               "type": "test",
               "ref": "tests/security-operations.test.js",
               "note": "Automated evidence covering the SEC-008 control family."
+            },
+            {
+              "type": "test",
+              "ref": "tests/enterprise-platform-conformance.test.js",
+              "note": "KMS/HSM/vault rotation, non-exportability, isolation, destruction, outage and recovery emulator evidence."
             },
             {
               "type": "doc",
@@ -12265,6 +12285,11 @@
               "note": "Automated evidence covering the SEC-014 control family."
             },
             {
+              "type": "test",
+              "ref": "tests/identity-operational-automation.test.js",
+              "note": "SIEM/WORM outage drill, uncustodied-activity findings and fail-closed/audit-complete witnessing contract."
+            },
+            {
               "type": "doc",
               "ref": "docs/architecture/current-implementation.md",
               "note": "Documented architecture or regulatory boundary for SEC-014."
@@ -12325,6 +12350,11 @@
               "type": "test",
               "ref": "tests/security-operations.test.js",
               "note": "Automated evidence covering the SEC-016 control family."
+            },
+            {
+              "type": "test",
+              "ref": "tests/enterprise-platform-conformance.test.js",
+              "note": "Trusted-time freshness, integrity, monotonicity, quorum, outage and recovery emulator evidence."
             },
             {
               "type": "doc",
@@ -12630,6 +12660,21 @@
               "type": "test",
               "ref": "tests/integration-worker-runtime.test.js",
               "note": "executable acceptance evidence for the currently tracked capability slice"
+            },
+            {
+              "type": "code",
+              "ref": "packages/core/src/organisation-admission-conformance.js",
+              "note": "153 stable deterministic simulator scenarios across INT-ADM-01 through INT-ADM-10."
+            },
+            {
+              "type": "test",
+              "ref": "tests/enterprise-platform-conformance.test.js",
+              "note": "85 deterministic enterprise-platform adverse scenarios with checksummed tenant-bound evidence."
+            },
+            {
+              "type": "test",
+              "ref": "tests/organisation-admission-conformance.test.js",
+              "note": "Admission source lineage, tenant/purpose isolation, replay conflict, compensation/rollback and no-live-claim evidence."
             }
           ],
           "owner": "Integration Platform Engineering",
@@ -12838,6 +12883,16 @@
               "type": "test",
               "ref": "tests/integration-worker-runtime.test.js",
               "note": "executable acceptance evidence for the currently tracked capability slice"
+            },
+            {
+              "type": "code",
+              "ref": "packages/core/src/identity-operational-automation.js",
+              "note": "Checksum-sealed run-once identity scheduler contract with containment as the only automatic mutation."
+            },
+            {
+              "type": "test",
+              "ref": "tests/identity-operational-automation.test.js",
+              "note": "Operational planning, unsafe-session containment and prohibited approval automation evidence."
             }
           ],
           "owner": "Site Reliability Engineering",
@@ -12919,6 +12974,11 @@
               "type": "test",
               "ref": "tests/service-operations.test.js",
               "note": "executable acceptance evidence for the currently tracked capability slice"
+            },
+            {
+              "type": "test",
+              "ref": "tests/identity-operational-automation.test.js",
+              "note": "Eight measured identity/custody resilience scenarios with independent witnessing and fail-closed evidence."
             }
           ],
           "owner": "Site Reliability Engineering",
@@ -13081,6 +13141,11 @@
               "type": "test",
               "ref": "tests/platform-delivery.test.js",
               "note": "executable acceptance evidence for the currently tracked capability slice"
+            },
+            {
+              "type": "test",
+              "ref": "tests/enterprise-platform-conformance.test.js",
+              "note": "Deployment partial-creation, compensation success/failure, rollback and controller-outage emulator evidence."
             }
           ],
           "owner": "Site Reliability Engineering",
@@ -14136,10 +14201,10 @@
     }
   ],
   "tests": {
-    "pass": 528,
+    "pass": 546,
     "fail": 0,
     "skipped": 5,
-    "total": 533,
+    "total": 551,
     "ran": true,
     "source": "live"
   }

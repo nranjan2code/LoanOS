@@ -174,6 +174,7 @@ Domain events continue to record the business outcome, maker, checker, evidence 
 ## 11. Implemented APIs
 
 - `GET /admin/identity-governance/roles`
+- `GET /admin/identity-governance/workspace` returns one tenant-contained administration projection: effective principal access, pending role/staffing/ownership/emergency requests, staffing readiness and escalations. It requires a same-tenant human session; service credentials cannot read it.
 - `GET /admin/identity-governance/launch-coverage`
 - `GET /admin/identity-governance/feature-readiness`
 - `GET /admin/identity-governance/staffing-escalations`
@@ -196,7 +197,7 @@ Domain events continue to record the business outcome, maker, checker, evidence 
 1. Run universal staffing in shadow for each tenant, close every `mutation_unclassified` or divergence, then activate; the active runtime is fail-closed but rollout evidence is still institution-specific.
 2. Deploy the separately addressed control fleet and supply the required unique `ctrl-*` identity, mTLS client/server/trust references, KMS/HSM signing reference, audit sink and witnessed cutover evidence.
 3. Complete IdP-specific conformance packs for Entra, Okta, AD FS, Keycloak and LDAP bridges; procure at least one production route and certify the SAML/device-posture adapters.
-4. Add front-end staffing/readiness, escalation, federation and role-request workspaces; current API behavior is ahead of administration UI.
+4. Operate and independently accessibility-test the dashboard access-governance workspace for canonical roles/SoD, effective principal access, role maker-checker, feature staffing, removal impact/status, escalations, governed agents, ownership and emergency access. Federation operations are available in the adjacent identity control room.
 5. Connect prepared activity exports to a live India SIEM/object-lock provider and reconcile collector/provider acknowledgements on schedule.
 6. Add risk-adaptive step-up, federation global logout/back-channel logout, token revocation/introspection and user-visible authenticator recovery.
 7. Produce route-coverage, IdP key-rollover, leaver-latency, WORM restore and control-engine failover operating evidence before bank production.

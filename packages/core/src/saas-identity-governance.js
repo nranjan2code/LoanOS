@@ -623,7 +623,53 @@ export function projectPrincipalAccess(state = {}, tenantId, principalId, now = 
   return { principal, grants, activeGrants, roleIds: [...new Set(activeGrants.map((grant) => grant.roleId))], sodViolations: findSodViolations(activeGrants.map((grant) => grant.roleId)), projectedAt: now.toISOString() };
 }
 
+// Read-only, tenant-contained projection for the IAM administration workspace.
+// Mutation authority remains exclusively in the maker-checker functions above.
+export function projectIdentityGovernanceWorkspace(state = {}, tenantId, now = new Date()) {
+  required(tenantId, "tenantId");
+  const tenantValues = (key) => Object.values(records(state, key)).filter((item) => item.tenantId === tenantId);
+  const principals = tenantPrincipals(state, tenantId)
+    .map((principal) => projectPrincipalAccess(state, tenantId, principal.principalId, now))
+    .sort((left, right) => left.principal.displayName.localeCompare(right.principal.displayName));
+  const roleRequests = tenantValues("saasRoleRequests").sort(newestFirst("proposedAt"));
+  const staffingRequests = tenantValues("featureStaffingRequests").sort(newestFirst("proposedAt"));
+  const staffingEscalations = tenantValues("staffingEscalations").sort(newestFirst("openedAt"));
+  const staffingClosureRequests = tenantValues("staffingEscalationClosureRequests").sort(newestFirst("proposedAt"));
+  const ownershipTransferRequests = tenantValues("ownershipTransferRequests").sort(newestFirst("proposedAt"));
+  const emergencyAccessRequests = tenantValues("emergencyAccessRequests").sort(newestFirst("requestedAt"));
+  const emergencyAccessGrants = tenantValues("emergencyAccessGrants")
+    .map((grant) => ({ ...grant, effectiveStatus: grant.status === "active" && Date.parse(grant.expiresAt) <= now.getTime() ? "expired" : grant.status }))
+    .sort(newestFirst("activatedAt"));
+  const featureReadiness = projectTenantFeatureStaffing(state, tenantId, now);
+  const launchCoverage = assessMinimumLaunchCoverage(state, tenantId, now);
+  const pendingCount = (items) => items.filter((item) => item.status === "pending").length;
+  return {
+    tenantId,
+    ownership: records(state, "tenantOwnership")[tenantId] ?? null,
+    principals,
+    roleRequests,
+    staffingRequests,
+    staffingEscalations,
+    staffingClosureRequests,
+    ownershipTransferRequests,
+    emergencyAccessRequests,
+    emergencyAccessGrants,
+    featureReadiness,
+    launchCoverage,
+    summary: {
+      principals: principals.length,
+      activeHumans: principals.filter((item) => item.principal.principalType === HUMAN_PRINCIPAL_TYPE && item.principal.status === "active").length,
+      activeAgents: principals.filter((item) => AGENT_PRINCIPAL_TYPES.has(item.principal.principalType) && item.principal.status === "active").length,
+      pendingApprovals: pendingCount(roleRequests) + pendingCount(staffingRequests) + pendingCount(staffingClosureRequests) + pendingCount(ownershipTransferRequests) + pendingCount(emergencyAccessRequests),
+      openEscalations: staffingEscalations.filter((item) => item.status === "open").length,
+      activeEmergencyGrants: emergencyAccessGrants.filter((item) => item.effectiveStatus === "active").length
+    },
+    projectedAt: now.toISOString()
+  };
+}
+
 function pair(left, right, ruleId) { return Object.freeze({ ruleId, roles: Object.freeze([left, right]), enforcement: "hard" }); }
+function newestFirst(field) { return (left, right) => String(right?.[field] ?? "").localeCompare(String(left?.[field] ?? "")); }
 function staffingPolicy(featureId, name, plane, requiredRoleSets, independentPairs, minimumDistinctPrincipals, regulatoryRefs) { return Object.freeze({ featureId, name, plane, scopes: Object.freeze(["tenant", "product"]), requiredRoleSets: Object.freeze(requiredRoleSets.map((set) => Object.freeze(set))), independentPairs: Object.freeze(independentPairs.map((set) => Object.freeze(set))), minimumDistinctPrincipals, regulatoryRefs: Object.freeze(regulatoryRefs) }); }
 function fail(code, message) { const error = new Error(message); error.code = code; throw error; }
 function required(value, field) { if (typeof value !== "string" || !value.trim()) fail("saas_identity_input_invalid", `${field} is required.`); return value.trim(); }

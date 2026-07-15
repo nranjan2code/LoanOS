@@ -29,7 +29,7 @@ Every `BOTH` integration requires idempotent commands, status/read, authenticate
 | Finance and accounting | CBS/GL, bank/escrow, co-lender, GSTN/TDS, reconciliation | Incumbent mappings, signed transport, bank statements and tax filing |
 | Compliance/reporting | CKYCRR, CIC, FIU, CERSAI, CRILC/CIMS/XBRL/PSL/DLA, RBI CMS | Institutional onboarding, schemas, signing keys, transport and portal acknowledgements |
 | Partner/LSP | onboarding/KYB, CRM, commissions, tax, bank payouts, SLA telemetry | Partner identity/feeds, GST/bank/CBS integration and live telemetry |
-| Enterprise platform/data | IdP/SCIM, KMS/HSM, SIEM/WORM/time, DB, queue, CDC/DW/BI, deploy, MDM | Most are governance attestations, not managed-service adapters |
+| Enterprise platform/data | IdP/SCIM, KMS/HSM, SIEM/WORM/time, DB, queue, CDC/DW/BI, deploy, MDM | Identity and six enterprise families have deterministic adverse conformance packs; managed-service adapters remain external |
 | SaaS organisation admission and tenant lifecycle | contact verification, legal/RE status, representative authority, domain control, abuse defence, contracting, billing and cloud provisioning | Direct-authority ingestion, production verification/delivery adapters, signed contracts, cloud/DNS/certificate controllers and re-verification feeds |
 
 ## 1. Customer channels, CRM and assisted acquisition
@@ -41,7 +41,7 @@ Every `BOTH` integration requires idempotent commands, status/read, authenticate
 | INT-CUS-03 | Branch/partner acquisition | Agent/branch/territory/credential/capacity master sync | BOTH; change/revoke and control totals | Internal only | LWS, partner |
 | INT-CUS-04 | Document collection | DMS/object upload, malware/DLP/OCR, download/version, hold and deletion proof | BOTH; content hash, scan callback, manifest | Internal only | LOS, LMS, LWS, compliance |
 | INT-CUS-05 | Government documents | DigiLocker consent, issuer/document discovery, fetch, URI/version and revocation | BOTH; consent and signed evidence | Missing | LOS |
-| INT-CUS-06 | Mobile/field channel | MDM enrol/attest/compliance/wipe; device certificate/key lifecycle | BOTH; posture and wipe callbacks | Missing | LWS, collections |
+| INT-CUS-06 | Mobile/field channel | MDM enrol/attest/compliance/wipe; device certificate/key lifecycle | BOTH; posture and wipe callbacks | Deterministic enrol/posture/certificate/wipe adverse pack; live MDM adapter missing | LWS, collections |
 | INT-CUS-07 | Offline field work | Encrypted work-pack lease/download; mutation/media replay/conflict/expiry | BOTH; checkpoint and reconciliation | Internal envelope controls | LWS, collections |
 | INT-CUS-08 | Language/accessibility | Approved translation/content import; optional TTS/relay services | IN/BOTH; version/checksum/approval | Internal only | All notices |
 
@@ -180,23 +180,25 @@ Regulatory integration must be in the regulated entity’s name where required. 
 | ID | Needed at | External operations | Direction / response | Current state | Also used by |
 | --- | --- | --- | --- | --- | --- |
 | INT-PLT-01 | Workforce identity | Entra/Okta/AD FS/Keycloak/OpenLDAP-bridge or generic OIDC/SAML metadata/JWKS/signatures, MFA/WebAuthn/device posture, SCIM JML, group-to-role request, logout/token revoke and access-review export | BOTH | Cryptographic OIDC, certified SAML-attestation boundary, scoped SCIM with explicit session revocation, rotation/recovery/reconciliation and exhaustive simulated conformance executable; no commercial connection. IdP groups never grant canonical roles directly | LWS, admin, isolated control engine |
-| INT-PLT-02 | Secrets/crypto | Vault lease/revoke; KMS/HSM encrypt/sign/rotate/destroy | BOTH | Attestation; local/env keys | Every adapter |
+| INT-PLT-02 | Secrets/crypto | Vault lease/revoke; KMS/HSM encrypt/sign/rotate/destroy | BOTH | Injected execution ports plus deterministic KMS/HSM/vault adverse pack; local/env keys are not production | Every adapter |
 | INT-PLT-03 | Security monitoring | Attributed API/UI/domain/decision/integration events, correlation propagation, SIEM ingest, completeness reconciliation, alert/SOAR, DLP/scanner and threat intelligence | BOTH | Authenticated API/UI activity, export custody reconciliation and mandatory simulated SIEM adverse pack exist; external collectors and live cross-system correlation remain missing | Compliance |
-| INT-PLT-04 | Evidence/time | WORM/object lock, hold/deletion, trusted NTP/TSA/anchor | BOTH | Exact custody contract and simulated adverse pack; no live WORM/time provider | Audit |
+| INT-PLT-04 | Evidence/time | WORM/object lock, hold/deletion, trusted NTP/TSA/anchor | BOTH | Exact custody plus trusted-time integrity/freshness/replay/quorum/outage adverse packs; no live WORM/time provider | Audit |
 | INT-PLT-05 | Database | Managed PostgreSQL HA/replica/PITR/restore/failover/telemetry | BOTH | Live-capable pg; control API absent | Whole platform |
-| INT-PLT-06 | Events/jobs | Queue/topic, scheduler, offsets, retry/DLQ and replay | BOTH | Persistent callback queue plus bounded HTTP dispatcher, circuit/health metrics complete; production scheduler/broker deployment pending | All modules |
+| INT-PLT-06 | Events/jobs | Queue/topic, scheduler, offsets, retry/DLQ and replay | BOTH | Persistent callback queue/dispatcher plus deterministic broker ordering, offset, poison, DLQ/replay and outage pack; production scheduler/broker pending | All modules |
 | INT-PLT-07 | API management | Gateway, mTLS/OAuth, WAF/rate-limit, schemas and usage | BOTH | App controls; gateway missing | All APIs |
 | INT-PLT-08 | Observability/support | Metrics/log/trace, synthetic, incident/on-call/ticket/SLA | BOTH | Internal ops; connectors missing | Vendors |
-| INT-PLT-09 | CDC/warehouse/lake | Log CDC, schema, checkpoint/backfill, sink, DQ, lineage, marts | BOTH | Governance only | Finance, risk, reporting |
+| INT-PLT-09 | CDC/warehouse/lake | Log CDC, schema, checkpoint/backfill, sink, DQ, lineage, marts | BOTH | Governance plus deterministic checkpoint/schema/gap/partial-commit/backfill/reconnect pack; vendor pipeline missing | Finance, risk, reporting |
 | INT-PLT-10 | BI | Dataset/semantic model/dashboard/export and row-level access | BOTH | Local dashboard; BI missing | Management |
-| INT-PLT-11 | Deployment/supply chain | CI, artifact/sign/SBOM/scans, canary/promote/rollback/evidence | BOTH | Governance; controllers missing | Engineering |
+| INT-PLT-11 | Deployment/supply chain | CI, artifact/sign/SBOM/scans, canary/promote/rollback/evidence | BOTH | Governance plus deterministic health/partial-create/compensation/rollback/drift/outage pack; controllers missing | Engineering |
 | INT-PLT-12 | Tenant billing | Meter, invoice/tax, payment, credit/refund and accounting export | BOTH | Commercial controls only | Platform finance |
-| INT-PLT-13 | Device management | MDM/attestation/certificates/wipe/app config | BOTH | Missing | Channels, collections |
+| INT-PLT-13 | Device management | MDM/attestation/certificates/wipe/app config | BOTH | Deterministic enrol/posture/certificate/wipe adverse pack; live MDM missing | Channels, collections |
 | INT-PLT-14 | Portability/archive | Encrypted bulk export/import, manifest, receipt and deletion attestation | BOTH/file | Local export; external custody missing | Tenant lifecycle |
 
 ## 12. SaaS organisation admission, contracting and tenant lifecycle
 
 These dependencies verify the prospective platform customer and safely create its tenant. They do **not** replace borrower KYC/CDD performed by the adopting regulated entity. A regulator or registry may provide a list, file or portal rather than a public API; the adapter must retain source/version/checksum evidence and fail closed when authority or status cannot be established.
+
+Simulator maturity for every row below is now `Bound/Mock`: a separate 153-scenario catalogue covers `INT-ADM-01` through `INT-ADM-10` with stable IDs, version/checksum lineage, tenant/purpose isolation, deterministic idempotent replay, mismatched replay rejection, and common plus family-specific adverse cases. `INT-ADM-09` explicitly covers partial provisioning, successful/failed compensation and incomplete rollback; `INT-ADM-10` covers key rollover, deprovision failure and continuing-authority drift. These contracts are non-production (`simulated=true`, `commerciallyLive=false`); the row-level text continues to state the live adapter gap.
 
 | ID | Needed at | External operations | Direction / response | Current state | Also used by |
 | --- | --- | --- | --- | --- | --- |

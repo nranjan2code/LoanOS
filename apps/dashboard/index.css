@@ -198,6 +198,64 @@ body {
   background: #fffaf0;
 }
 
+.iam-control-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  border-left: 4px solid var(--border-active);
+}
+
+.iam-workspace-section > summary {
+  cursor: pointer;
+  padding: var(--space-2) 0;
+}
+
+.iam-workspace-section > summary + p {
+  color: var(--text-secondary);
+}
+
+.iam-action-columns,
+.iam-catalogue-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.admin-form-grid.admin-form-grid-wide {
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+
+.iam-role-row code,
+.iam-principal-row code {
+  overflow-wrap: anywhere;
+}
+
+.iam-readiness-ready {
+  border-left: 3px solid var(--success, #2f855a);
+}
+
+.iam-readiness-blocked {
+  border-left: 3px solid var(--danger, #c53030);
+}
+
+.iam-workspace-section select[multiple] {
+  min-height: 9rem;
+}
+
+@media (max-width: 760px) {
+  .iam-control-header,
+  .iam-action-columns,
+  .iam-catalogue-grid {
+    display: block;
+  }
+
+  .iam-control-header .btn,
+  .iam-action-columns > div + div {
+    margin-top: var(--space-4);
+  }
+}
+
 .login-form {
   display: flex;
   flex-direction: column;

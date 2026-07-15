@@ -18,6 +18,7 @@ import {
   configureTenantFeatureStaffing,
   issueBootstrapChecker,
   issueBootstrapOwner,
+  projectIdentityGovernanceWorkspace,
   projectPrincipalAccess,
   projectTenantFeatureStaffing,
   proposeRoleGrant,
@@ -48,6 +49,11 @@ export async function routeSaasIdentityGovernance(req, res, { method, path, tena
     const actor = humanActor(authContext, tenant.tenantId);
     const body = method === "POST" ? await readJson(req) : {};
     let state = await store.load();
+
+    if (method === "GET" && path === `${PREFIX}/workspace`) {
+      sendJson(res, 200, { workspace: projectIdentityGovernanceWorkspace(state, tenant.tenantId) });
+      return true;
+    }
 
     if (method === "GET" && path === `${PREFIX}/feature-readiness`) {
       sendJson(res, 200, { readiness: projectTenantFeatureStaffing(state, tenant.tenantId) });

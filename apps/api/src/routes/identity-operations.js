@@ -6,13 +6,17 @@ import {
   approveIdentityConformanceCampaign,
   assessIdentityConformanceCampaign,
   createIdentityConformanceCampaign,
+  executeIdentityOperationalRun,
+  planIdentityOperationalRun,
   projectIdentityOperationalReadiness,
   proposeAuthenticatorRecovery,
   proposeFederationRotation,
+  proposeIdentityOperationsDrill,
   reconcileFederatedDirectory,
   recordIdentityConformanceResult,
   revokePrincipalSessions,
-  suspendFederationPolicy
+  suspendFederationPolicy,
+  witnessIdentityOperationsDrill
 } from "../../../../packages/core/src/index.js";
 
 const PREFIX = "/admin/identity-operations";
@@ -115,6 +119,34 @@ export async function routeIdentityOperations(context) {
       await save(store, appendEvent, result.state, "identity.directory.reconciled", actor, { reconciliationId: result.reconciliation.reconciliationId, status: result.reconciliation.status, evidenceChecksumSha256: result.reconciliation.evidenceChecksumSha256 });
       sendJson(res, 201, { reconciliation: result.reconciliation }); return true;
     }
+    if (method === "GET" && path === `${PREFIX}/automation/runs`) {
+      sendJson(res, 200, { runs: Object.values(state.identityOperationalRuns ?? {}), automaticActions: ["revoke_principal_sessions"], commerciallyLive: false }); return true;
+    }
+    if (method === "POST" && path === `${PREFIX}/automation/runs`) {
+      requireOperationRoles(["tenant_admin", "security_admin"]);
+      const body = await readJson(req); const whole = stateRef.get();
+      const plan = planIdentityOperationalRun(state, whole.controlPlane.sessions, { ...body, tenantId: tenant.tenantId, plannedBy: actor });
+      const executed = executeIdentityOperationalRun(state, whole.controlPlane.sessions, plan, { executedBy: actor, executionEvidenceRef: required(body.executionEvidenceRef, "executionEvidenceRef") });
+      await stateRef.set({ ...whole, controlPlane: { ...whole.controlPlane, sessions: executed.sessions } });
+      await save(store, appendEvent, executed.state, "identity.operations.automation_executed", actor, { runId: executed.run.runId, status: executed.run.status, findingCount: executed.run.findings.length, containmentCount: executed.run.results.length, planChecksumSha256: executed.run.planChecksumSha256 });
+      sendJson(res, 201, { run: executed.run }); return true;
+    }
+    if (method === "GET" && path === `${PREFIX}/drills`) {
+      sendJson(res, 200, { drills: Object.values(state.identityOperationsDrills ?? {}), simulation: true, commerciallyLive: false }); return true;
+    }
+    if (method === "POST" && path === `${PREFIX}/drills/proposals`) {
+      requireOperationRoles(["tenant_admin", "security_admin"]);
+      const body = await readJson(req); const result = proposeIdentityOperationsDrill(state, { ...body, tenantId: tenant.tenantId, proposedBy: actor });
+      await save(store, appendEvent, result.state, "identity.operations.drill_proposed", actor, { drillId: result.drill.drillId, scenario: result.drill.scenario });
+      sendJson(res, 201, { drill: result.drill }); return true;
+    }
+    const drillWitness = path.match(/^\/admin\/identity-operations\/drills\/([^/]+)\/witness$/);
+    if (method === "POST" && drillWitness) {
+      requireOperationRoles(["tenant_admin", "security_admin"]);
+      const body = await readJson(req); const result = witnessIdentityOperationsDrill(state, { ...body, drillId: decodeURIComponent(drillWitness[1]), witnessedBy: actor });
+      await save(store, appendEvent, result.state, "identity.operations.drill_witnessed", actor, { drillId: result.drill.drillId, scenario: result.drill.scenario, status: result.drill.status });
+      sendJson(res, 200, { drill: result.drill }); return true;
+    }
     sendJson(res, 404, { error: { code: "not_found", message: "Identity operations route not found." } }); return true;
   } catch (error) {
     sendJson(res, error.statusCode ?? statusFor(error.code), { error: { code: error.code ?? "identity_operations_error", message: error.message } }); return true;
@@ -128,6 +160,6 @@ function revokeAffectedSessions(sessions, tenantId, userIds, actor, reason) {
 }
 async function save(store, appendEvent, state, type, actor, details) { await store.save(appendEvent(state, { type, actor, ...details })); }
 function publicRecoveryUser(user) { const { passwordHash, mfaSecret, ...safe } = user; return safe; }
-function required(value, field) { if (typeof value !== "string" || !value.trim()) fail("identity_operations_input_invalid", `${field} is required.`, 422); }
+function required(value, field) { if (typeof value !== "string" || !value.trim()) fail("identity_operations_input_invalid", `${field} is required.`, 422); return value.trim(); }
 function fail(code, message, statusCode) { throw Object.assign(new Error(message), { code, statusCode }); }
 function statusFor(code = "") { if (code.includes("forbidden")) return 403; if (code.includes("missing")) return 404; if (code.includes("exists") || code.includes("not_pending") || code.includes("four_eyes")) return 409; return 422; }

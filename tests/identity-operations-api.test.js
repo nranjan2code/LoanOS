@@ -41,6 +41,13 @@ test("identity operations API governs simulator campaigns, recovery, and immedia
   assert.equal(response.status, 200, await response.clone().text());
   const campaign = await response.json(); assert.equal(campaign.campaign.status, "simulator_certified"); assert.equal(campaign.campaign.commerciallyLive, false);
 
+  response = await post("/admin/identity-operations/drills/proposals", { drillId: "drill-1", scenario: "idp_outage", objective: "prove fail-closed login and recovery", runbookRef: "IAM-RUNBOOK-1", targetDetectionMs: 60_000, targetContainmentMs: 120_000, targetRecoveryMs: 600_000 });
+  assert.equal(response.status, 201, await response.clone().text());
+  response = await post("/admin/identity-operations/drills/drill-1/witness", { executionEvidenceRef: "DRILL-EXEC-1", recoveryEvidenceRef: "DRILL-RECOVERY-1", detectionMs: 30_000, containmentMs: 90_000, recoveryMs: 300_000, failClosedObserved: true, auditComplete: true }, checker);
+  assert.equal(response.status, 200, await response.clone().text()); assert.equal((await response.json()).drill.status, "passed");
+  response = await post("/admin/identity-operations/automation/runs", { runId: "identity-run-1", executionEvidenceRef: "SCHEDULER-1" });
+  assert.equal(response.status, 201, await response.clone().text()); assert.ok((await response.json()).run.planChecksumSha256);
+
   response = await post("/admin/identity-operations/recovery/proposals", { requestId: "recover-subject-1", principalId: "subject", identityEvidenceRef: "verified-helpdesk-video-1", reason: "lost authenticator" });
   assert.equal(response.status, 201, await response.clone().text());
   response = await post("/admin/identity-operations/recovery/recover-subject-1/approval", { approvalRef: "SEC-APPROVAL-1" }, checker);

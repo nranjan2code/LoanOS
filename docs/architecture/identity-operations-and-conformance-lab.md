@@ -24,6 +24,8 @@ flowchart LR
 
 Tenant data holds federation rotations, recovery requests, conformance campaigns and directory reconciliations. Sessions remain control-plane records but carry exactly one tenant and principal. API callers cannot supply the effective actor: it is always derived from the authenticated tenant-user session. Service credentials may operate the scoped SCIM protocol, but cannot propose, approve, recover or certify human access.
 
+The canonical IAM administration workspace is a read-only tenant projection at `GET /admin/identity-governance/workspace`. It composes ownership, effective principal access, pending role/staffing/ownership/emergency requests, escalation state, feature readiness and minimum launch coverage. Every mutation continues to use its existing maker-checker domain workflow; the workspace is not a privileged bypass.
+
 ## Lifecycle controls
 
 ### Planned federation metadata and key rotation
@@ -35,6 +37,8 @@ Tenant data holds federation rotations, recovery requests, conformance campaigns
 `POST /admin/identity-operations/federation/policies/{policyId}/suspension` is intentionally immediate. It requires a reason and incident/evidence reference, suspends the policy and explicitly revokes every active session for affected federated users. `POST /admin/identity-operations/sessions/revoke` provides the same attributed, tenant-scoped all-session containment for one principal.
 
 SCIM `active=false` now performs four actions in the same operation: inactivate the login, suspend the canonical principal, calculate staffing/pause/escalation impact, and mark every matching persisted session `revoked` with revoker and reason. The audit event includes the exact revoked session IDs. Rehire never silently restores old canonical grants.
+
+`POST /federation/v1/logout-events` accepts a trusted-adapter attestation for a signed, short-lived OIDC back-channel logout, OIDC token-revocation, SAML single-logout or provider-session-revocation event from a tenant service credential scoped to `federation:revoke`. Issuer, audience, tenant, policy, subject, optional provider session id, validity window and evidence checksum are bound into an idempotent event checksum. A conflicting replay is rejected; an exact replay returns the original result. Matching persisted sessions are revoked immediately and the exact session IDs, revoker and reason are retained. This surface remains a simulator/proxy contract (`commerciallyLive: false`) until a tenant-specific provider and signature-validation adapter are commercially activated and witnessed.
 
 ### Authenticator recovery
 
@@ -65,6 +69,8 @@ The dashboard Administration dialog now includes **Identity Operations**. It sho
 
 The existing Tenant Users, Access Reviews, Service Access, Audit and canonical Identity Governance APIs remain authoritative for user records, access reviews, service credentials, role grants/revocations, staffing, emergency access and activity custody. The control room is an operational composition of those controls, not a second authorization model.
 
+The same administration area now exposes the full canonical IAM workspace: effective human and agent access, the 85-role catalogue and hard SoD pairs, removal-impact checks, maker-checker grant/revocation queues, all 34 feature-staffing policies, pause/escalation state, ownership transfer and time-bounded emergency access. It also exposes the operational-run and resilience-drill controls described below. Tenant service credentials cannot read or operate this human administration workspace.
+
 ## Operational readiness automation
 
 `GET /admin/identity-operations/summary` recomputes readiness from current users, sessions, federation policies, all six conformance families, role requests, recovery/rotation requests, staffing configuration and open escalations. It reports `ready_for_simulated_operations` or `needs_attention`, never production-ready or commercially-live. Production activation additionally requires:
@@ -76,6 +82,25 @@ The existing Tenant Users, Access Reviews, Service Access, Audit and canonical I
 5. deployed per-tenant control-engine identity, mTLS and KMS grants;
 6. connected SIEM/WORM/trusted-time services with restore and gap detection;
 7. institutional IAM/SOC/on-call ownership, runbooks, evidence retention and independent assurance.
+
+### Governed operational runs
+
+`POST /admin/identity-operations/automation/runs` builds a checksum-sealed plan from metadata expiry, missing/stale conformance packs, overdue rotation/recovery/role requests, overdue access reviews, stale directory reconciliation, unsafe active sessions and uncustodied activity batches. Automation is deliberately narrow: it may automatically revoke an active session belonging to an inactive principal or inactive federation policy. It cannot approve a role or recovery, activate federation or close an escalation. Every run retains its findings, exact containment results, actor, evidence reference and plan checksum. `GET /automation/runs` returns the tenant run history.
+
+This is an executable run-once control, not yet a deployed scheduler. A production scheduler must use a named workload identity, tenant fencing, lease/idempotency controls, alert delivery and externally retained run evidence.
+
+### Witnessed resilience drills
+
+The drill registry covers IdP outage, signing-key compromise, SCIM-credential compromise, leaver containment, control-engine outage, SIEM/WORM outage, metadata rollover and directory drift. One tenant/security administrator proposes a drill with a runbook and target detection, containment and recovery times; a different administrator witnesses it through `/admin/identity-operations/drills/{drillId}/witness`. Passing requires measured objectives, fail-closed observation, complete audit evidence and independent execution/recovery references. A failed drill remains failed evidence and must be followed by remediation and a new drill. Every drill is explicitly simulated and non-live.
+
+## Enterprise and organisation-admission emulator coverage
+
+The identity packs are complemented by two exhaustive simulator catalogues:
+
+- 85 enterprise-platform scenarios across KMS/HSM/vault, broker/DLQ, CDC/checkpoints, MDM/device lifecycle, deployment compensation/rollback and trusted time;
+- 153 organisation-admission scenarios across `INT-ADM-01` through `INT-ADM-10`, including invitation delivery, legal/tax and regulated-entity authority, representative signature, corporate domain, abuse/device risk, contracting, billing, infrastructure provisioning and workforce federation/re-verification.
+
+Both catalogues are deterministic, checksum-bound, tenant-isolated and fail closed on missing, altered, duplicate or unsafe evidence. They certify LoanOS contracts only. They do not certify or activate a commercial provider.
 
 ## Rollback and recovery
 
@@ -90,9 +115,18 @@ The existing Tenant Users, Access Reviews, Service Access, Audit and canonical I
 
 - `packages/core/src/identity-operations.js`
 - `packages/core/src/identity-integration-conformance.js`
+- `packages/core/src/identity-operational-automation.js`
+- `packages/core/src/enterprise-platform-conformance.js`
+- `packages/core/src/organisation-admission-conformance.js`
 - `apps/api/src/routes/identity-operations.js`
+- `apps/api/src/routes/enterprise-controls.js`
 - `apps/dashboard/index.html` and `apps/dashboard/index.js`
 - `tests/identity-operations.test.js`
 - `tests/identity-integration-conformance.test.js`
 - `tests/identity-operations-api.test.js`
+- `tests/identity-operational-automation.test.js`
+- `tests/federated-revocation-api.test.js`
+- `tests/iam-administration-workspace.test.js`
+- `tests/enterprise-platform-conformance.test.js`
+- `tests/organisation-admission-conformance.test.js`
 - `tests/scim-protocol-api.test.js`

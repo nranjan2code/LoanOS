@@ -78,7 +78,7 @@ export function federatedPrincipalFromClaims(policy, verification) {
   const groups = list(claims.groups);
   const mappings = groups.map((group) => policy.groupMappings?.[group]).filter(Boolean);
   if (!mappings.length) fail("federated_group_unmapped", "Federated identity has no approved group mapping.");
-  return { externalId: subject, email, displayName: String(claims.name ?? email), groups, requestedCanonicalRoleIds: [...new Set(mappings.flatMap((mapping) => mapping.canonicalRoleIds ?? []))], assurance: verification.assurance, evidenceChecksumSha256: verification.evidenceChecksumSha256 };
+  return { externalId: subject, providerSessionId: typeof claims.sid === "string" && claims.sid.trim() ? claims.sid : null, email, displayName: String(claims.name ?? email), groups, requestedCanonicalRoleIds: [...new Set(mappings.flatMap((mapping) => mapping.canonicalRoleIds ?? []))], assurance: verification.assurance, evidenceChecksumSha256: verification.evidenceChecksumSha256 };
 }
 
 export function scimUserResourceToIdentityEvent(resource, { policyId, operation = "upsert", appliedBy = "scim", idempotencyKey, eventId } = {}) {
