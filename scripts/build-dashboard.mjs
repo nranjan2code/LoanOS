@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Live build dashboard generator for LoanOS India.
-// Re-scans git, the full capability register (463 caps across 33 categories),
+// Re-scans git and the full capability register across all catalogue categories,
 // backlog epics, and runs the test suite, then writes a self-contained
 // docs/dashboard.html. Run: node scripts/build-dashboard.mjs
 import { execFileSync, execSync } from 'node:child_process';

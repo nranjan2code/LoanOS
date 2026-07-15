@@ -24,6 +24,9 @@ test("every depth claim has repository evidence and maps only to governed shared
     assert.ok(journey.gaps.length > 0, `${journey.journeyType} must retain truthful gaps`);
     for (const batchId of journey.gaps) assert.ok(audit.batches[batchId], `${journey.journeyType} references ${batchId}`);
   }
-  assert.equal(audit.journeys.filter((item) => item.apiDepth === "kernel_not_persisted").length, 17);
+  assert.equal(audit.journeys.filter((item) => item.apiDepth === "kernel_not_persisted").length, 0);
+  assert.equal(audit.journeys.filter((item) => item.apiDepth === "tenant_persistent_specialist_partial").length, 17);
+  assert.equal(audit.journeys.filter((item) => item.gaps.includes("JD-02")).length, 0);
+  for (const ref of audit.completedBatchEvidence["JD-02"]) await access(new URL(`../${ref}`, import.meta.url));
   assert.equal(audit.journeys.filter((item) => item.experienceDepth === "missing_specialised").length, 19);
 });

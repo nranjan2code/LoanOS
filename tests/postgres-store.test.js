@@ -272,6 +272,32 @@ test("Postgres tenant lock makes competing identity-worker claims atomic and RLS
   });
 });
 
+test("Postgres persists specialist journey cases under tenant RLS without cross-tenant visibility", { skip: describeSkip && skipReason }, async (t) => {
+  const pg = await import("pg");
+  const { Pool } = pg.default;
+  const adminPool = new Pool({ connectionString: DATABASE_URL_TEST });
+  t.after(() => adminPool.end());
+  await applySchema(adminPool);
+  await resetDatabase(adminPool);
+  for (const tenantId of ["tnt_specialist_a", "tnt_specialist_b"]) {
+    await adminPool.query(`INSERT INTO tenants (tenant_id, name, api_key_hash, onboarding) VALUES ($1, $2, $3, '{}'::jsonb)`, [tenantId, tenantId, "hash"]);
+  }
+  const postgresStore = await import("../apps/api/src/postgres-store.js");
+  const { approveSpecialistJourneyConfiguration, openSpecialistJourneyCase, proposeSpecialistJourneyConfiguration } = await import("../packages/core/src/specialist-journey-service.js");
+  await postgresStore.resetPoolForTests(rewriteRole(DATABASE_URL_TEST, "loanos_control_plane"));
+  t.after(() => postgresStore.resetPoolForTests(DATABASE_URL_TEST));
+  const H = "a".repeat(64), tenantId = "tnt_specialist_a";
+  let state = await postgresStore.loadTenantDataOnly("ignored", tenantId);
+  let result = proposeSpecialistJourneyConfiguration(state, { tenantId, requestId: "request-home", configurationId: "config-home", journeyType: "home_loan", productTemplateRef: "builtin:home_loan", productTemplateVersion: "1.0.0", productTemplateChecksumSha256: H, schemaVersion: "1.0.0", policyVersionRef: "policy/v1", workflowVersionRef: "workflow/v1", accountingPolicyRef: "accounting/v1", assignedRoleIds: ["credit_operations_officer", "credit_approver"], kernelConfiguration: { minimumAmountPaise: "100", maximumAmountPaise: "1000000", maximumLtvPercent: "75.0000", eligibilityPolicyRef: "eligibility/v1", kycControlRef: "kyc/v1", agreementTemplateRef: "agreement/v1", servicingPolicyRef: "servicing/v1", collateralPolicyRef: "collateral/v1" }, idempotencyKey: "configuration/home", proposedBy: "maker" });
+  result = approveSpecialistJourneyConfiguration(result.state, { tenantId, requestId: "request-home", approvedBy: "checker", approvalRef: "approval/home" });
+  const opened = openSpecialistJourneyCase(result.state, { tenantId, caseId: "case-home", configurationId: "config-home", expectedConfigurationVersion: 1, subjectRef: "borrower/1", sourceApplicationRef: "application/1", assignedPrincipalIds: ["operator"], idempotencyKey: "case/home", openedBy: "operator" });
+  await postgresStore.saveTenantDataOnly("ignored", tenantId, opened.state);
+  state = await postgresStore.loadTenantDataOnly("ignored", tenantId);
+  assert.equal(state.specialistJourneyCases[`${tenantId}:case-home`].status, "active");
+  const other = await postgresStore.loadTenantDataOnly("ignored", "tnt_specialist_b");
+  assert.equal(other.specialistJourneyCases?.[`${tenantId}:case-home`], undefined);
+});
+
 test("storage.js with LOANOS_STORAGE_DRIVER=postgres serves a full multi-tenant API round-trip", { skip: describeSkip && skipReason }, async (t) => {
   const pg = await import("pg");
   const { Pool } = pg.default;

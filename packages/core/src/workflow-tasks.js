@@ -7,6 +7,7 @@ import { enrichLegalRecoveryCase, evaluatePromisesToPay } from "./collections-re
 import { enrichCicCorrection } from "./cic-reporting.js";
 import { REPORT_STATUSES, REPORT_TYPES, enrichFiuReport } from "./fiu-str.js";
 import { SECURITY_INTEREST_STATUSES, enrichSecurityInterest } from "./cersai.js";
+import { projectSpecialistJourneyTasks } from "./specialist-journey-service.js";
 
 export const WORKFLOW_TASK_STATUSES = {
   OPEN: "open",
@@ -48,7 +49,10 @@ const TASK_SLA_HOURS = {
   "fiu.repair": 24,
   "cersai.filing": 24,
   "cersai.response": 24,
-  "cersai.repair": 24
+  "cersai.repair": 24,
+  "specialist_journey.action": 8,
+  "specialist_journey.exception": 4,
+  "specialist_journey.recovery": 4
 };
 
 export function normalizeWorkflowTaskStore(store = {}) {
@@ -70,12 +74,18 @@ export function deriveWorkflowTasks(state, options = {}) {
     ...deriveCicTasks(state, asOf),
     ...deriveCkycrrTasks(state, asOf),
     ...deriveFiuTasks(state, asOf),
-    ...deriveCersaiTasks(state, asOf)
+    ...deriveCersaiTasks(state, asOf),
+    ...deriveSpecialistJourneyTasks(state)
   ]
     .map((task) => applyTaskRecord(task, taskStore.records[task.taskId]))
     .map((task) => withTaskSla(task, asOf));
 
   return tasks.filter((task) => matchesTaskFilters(task, options.filters ?? {}));
+}
+
+function deriveSpecialistJourneyTasks(state) {
+  const tenantIds = [...new Set(Object.values(state?.specialistJourneyCases ?? {}).map((item) => item.tenantId).filter(Boolean))];
+  return tenantIds.flatMap((tenantId) => projectSpecialistJourneyTasks(state, tenantId));
 }
 
 function deriveCersaiTasks(state, asOf) {

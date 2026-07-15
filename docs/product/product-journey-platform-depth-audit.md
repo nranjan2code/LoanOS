@@ -42,7 +42,7 @@ Readiness is fail closed. It is not a percentage average: a missing authority, a
 | Canonical built-ins | 21 | Catalogue/provisioning definitions exist for the complete set. |
 | Controlled first slices | 3 | Personal loan, co-lending programme and MSME working capital have the strongest composed domain/API paths. They are still not tenant-production-ready. |
 | Configurable patterns | 18 | They have prerequisite templates and shared lifecycle building blocks, not complete products. |
-| Specialized/trade kernels not persisted through API | 17 | Thirteen specialized families and four trade families are deterministic/tested domain functions, but no tenant-persistent API invokes them. |
+| Specialist/trade persistent service | 17 | All thirteen specialised families and four trade families now have a shared tenant-persistent configuration/case/action API with exact version lineage. This remains a specialist-service slice, not a composed end-to-end product. |
 | Product-specific experience missing | 19 | Co-lending, working-capital, asset, property, gold, field, merchant and trade facts do not have adequate specialized workspaces. Personal/MSME term have generic application surfaces only. |
 | Production-ready | 0 | No selected-provider, tenant-UAT, operations, security and DR evidence chain exists. |
 
@@ -50,19 +50,21 @@ Important defects found by the audit:
 
 - Resolved in the JD-01 foundation: `registries.js`, prepayment/foreclosure classification, tests and tenant onboarding now use only the canonical 21; legacy generic product IDs are rejected rather than aliased. Facility mechanics remain independently expressed as `term_loan`, `revolving_credit`, or `overdraft`.
 - Resolved in the JD-01 foundation: the platform onboarding selector exposes exactly the canonical 21 and is regression-tested against the domain catalogue.
-- `specialised-lending-journeys.js` and `working-capital-trade-journeys.js` are exported and unit tested but have no API route, persistent tenant registry lifecycle, audit event, workflow task, or UI consumer.
+- Resolved in JD-02: `specialist-journey-service.js` wraps all 17 kernel-only journeys in persistent configurations, cases, checksum-bound action requests, independent approval, workflow tasks, visible exceptions, suspension and access-revocation containment. `/admin/specialist-journeys` binds tenant and actor authority to the authenticated session; file restart and PostgreSQL RLS tests cover persistence boundaries. A specialised UI consumer remains JD-03.
 - The borrower form is a generic product/amount/tenor/destination-account form. It cannot capture property/title, dealer/vehicle, assay/custody, education, agricultural, group, merchant, invoice/PO/shipment, anchor, or co-lending facts.
 - Staff workspaces implement generic task and selected operational actions, not complete archetype-specific origination-to-closure desks.
 - JD-05 foundation implemented: every canonical journey receives 16 stable common scenarios plus one archetype-specific scenario; campaign proposal, independent approval, immutable result evidence, independent assessment, tenant persistence/API and audit events are executable. The scenario contracts exist, but the generated end-to-end runners that drive every platform layer are still to be implemented.
 
-### JD-01/JD-05 foundation delivered
+### JD-01/JD-02/JD-05 foundations delivered
 
 - Canonical/business journey classification is centralized in `product-journey-administration.js`.
 - Product-policy validation rejects every removed legacy ID and accepts all canonical built-ins.
 - Tenant onboarding renders the exact canonical catalogue.
 - `product-journey-conformance.js` creates checksum-bound 17-scenario manifests for all 21, with exact-content idempotency, four-eyes approval, evidence checksums, assessor independence and a simulated/live distinction.
 - `/admin/product-journey-conformance` persists campaign administration and exposes tenant coverage; no conformance result directly marks a journey production-ready.
-- Remaining JD-01 work is the complete subscription/add-product/configuration/staffing administration workspace. Remaining JD-05 work is generated full-stack/API/browser/PostgreSQL execution for every scenario contract.
+- The shared specialist service activates immutable configurations, opens version-bound cases, executes the 13 specialised and four trade kernels only after independent action approval, and preserves failures as actionable exceptions.
+- Configuration suspension, principal suspension/inactivation and role revocation immediately pause affected cases and expose critical escalations/tasks.
+- Remaining JD-01 work is the complete subscription/add-product/configuration/staffing administration workspace. JD-02 is complete at the persistent service/API boundary; JD-03 must render its schemas and workspaces, and JD-04 must compose it with the common lending lifecycle. Remaining JD-05 work is generated full-stack/API/browser execution for every scenario contract.
 
 ## Greenfield rule
 
@@ -88,6 +90,8 @@ Acceptance: every platform/product-policy record uses a canonical or governed cu
 Wrap the 13 specialized and four trade kernels in tenant-persistent services and API routes. Add immutable version binding, idempotency, actor attribution, maker-checker, audit events, workflow tasks, exception state, and safe suspension.
 
 Acceptance: a tenant can configure and assess every specialized/trade pack through authenticated APIs; restart persistence and PostgreSQL RLS are proven; no body-supplied tenant/actor authority is trusted.
+
+Status: persistent service slice delivered. All 17 use one service, exact template/configuration/schema/policy/workflow lineage, maker-checker configuration and actions, restart-safe storage, RLS-scoped Postgres storage, workflow projections, visible exception state, and immediate safety pause. Product-specific capture screens and common LOS/LMS composition deliberately remain JD-03/JD-04.
 
 ### JD-03 — Archetype schemas and workspaces · all 21
 

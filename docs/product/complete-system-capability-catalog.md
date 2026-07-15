@@ -741,6 +741,8 @@ The detailed register contains **462 individually identified capabilities**. At 
 
 The complete-system catalogue must be filtered into a product pack before a product is advertised or committed. Each pack inherits all applicable `Core` capabilities and adds its specific requirements.
 
+JD-02 now provides a governed tenant-persistent backend service for the 13 specialised and four trade packs: exact version binding, independently approved configuration/actions, exceptions, workflow tasks and revocation pause. This improves execution depth but does not supply the JD-03 specialised channel workspaces or JD-04 common origination-to-closure composition described below.
+
 ### Unsecured personal term loan
 
 - Individual KYC, bureau, affordability, KFS, direct disbursement, monthly servicing, payment reconciliation, CIC reporting, complaints, collections, and closure.
@@ -768,7 +770,7 @@ The complete-system catalogue must be filtered into a product pack before a prod
 ### Gold loan
 
 - Assaying, purity/net-weight valuation, LTV monitoring, dual-control custody, packet/barcode, branch vault, auction notices, auction execution, surplus refund, and collateral release.
-- Entire specialist workflow is currently missing.
+- The assay/weight/custody/LTV kernel is now reachable through the governed persistent specialist service. Branch assay/custody/auction workspaces and common origination-to-closure composition remain missing.
 
 ### Education loan
 

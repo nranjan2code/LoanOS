@@ -6897,6 +6897,16 @@
         "type": "test",
         "ref": "tests/compliance.test.js",
         "note": "Executable coverage for the LWS capability family."
+      },
+      {
+        "type": "code",
+        "ref": "packages/core/src/specialist-journey-service.js",
+        "note": "Specialist cases project active, paused and exception work into the shared workflow task boundary."
+      },
+      {
+        "type": "test",
+        "ref": "tests/specialist-journey-service.test.js",
+        "note": "Executable evidence for specialist action, recovery and exception task projection."
       }
     ],
     "acceptance": "Automated tests exercise derived queues by domain state and exception and the cited implementation enforces the capability boundary.",
@@ -9574,6 +9584,16 @@
         "type": "doc",
         "ref": "docs/architecture/current-implementation.md",
         "note": "Documented architecture or regulatory boundary for PRD-010."
+      },
+      {
+        "type": "code",
+        "ref": "packages/core/src/specialist-journey-service.js",
+        "note": "All 17 specialist/trade configurations and business actions require independent authenticated approval."
+      },
+      {
+        "type": "test",
+        "ref": "tests/specialist-journey-service.test.js",
+        "note": "Executable maker-checker, idempotency, tamper, version and suspension evidence for JD-02."
       }
     ],
     "acceptance": "Product approval, maker-checker publication, and rollback is accepted when tenant-scoped execution fails closed on invalid authority or evidence, retains auditable lineage, and the cited automated control-family tests pass.",

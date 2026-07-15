@@ -27,6 +27,7 @@ import {
   requestEmergencyAccess,
   requestOwnershipTransfer
 } from "../../../../packages/core/src/saas-identity-governance.js";
+import { pauseSpecialistCasesForPrincipal } from "../../../../packages/core/src/specialist-journey-service.js";
 import { decidePlatformControlStaffing } from "../control-rules-engine.js";
 
 const PREFIX = "/admin/identity-governance";
@@ -112,8 +113,9 @@ export async function routeSaasIdentityGovernance(req, res, { method, path, tena
     if (method === "POST" && principalStatus) {
       requireCanonicalAction(state, tenant.tenantId, actor, "user.manage");
       const result = changeSaasPrincipalStatus(state, { ...body, tenantId: tenant.tenantId, principalId: decodeURIComponent(principalStatus[1]), changedBy: actor });
-      await persist(store, result.state, "saas_identity.principal_status_changed", actor, { principalId: result.principal.principalId, status: result.principal.status, staffingImpact: result.staffingImpact });
-      sendJson(res, 200, { principal: result.principal, staffingImpact: result.staffingImpact, escalations: result.escalations });
+      const specialist = result.principal.status === "active" ? { state: result.state, affectedCaseIds: [], escalations: [] } : pauseSpecialistCasesForPrincipal(result.state, { tenantId: tenant.tenantId, principalId: result.principal.principalId, actor, causeType: `principal_${result.principal.status}`, causeRef: required(body.evidenceRef, "evidenceRef") });
+      await persist(store, specialist.state, "saas_identity.principal_status_changed", actor, { principalId: result.principal.principalId, status: result.principal.status, staffingImpact: result.staffingImpact, pausedSpecialistCaseIds: specialist.affectedCaseIds });
+      sendJson(res, 200, { principal: result.principal, staffingImpact: result.staffingImpact, escalations: [...result.escalations, ...specialist.escalations], pausedSpecialistCaseIds: specialist.affectedCaseIds });
       return true;
     }
 
@@ -249,8 +251,9 @@ export async function routeSaasIdentityGovernance(req, res, { method, path, tena
     if (method === "POST" && revokeApproval) {
       const requestId = decodeURIComponent(revokeApproval[1]);
       const result = approveRoleRevocation(state, { ...body, requestId, tenantId: tenant.tenantId, approvedBy: actor });
-      await persistAndSyncCoverage(store, stateRef, tenant, result.state, "saas_identity.role_revocation_approved", actor, { requestId });
-      sendJson(res, 200, { request: result.request, grants: result.grants });
+      const specialist = pauseSpecialistCasesForPrincipal(result.state, { tenantId: tenant.tenantId, principalId: result.request.principalId, actor, causeType: "role_revocation", causeRef: required(body.approvalRef, "approvalRef") });
+      await persistAndSyncCoverage(store, stateRef, tenant, specialist.state, "saas_identity.role_revocation_approved", actor, { requestId, pausedSpecialistCaseIds: specialist.affectedCaseIds });
+      sendJson(res, 200, { request: result.request, grants: result.grants, pausedSpecialistCaseIds: specialist.affectedCaseIds, specialistEscalations: specialist.escalations });
       return true;
     }
 
