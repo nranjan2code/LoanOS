@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#123e32">
+  <meta name="description" content="Tenant-entitled, schema-driven lending journey workspace.">
+  <title>Lending journeys</title>
+  <link rel="stylesheet" href="/shared/design-tokens.css">
+  <link rel="stylesheet" href="/journey-workspace/workspace.css?v=1">
+  <script src="/journey-workspace/workspace.js?v=1" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+  <p id="offline" class="offline" role="status" hidden>Offline: customer and lending data are not cached. Reconnect to continue securely.</p>
+  <header class="topbar">
+    <a id="back" class="brand" href="/">▲ <span>LoanOS</span></a>
+    <div class="controls">
+      <label for="language">Language</label>
+      <select id="language"><option value="en">English</option><option value="hi">हिन्दी</option></select>
+      <label id="staff-channel-label" for="staff-channel">Workspace</label>
+      <select id="staff-channel"><option value="branch">Branch</option><option value="credit">Credit</option><option value="operations">Operations</option><option value="control">Control</option></select>
+    </div>
+  </header>
+  <main id="main">
+    <section class="hero" aria-labelledby="page-title">
+      <p class="eyebrow" id="channel-label">Governed lending workspace</p>
+      <h1 id="page-title">Choose a lending journey</h1>
+      <p id="page-description">Only products activated for this tenant and authorised for your role appear here.</p>
+      <div class="trust"><span>Tenant isolated</span><span>No browser PII storage</span><span>Version bound</span><span>Fully attributable</span></div>
+    </section>
+    <div id="status" class="status" role="status" aria-live="polite">Loading authorised journeys…</div>
+    <section id="catalogue" class="catalogue" aria-label="Available lending journeys"></section>
+    <section id="workspace" class="workspace" aria-labelledby="workspace-title" hidden>
+      <div class="workspace-head"><div><p class="eyebrow" id="schema-meta"></p><h2 id="workspace-title"></h2></div><button id="close-workspace" class="secondary" type="button">Back to journeys</button></div>
+      <form id="journey-form" novalidate>
+        <div id="form-sections"></div>
+        <section class="documents" aria-labelledby="documents-title"><h3 id="documents-title">Required evidence</h3><div id="document-list"></div></section>
+        <section class="actions" aria-labelledby="actions-title"><h3 id="actions-title">Authorised next actions</h3><div id="action-list"></div></section>
+        <label class="confirm"><input id="declaration" type="checkbox" required><span>I confirm these details and evidence references are accurate and authorised for this journey.</span></label>
+        <div class="form-actions"><button class="secondary" id="save-draft" type="button">Save secure draft</button><button class="primary" type="submit">Submit application</button></div>
+        <p id="form-status" class="status" role="status" aria-live="polite"></p>
+      </form>
+    </section>
+  </main>
+  <noscript>This secure workspace requires JavaScript to render governed schemas. No data is stored in the browser.</noscript>
+</body>
+</html>

@@ -15,6 +15,7 @@ import { routeIdentityOperations, routeIdentityOperationsWorker } from "./routes
 import { routeTenantActivation } from "./routes/tenant-activation.js";
 import { routeProductJourneyConformance } from "./routes/product-journey-conformance.js";
 import { routeSpecialistJourneys } from "./routes/specialist-journeys.js";
+import { routeJourneyWorkspaces } from "./routes/journey-workspaces.js";
 import { routeConformanceAdministration } from "./routes/conformance-administration.js";
 import { routeAiAgentPlatform } from "./routes/ai-agent-platform.js";
 import { enforceUniversalMutationStaffing } from "./mutation-staffing-policy.js";
@@ -773,6 +774,9 @@ async function route(req, res, dataDir, platformAdminKey, observability, allowDi
   if (method === "GET" && path.startsWith("/shared/")) {
     return serveStaticFile(res, appsRoot, "shared", path, "/shared/");
   }
+  if (method === "GET" && path.startsWith("/journey-workspace/")) {
+    return serveStaticFile(res, appsRoot, "journey-workspace", path, "/journey-workspace/");
+  }
 
   // --- Platform SaaS website at / ---
   if (method === "GET" && (path === "/" || path === "/index.html")) {
@@ -875,6 +879,9 @@ async function route(req, res, dataDir, platformAdminKey, observability, allowDi
     }
 
     // GET /t/{tenantId}/staff/ → Staff workspace (dashboard)
+    if (subPath === "/staff/journeys" || subPath === "/staff/journeys/") {
+      return serveStaticFile(res, appsRoot, "journey-workspace", "/index.html", "/");
+    }
     if (subPath === "/staff" || subPath === "/staff/") {
       return serveStaticFile(res, appsRoot, "dashboard", "/index.html", "/");
     }
@@ -884,6 +891,9 @@ async function route(req, res, dataDir, platformAdminKey, observability, allowDi
     }
 
     // GET /t/{tenantId}/portal/ → Customer/borrower portal
+    if (subPath === "/portal/journeys" || subPath === "/portal/journeys/") {
+      return serveStaticFile(res, appsRoot, "journey-workspace", "/index.html", "/");
+    }
     if (subPath === "/portal" || subPath === "/portal/") {
       return serveStaticFile(res, appsRoot, "customer", "/index.html", "/");
     }
@@ -893,12 +903,20 @@ async function route(req, res, dataDir, platformAdminKey, observability, allowDi
     }
 
     // GET /t/{tenantId}/partners/ → Branch and authorised-channel workspace
+    if (subPath === "/partners/journeys" || subPath === "/partners/journeys/") {
+      return serveStaticFile(res, appsRoot, "journey-workspace", "/index.html", "/");
+    }
     if (subPath === "/partners" || subPath === "/partners/") {
       return serveStaticFile(res, appsRoot, "partner", "/index.html", "/");
     }
     if (subPath.startsWith("/partners/")) {
       const assetPath = subPath.slice("/partners".length);
       return serveStaticFile(res, appsRoot, "partner", assetPath, "/");
+    }
+
+    // GET /t/{tenantId}/field/ → Certified field-device journey workspace.
+    if (subPath === "/field" || subPath === "/field/" || subPath === "/field/journeys" || subPath === "/field/journeys/") {
+      return serveStaticFile(res, appsRoot, "journey-workspace", "/index.html", "/");
     }
 
     // Fallback: unknown sub-route under /t/{tenantId}/
@@ -1268,6 +1286,7 @@ async function route(req, res, dataDir, platformAdminKey, observability, allowDi
   if (await routeTenantActivation({ method, path, req, res, tenant, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
   if (await routeProductJourneyConformance({ method, path, req, res, tenant, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
   if (await routeSpecialistJourneys({ method, path, req, res, tenant, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
+  if (await routeJourneyWorkspaces({ method, path, req, res, tenant, store, readJson, sendJson, appendEvent, authContext, authActor })) return;
   if (await routeConformanceAdministration({ method, path, req, res, tenant, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
   if (await routeRiskAmlControls({ method, path, req, res, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
   if (await routeImplementationControls({ method, path, req, res, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
@@ -7481,6 +7500,7 @@ function authorizeBorrowerRoute(method, path, borrowerId, tenantData) {
   }
   if (method === "GET" && path === "/borrower/application-options") return allow();
   if (method === "POST" && path === "/borrower/applications") return allow();
+  if ((method === "GET" || method === "POST") && path.startsWith("/journey-workspaces/borrower/")) return allow();
   if (method === "POST" && ["/complaints", "/erasure-requests"].includes(path)) {
     return allow();
   }

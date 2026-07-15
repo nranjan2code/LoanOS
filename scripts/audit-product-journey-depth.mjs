@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 
 import { PRODUCT_JOURNEY_TYPES } from "../packages/core/src/product-journey-administration.js";
 import { PERSISTENT_SPECIALIST_JOURNEY_TYPES } from "../packages/core/src/specialist-journey-service.js";
+import { JOURNEY_WORKSPACE_ARCHETYPES, PRODUCT_TO_WORKSPACE_ARCHETYPE, validateJourneyWorkspaceCatalogue } from "../packages/core/src/journey-workspace.js";
 
 const root = resolve(new URL("..", import.meta.url).pathname);
 const audit = JSON.parse(await readFile(resolve(root, "docs/product/product-journey-platform-depth.json"), "utf8"));
@@ -18,6 +19,13 @@ for (const ref of audit.completedBatchEvidence?.["JD-02"] ?? []) {
   try { await access(resolve(root, ref)); } catch { errors.push(`JD-02 evidence does not exist: ${ref}`); }
 }
 if ((audit.completedBatchEvidence?.["JD-02"] ?? []).length < 5) errors.push("JD-02 requires domain, API, restart and PostgreSQL evidence");
+const workspaceValidation = validateJourneyWorkspaceCatalogue();
+if (!workspaceValidation.valid) errors.push(...workspaceValidation.errors);
+if (JOURNEY_WORKSPACE_ARCHETYPES.length !== 11 || Object.keys(PRODUCT_TO_WORKSPACE_ARCHETYPE).length !== 21) errors.push("JD-03 must map the canonical 21 to exactly 11 workspace schemas");
+for (const ref of audit.completedBatchEvidence?.["JD-03"] ?? []) {
+  try { await access(resolve(root, ref)); } catch { errors.push(`JD-03 evidence does not exist: ${ref}`); }
+}
+if ((audit.completedBatchEvidence?.["JD-03"] ?? []).length < 7) errors.push("JD-03 requires schema, API, UI, test and architecture evidence");
 
 for (const journey of audit.journeys) {
   for (const field of ["journeyType", "archetype", "maturity", "apiDepth", "experienceDepth", "testDepth"]) if (!journey[field]) errors.push(`${journey.journeyType || "unknown"}.${field} is required`);
@@ -41,13 +49,14 @@ const summary = {
   kernelNotPersisted: audit.journeys.filter((item) => item.apiDepth === "kernel_not_persisted").length,
   persistentSpecialistApi: persistentSpecialist.length,
   specialisedExperienceMissing: audit.journeys.filter((item) => item.experienceDepth === "missing_specialised").length,
+  schemaWorkspacePartial: audit.journeys.filter((item) => item.experienceDepth === "schema_workspace_partial").length,
   batches: batches.map((item) => ({ batchId: item.batchId, affectedCount: item.affectedJourneys.length }))
 };
 
 if (process.argv.includes("--json")) process.stdout.write(`${JSON.stringify({ valid: errors.length === 0, errors, summary, batches }, null, 2)}\n`);
 else {
   process.stdout.write(`product journey platform-depth audit · journeys=${summary.canonicalJourneys} · controlled=${summary.controlledFirstSlice} · configurable=${summary.configurablePattern} · production-ready=0\n`);
-  process.stdout.write(`kernel-not-persisted=${summary.kernelNotPersisted} · persistent-specialist-api=${summary.persistentSpecialistApi} · specialised-experience-missing=${summary.specialisedExperienceMissing}\n`);
+  process.stdout.write(`kernel-not-persisted=${summary.kernelNotPersisted} · persistent-specialist-api=${summary.persistentSpecialistApi} · schema-workspace-partial=${summary.schemaWorkspacePartial} · specialised-experience-missing=${summary.specialisedExperienceMissing}\n`);
   for (const batch of batches) process.stdout.write(`${batch.batchId} · ${batch.affectedJourneys.length}/21 · ${batch.name}\n`);
   if (errors.length) for (const error of errors) process.stderr.write(`ERROR ${error}\n`);
 }

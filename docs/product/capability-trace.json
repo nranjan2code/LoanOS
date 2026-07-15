@@ -12762,6 +12762,16 @@
         "note": "Implementation evidence for borrower application and onboarding journey."
       },
       {
+        "type": "code",
+        "ref": "packages/core/src/journey-workspace.js",
+        "note": "Tenant-entitled borrower schemas cover common and specialist capture for all 21 journeys with field classification and redaction."
+      },
+      {
+        "type": "test",
+        "ref": "tests/journey-workspace.test.js",
+        "note": "Executable 21-to-11 schema, entitlement, exact-money, ownership and submission validation evidence."
+      },
+      {
         "type": "test",
         "ref": "tests/operational-workspaces.test.js",
         "note": "Executable acceptance evidence for borrower application and onboarding journey."
@@ -12897,6 +12907,16 @@
         "note": "Implementation evidence for underwriter case desktop with financial, bureau, policy, deviations, and note."
       },
       {
+        "type": "code",
+        "ref": "apps/journey-workspace/workspace.js",
+        "note": "Schema-driven credit workspace renders only role-authorised specialist fields, evidence and actions."
+      },
+      {
+        "type": "test",
+        "ref": "tests/journey-workspace-api.test.js",
+        "note": "Authenticated tenant/role projection and persistent redacted credit-draft evidence."
+      },
+      {
         "type": "test",
         "ref": "tests/operational-workspaces.test.js",
         "note": "Executable acceptance evidence for underwriter case desktop with financial, bureau, policy, deviations, and note."
@@ -12922,6 +12942,11 @@
         "type": "code",
         "ref": "apps/dashboard/workspaces.js",
         "note": "Implementation evidence for operations/disbursement task workspace."
+      },
+      {
+        "type": "code",
+        "ref": "packages/core/src/journey-workspace.js",
+        "note": "Operations channel projections expose product-specific documents and actions under role and maker-checker metadata."
       },
       {
         "type": "test",
@@ -13069,6 +13094,16 @@
         "note": "Implementation evidence for branch, dsa, bc, dealer, merchant, lsp, and partner portals."
       },
       {
+        "type": "code",
+        "ref": "apps/journey-workspace/workspace.js",
+        "note": "One shared branch/partner/field workspace renders tenant-entitled product schemas without cloned channel applications."
+      },
+      {
+        "type": "test",
+        "ref": "tests/journey-workspace-ui.test.js",
+        "note": "Safe-DOM, multilingual, accessible and browser-privacy workspace evidence."
+      },
+      {
         "type": "test",
         "ref": "tests/customer-channel-operations.test.js",
         "note": "Executable coverage for the UX capability family."
@@ -13094,6 +13129,11 @@
         "type": "code",
         "ref": "packages/core/src/customer-experience-completion.js",
         "note": "Implementation evidence for multilingual indian-language content and templates."
+      },
+      {
+        "type": "code",
+        "ref": "packages/core/src/journey-workspace.js",
+        "note": "Every workspace field, section and action has English/Hindi schema labels; governed tenant language packs remain follow-on."
       },
       {
         "type": "test",
@@ -13124,6 +13164,11 @@
       },
       {
         "type": "test",
+        "ref": "tests/journey-workspace-ui.test.js",
+        "note": "Skip-link, live-region, explicit-label, safe rendering and reduced-motion regression evidence for dynamic journeys."
+      },
+      {
+        "type": "test",
         "ref": "tests/customer-experience-completion.test.js",
         "note": "Executable acceptance evidence for accessibility testing, assisted journeys, and reduced-motion support."
       }
@@ -13148,6 +13193,11 @@
         "type": "code",
         "ref": "packages/core/src/customer-experience-completion.js",
         "note": "Implementation evidence for mobile/pwa/offline capability."
+      },
+      {
+        "type": "test",
+        "ref": "tests/journey-workspace-ui.test.js",
+        "note": "Responsive workspace and fail-safe offline policy evidence: no browser persistence, no service worker and no-store business requests."
       },
       {
         "type": "test",

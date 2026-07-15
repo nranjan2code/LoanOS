@@ -7,6 +7,7 @@ This index is the navigation root for LoanOS architecture. The current implement
 - [LoanOS India blueprint](loanos-india-blueprint.md)
 - [Current implementation map](current-implementation.md)
 - [Persistent specialist journey service](persistent-specialist-journey-service.md)
+- [Archetype journey workspaces](archetype-journey-workspaces.md)
 - [SaaS tenancy and operating model](saas-tenancy-and-operating-model.md)
 - [RE onboarding and product administration](re-tenant-onboarding-and-product-administration.md)
 - [PostgreSQL migration and RLS](postgres-migration.md)

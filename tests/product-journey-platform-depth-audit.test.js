@@ -28,5 +28,8 @@ test("every depth claim has repository evidence and maps only to governed shared
   assert.equal(audit.journeys.filter((item) => item.apiDepth === "tenant_persistent_specialist_partial").length, 17);
   assert.equal(audit.journeys.filter((item) => item.gaps.includes("JD-02")).length, 0);
   for (const ref of audit.completedBatchEvidence["JD-02"]) await access(new URL(`../${ref}`, import.meta.url));
-  assert.equal(audit.journeys.filter((item) => item.experienceDepth === "missing_specialised").length, 19);
+  assert.equal(audit.journeys.filter((item) => item.gaps.includes("JD-03")).length, 0);
+  for (const ref of audit.completedBatchEvidence["JD-03"]) await access(new URL(`../${ref}`, import.meta.url));
+  assert.equal(audit.journeys.filter((item) => item.experienceDepth === "missing_specialised").length, 0);
+  assert.equal(audit.journeys.filter((item) => item.experienceDepth === "schema_workspace_partial").length, 21);
 });

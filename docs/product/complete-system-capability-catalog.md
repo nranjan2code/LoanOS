@@ -741,7 +741,7 @@ The detailed register contains **462 individually identified capabilities**. At 
 
 The complete-system catalogue must be filtered into a product pack before a product is advertised or committed. Each pack inherits all applicable `Core` capabilities and adds its specific requirements.
 
-JD-02 now provides a governed tenant-persistent backend service for the 13 specialised and four trade packs: exact version binding, independently approved configuration/actions, exceptions, workflow tasks and revocation pause. This improves execution depth but does not supply the JD-03 specialised channel workspaces or JD-04 common origination-to-closure composition described below.
+JD-02 provides a governed tenant-persistent backend service for the 13 specialised and four trade packs: exact version binding, independently approved configuration/actions, exceptions, workflow tasks and revocation pause. JD-03 now maps all 21 products into 11 governed schema/workspace archetypes across borrower, branch, partner, field, credit, operations and control channels, including tenant entitlement, field/document/action classification, exact schema lineage, server-side drafts, redaction, accessibility and offline privacy controls. JD-04 common origination-to-closure composition and JD-05/JD-06 production evidence remain.
 
 ### Unsecured personal term loan
 

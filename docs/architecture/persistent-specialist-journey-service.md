@@ -4,7 +4,7 @@
 
 This is the JD-02 architecture for the 17 lending journeys that previously existed only as deterministic domain kernels: thirteen specialised lending families and four working-capital/trade families. It provides one tenant-persistent control and execution boundary. It does not create 17 services and it does not claim that any journey is production-ready.
 
-The service owns governed specialist configuration, version-bound cases, independently approved actions, kernel invocation, exceptions, pause/escalation and workflow projection. Common borrower onboarding, KYC, underwriting decision, KFS, contracting, disbursement, LMS, accounting, reporting and closure remain the JD-04 composition boundary. Product-specific screens remain JD-03.
+The service owns governed specialist configuration, version-bound cases, independently approved actions, kernel invocation, exceptions, pause/escalation and workflow projection. Common borrower onboarding, KYC, underwriting decision, KFS, contracting, disbursement, LMS, accounting, reporting and closure remain the JD-04 composition boundary. JD-03 schema-driven channel workspaces now consume this service boundary without changing it.
 
 ## Covered journey types
 
@@ -147,7 +147,7 @@ Operations should alert on:
 
 JD-02 does not complete the 17 products. Remaining work is explicit:
 
-- JD-03: schema-driven borrower, partner, field and staff experiences;
+- JD-03: delivered schema-driven borrower, branch, partner, field, credit, operations and control experiences; see `archetype-journey-workspaces.md`;
 - JD-04: compose common KYC, credit, KFS, documents, disbursement, LMS, accounting, reporting and closure;
 - JD-05: run the full 17-scenario corpus through API/browser/PostgreSQL for every current template version;
 - JD-06: commercial providers, production workers, reconciliation, migration, scale, security, DR and institution-witnessed evidence.
