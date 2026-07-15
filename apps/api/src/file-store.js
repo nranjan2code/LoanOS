@@ -117,6 +117,7 @@ export function createEmptyTenantData() {
     dataQualityCertifications: {},
     federationPolicies: {},
     federationRotationRequests: {},
+    federatedRevocationVerifierProfiles: {},
     federatedRevocationEvents: {},
     scimEvents: {},
     authenticatorRecoveryRequests: {},
@@ -124,6 +125,16 @@ export function createEmptyTenantData() {
     directoryReconciliations: {},
     identityOperationalRuns: {},
     identityOperationsDrills: {},
+    identityOperationsJobs: {},
+    identityOperationsWorkerRuns: {},
+    identityOperationsDeadLetters: {},
+    identityOperationsJobReplays: {},
+    identityOperationsDeadLetterReplayRequests: {},
+    identityOperationsAlerts: {},
+    identityOperationsEscalations: {},
+    conformanceCandidateProfiles: {},
+    conformanceCampaigns: {},
+    tenantActivationAssessments: {},
     activityExportBatches: {},
     screeningLists: {},
     cddReviews: {},
@@ -344,6 +355,7 @@ function normalizeTenantData(data) {
     dataQualityCertifications: data?.dataQualityCertifications ?? {},
     federationPolicies: data?.federationPolicies ?? {},
     federationRotationRequests: data?.federationRotationRequests ?? {},
+    federatedRevocationVerifierProfiles: data?.federatedRevocationVerifierProfiles ?? {},
     federatedRevocationEvents: data?.federatedRevocationEvents ?? {},
     scimEvents: data?.scimEvents ?? {},
     authenticatorRecoveryRequests: data?.authenticatorRecoveryRequests ?? {},
@@ -351,6 +363,16 @@ function normalizeTenantData(data) {
     directoryReconciliations: data?.directoryReconciliations ?? {},
     identityOperationalRuns: data?.identityOperationalRuns ?? {},
     identityOperationsDrills: data?.identityOperationsDrills ?? {},
+    identityOperationsJobs: data?.identityOperationsJobs ?? {},
+    identityOperationsWorkerRuns: data?.identityOperationsWorkerRuns ?? {},
+    identityOperationsDeadLetters: data?.identityOperationsDeadLetters ?? {},
+    identityOperationsJobReplays: data?.identityOperationsJobReplays ?? {},
+    identityOperationsDeadLetterReplayRequests: data?.identityOperationsDeadLetterReplayRequests ?? {},
+    identityOperationsAlerts: data?.identityOperationsAlerts ?? {},
+    identityOperationsEscalations: data?.identityOperationsEscalations ?? {},
+    conformanceCandidateProfiles: data?.conformanceCandidateProfiles ?? {},
+    conformanceCampaigns: data?.conformanceCampaigns ?? {},
+    tenantActivationAssessments: data?.tenantActivationAssessments ?? {},
     activityExportBatches: data?.activityExportBatches ?? {},
     screeningLists: data?.screeningLists ?? {},
     cddReviews: data?.cddReviews ?? {},
@@ -737,7 +759,7 @@ export function createServiceCredential(record, input = {}, secret, now = new Da
   if (!input.credentialId || !/^[a-zA-Z0-9_-]{3,64}$/.test(input.credentialId)) throw new Error("credentialId must be 3-64 safe characters.");
   if (!input.name) throw new Error("Service credential name is required.");
   const scopes = [...new Set(Array.isArray(input.scopes) ? input.scopes : [])];
-  if (scopes.length === 0 || scopes.some((scope) => scope !== "*" && !/^module:[a-z_]+$/.test(scope))) throw new Error("Service credential requires valid scopes.");
+  if (scopes.length === 0 || scopes.some((scope) => scope !== "*" && !/^[a-z][a-z0-9_-]*:[a-z][a-z0-9_-]*$/.test(scope))) throw new Error("Service credential requires valid scopes.");
   const expiresAt = input.expiresAt ?? null;
   if (expiresAt && (Number.isNaN(new Date(expiresAt).getTime()) || new Date(expiresAt).getTime() <= now.getTime())) throw new Error("Service credential expiry must be in the future.");
   if (record.serviceCredentials?.[input.credentialId]) throw new Error("Service credential already exists.");

@@ -854,6 +854,60 @@
             <button id="btn-identity-campaign-run" class="btn btn-warning" type="button">Run complete simulator pack</button>
           </div>
         </div>
+        <details class="admin-form iam-workspace-section" open>
+          <summary><strong>Cross-platform conformance administration</strong></summary>
+          <p>Register non-live provider candidates and govern canonical organisation-admission or enterprise-platform campaign manifests. Registration and campaign activation never establish commercial production approval.</p>
+          <div class="iam-action-columns">
+            <div class="admin-form-grid">
+              <h5>Register simulator candidate</h5>
+              <input id="conformance-candidate-id" placeholder="Candidate profile ID">
+              <input id="conformance-provider-name" placeholder="Provider / proxy name">
+              <input id="conformance-provider-category" placeholder="Provider category">
+              <input id="conformance-adapter-version" placeholder="Adapter contract version" value="adapter/v1">
+              <input id="conformance-simulator-ref" placeholder="Simulator configuration ref">
+              <input id="conformance-diligence-ref" placeholder="Due-diligence evidence ref">
+              <input id="conformance-admission-scopes" placeholder="Admission integration IDs, comma separated">
+              <input id="conformance-enterprise-scopes" placeholder="Enterprise platform families, comma separated">
+              <button id="btn-conformance-candidate" class="btn btn-secondary" type="button">Register candidate</button>
+            </div>
+            <div class="admin-form-grid">
+              <h5>Govern campaign</h5>
+              <input id="conformance-campaign-id" placeholder="Campaign ID">
+              <input id="conformance-profile-id" placeholder="Candidate profile ID">
+              <select id="conformance-target-type"><option value="organisation_admission">Organisation admission</option><option value="enterprise_platform">Enterprise platform</option></select>
+              <input id="conformance-target-id" placeholder="Canonical integration / family ID">
+              <input id="conformance-validity-days" type="number" min="1" max="366" value="90">
+              <input id="conformance-proposal-ref" placeholder="Proposal / change ref">
+              <button id="btn-conformance-propose" class="btn btn-secondary" type="button">Propose campaign</button>
+              <input id="conformance-approval-ref" placeholder="Independent approval ref">
+              <button id="btn-conformance-approve" class="btn btn-primary" type="button">Approve campaign</button>
+              <input id="conformance-assessment-ref" placeholder="Assessment evidence ref">
+              <button id="btn-conformance-assess" class="btn btn-warning" type="button">Assess recorded evidence</button>
+            </div>
+          </div>
+          <div class="admin-list" id="conformance-campaigns-list"></div>
+        </details>
+        <details class="admin-form iam-workspace-section" open>
+          <summary><strong>Durable identity operations worker</strong></summary>
+          <p>Schedule reference-only work for a named tenant service credential. Claims are lease-fenced; exhausted work enters a visible dead-letter and escalation queue.</p>
+          <div class="admin-form-grid admin-form-grid-wide">
+            <input id="identity-worker-job-id" placeholder="Job ID">
+            <select id="identity-worker-job-type"><option value="identity_readiness_assessment">Identity readiness</option><option value="directory_reconciliation">Directory reconciliation</option><option value="federation_metadata_validation">Federation metadata validation</option><option value="activity_custody_verification">Activity custody verification</option></select>
+            <input id="identity-worker-credential" placeholder="Service credential ID" value="svc_default">
+            <input id="identity-worker-purpose" placeholder="Operational purpose">
+            <input id="identity-worker-idempotency" placeholder="Idempotency key">
+            <input id="identity-worker-policy-ref" placeholder="Policy / evidence reference">
+            <button id="btn-identity-worker-schedule" class="btn btn-secondary" type="button">Schedule durable job</button>
+          </div>
+          <div class="admin-list" id="identity-worker-list"></div>
+        </details>
+        <details class="admin-form iam-workspace-section">
+          <summary><strong>Unified tenant activation gate</strong></summary>
+          <p>Assessment requires checksummed, current, same-tenant evidence for admission, IAM staffing, products, integrations, deployment, security, UAT and drills. Simulator evidence can reach sandbox readiness only.</p>
+          <textarea id="tenant-activation-assessment-json" rows="7" placeholder='{"assessmentId":"...","selectedProductIds":[],"requiredIntegrationIds":[],"requiredDeploymentComponentIds":[],"requiredSecurityControlIds":[],"requiredDrillScenarioIds":[],"evidence":{}}'></textarea>
+          <button id="btn-tenant-activation-assess" class="btn btn-warning" type="button">Run activation assessment</button>
+          <div class="admin-list" id="tenant-activation-list"></div>
+        </details>
         <div class="admin-form">
           <h4>Federated directory reconciliation</h4>
           <p>Paste the provider snapshot. Provider-supplied roles are detected and never applied as LoanOS access grants.</p>

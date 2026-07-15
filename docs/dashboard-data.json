@@ -1,18 +1,28 @@
 {
-  "generated": "2026-07-15T03:02:51.446Z",
+  "generated": "2026-07-15T03:34:21.099Z",
   "git": {
     "branch": "main",
-    "count": 187,
+    "count": 189,
     "commits": [
+      {
+        "hash": "768e426",
+        "subject": "feat(web): unify public site design system",
+        "when": "26 minutes ago"
+      },
+      {
+        "hash": "8f2d000",
+        "subject": "feat(identity): complete platform operations conformance",
+        "when": "30 minutes ago"
+      },
       {
         "hash": "5ae4e21",
         "subject": "feat(identity): add tenant operations and conformance lab",
-        "when": "20 minutes ago"
+        "when": "52 minutes ago"
       },
       {
         "hash": "f9a7f90",
         "subject": "feat(identity): harden federation and universal access control",
-        "when": "41 minutes ago"
+        "when": "73 minutes ago"
       },
       {
         "hash": "061c783",
@@ -22,7 +32,7 @@
       {
         "hash": "b411a51",
         "subject": "feat(identity): govern organisation admission and bootstrap access",
-        "when": "5 hours ago"
+        "when": "6 hours ago"
       },
       {
         "hash": "f0e72f7",
@@ -37,7 +47,7 @@
       {
         "hash": "adfb90c",
         "subject": "feat(platform): add production execution foundations",
-        "when": "6 hours ago"
+        "when": "7 hours ago"
       },
       {
         "hash": "5d36a8c",
@@ -52,16 +62,6 @@
       {
         "hash": "ce1aacb",
         "subject": "fix(web): serve product journeys publicly",
-        "when": "7 hours ago"
-      },
-      {
-        "hash": "0848776",
-        "subject": "feat(integrations): complete deployment execution ports",
-        "when": "7 hours ago"
-      },
-      {
-        "hash": "5f992d0",
-        "subject": "feat(integrations): complete adapter execution baseline",
         "when": "7 hours ago"
       }
     ]
@@ -11853,6 +11853,16 @@
               "note": "Scoped tenant-service provider logout endpoint persists exact session revocation evidence and non-live status."
             },
             {
+              "type": "code",
+              "ref": "packages/core/src/federated-revocation-verification.js",
+              "note": "Maker-checker public-JWK profiles and exact-byte RS256/ES256 verification bind logout to tenant, policy, protocol, issuer, audience and key validity."
+            },
+            {
+              "type": "test",
+              "ref": "tests/federated-revocation-verification.test.js",
+              "note": "Cryptographic tamper, scope, key-window, public-only key and explicit supersession coverage."
+            },
+            {
               "type": "doc",
               "ref": "docs/architecture/tenant-role-staffing-and-feature-gating.md",
               "note": "Provider trust, authentication-versus-authorization and commercial-integration boundary."
@@ -11863,7 +11873,7 @@
           "dependencies": [
             "AUD-001"
           ],
-          "notes": "The protocol runtime, governed metadata/key rotation and exhaustive simulator campaigns are executable. Remaining gap: no commercial IdP/MDM/SAML-gateway tenant, provider-native global logout/revocation or witnessed provider conformance is live.",
+          "notes": "The protocol runtime, governed metadata/key rotation, exact-byte cryptographic logout verification and persistent exhaustive simulator campaigns are executable. Remaining gap: no commercial IdP/MDM/SAML-gateway tenant, provider-native fixture certification or witnessed provider conformance is live.",
           "lastReviewed": "2026-07-15"
         },
         {
@@ -12061,6 +12071,16 @@
               "type": "doc",
               "ref": "docs/architecture/current-implementation.md",
               "note": "Documented architecture or regulatory boundary for SEC-007."
+            },
+            {
+              "type": "code",
+              "ref": "apps/api/src/routes/identity-operations.js",
+              "note": "Worker tenant and workload identity are derived from a named scoped service credential rather than caller-supplied authority."
+            },
+            {
+              "type": "test",
+              "ref": "tests/identity-operations-worker-api.test.js",
+              "note": "Tenant service credential scheduling, claim, fenced completion and finalization evidence."
             }
           ],
           "owner": "Information Security",
@@ -12675,6 +12695,16 @@
               "type": "test",
               "ref": "tests/organisation-admission-conformance.test.js",
               "note": "Admission source lineage, tenant/purpose isolation, replay conflict, compensation/rollback and no-live-claim evidence."
+            },
+            {
+              "type": "code",
+              "ref": "packages/core/src/conformance-campaign-administration.js",
+              "note": "Persistent candidate profiles, immutable canonical manifests, append-only evidence, expiry and reassessment across admission and enterprise packs."
+            },
+            {
+              "type": "test",
+              "ref": "tests/conformance-administration-api.test.js",
+              "note": "Authenticated maker-checker persistence and full simulator certification through the tenant API."
             }
           ],
           "owner": "Integration Platform Engineering",
@@ -12893,6 +12923,16 @@
               "type": "test",
               "ref": "tests/identity-operational-automation.test.js",
               "note": "Operational planning, unsafe-session containment and prohibited approval automation evidence."
+            },
+            {
+              "type": "code",
+              "ref": "packages/core/src/identity-operations-worker.js",
+              "note": "Persistent tenant/workload-fenced scheduling with monotonic claim fences, deterministic retries, DLQ and run finalization."
+            },
+            {
+              "type": "test",
+              "ref": "tests/identity-operations-worker.test.js",
+              "note": "Lease expiry/reclaim, stale-worker rejection, bounded retry, exhausted DLQ/escalation and independent replay evidence."
             }
           ],
           "owner": "Site Reliability Engineering",
@@ -13060,6 +13100,16 @@
               "type": "test",
               "ref": "tests/service-operations.test.js",
               "note": "executable acceptance evidence for the currently tracked capability slice"
+            },
+            {
+              "type": "code",
+              "ref": "packages/core/src/identity-operations-worker.js",
+              "note": "Lease expiry, retry exhaustion, DLQ, alert and critical escalation records make stuck identity work explicit."
+            },
+            {
+              "type": "test",
+              "ref": "tests/identity-operations-worker.test.js",
+              "note": "Proves stuck lease reclamation and terminal visibility without exceeding retry bounds."
             }
           ],
           "owner": "Site Reliability Engineering",
@@ -13630,6 +13680,16 @@
               "type": "test",
               "ref": "tests/operational-workspaces.test.js",
               "note": "Executable acceptance evidence for platform/tenant administration."
+            },
+            {
+              "type": "code",
+              "ref": "apps/dashboard/index.html",
+              "note": "Identity control room exposes persistent conformance, durable worker health and unified activation administration."
+            },
+            {
+              "type": "test",
+              "ref": "tests/conformance-administration-api.test.js",
+              "note": "End-to-end tenant administration evidence for persistent candidate and campaign governance."
             }
           ],
           "owner": "Customer Experience & Implementation",
@@ -14201,10 +14261,10 @@
     }
   ],
   "tests": {
-    "pass": 546,
+    "pass": 574,
     "fail": 0,
     "skipped": 5,
-    "total": 551,
+    "total": 579,
     "ran": true,
     "source": "live"
   }

@@ -4,7 +4,9 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createLoanOsServer } from "../apps/api/src/server.js";
+import { loadState, saveState } from "../apps/api/src/file-store.js";
 import { totpCode } from "../apps/api/src/identity.js";
+import { assessTenantActivation, checksumTenantActivationEvidence, TENANT_ACTIVATION_DIMENSIONS } from "../packages/core/src/index.js";
 
 const jsonHeaders = (idempotencyKey, adminKey = null, signupAccessToken = null) => ({
   "content-type": "application/json",
@@ -199,13 +201,35 @@ test("verified organisation admission creates only a quarantined tenant and sing
   response = await post(base, `/platform/organisation-signups/${signupId}/activation`, {}, "activate", adminKey);
   assert.equal(response.status, 409);
   const blocked = await response.json();
-  assert.deepEqual(blocked.blockers, ["provisioning", "roleCoverage", "uat", "handover"]);
+  assert.deepEqual(blocked.blockers, ["provisioning", "roleCoverage", "uat", "handover", "unifiedActivationAssessment"]);
   response = await post(base, "/platform/tenants/tenant_verified_bank/status", { status: "active" }, null, adminKey);
   assert.equal(response.status, 409, "generic tenant status endpoint cannot bypass signup gates");
 
+  const activationState = await loadState(dataDir); const activationTenantId = "tenant_verified_bank";
+  activationState.controlPlane.tenants[activationTenantId].activationGates = { provisioning: true, roleCoverage: true, uat: true, handover: true };
+  const observedAt = new Date().toISOString(); const validUntil = new Date(Date.now() + 86_400_000).toISOString();
+  const item = (field, id, status) => ({ tenantId: activationTenantId, [field]: id, status, mode: "live", commerciallyLive: true, validUntil });
+  const payloads = {
+    organisation_admission: { decision: "approved", requiredChecksComplete: true },
+    iam_staffing: { launchRoleCoverageComplete: true, featureStaffingComplete: true, segregationViolations: [], orphanedRequiredRoles: [], activeHumanPrincipalCount: 2 },
+    products: { products: [item("productId", "personal-loan", "ready")] },
+    integrations: { campaigns: [item("integrationId", "identity-provider", "passed")] },
+    deployment: { components: [item("componentId", "api", "healthy")], rollbackVerified: true },
+    security_controls: { controls: [item("controlId", "session-revocation", "effective")], failClosedVerified: true },
+    uat: { status: "passed", adverseCasesComplete: true, tenantSignoffComplete: true },
+    drills: { drills: [item("scenarioId", "idp-outage", "passed")], independentWitnessComplete: true }
+  };
+  const evidence = Object.fromEntries(TENANT_ACTIVATION_DIMENSIONS.map((dimension) => { const value = { evidenceId: `live-${dimension}`, tenantId: activationTenantId, dimension, evidenceRef: `evidence://live/${dimension}`, observedAt, validUntil, mode: "live", commerciallyLive: true, payload: payloads[dimension] }; value.evidenceChecksumSha256 = checksumTenantActivationEvidence(value); return [dimension, value]; }));
+  const activationInput = { assessmentId: "activation-live-1", tenantId: activationTenantId, selectedProductIds: ["personal-loan"], requiredIntegrationIds: ["identity-provider"], requiredDeploymentComponentIds: ["api"], requiredSecurityControlIds: ["session-revocation"], requiredDrillScenarioIds: ["idp-outage"], evidence };
+  const activationAssessment = assessTenantActivation(activationInput, new Date(observedAt));
+  activationState.tenants[activationTenantId].tenantActivationAssessments[activationAssessment.assessmentId] = { assessment: activationAssessment, input: activationInput, assessedBy: "tenant_assessor", recordedAt: observedAt, activationAuthority: "platform_independent_approval_required" };
+  await saveState(activationState, dataDir);
+  response = await postSession(base, `/platform/organisation-signups/${signupId}/activation`, { expectedAssessmentChecksumSha256: activationAssessment.assessmentChecksumSha256, approvalRef: "approval:platform-activation", evidenceValidationRef: "validation:live-gates" }, "activate-approved", checkerCookie);
+  assert.equal(response.status, 200, await response.clone().text()); const activated = await response.json(); assert.equal(activated.tenant.status, "active"); assert.equal(activated.assessment.status, "production_ready");
+
   const persisted = JSON.parse(await readFile(join(dataDir, "state.json"), "utf8"));
   const storedSignup = persisted.controlPlane.organisationSignups[signupId];
-  assert.equal(storedSignup.status, "provisioning_requested");
+  assert.equal(storedSignup.status, "tenant_activated");
   assert.equal(storedSignup.ownerInvitation.tokenHashSha256, null);
   assert.equal(storedSignup.ownerMfaEnrollment, null);
   assert(storedSignup.auditEvents.length >= 8);

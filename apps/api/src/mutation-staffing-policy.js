@@ -8,7 +8,7 @@ const SELF_GOVERNED_PREFIXES = ["/activity/screen-events", "/admin/identity-gove
 // active mode an unclassified staff mutation is denied, so new endpoints must
 // deliberately select a control family instead of silently bypassing staffing.
 export const MUTATION_STAFFING_ROUTE_RULES = Object.freeze([
-  rule("FST-001", /^\/admin\/(users|invites|access-reviews|federation|scim|identity-operations|sessions|service-credentials|service-credential-compromises|api-key)/),
+  rule("FST-001", /^\/(admin\/(users|invites|access-reviews|federation|scim|identity-operations|sessions|service-credentials|service-credential-compromises|api-key)|identity-operations-worker\/v1)/),
   rule("FST-002", /^\/(products|product-configurations|journeys|pricing-policies|loans\/marketplace-offers)/),
   rule("FST-003", /^\/(loans\/(applications|decisions|sanctions|eligibility)|channels\/leads)/),
   rule("FST-004", /^\/(borrowers(?:\/|$)|kyc|ckyc|aml\/customer|reporting\/ckycrr)/),
@@ -29,7 +29,7 @@ export const MUTATION_STAFFING_ROUTE_RULES = Object.freeze([
   rule("FST-019", /^\/(cic|credit-bureau|credit-reporting|reporting\/cic)/),
   rule("FST-020", /^\/(models|model-governance|model-monitoring)/),
   rule("FST-021", /^\/(privacy|erasure-requests|data-retention|data-disclosures|customers\/(relationships|merge-plans|preferences)|completion\/customer-identity|borrowers\/[^/]+\/(access-requests|correction-requests))/),
-  rule("FST-022", /^\/(integrations|providers|admin\/integrations|account-aggregator|communications)/),
+  rule("FST-022", /^\/(integrations|providers|admin\/(integrations|conformance)|account-aggregator|communications)/),
   rule("FST-023", /^\/(vendors|outsourcing|sub-processors|lending-service-providers|digital-lending-apps|dlg-arrangements|channels\/(partners|commission-policies)|completion\/channel)/),
   rule("FST-024", /^\/(security|admin\/security|audit-access|activity\/exports)/),
   rule("FST-025", /^\/(incidents|cyber-incidents|security-operations)/),
@@ -38,7 +38,7 @@ export const MUTATION_STAFFING_ROUTE_RULES = Object.freeze([
   rule("FST-028", /^\/(implementation|migrations|cutovers)/),
   rule("FST-029", /^\/(assurance|internal-audit|governance|institution|regulated-entities)/),
   rule("FST-030", /^\/(subscriptions|tenant-products|admin\/products)/),
-  rule("FST-031", /^\/(tenant-provisioning|onboarding|handover|activation|sandbox-environments|workflow|completion\/operations)/),
+  rule("FST-031", /^\/(tenant-provisioning|onboarding|handover|activation|admin\/tenant-activation|sandbox-environments|workflow|completion\/operations)/),
   rule("FST-032", /^\/(co-lending|co-lending-arrangements)/),
   rule("FST-033", /^\/(fraud|fraud-cases|fraud-signals)/),
   rule("FST-034", /^\/(ai|agents|model-actions)/)

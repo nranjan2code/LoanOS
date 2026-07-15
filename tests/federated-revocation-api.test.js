@@ -1,11 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { generateKeyPairSync, sign } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createLoanOsServer } from "../apps/api/src/server.js";
 import { loadState, saveState } from "../apps/api/src/file-store.js";
+import { approveFederatedRevocationVerifier, proposeFederatedRevocationVerifier } from "../packages/core/src/index.js";
 
 test("federated logout endpoint requires tenant service authority and persists revocation evidence", async (t) => {
   const tenant = { tenantId: "tenant_logout", name: "Logout Bank", apiKey: "logout-service-key" }; const dataDir = await mkdtemp(join(tmpdir(), "loanos-logout-"));
@@ -13,12 +14,17 @@ test("federated logout endpoint requires tenant service authority and persists r
   t.after(async () => { await new Promise((resolve) => server.close(resolve)); await rm(dataDir, { recursive: true, force: true }); });
   const base = `http://127.0.0.1:${server.address().port}`; await fetch(`${base}/health`); const now = new Date();
   let state = await loadState(dataDir); state.tenants[tenant.tenantId].federationPolicies.idp = { policyId: "idp", status: "active", issuer: "https://idp.bank.in", audience: "loanos" };
+  const keys = generateKeyPairSync("rsa", { modulusLength: 2048 });
+  const proposed = proposeFederatedRevocationVerifier({}, { profileId: "verifier-1", tenantId: tenant.tenantId, policyId: "idp", protocol: "oidc_backchannel_logout", issuer: "https://idp.bank.in", audience: "loanos", proposedBy: "maker", providerProfileRef: "candidate-idp", verificationEvidenceRef: "evidence://logout-uat", keys: [{ keyId: "key-1", algorithm: "RS256", publicJwk: keys.publicKey.export({ format: "jwk" }), validFrom: new Date(now.getTime() - 60_000).toISOString(), validUntil: new Date(now.getTime() + 86_400_000).toISOString(), keyEvidenceRef: "evidence://key-1" }] }, now);
+  state.tenants[tenant.tenantId].federatedRevocationVerifierProfiles = approveFederatedRevocationVerifier(proposed.registry, { profileId: "verifier-1", tenantId: tenant.tenantId, approvedBy: "checker", approvalRef: "approval://verifier" }, now).registry;
   state.tenants[tenant.tenantId].users.u1 = { userId: "u1", email: "u1@bank.in", status: "active", federationPolicyId: "idp", federationExternalId: "subject-1", authenticationSource: "federated" };
   state.controlPlane.sessions.s1 = { sessionId: "s1", tokenHash: "opaque", principalType: "tenant_user", tenantId: tenant.tenantId, userId: "u1", email: "u1@bank.in", roles: [], status: "active", federationPolicyId: "idp", federationSubject: "subject-1", providerSessionId: "sid-1", createdAt: now.toISOString(), expiresAt: new Date(now.getTime() + 3_600_000).toISOString(), lastSeenAt: now.toISOString() };
   await saveState(state, dataDir);
-  const body = { eventId: "logout-1", policyId: "idp", protocol: "oidc_backchannel_logout", issuer: "https://idp.bank.in", audience: "loanos", subject: "subject-1", providerSessionId: "sid-1", issuedAt: now.toISOString(), expiresAt: new Date(now.getTime() + 300_000).toISOString(), signatureVerified: true, providerEvidenceRef: "idp-event-1", evidenceChecksumSha256: createHash("sha256").update("event").digest("hex") };
+  const event = { eventId: "logout-1", tenantId: tenant.tenantId, policyId: "idp", protocol: "oidc_backchannel_logout", issuer: "https://idp.bank.in", audience: "loanos", subject: "subject-1", providerSessionId: "sid-1", issuedAt: now.toISOString(), expiresAt: new Date(now.getTime() + 300_000).toISOString() };
+  const payload = Buffer.from(JSON.stringify(event));
+  const body = { profileId: "verifier-1", keyId: "key-1", payloadBase64Url: payload.toString("base64url"), signatureBase64Url: sign("RSA-SHA256", payload, keys.privateKey).toString("base64url") };
   let response = await fetch(`${base}/federation/v1/logout-events`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }); assert.equal(response.status, 401);
   response = await fetch(`${base}/federation/v1/logout-events`, { method: "POST", headers: { "content-type": "application/json", "x-api-key": tenant.apiKey }, body: JSON.stringify(body) }); assert.equal(response.status, 201, await response.clone().text()); assert.deepEqual((await response.json()).revokedSessionIds, ["s1"]);
-  state = await loadState(dataDir); assert.equal(state.controlPlane.sessions.s1.status, "revoked"); assert.equal(state.tenants[tenant.tenantId].federatedRevocationEvents["logout-1"].commerciallyLive, false);
+  state = await loadState(dataDir); assert.equal(state.controlPlane.sessions.s1.status, "revoked"); assert.equal(state.tenants[tenant.tenantId].federatedRevocationEvents["logout-1"].commerciallyLive, false); assert.equal(state.tenants[tenant.tenantId].federatedRevocationEvents["logout-1"].verificationKeyId, "key-1");
   response = await fetch(`${base}/federation/v1/logout-events`, { method: "POST", headers: { "content-type": "application/json", "x-api-key": tenant.apiKey }, body: JSON.stringify(body) }); assert.equal(response.status, 200); assert.equal((await response.json()).idempotent, true);
 });

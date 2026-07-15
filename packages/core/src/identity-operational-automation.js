@@ -10,6 +10,8 @@ export function applyFederatedRevocationEvent(eventRegistry = {}, sessions = {},
   if (!FEDERATED_REVOCATION_PROTOCOLS.includes(input.protocol)) fail("federated_revocation_protocol_invalid", "Federated revocation protocol is unsupported.");
   if (input.signatureVerified !== true) fail("federated_revocation_signature_invalid", "Provider revocation evidence must have a verified signature.");
   digest(input.evidenceChecksumSha256, "evidenceChecksumSha256");
+  if (input.verification?.cryptographicallyVerified !== true || input.verification.payloadChecksumSha256 !== input.evidenceChecksumSha256) fail("federated_revocation_verification_missing", "Cryptographic verifier lineage must match the signed payload checksum.");
+  for (const field of ["profileId", "keyId", "algorithm", "profileChecksumSha256", "activationChecksumSha256", "verificationEvidenceRef"]) required(input.verification[field], `verification.${field}`);
   const policy = policies[input.policyId];
   if (!policy || !["active", "suspended"].includes(policy.status)) fail("federated_revocation_policy_missing", "An active or suspended same-tenant federation policy is required.");
   if (policy.tenantId && policy.tenantId !== input.tenantId) fail("federated_revocation_tenant_mismatch", "Federation policy and revocation event must belong to the same tenant.");
@@ -17,7 +19,7 @@ export function applyFederatedRevocationEvent(eventRegistry = {}, sessions = {},
   const issuedAt = time(input.issuedAt, "issuedAt");
   const expiresAt = time(input.expiresAt, "expiresAt");
   if (issuedAt > now.getTime() + 60_000 || now.getTime() - issuedAt > 5 * 60_000 || expiresAt <= now.getTime() || expiresAt - issuedAt > 10 * 60_000) fail("federated_revocation_stale", "Revocation evidence is stale, future-dated or has an excessive validity window.");
-  const canonical = { tenantId: input.tenantId, policyId: input.policyId, protocol: input.protocol, issuer: input.issuer, audience: input.audience, subject: input.subject, providerSessionId: input.providerSessionId ?? null, issuedAt: new Date(issuedAt).toISOString(), expiresAt: new Date(expiresAt).toISOString(), evidenceChecksumSha256: input.evidenceChecksumSha256 };
+  const canonical = { tenantId: input.tenantId, policyId: input.policyId, protocol: input.protocol, issuer: input.issuer, audience: input.audience, subject: input.subject, providerSessionId: input.providerSessionId ?? null, issuedAt: new Date(issuedAt).toISOString(), expiresAt: new Date(expiresAt).toISOString(), evidenceChecksumSha256: input.evidenceChecksumSha256, verificationProfileId: input.verification.profileId, verificationKeyId: input.verification.keyId };
   const eventChecksumSha256 = hash(canonical);
   const replay = eventRegistry[input.eventId];
   if (replay) {
@@ -33,7 +35,7 @@ export function applyFederatedRevocationEvent(eventRegistry = {}, sessions = {},
     revokedSessionIds.push(id);
     return [id, { ...session, status: "revoked", revokedAt: now.toISOString(), revokedBy: `federation:${input.policyId}`, revocationReason: `${input.protocol}:${input.eventId}` }];
   }));
-  const event = Object.freeze({ eventId: input.eventId, ...canonical, providerEvidenceRef: input.providerEvidenceRef, eventChecksumSha256, revokedSessionIds, status: "applied", appliedAt: now.toISOString(), executionMode: "simulated", commerciallyLive: false });
+  const event = Object.freeze({ eventId: input.eventId, ...canonical, providerEvidenceRef: input.providerEvidenceRef, verification: Object.freeze({ ...input.verification }), eventChecksumSha256, revokedSessionIds, status: "applied", appliedAt: now.toISOString(), executionMode: "simulated", commerciallyLive: false });
   return { events: { ...eventRegistry, [event.eventId]: event }, sessions: nextSessions, event, revokedSessionIds, idempotent: false };
 }
 

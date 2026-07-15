@@ -7,6 +7,9 @@ import { MUTATION_STAFFING_ROUTE_RULES, classifyProtectedMutation, enforceUniver
 test("universal mutation classifier covers every staffing family and defaults unknown mutations to deny", async () => {
   assert.deepEqual([...new Set(MUTATION_STAFFING_ROUTE_RULES.map((rule) => rule.featureId))].sort(), [...FEATURE_STAFFING_POLICY_IDS].sort());
   assert.equal(classifyProtectedMutation("POST", "/loans/applications/app-1/sanction").featureId, "FST-003");
+  assert.equal(classifyProtectedMutation("POST", "/admin/conformance/campaigns/proposals").featureId, "FST-022");
+  assert.equal(classifyProtectedMutation("POST", "/admin/tenant-activation/assessments").featureId, "FST-031");
+  assert.equal(classifyProtectedMutation("POST", "/identity-operations-worker/v1/claims").featureId, "FST-001");
   assert.equal(classifyProtectedMutation("PATCH", "/new-sensitive-surface/item-1").disposition, "unclassified");
   const result = await enforceUniversalMutationStaffing({ state: {}, tenantId: "tenant-a", authContext: { principalType: "tenant_user", userId: "user-a" }, method: "PATCH", path: "/new-sensitive-surface/item-1", requestId: "req-1", env: { LOANOS_UNIVERSAL_STAFFING: "active" } });
   assert.equal(result.allowed, false); assert.equal(result.reason, "mutation_unclassified");

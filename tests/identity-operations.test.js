@@ -70,6 +70,12 @@ test("tenant dashboard exposes the IAM control room and labels simulator evidenc
   assert.match(html, /Integration state: simulated only/);
   assert.match(html, /Immediate session containment/);
   assert.match(html, /Federation rotation and emergency suspension/);
+  assert.match(html, /Cross-platform conformance administration/);
+  assert.match(html, /Durable identity operations worker/);
+  assert.match(html, /Unified tenant activation gate/);
   assert.match(script, /\/admin\/identity-operations\/conformance\/campaigns/);
   assert.match(script, /\/admin\/identity-operations\/sessions\/revoke/);
+  assert.match(script, /\/admin\/conformance\/campaigns\/proposals/);
+  assert.match(script, /\/admin\/identity-operations\/worker\/jobs/);
+  assert.match(script, /\/admin\/tenant-activation\/assessments/);
 });

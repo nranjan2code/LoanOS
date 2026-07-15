@@ -1,12 +1,14 @@
 import {
   applyScimIdentityEvent,
   applyFederatedRevocationEvent,
+  approveFederatedRevocationVerifier,
   assessFederationPolicy,
   assessPlatformCapacity,
   certifyFederationPolicy,
   createFederationPolicy,
   createWebhookSubscription,
   projectEnterprisePlatform,
+  proposeFederatedRevocationVerifier,
   queueWebhookDelivery,
   recordWebhookOutcome,
   registerApiContract,
@@ -20,7 +22,8 @@ import {
   revokePrincipalSessions,
   scimUserProjection,
   scimUserResourceToIdentityEvent,
-  suspendSaasPrincipalFromIdentityProvider
+  suspendSaasPrincipalFromIdentityProvider,
+  verifyFederatedRevocationEnvelope
 } from "../../../../packages/core/src/index.js";
 
 export async function routeEnterpriseTenantControls(context) {
@@ -32,6 +35,29 @@ export async function routeEnterpriseTenantControls(context) {
   if (!hasTenantAdminRole(authContext, allowedTenantRoles)) { sendJson(res, 403, { error: { code: "enterprise_identity_forbidden", message: "Tenant identity administration access is required." } }); return true; }
   if (method === "GET" && path === "/admin/federation/policies") {
     const state = await store.load(); const policies = Object.values(state.federationPolicies ?? {}).map((policy) => ({ ...policy, readiness: assessFederationPolicy(policy) })); sendJson(res, 200, { policies }); return true;
+  }
+  if (method === "GET" && path === "/admin/federation/revocation-verifiers") {
+    const state = await store.load(); sendJson(res, 200, { profiles: Object.values(state.federatedRevocationVerifierProfiles ?? {}) }); return true;
+  }
+  if (method === "POST" && path === "/admin/federation/revocation-verifiers/proposals") {
+    const body = await readJson(req); const state = await store.load(); const actor = authActor(authContext); const policy = state.federationPolicies?.[body.policyId];
+    if (!policy || !["active", "suspended"].includes(policy.status)) { sendJson(res, 422, { error: { code: "federated_revocation_policy_missing", message: "An active or suspended federation policy is required." } }); return true; }
+    try {
+      const result = proposeFederatedRevocationVerifier(state.federatedRevocationVerifierProfiles, { ...body, tenantId: authContext.tenantId, issuer: policy.issuer, audience: policy.audience, proposedBy: actor, commerciallyLive: false });
+      await store.save(appendEvent({ ...state, federatedRevocationVerifierProfiles: result.registry }, { type: "identity.federation.revocation_verifier_proposed", profileId: result.profile.profileId, policyId: result.profile.policyId, profileChecksumSha256: result.profile.profileChecksumSha256, actor }));
+      sendJson(res, 201, { profile: result.profile });
+    } catch (error) { sendEnterpriseError(res, sendJson, error); }
+    return true;
+  }
+  const verifierApproval = path.match(/^\/admin\/federation\/revocation-verifiers\/([^/]+)\/approval$/);
+  if (method === "POST" && verifierApproval) {
+    const body = await readJson(req); const state = await store.load(); const actor = authActor(authContext);
+    try {
+      const result = approveFederatedRevocationVerifier(state.federatedRevocationVerifierProfiles, { ...body, profileId: decodeURIComponent(verifierApproval[1]), tenantId: authContext.tenantId, approvedBy: actor });
+      await store.save(appendEvent({ ...state, federatedRevocationVerifierProfiles: result.registry }, { type: "identity.federation.revocation_verifier_activated", profileId: result.profile.profileId, policyId: result.profile.policyId, activationChecksumSha256: result.profile.activationChecksumSha256, actor }));
+      sendJson(res, 200, { profile: result.profile });
+    } catch (error) { sendEnterpriseError(res, sendJson, error); }
+    return true;
   }
   if (method === "POST" && path === "/admin/federation/policies") {
     const body = await readJson(req); const state = await store.load();
@@ -89,10 +115,11 @@ async function routeFederatedLogoutEvent(context) {
   }
   try {
     const body = await readJson(req); const state = await store.load(); const whole = stateRef.get();
-    const result = applyFederatedRevocationEvent(state.federatedRevocationEvents, whole.controlPlane.sessions, state.federationPolicies, state.users, { ...body, tenantId: authContext.tenantId, commerciallyLive: false });
+    const verified = verifyFederatedRevocationEnvelope(state.federatedRevocationVerifierProfiles, { ...body, tenantId: authContext.tenantId });
+    const result = applyFederatedRevocationEvent(state.federatedRevocationEvents, whole.controlPlane.sessions, state.federationPolicies, state.users, { ...verified.event, verification: verified.verification, tenantId: authContext.tenantId, commerciallyLive: false });
     if (!result.idempotent) {
       await stateRef.set({ ...whole, controlPlane: { ...whole.controlPlane, sessions: result.sessions } });
-      await store.save(appendEvent({ ...state, federatedRevocationEvents: result.events }, { type: "identity.federation.revocation_applied", eventId: result.event.eventId, policyId: result.event.policyId, protocol: result.event.protocol, revokedSessionIds: result.revokedSessionIds, evidenceChecksumSha256: result.event.evidenceChecksumSha256, actor: authActor(authContext) }));
+      await store.save(appendEvent({ ...state, federatedRevocationEvents: result.events }, { type: "identity.federation.revocation_applied", eventId: result.event.eventId, policyId: result.event.policyId, protocol: result.event.protocol, verificationProfileId: result.event.verificationProfileId, verificationKeyId: result.event.verificationKeyId, revokedSessionIds: result.revokedSessionIds, evidenceChecksumSha256: result.event.evidenceChecksumSha256, actor: authActor(authContext) }));
     }
     sendJson(res, result.idempotent ? 200 : 201, { event: result.event, revokedSessionIds: result.revokedSessionIds, idempotent: result.idempotent });
   } catch (error) { sendEnterpriseError(res, sendJson, error); }
@@ -235,4 +262,4 @@ export async function routeEnterprisePlatformControls(context) {
   return false;
 }
 
-function sendEnterpriseError(res, sendJson, error) { sendJson(res, /(duplicate|conflict|exists)/.test(error.code ?? "") ? 409 : 422, { error: { code: error.code ?? "enterprise_control_invalid", message: error.message } }); }
+function sendEnterpriseError(res, sendJson, error) { sendJson(res, /(duplicate|conflict|exists|four_eyes|not_pending)/.test(error.code ?? "") ? 409 : 422, { error: { code: error.code ?? "enterprise_control_invalid", message: error.message } }); }

@@ -2023,11 +2023,14 @@ async function renderTenantAdmin() {
 
 async function loadIdentityOperations() {
   try {
-    const [summaryResponse, campaignsResponse, automationResponse, drillsResponse] = await Promise.all([
+    const [summaryResponse, campaignsResponse, automationResponse, drillsResponse, conformanceResponse, workerResponse, activationResponse] = await Promise.all([
       apiFetch('/admin/identity-operations/summary'),
       apiFetch('/admin/identity-operations/conformance/campaigns'),
       apiFetch('/admin/identity-operations/automation/runs'),
-      apiFetch('/admin/identity-operations/drills')
+      apiFetch('/admin/identity-operations/drills'),
+      apiFetch('/admin/conformance/summary'),
+      apiFetch('/admin/identity-operations/worker'),
+      apiFetch('/admin/tenant-activation/assessments')
     ]);
     const summary = summaryResponse.summary;
     document.getElementById('identity-ops-summary').innerHTML = renderSummaryCards([
@@ -2051,6 +2054,11 @@ async function loadIdentityOperations() {
       ...automationRuns.map(run => `<div class="admin-row"><div class="admin-row-header"><div class="admin-row-title">Automation · ${escapeHtml(run.runId)}</div><span class="admin-pill">${escapeHtml(run.status)}</span></div><p>${escapeHtml(run.executionEvidenceRef || '')} · ${(run.findings || []).length} finding(s)</p></div>`),
       ...drills.map(drill => `<div class="admin-row"><div class="admin-row-header"><div class="admin-row-title">Drill · ${escapeHtml(drill.drillId)}</div><span class="admin-pill">${escapeHtml(drill.status)}</span></div><p>${escapeHtml(drill.scenario)} · ${escapeHtml(drill.objective)}</p>${drill.status === 'pending_witness' ? `<button type="button" class="btn btn-primary btn-sm" data-identity-drill="${escapeHtml(drill.drillId)}">Load for witness</button>` : ''}</div>`)
     ].join('') || emptyAdminRow('No readiness automation runs or resilience drills yet.');
+    const conformance = conformanceResponse.summary;
+    document.getElementById('conformance-campaigns-list').innerHTML = (conformance.campaigns || []).map(campaign => `<div class="admin-row"><div class="admin-row-header"><div class="admin-row-title">${escapeHtml(campaign.targetType)} · ${escapeHtml(campaign.targetId)}</div><span class="admin-pill">${escapeHtml(campaign.status)}</span></div><p>${escapeHtml(campaign.campaignId)} · ${Object.keys(campaign.results || {}).length}/${campaign.manifest.scenarios.length} canonical scenarios · simulated only</p><code>${escapeHtml(campaign.manifestChecksumSha256)}</code></div>`).join('') || emptyAdminRow('No cross-platform conformance campaigns yet.');
+    const workerRows = [...(workerResponse.jobs || []).map(job => `<div class="admin-row"><div class="admin-row-header"><div class="admin-row-title">${escapeHtml(job.type)} · ${escapeHtml(job.jobId)}</div><span class="admin-pill">${escapeHtml(job.status)}</span></div><p>attempt ${job.attempt}/${job.maxAttempts} · ${escapeHtml(job.workloadIdentityRef)}</p></div>`), ...(workerResponse.deadLetters || []).map(item => `<div class="admin-row"><div class="admin-row-header"><div class="admin-row-title">Dead letter · ${escapeHtml(item.jobId)}</div><span class="admin-pill">${escapeHtml(item.status)}</span></div><p>${escapeHtml(item.lastError?.errorCode || 'worker failure')} · independent replay approval required</p></div>`), ...(workerResponse.escalations || []).filter(item => item.status === 'open').map(item => `<div class="admin-row"><div class="admin-row-header"><div class="admin-row-title">Escalation · ${escapeHtml(item.jobId)}</div><span class="admin-pill">critical</span></div><p>${escapeHtml(item.requiredAction)}</p></div>` )];
+    document.getElementById('identity-worker-list').innerHTML = workerRows.join('') || emptyAdminRow('No durable worker jobs, dead letters or escalations yet.');
+    document.getElementById('tenant-activation-list').innerHTML = (activationResponse.assessments || []).map(item => `<div class="admin-row"><div class="admin-row-header"><div class="admin-row-title">${escapeHtml(item.assessmentId)}</div><span class="admin-pill">${escapeHtml(item.status)}</span></div><p>${item.blockers.length} blocker(s) · ${item.productionGaps.length} production gap(s) · platform approval required</p><code>${escapeHtml(item.assessmentChecksumSha256)}</code></div>`).join('') || emptyAdminRow('No unified activation assessment has been recorded.');
   } catch (err) {
     showToast(`Identity control room load failed: ${err.message}`, 'error');
   }
@@ -2747,6 +2755,51 @@ document.getElementById('btn-iam-emergency-close').addEventListener('click', asy
 });
 
 document.getElementById('btn-identity-ops-refresh').addEventListener('click', loadIdentityOperations);
+
+document.getElementById('btn-conformance-candidate').addEventListener('click', async () => {
+  try {
+    await apiFetch('/admin/conformance/candidates', { method: 'POST', body: JSON.stringify({ profileId: document.getElementById('conformance-candidate-id').value.trim(), providerName: document.getElementById('conformance-provider-name').value.trim(), providerCategory: document.getElementById('conformance-provider-category').value.trim(), adapterContractVersion: document.getElementById('conformance-adapter-version').value.trim(), simulatorConfigurationRef: document.getElementById('conformance-simulator-ref').value.trim(), dueDiligenceRef: document.getElementById('conformance-diligence-ref').value.trim(), organisationAdmissionIntegrationIds: parseCommaList(document.getElementById('conformance-admission-scopes').value), enterprisePlatformFamilies: parseCommaList(document.getElementById('conformance-enterprise-scopes').value) }) });
+    showToast('Simulator candidate profile registered with immutable scope.', 'success'); await loadIdentityOperations();
+  } catch (err) { showToast(`Candidate registration failed: ${err.message}`, 'error'); }
+});
+
+document.getElementById('btn-conformance-propose').addEventListener('click', async () => {
+  try {
+    await apiFetch('/admin/conformance/campaigns/proposals', { method: 'POST', body: JSON.stringify({ campaignId: document.getElementById('conformance-campaign-id').value.trim(), profileId: document.getElementById('conformance-profile-id').value.trim(), targetType: document.getElementById('conformance-target-type').value, targetId: document.getElementById('conformance-target-id').value.trim(), validityDays: Number(document.getElementById('conformance-validity-days').value), proposalRef: document.getElementById('conformance-proposal-ref').value.trim() }) });
+    showToast('Canonical conformance campaign proposed; independent approval is required.', 'success'); await loadIdentityOperations();
+  } catch (err) { showToast(`Campaign proposal failed: ${err.message}`, 'error'); }
+});
+
+document.getElementById('btn-conformance-approve').addEventListener('click', async () => {
+  try {
+    const campaignId = document.getElementById('conformance-campaign-id').value.trim();
+    await apiFetch(`/admin/conformance/campaigns/${encodeURIComponent(campaignId)}/approval`, { method: 'POST', body: JSON.stringify({ approvalRef: document.getElementById('conformance-approval-ref').value.trim() }) });
+    showToast('Conformance campaign approved by the authenticated checker.', 'success'); await loadIdentityOperations();
+  } catch (err) { showToast(`Campaign approval failed: ${err.message}`, 'error'); }
+});
+
+document.getElementById('btn-conformance-assess').addEventListener('click', async () => {
+  try {
+    const campaignId = document.getElementById('conformance-campaign-id').value.trim();
+    const result = await apiFetch(`/admin/conformance/campaigns/${encodeURIComponent(campaignId)}/assessment`, { method: 'POST', body: JSON.stringify({ assessmentRef: document.getElementById('conformance-assessment-ref').value.trim() }) });
+    showToast(`Conformance assessment: ${result.assessment.status}.`, result.assessment.status === 'simulator_certified' ? 'success' : 'warning'); await loadIdentityOperations();
+  } catch (err) { showToast(`Campaign assessment failed: ${err.message}`, 'error'); }
+});
+
+document.getElementById('btn-identity-worker-schedule').addEventListener('click', async () => {
+  try {
+    await apiFetch('/admin/identity-operations/worker/jobs', { method: 'POST', body: JSON.stringify({ jobId: document.getElementById('identity-worker-job-id').value.trim(), type: document.getElementById('identity-worker-job-type').value, serviceCredentialId: document.getElementById('identity-worker-credential').value.trim(), purpose: document.getElementById('identity-worker-purpose').value.trim(), idempotencyKey: document.getElementById('identity-worker-idempotency').value.trim(), payload: { policyRef: document.getElementById('identity-worker-policy-ref').value.trim() } }) });
+    showToast('Durable identity operations job scheduled.', 'success'); await loadIdentityOperations();
+  } catch (err) { showToast(`Worker scheduling failed: ${err.message}`, 'error'); }
+});
+
+document.getElementById('btn-tenant-activation-assess').addEventListener('click', async () => {
+  try {
+    const payload = JSON.parse(document.getElementById('tenant-activation-assessment-json').value || '{}');
+    const result = await apiFetch('/admin/tenant-activation/assessments', { method: 'POST', body: JSON.stringify(payload) });
+    showToast(`Tenant activation assessment: ${result.assessment.status}.`, result.assessment.status === 'blocked' ? 'warning' : 'success'); await loadIdentityOperations();
+  } catch (err) { showToast(`Activation assessment failed: ${err.message}`, 'error'); }
+});
 
 document.getElementById('btn-identity-automation-run').addEventListener('click', async () => {
   try {

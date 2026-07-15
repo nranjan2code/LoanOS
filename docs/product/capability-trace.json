@@ -5575,6 +5575,16 @@
         "type": "test",
         "ref": "tests/organisation-admission-conformance.test.js",
         "note": "Admission source lineage, tenant/purpose isolation, replay conflict, compensation/rollback and no-live-claim evidence."
+      },
+      {
+        "type": "code",
+        "ref": "packages/core/src/conformance-campaign-administration.js",
+        "note": "Persistent candidate profiles, immutable canonical manifests, append-only evidence, expiry and reassessment across admission and enterprise packs."
+      },
+      {
+        "type": "test",
+        "ref": "tests/conformance-administration-api.test.js",
+        "note": "Authenticated maker-checker persistence and full simulator certification through the tenant API."
       }
     ],
     "acceptance": "Repository evidence must demonstrate the current controlled slice of external providers with deterministic simulation, schema-bound vendor mapping, executable https/sftp/portal and crypto ports, lease-fenced workers, signed-file transports, adverse uat gate and certified business-adapter baseline; production acceptance additionally requires closure of the stated remaining gap.",
@@ -7373,6 +7383,16 @@
         "type": "test",
         "ref": "tests/identity-operational-automation.test.js",
         "note": "Operational planning, unsafe-session containment and prohibited approval automation evidence."
+      },
+      {
+        "type": "code",
+        "ref": "packages/core/src/identity-operations-worker.js",
+        "note": "Persistent tenant/workload-fenced scheduling with monotonic claim fences, deterministic retries, DLQ and run finalization."
+      },
+      {
+        "type": "test",
+        "ref": "tests/identity-operations-worker.test.js",
+        "note": "Lease expiry/reclaim, stale-worker rejection, bounded retry, exhausted DLQ/escalation and independent replay evidence."
       }
     ],
     "acceptance": "Repository evidence must demonstrate the current controlled slice of horizontal scale, stateless api, background workers, and schedulers; production acceptance additionally requires closure of the stated remaining gap.",
@@ -7540,6 +7560,16 @@
         "type": "test",
         "ref": "tests/service-operations.test.js",
         "note": "executable acceptance evidence for the currently tracked capability slice"
+      },
+      {
+        "type": "code",
+        "ref": "packages/core/src/identity-operations-worker.js",
+        "note": "Lease expiry, retry exhaustion, DLQ, alert and critical escalation records make stuck identity work explicit."
+      },
+      {
+        "type": "test",
+        "ref": "tests/identity-operations-worker.test.js",
+        "note": "Proves stuck lease reclamation and terminal visibility without exceeding retry bounds."
       }
     ],
     "acceptance": "Repository evidence must demonstrate the current controlled slice of queue/batch/provider monitoring and stuck-work detection; production acceptance additionally requires closure of the stated remaining gap.",
@@ -10872,6 +10902,16 @@
         "note": "Scoped tenant-service provider logout endpoint persists exact session revocation evidence and non-live status."
       },
       {
+        "type": "code",
+        "ref": "packages/core/src/federated-revocation-verification.js",
+        "note": "Maker-checker public-JWK profiles and exact-byte RS256/ES256 verification bind logout to tenant, policy, protocol, issuer, audience and key validity."
+      },
+      {
+        "type": "test",
+        "ref": "tests/federated-revocation-verification.test.js",
+        "note": "Cryptographic tamper, scope, key-window, public-only key and explicit supersession coverage."
+      },
+      {
         "type": "doc",
         "ref": "docs/architecture/tenant-role-staffing-and-feature-gating.md",
         "note": "Provider trust, authentication-versus-authorization and commercial-integration boundary."
@@ -10881,7 +10921,7 @@
     "dependencies": [
       "AUD-001"
     ],
-    "notes": "The protocol runtime, governed metadata/key rotation and exhaustive simulator campaigns are executable. Remaining gap: no commercial IdP/MDM/SAML-gateway tenant, provider-native global logout/revocation or witnessed provider conformance is live.",
+    "notes": "The protocol runtime, governed metadata/key rotation, exact-byte cryptographic logout verification and persistent exhaustive simulator campaigns are executable. Remaining gap: no commercial IdP/MDM/SAML-gateway tenant, provider-native fixture certification or witnessed provider conformance is live.",
     "lastReviewed": "2026-07-15"
   },
   "SEC-003": {
@@ -11080,6 +11120,16 @@
         "type": "doc",
         "ref": "docs/architecture/current-implementation.md",
         "note": "Documented architecture or regulatory boundary for SEC-007."
+      },
+      {
+        "type": "code",
+        "ref": "apps/api/src/routes/identity-operations.js",
+        "note": "Worker tenant and workload identity are derived from a named scoped service credential rather than caller-supplied authority."
+      },
+      {
+        "type": "test",
+        "ref": "tests/identity-operations-worker-api.test.js",
+        "note": "Tenant service credential scheduling, claim, fenced completion and finalization evidence."
       }
     ],
     "acceptance": "Named, scoped, expiring, and independently rotatable service credentials is accepted when tenant-scoped execution fails closed on invalid authority or evidence, retains auditable lineage, and the cited automated control-family tests pass.",
@@ -12638,6 +12688,16 @@
         "type": "test",
         "ref": "tests/operational-workspaces.test.js",
         "note": "Executable acceptance evidence for platform/tenant administration."
+      },
+      {
+        "type": "code",
+        "ref": "apps/dashboard/index.html",
+        "note": "Identity control room exposes persistent conformance, durable worker health and unified activation administration."
+      },
+      {
+        "type": "test",
+        "ref": "tests/conformance-administration-api.test.js",
+        "note": "End-to-end tenant administration evidence for persistent candidate and campaign governance."
       }
     ],
     "acceptance": "The cited implementation and tests demonstrate a controlled first slice of platform/tenant administration.",

@@ -38,7 +38,7 @@ The canonical IAM administration workspace is a read-only tenant projection at `
 
 SCIM `active=false` now performs four actions in the same operation: inactivate the login, suspend the canonical principal, calculate staffing/pause/escalation impact, and mark every matching persisted session `revoked` with revoker and reason. The audit event includes the exact revoked session IDs. Rehire never silently restores old canonical grants.
 
-`POST /federation/v1/logout-events` accepts a trusted-adapter attestation for a signed, short-lived OIDC back-channel logout, OIDC token-revocation, SAML single-logout or provider-session-revocation event from a tenant service credential scoped to `federation:revoke`. Issuer, audience, tenant, policy, subject, optional provider session id, validity window and evidence checksum are bound into an idempotent event checksum. A conflicting replay is rejected; an exact replay returns the original result. Matching persisted sessions are revoked immediately and the exact session IDs, revoker and reason are retained. This surface remains a simulator/proxy contract (`commerciallyLive: false`) until a tenant-specific provider and signature-validation adapter are commercially activated and witnessed.
+`POST /federation/v1/logout-events` accepts a canonical base64url signed envelope for a short-lived OIDC back-channel logout, OIDC token-revocation, SAML single-logout or provider-session-revocation event from a tenant service credential scoped to `federation:revoke`. Maker-checker verifier profiles bind public RS256/ES256 JWKs and validity windows to one tenant, policy, protocol, issuer and audience. The signature is verified over the exact payload bytes before JSON parsing; cryptographic profile/key/payload lineage is mandatory input to containment. A conflicting replay is rejected; an exact replay returns the original result. Matching persisted sessions are revoked immediately and the exact session IDs, revoker and reason are retained. This remains a simulator/proxy contract (`commerciallyLive: false`) until tenant-specific provider-native signed fixtures and commercial activation are witnessed.
 
 ### Authenticator recovery
 
@@ -87,7 +87,7 @@ The same administration area now exposes the full canonical IAM workspace: effec
 
 `POST /admin/identity-operations/automation/runs` builds a checksum-sealed plan from metadata expiry, missing/stale conformance packs, overdue rotation/recovery/role requests, overdue access reviews, stale directory reconciliation, unsafe active sessions and uncustodied activity batches. Automation is deliberately narrow: it may automatically revoke an active session belonging to an inactive principal or inactive federation policy. It cannot approve a role or recovery, activate federation or close an escalation. Every run retains its findings, exact containment results, actor, evidence reference and plan checksum. `GET /automation/runs` returns the tenant run history.
 
-This is an executable run-once control, not yet a deployed scheduler. A production scheduler must use a named workload identity, tenant fencing, lease/idempotency controls, alert delivery and externally retained run evidence.
+The run-once check now has a durable service-worker execution plane. Jobs are bound to a named tenant service credential, claimed under expiring monotonic fences, retried with deterministic bounds and moved to visible DLQ/escalation state when exhausted; human replay is independent-approved. A production cloud schedule and the four certified provider handlers are still required, together with PostgreSQL CAS/RLS evidence, alert delivery and externally retained run evidence.
 
 ### Witnessed resilience drills
 
@@ -116,6 +116,10 @@ Both catalogues are deterministic, checksum-bound, tenant-isolated and fail clos
 - `packages/core/src/identity-operations.js`
 - `packages/core/src/identity-integration-conformance.js`
 - `packages/core/src/identity-operational-automation.js`
+- `packages/core/src/identity-operations-worker.js`
+- `packages/core/src/federated-revocation-verification.js`
+- `packages/core/src/conformance-campaign-administration.js`
+- `packages/core/src/tenant-activation-gate.js`
 - `packages/core/src/enterprise-platform-conformance.js`
 - `packages/core/src/organisation-admission-conformance.js`
 - `apps/api/src/routes/identity-operations.js`
@@ -126,6 +130,14 @@ Both catalogues are deterministic, checksum-bound, tenant-isolated and fail clos
 - `tests/identity-operations-api.test.js`
 - `tests/identity-operational-automation.test.js`
 - `tests/federated-revocation-api.test.js`
+- `tests/federated-revocation-verification.test.js`
+- `tests/federated-revocation-verifier-api.test.js`
+- `tests/identity-operations-worker.test.js`
+- `tests/identity-operations-worker-api.test.js`
+- `tests/conformance-campaign-administration.test.js`
+- `tests/conformance-administration-api.test.js`
+- `tests/tenant-activation-gate.test.js`
+- `tests/tenant-activation-api.test.js`
 - `tests/iam-administration-workspace.test.js`
 - `tests/enterprise-platform-conformance.test.js`
 - `tests/organisation-admission-conformance.test.js`

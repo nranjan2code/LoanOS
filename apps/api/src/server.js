@@ -11,7 +11,9 @@ import { routeCompletionControls } from "./routes/completion-controls.js";
 import { routeCersaiSearch } from "./routes/cersai-search.js";
 import { routeSaasIdentityGovernance } from "./routes/saas-identity-governance.js";
 import { routeAccessActivityCustody } from "./routes/access-activity-custody.js";
-import { routeIdentityOperations } from "./routes/identity-operations.js";
+import { routeIdentityOperations, routeIdentityOperationsWorker } from "./routes/identity-operations.js";
+import { routeTenantActivation } from "./routes/tenant-activation.js";
+import { routeConformanceAdministration } from "./routes/conformance-administration.js";
 import { enforceUniversalMutationStaffing } from "./mutation-staffing-policy.js";
 import { validateControlEngineFleetConfiguration } from "./control-rules-engine.js";
 import { exchangeOidcAuthorizationCode, loadFederationAuthorizationEndpoint, validateFederatedLogin } from "./federation-runtime.js";
@@ -55,6 +57,7 @@ import {
   assessChargeToLoanAccount,
   assessDetectionCoverage,
   assessDependencyConcentration,
+  assessTenantActivation,
   assessVendorSla,
   buildAiDisclosure,
   buildKeyFactStatement,
@@ -1257,7 +1260,10 @@ async function route(req, res, dataDir, platformAdminKey, observability, allowDi
 
   if (await routeDataGovernanceControls({ method, path, req, res, tenant, store, readJson, sendJson, appendEvent })) return;
   if (await routeEnterpriseTenantControls({ method, path, req, res, store, stateRef, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor, upsertFederatedTenantUser })) return;
+  if (await routeIdentityOperationsWorker({ method, path, req, res, tenant, store, readJson, sendJson, appendEvent, authContext, authActor })) return;
   if (await routeIdentityOperations({ method, path, req, res, tenant, store, stateRef, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
+  if (await routeTenantActivation({ method, path, req, res, tenant, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
+  if (await routeConformanceAdministration({ method, path, req, res, tenant, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
   if (await routeRiskAmlControls({ method, path, req, res, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
   if (await routeImplementationControls({ method, path, req, res, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
   if (await routeInstitutionalOperations({ method, path, req, res, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
@@ -7872,7 +7878,26 @@ async function routePlatformOrganisationSignup(req, res, { dataDir, method, path
     if (method === "POST" && action === "activation") {
       const tenant = state.controlPlane.tenants[signup.proposedTenantId]; const gates = tenant?.activationGates ?? {};
       const blockers = ["provisioning", "roleCoverage", "uat", "handover"].filter((gate) => !gates[gate]);
-      sendJson(res, 409, { error: { code: "tenant_activation_blocked", message: "Activation is controlled by the provisioning saga after independent readiness approval." }, blockers: blockers.length ? blockers : ["independent_activation_approval"] }); return true;
+      const records = Object.values(state.tenants?.[signup.proposedTenantId]?.tenantActivationAssessments ?? {}).sort((left, right) => String(right.recordedAt).localeCompare(String(left.recordedAt)));
+      const latest = records[0] ?? null;
+      let currentAssessment = null;
+      if (!latest) blockers.push("unifiedActivationAssessment");
+      else {
+        const sealedAssessment = assessTenantActivation(latest.input, new Date(latest.assessment.assessedAt));
+        currentAssessment = assessTenantActivation(latest.input, now);
+        if (sealedAssessment.assessmentChecksumSha256 !== latest.assessment.assessmentChecksumSha256) blockers.push("activationAssessmentTampered");
+        if (currentAssessment.status !== "production_ready") blockers.push("productionReadiness");
+      }
+      if (blockers.length) { sendJson(res, 409, { error: { code: "tenant_activation_blocked", message: "Tenant activation prerequisites are incomplete or stale." }, blockers, assessment: currentAssessment }); return true; }
+      if (authContext.principalType !== "platform_user" || !hasPlatformRole(authContext, ["platform_admin", "security_admin"])) throw Object.assign(new Error("An authenticated human platform activation approver is required."), { code: "platform_role_forbidden" });
+      for (const field of ["expectedAssessmentChecksumSha256", "approvalRef", "evidenceValidationRef"]) if (typeof body[field] !== "string" || !body[field].trim()) throw Object.assign(new Error(`${field} is required.`), { code: "tenant_activation_approval_invalid" });
+      if (body.expectedAssessmentChecksumSha256 !== latest.assessment.assessmentChecksumSha256) throw Object.assign(new Error("Activation assessment changed before approval."), { code: "tenant_activation_assessment_conflict" });
+      if (latest.assessedBy === actor) throw Object.assign(new Error("Platform activation approver must be independent of the tenant assessor."), { code: "tenant_activation_four_eyes_required" });
+      const activatedTenant = { ...tenant, status: "active", activationGates: { ...gates, unifiedActivation: true }, activation: { assessmentId: currentAssessment.assessmentId, assessmentChecksumSha256: latest.assessment.assessmentChecksumSha256, currentValidationChecksumSha256: currentAssessment.assessmentChecksumSha256, evidenceValidationRef: body.evidenceValidationRef, approvalRef: body.approvalRef, activatedBy: actor, activatedAt: now.toISOString() }, updatedAt: now.toISOString() };
+      const activatedSignup = { ...signup, status: "tenant_activated", tenantActivation: activatedTenant.activation, revision: signup.revision + 1, updatedAt: now.toISOString() };
+      let nextState = { ...state, controlPlane: { ...state.controlPlane, tenants: { ...state.controlPlane.tenants, [tenant.tenantId]: activatedTenant }, organisationSignups: { ...state.controlPlane.organisationSignups, [signupId]: activatedSignup } } };
+      nextState = appendPlatformEvent(nextState, { type: "platform.tenant.activated", signupId, tenantId: tenant.tenantId, assessmentId: currentAssessment.assessmentId, assessmentChecksumSha256: currentAssessment.assessmentChecksumSha256, evidenceValidationRef: body.evidenceValidationRef, approvalRef: body.approvalRef }, { actor }, now);
+      await saveWholeState(nextState, dataDir); sendJson(res, 200, { tenant: publicTenant(activatedTenant), application: platformSignupView(activatedSignup), assessment: currentAssessment }); return true;
     }
   } catch (error) { if (error?.code === "platform_role_forbidden") sendJson(res, 403, { error: { code: error.code, message: error.message } }); else sendSignupFailure(res, error); return true; }
   sendJson(res, 404, { error: { code: "not_found", message: "Platform route not found." } }); return true;
