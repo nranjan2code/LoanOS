@@ -215,7 +215,12 @@ body {
   color: var(--text-secondary);
 }
 
-.iam-action-columns,
+.iam-action-columns {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
 .iam-catalogue-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2302,16 +2307,126 @@ body { background-image: none; }
 .detail-panel { background: #fbfaf6; }
 .panel-header h2, .detail-title { color: #173f35; }
 
-.admin-dialog { width: min(1180px, 95vw); border: 0; border-radius: 22px; box-shadow: 0 35px 100px rgba(12,45,38,.25); }
-.admin-dialog::backdrop { background: rgba(12,45,38,.58); backdrop-filter: blur(5px); }
-.admin-dialog .dialog-header { padding: 24px 28px 18px; background: #173f35; color: white; }
-.admin-dialog .dialog-header h3 { font-family: 'DM Serif Display', Georgia, serif; font-size: 2rem; font-weight: 400; }
-.admin-dialog .dialog-header p { color: rgba(255,255,255,.65); }
-.admin-layout { display: grid; grid-template-columns: 190px minmax(0,1fr); gap: 24px; padding: 24px 28px; }
-.admin-tabs { flex-direction: column; align-items: stretch; margin: 0; }
-.admin-tab { flex: none; min-height: 42px; border: 0; background: transparent; text-align: left; }
-.admin-tab.active { border: 0; background: #173f35; color: white; }
-.admin-panel { grid-column: 2; min-height: 520px; max-height: 65vh; }
+.admin-dialog {
+  width: 100vw;
+  height: 100vh;
+  max-width: 100vw;
+  max-height: 100vh;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: #fbfaf6;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.admin-dialog::backdrop {
+  background: rgba(12,45,38,.85);
+  backdrop-filter: blur(8px);
+}
+
+.admin-dialog .dialog-header {
+  padding: 20px 32px;
+  background: #173f35;
+  color: white;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+  border-bottom: 2px solid #d8ef88;
+}
+
+.admin-dialog .dialog-header h3 {
+  font-family: 'DM Serif Display', Georgia, serif;
+  font-size: 1.8rem;
+  font-weight: 400;
+  margin: 0;
+  line-height: 1.1;
+}
+
+.admin-dialog .dialog-header p {
+  color: rgba(255,255,255,.75);
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.admin-layout {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 0;
+  padding: 0;
+  flex-grow: 1;
+  overflow: hidden;
+  height: calc(100vh - 84px);
+}
+
+.admin-tabs {
+  background: #f4f2ea;
+  padding: 24px 16px;
+  border-right: 1px solid rgba(23,63,53,.08);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: stretch;
+  margin: 0;
+  overflow-y: auto;
+  height: 100%;
+}
+
+.admin-tab {
+  flex: none;
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  text-align: left;
+  font-weight: 600;
+  color: #4f665d;
+  font-size: 0.88rem;
+  transition: all 0.2s ease;
+}
+
+.admin-tab:hover {
+  background: rgba(23,63,53,.04);
+  color: #173f35;
+}
+
+.admin-tab.active {
+  border: 0;
+  background: #173f35;
+  color: white;
+}
+
+.admin-panel {
+  grid-column: 2;
+  padding: 32px 40px;
+  overflow-y: auto;
+  height: 100%;
+  max-height: 100% !important;
+  box-sizing: border-box;
+}
+
+.admin-dialog .dialog-footer {
+  display: none !important;
+}
+
+.iam-subpanel.hidden,
+.identity-subpanel.hidden {
+  display: none !important;
+}
+
+.iam-subpanel.active,
+.identity-subpanel.active {
+  display: block !important;
+}
+
+.iam-control-header button {
+  flex-shrink: 0 !important;
+  white-space: nowrap !important;
+}
 .admin-summary-card, .admin-row, .admin-form { border-color: rgba(23,63,53,.12); background: #fbfaf6; }
 .onboarding-wizard { padding: 24px; }
 .wizard-title-row h4 { color: #173f35; font-family: 'DM Serif Display', Georgia, serif; font-size: 1.7rem; font-weight: 400; }

@@ -178,7 +178,7 @@ Before the customer joins:
 3. Privately retrieve the required administrator credential from the stack's
    `CredentialsParameter`.
 4. For the tenant workspace, sign in at `/t/dev/staff/` as
-   `admin@dev.loanos.local` using `tenantAdminPassword`. For the platform
+   `admin@dev.local` using `tenantAdminPassword`. For the platform
    workspace, select **Platform administration** on the same page and sign in
    as `admin@platform.local` using `platformAdminPassword`. Never expose a
    password or API key on screen; `platformAdminKey` is not a browser password.
@@ -191,13 +191,27 @@ Before the customer joins:
 
 ### 6.1 Showcase personas
 
-| Persona | Demo use |
-| --- | --- |
-| Tenant administrator | Tenant setup, products, roles, integrations, and readiness |
-| Credit maker | Create or propose a credit action |
-| Credit checker | Independently approve/reject the maker's exact proposal |
-| Credit lead | Product ownership, deviations, queue, and policy oversight |
-| Human reviewer | Resolve a referred decision without presenting AI as final authority |
+All tenant personas below use the `tenantAdminPassword` from the private
+`CredentialsParameter`; there are no separate role passwords in the synthetic
+showcase. The platform administrator uses the separate
+`platformAdminPassword`. API keys are not accepted by browser sign-in.
+
+| Persona | Sign-in email | Demo use |
+| --- | --- | --- |
+| Tenant administrator | `admin@dev.local` | Tenant setup, products, roles, integrations, and readiness |
+| Credit maker | `credit-maker-1@dev.local` | Create or propose a credit action |
+| Credit checker | `credit-checker-1@dev.local` | Independently approve/reject the maker's exact proposal |
+| Credit lead | `credit-lead-1@dev.local` | Product ownership, deviations, queue, and policy oversight |
+| Human reviewer | `credit-reviewer-1@dev.local` | Resolve a referred decision without presenting AI as final authority |
+| Loan officer | `loan-officer-1@dev.local` | Work a lending case through the operational queue |
+| Disbursement maker | `disbursement-maker-1@dev.local` | Prepare the controlled disbursement handoff |
+| Compliance analyst | `compliance-analyst-1@dev.local` | Review controls, evidence, and exceptions |
+| Collections manager | `collections-manager-1@dev.local` | Show delinquency and collections operations |
+| Collections lead | `collections-lead-1@dev.local` | Oversee collections workflow and queue assignment |
+| Portfolio risk manager | `portfolio-risk-1@dev.local` | Review portfolio risk signals and oversight |
+| Grievance officer | `grievance-officer-1@dev.local` | Handle borrower grievance workflow and evidence |
+| Grievance lead | `grievance-lead-1@dev.local` | Oversee grievance operations and queues |
+| KYC officer | `kyc-officer-1@dev.local` | Complete KYC evidence and exception handling |
 | Loan officer | Origination work queue and customer evidence |
 | Disbursement maker | Conditions precedent and controlled disbursement preparation |
 | Compliance analyst | Regulatory controls, audit lineage, and evidence export |

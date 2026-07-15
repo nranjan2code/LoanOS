@@ -266,7 +266,54 @@ dialog { color: var(--portal-ink); }
 .portal-dialog { width: min(680px, calc(100% - 28px)); max-height: calc(100vh - 30px); margin: auto; padding: 28px; overflow-y: auto; border: 0; border-radius: 20px; background: var(--portal-paper); box-shadow: 0 30px 90px rgba(8, 43, 35, .28); }.portal-dialog::backdrop, .film-dialog::backdrop { background: rgba(8, 43, 35, .68); backdrop-filter: blur(6px); }
 .dialog-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 22px; margin-bottom: 22px; }.dialog-head h2, .film-dialog h2 { margin: 6px 0; color: var(--portal-forest); font-family: var(--portal-display); font-size: 2rem; font-weight: 400; line-height: 1; }.dialog-head p { margin: 0; color: var(--portal-muted); font-size: .68rem; }.dialog-close { width: 35px; height: 35px; display: grid; place-items: center; flex: 0 0 auto; border: 1px solid var(--portal-line); border-radius: 50%; background: transparent; color: var(--portal-forest); font-size: 1.2rem; cursor: pointer; }.dialog-close.light { border-color: rgba(255, 255, 255, .22); color: white; }
 .kfs-hero { display: grid; justify-items: center; padding: 27px; border-radius: 14px; background: var(--portal-forest); color: white; }.kfs-hero span, .kfs-hero small { color: rgba(255, 255, 255, .62); font-size: .64rem; }.kfs-hero strong { margin: 3px 0; font-family: var(--portal-display); font-size: 2.8rem; font-weight: 400; }
-.fact-grid { display: grid; grid-template-columns: 1fr 1fr; margin: 17px 0; border: 1px solid var(--portal-line); border-radius: 12px; overflow: hidden; }.fact-grid div { min-height: 76px; display: grid; align-content: center; gap: 5px; padding: 14px; border-right: 1px solid var(--portal-line); border-bottom: 1px solid var(--portal-line); }.fact-grid div:nth-child(2n), .fact-grid .wide { border-right: 0; }.fact-grid div:nth-last-child(-n+2) { border-bottom: 0; }.fact-grid .wide { grid-column: 1 / -1; }.fact-grid dt { color: var(--portal-muted); font-size: .59rem; }.fact-grid dd { margin: 0; color: var(--portal-forest); font-size: .8rem; font-weight: 700; }
+.fact-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin: 17px 0;
+  border: 1px solid var(--portal-line);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(12, 45, 38, 0.03);
+}
+.fact-grid div {
+  min-height: 76px;
+  display: grid;
+  align-content: center;
+  gap: 5px;
+  padding: 14px 18px;
+  border-right: 1px solid var(--portal-line);
+  border-bottom: 1px solid var(--portal-line);
+  background: white;
+  transition: background-color 0.2s ease;
+}
+.fact-grid div:hover {
+  background: #fbfbf9;
+}
+.fact-grid div:nth-child(2n),
+.fact-grid .wide {
+  border-right: 0;
+}
+.fact-grid div:nth-last-child(-n+2) {
+  border-bottom: 0;
+}
+.fact-grid .wide {
+  grid-column: 1 / -1;
+  background: #fafaf6;
+  border-bottom: 0;
+}
+.fact-grid dt {
+  color: var(--portal-muted);
+  font-size: 0.62rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.fact-grid dd {
+  margin: 0;
+  color: var(--portal-forest);
+  font-size: 0.95rem;
+  font-weight: 700;
+}
 .dialog-note { display: grid; grid-template-columns: 25px 1fr; gap: 9px; padding: 13px; border-radius: 10px; background: #ecf3d3; }.dialog-note span { width: 23px; height: 23px; display: grid; place-items: center; border-radius: 50%; background: var(--portal-forest); color: white; font-family: var(--portal-display); }.dialog-note p { margin: 0; color: #4f665d; font-size: .63rem; line-height: 1.5; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 22px; }.document-stack { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 20px; }.document-stack span { padding: 11px; border-radius: 8px; background: #ecf3d3; color: var(--portal-forest); font-size: .65rem; font-weight: 700; }.two-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }.data-dialog pre { max-height: 420px; overflow: auto; padding: 18px; border-radius: 12px; background: #102e27; color: #d8ef88; font: .66rem/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; }
 .film-dialog { width: min(960px, calc(100% - 28px)); margin: auto; padding: 0; overflow: hidden; border: 0; border-radius: 20px; background: var(--portal-forest-deep); color: white; box-shadow: 0 35px 100px rgba(0, 0, 0, .4); }.film-dialog-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 24px; }.film-dialog h2 { color: white; }.film-dialog video { width: 100%; max-height: 65vh; display: block; background: black; }.film-dialog > p { margin: 0; padding: 13px 24px 18px; color: rgba(255, 255, 255, .55); font-size: .63rem; }

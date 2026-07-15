@@ -263,7 +263,7 @@ curl --fail --silent "http://127.0.0.1:${RULES_PORT}/health" | jq -e '.kill_swit
 CREDENTIALS_JSON=$(jq -n \
   --arg environment "synthetic-demo-only" \
   --arg tenantId "dev" \
-  --arg tenantAdminEmail "admin@dev.loanos.local" \
+  --arg tenantAdminEmail "admin@dev.local" \
   --arg tenantAdminPassword "$TENANT_ADMIN_PASSWORD" \
   --arg tenantApiKey "$TENANT_API_KEY" \
   --arg platformAdminEmail "admin@platform.local" \

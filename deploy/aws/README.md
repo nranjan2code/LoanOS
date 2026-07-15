@@ -284,8 +284,14 @@ Tenant staff login:
 
 - scope: tenant;
 - tenant ID: `dev`;
-- email: `admin@dev.loanos.local`;
+- email: `admin@dev.local`;
 - password: `tenantAdminPassword` from the secure parameter.
+
+The synthetic showcase also seeds the role personas listed in the
+[demo handbook](../../docs/operations/demo-handbook.md#61-showcase-personas).
+Each persona signs in at the same tenant URL with its documented `@dev.local`
+email and the same `tenantAdminPassword`. This shared password is strictly a
+synthetic-demo convenience and must never be copied into a real tenant.
 
 Platform administration login:
 

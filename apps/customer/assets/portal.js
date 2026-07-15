@@ -3,6 +3,7 @@ const urlTenantId = pathSegments[1] === "t" && pathSegments[2] ? decodeURICompon
 
 const state = {
   auth: { tenantId: urlTenantId, borrowerId: "", email: "", name: "" },
+  borrower: null,
   applications: [],
   applicationOptions: [],
   loans: [],
@@ -436,6 +437,7 @@ async function loadData() {
 }
 
 function showSignedInPortal(borrower) {
+  state.borrower = borrower;
   const name = borrower.fullName || borrower.legalName || borrower.name || borrower.borrowerId;
   state.auth = { tenantId: urlTenantId, borrowerId: borrower.borrowerId, email: borrower.email || document.getElementById("borrower-email").value.trim(), name };
   dom.welcomeName.textContent = `Hello, ${name.split(" ")[0]}`;
@@ -446,6 +448,7 @@ function showSignedInPortal(borrower) {
   dom.mainPortal.hidden = false;
   dom.headerStatus.innerHTML = `<span class="secure-label"><span class="secure-dot"></span> Secure session</span><button class="text-button" id="btn-header-logout" type="button">Sign out</button>`;
   document.getElementById("btn-header-logout").addEventListener("click", disconnect);
+  updateCurrentCorrectionValue();
   openPanel("home", false);
 }
 
@@ -833,6 +836,36 @@ document.addEventListener("click", event => {
 if (["localhost", "127.0.0.1"].includes(window.location.hostname) && urlTenantId === "dev") {
   document.getElementById("borrower-id").value = "borrower_1";
   document.getElementById("borrower-email").value = "rajesh@example.com";
+}
+
+function updateCurrentCorrectionValue() {
+  const fieldEl = document.getElementById("corr-field");
+  const valInput = document.getElementById("corr-val");
+  if (!fieldEl || !valInput) return;
+  const field = fieldEl.value;
+  if (!state.borrower) return;
+  
+  let currentVal = "";
+  if (field === "name") {
+    currentVal = state.borrower.fullName || state.borrower.name || "";
+  } else if (field === "email") {
+    currentVal = state.borrower.email || state.borrower.contact?.email || "";
+  } else if (field === "phone") {
+    currentVal = state.borrower.contact?.mobile || state.borrower.phone || "";
+  } else if (field === "address") {
+    currentVal = state.borrower.primaryAddress || state.borrower.address || "";
+  }
+  
+  if (currentVal) {
+    valInput.placeholder = `Current: ${currentVal}`;
+  } else {
+    valInput.placeholder = "Enter the correct detail";
+  }
+}
+
+const corrFieldSelect = document.getElementById("corr-field");
+if (corrFieldSelect) {
+  corrFieldSelect.addEventListener("change", updateCurrentCorrectionValue);
 }
 
 loadBranding();

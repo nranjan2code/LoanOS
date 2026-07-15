@@ -2016,6 +2016,7 @@ async function renderTenantAdmin() {
     dom.adminUsersList.innerHTML = (users.users || []).map(renderUserRow).join('') || emptyAdminRow('No tenant users yet.');
     dom.adminReviewsList.innerHTML = (reviews.accessReviews || []).map(renderReviewRow).join('') || emptyAdminRow('No access reviews yet.');
     dom.adminRotatedKeyOutput.textContent = '';
+    populatePrincipalDatalist(users.users);
   } catch (err) {
     showToast(`Admin load failed: ${err.message}`, 'error');
   }
@@ -2059,6 +2060,7 @@ async function loadIdentityOperations() {
     const workerRows = [...(workerResponse.jobs || []).map(job => `<div class="admin-row"><div class="admin-row-header"><div class="admin-row-title">${escapeHtml(job.type)} · ${escapeHtml(job.jobId)}</div><span class="admin-pill">${escapeHtml(job.status)}</span></div><p>attempt ${job.attempt}/${job.maxAttempts} · ${escapeHtml(job.workloadIdentityRef)}</p></div>`), ...(workerResponse.deadLetters || []).map(item => `<div class="admin-row"><div class="admin-row-header"><div class="admin-row-title">Dead letter · ${escapeHtml(item.jobId)}</div><span class="admin-pill">${escapeHtml(item.status)}</span></div><p>${escapeHtml(item.lastError?.errorCode || 'worker failure')} · independent replay approval required</p></div>`), ...(workerResponse.escalations || []).filter(item => item.status === 'open').map(item => `<div class="admin-row"><div class="admin-row-header"><div class="admin-row-title">Escalation · ${escapeHtml(item.jobId)}</div><span class="admin-pill">critical</span></div><p>${escapeHtml(item.requiredAction)}</p></div>` )];
     document.getElementById('identity-worker-list').innerHTML = workerRows.join('') || emptyAdminRow('No durable worker jobs, dead letters or escalations yet.');
     document.getElementById('tenant-activation-list').innerHTML = (activationResponse.assessments || []).map(item => `<div class="admin-row"><div class="admin-row-header"><div class="admin-row-title">${escapeHtml(item.assessmentId)}</div><span class="admin-pill">${escapeHtml(item.status)}</span></div><p>${item.blockers.length} blocker(s) · ${item.productionGaps.length} production gap(s) · platform approval required</p><code>${escapeHtml(item.assessmentChecksumSha256)}</code></div>`).join('') || emptyAdminRow('No unified activation assessment has been recorded.');
+    prefillIdentityOperationsRequestIds();
   } catch (err) {
     showToast(`Identity control room load failed: ${err.message}`, 'error');
   }
@@ -2089,6 +2091,7 @@ async function loadIamWorkspace() {
     renderIamEscalations(workspace);
     renderIamOwnership(workspace);
     renderIamEmergencyAccess(workspace);
+    prefillIamRequestIds();
   } catch (err) {
     showToast(`Access-governance workspace load failed: ${err.message}`, 'error');
   }
@@ -2466,6 +2469,59 @@ function enhanceAccessibleForms() {
   });
 }
 
+function generateRandomSuffix() {
+  return Math.random().toString(36).substring(2, 10);
+}
+
+function prefillFieldIfEmpty(elementId, prefix) {
+  const el = document.getElementById(elementId);
+  if (el && !el.value.trim()) {
+    el.value = `${prefix}_${generateRandomSuffix()}`;
+  }
+}
+
+function prefillIamRequestIds() {
+  prefillFieldIfEmpty('iam-grant-request', 'grant_req');
+  prefillFieldIfEmpty('iam-revoke-request', 'rev_req');
+  prefillFieldIfEmpty('iam-staffing-request', 'staff_req');
+  prefillFieldIfEmpty('iam-escalation-request', 'esc_req');
+  prefillFieldIfEmpty('iam-agent-id', 'agent');
+  prefillFieldIfEmpty('iam-owner-request', 'owner_req');
+  prefillFieldIfEmpty('iam-emergency-request', 'emerg_req');
+}
+
+function prefillIdentityOperationsRequestIds() {
+  prefillFieldIfEmpty('identity-automation-run', 'auto_run');
+  prefillFieldIfEmpty('identity-drill-id', 'drill');
+  prefillFieldIfEmpty('identity-worker-job-id', 'job');
+  prefillFieldIfEmpty('identity-recon-id', 'recon');
+  prefillFieldIfEmpty('identity-campaign-id', 'camp');
+  prefillFieldIfEmpty('conformance-candidate-id', 'cand');
+  prefillFieldIfEmpty('conformance-campaign-id', 'camp');
+}
+
+function populatePrincipalDatalist(users) {
+  const datalist = document.getElementById('principal-list');
+  if (!datalist) return;
+  datalist.innerHTML = (users || []).map(u => 
+    `<option value="${escapeHtml(u.userId)}">${escapeHtml(u.displayName)} (${escapeHtml(u.email)})</option>`
+  ).join('');
+}
+
+function setupSubtabs(subtabSelector, panelSelector, dataAttrSubtab, dataAttrPanel) {
+  const tabs = document.querySelectorAll(subtabSelector);
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      tabs.forEach(t => t.classList.toggle('active', t === tab));
+      document.querySelectorAll(panelSelector).forEach(panel => {
+        const isTarget = panel.getAttribute(dataAttrPanel) === tab.getAttribute(dataAttrSubtab);
+        panel.classList.toggle('active', isTarget);
+        panel.classList.toggle('hidden', !isTarget);
+      });
+    });
+  });
+}
+
 
 // ─── Event Handlers & Initializers ──────────────────────────────────────────
 
@@ -2606,14 +2662,18 @@ document.getElementById('btn-iam-grant-propose').addEventListener('click', async
       scope: { type: document.getElementById('iam-grant-scope-type').value, id: document.getElementById('iam-grant-scope-id').value.trim() || tenantId },
       reason: document.getElementById('iam-grant-reason').value.trim()
     }) });
-    showToast('Role grant proposed. A different access reviewer must approve it.', 'success'); await loadIamWorkspace();
+    showToast('Role grant proposed. A different access reviewer must approve it.', 'success');
+    document.getElementById('iam-grant-request').value = '';
+    await loadIamWorkspace();
   } catch (err) { showToast(`Role grant proposal failed: ${err.message}`, 'error'); }
 });
 
 document.getElementById('btn-iam-revoke-propose').addEventListener('click', async () => {
   try {
     await apiFetch('/admin/identity-governance/role-revocations/proposals', { method: 'POST', body: JSON.stringify({ requestId: document.getElementById('iam-revoke-request').value.trim(), grantIds: parseCommaList(document.getElementById('iam-revoke-grants').value), reason: document.getElementById('iam-revoke-reason').value.trim() }) });
-    showToast('Role revocation proposed. Access remains unchanged until independent approval.', 'success'); await loadIamWorkspace();
+    showToast('Role revocation proposed. Access remains unchanged until independent approval.', 'success');
+    document.getElementById('iam-revoke-request').value = '';
+    await loadIamWorkspace();
   } catch (err) { showToast(`Role revocation proposal failed: ${err.message}`, 'error'); }
 });
 
@@ -2634,7 +2694,9 @@ document.getElementById('btn-iam-role-approve').addEventListener('click', async 
       payload.validUntil = isoFromLocalInput('iam-grant-valid-until');
     }
     await apiFetch(`/admin/identity-governance/role-${kind === 'grant' ? 'grants' : 'revocations'}/${encodeURIComponent(requestId)}/approval`, { method: 'POST', body: JSON.stringify(payload) });
-    showToast(`Role ${kind} approved independently.`, 'success'); await loadIamWorkspace();
+    showToast(`Role ${kind} approved independently.`, 'success');
+    document.getElementById('iam-approval-request').value = '';
+    await loadIamWorkspace();
   } catch (err) { showToast(`Role approval failed: ${err.message}`, 'error'); }
 });
 
@@ -2652,7 +2714,9 @@ document.getElementById('btn-iam-staffing-propose').addEventListener('click', as
       features,
       reason: document.getElementById('iam-staffing-reason').value.trim()
     }) });
-    showToast('Staffing configuration proposed. Independent control-engine approval is required.', 'success'); await loadIamWorkspace();
+    showToast('Staffing configuration proposed. Independent control-engine approval is required.', 'success');
+    document.getElementById('iam-staffing-request').value = '';
+    await loadIamWorkspace();
   } catch (err) { showToast(`Staffing proposal failed: ${err.message}`, 'error'); }
 });
 
@@ -2665,7 +2729,9 @@ document.getElementById('btn-iam-staffing-approve').addEventListener('click', as
   try {
     const requestId = document.getElementById('iam-staffing-approval-request').value.trim();
     await apiFetch(`/admin/identity-governance/staffing-config/${encodeURIComponent(requestId)}/approval`, { method: 'POST', body: JSON.stringify({ approvalRef: document.getElementById('iam-staffing-approval-ref').value.trim() }) });
-    showToast('Staffing configuration approved by the isolated control path.', 'success'); await loadIamWorkspace();
+    showToast('Staffing configuration approved by the isolated control path.', 'success');
+    document.getElementById('iam-staffing-approval-request').value = '';
+    await loadIamWorkspace();
   } catch (err) { showToast(`Staffing approval failed: ${err.message}`, 'error'); }
 });
 
@@ -2679,7 +2745,9 @@ document.getElementById('iam-escalations-list').addEventListener('click', (event
 document.getElementById('btn-iam-escalation-propose').addEventListener('click', async () => {
   try {
     await apiFetch('/admin/identity-governance/staffing-escalations/closure-proposals', { method: 'POST', body: JSON.stringify({ requestId: document.getElementById('iam-escalation-request').value.trim(), escalationId: document.getElementById('iam-escalation-id').value.trim(), resolutionRef: document.getElementById('iam-escalation-resolution').value.trim() }) });
-    showToast('Escalation closure proposed. The operational pause remains active.', 'success'); await loadIamWorkspace();
+    showToast('Escalation closure proposed. The operational pause remains active.', 'success');
+    document.getElementById('iam-escalation-request').value = '';
+    await loadIamWorkspace();
   } catch (err) { showToast(`Escalation closure proposal failed: ${err.message}`, 'error'); }
 });
 
@@ -2687,7 +2755,9 @@ document.getElementById('btn-iam-escalation-approve').addEventListener('click', 
   try {
     const requestId = document.getElementById('iam-escalation-approval-request').value.trim();
     await apiFetch(`/admin/identity-governance/staffing-escalations/closure-proposals/${encodeURIComponent(requestId)}/approval`, { method: 'POST', body: JSON.stringify({ approvalRef: document.getElementById('iam-escalation-approval-ref').value.trim() }) });
-    showToast('Staffing escalation closed after readiness re-check.', 'success'); await loadIamWorkspace();
+    showToast('Staffing escalation closed after readiness re-check.', 'success');
+    document.getElementById('iam-escalation-approval-request').value = '';
+    await loadIamWorkspace();
   } catch (err) { showToast(`Escalation approval failed: ${err.message}`, 'error'); }
 });
 
@@ -2700,14 +2770,18 @@ document.getElementById('btn-iam-agent-register').addEventListener('click', asyn
       workloadIdentityRef: document.getElementById('iam-agent-workload').value.trim(), workloadIdentityVerified: true,
       identityEvidenceRef: document.getElementById('iam-agent-evidence').value.trim(), expiresAt: principalType === 'dynamic_agent' ? isoFromLocalInput('iam-agent-expires') : null
     }) });
-    showToast('Governed agent registered. Grant a dedicated agent role through maker-checker next.', 'success'); await loadIamWorkspace();
+    showToast('Governed agent registered. Grant a dedicated agent role through maker-checker next.', 'success');
+    document.getElementById('iam-agent-id').value = '';
+    await loadIamWorkspace();
   } catch (err) { showToast(`Agent registration failed: ${err.message}`, 'error'); }
 });
 
 document.getElementById('btn-iam-owner-propose').addEventListener('click', async () => {
   try {
     await apiFetch('/admin/identity-governance/ownership-transfers/proposals', { method: 'POST', body: JSON.stringify({ requestId: document.getElementById('iam-owner-request').value.trim(), newOwnerPrincipalId: document.getElementById('iam-owner-target').value.trim(), targetAcceptanceRef: document.getElementById('iam-owner-acceptance').value.trim(), reason: document.getElementById('iam-owner-reason').value.trim() }) });
-    showToast('Ownership transfer proposed by the current owner.', 'success'); await loadIamWorkspace();
+    showToast('Ownership transfer proposed by the current owner.', 'success');
+    document.getElementById('iam-owner-request').value = '';
+    await loadIamWorkspace();
   } catch (err) { showToast(`Ownership-transfer proposal failed: ${err.message}`, 'error'); }
 });
 
@@ -2720,14 +2794,18 @@ document.getElementById('btn-iam-owner-approve').addEventListener('click', async
   try {
     const requestId = document.getElementById('iam-owner-approval-request').value.trim();
     await apiFetch(`/admin/identity-governance/ownership-transfers/${encodeURIComponent(requestId)}/approval`, { method: 'POST', body: JSON.stringify({ approvalRef: document.getElementById('iam-owner-approval-ref').value.trim() }) });
-    showToast('Organisation ownership transferred with independent approval.', 'success'); await loadIamWorkspace();
+    showToast('Organisation ownership transferred with independent approval.', 'success');
+    document.getElementById('iam-owner-approval-request').value = '';
+    await loadIamWorkspace();
   } catch (err) { showToast(`Ownership-transfer approval failed: ${err.message}`, 'error'); }
 });
 
 document.getElementById('btn-iam-emergency-propose').addEventListener('click', async () => {
   try {
     await apiFetch('/admin/identity-governance/emergency-access/proposals', { method: 'POST', body: JSON.stringify({ requestId: document.getElementById('iam-emergency-request').value.trim(), beneficiaryPrincipalId: document.getElementById('iam-emergency-beneficiary').value.trim(), actions: selectedValues('iam-emergency-actions'), incidentRef: document.getElementById('iam-emergency-incident').value.trim(), reason: document.getElementById('iam-emergency-reason').value.trim(), expiresAt: isoFromLocalInput('iam-emergency-expires') }) });
-    showToast('Emergency access requested. No authority is active until independent approval.', 'success'); await loadIamWorkspace();
+    showToast('Emergency access requested. No authority is active until independent approval.', 'success');
+    document.getElementById('iam-emergency-request').value = '';
+    await loadIamWorkspace();
   } catch (err) { showToast(`Emergency-access request failed: ${err.message}`, 'error'); }
 });
 
@@ -2742,7 +2820,9 @@ document.getElementById('btn-iam-emergency-approve').addEventListener('click', a
   try {
     const requestId = document.getElementById('iam-emergency-approval-request').value.trim();
     await apiFetch(`/admin/identity-governance/emergency-access/${encodeURIComponent(requestId)}/approval`, { method: 'POST', body: JSON.stringify({ approvalRef: document.getElementById('iam-emergency-approval-ref').value.trim() }) });
-    showToast('Emergency access approved and is now visible in the active grant register.', 'warning'); await loadIamWorkspace();
+    showToast('Emergency access approved and is now visible in the active grant register.', 'warning');
+    document.getElementById('iam-emergency-approval-request').value = '';
+    await loadIamWorkspace();
   } catch (err) { showToast(`Emergency-access approval failed: ${err.message}`, 'error'); }
 });
 
@@ -2750,7 +2830,9 @@ document.getElementById('btn-iam-emergency-close').addEventListener('click', asy
   try {
     const grantId = document.getElementById('iam-emergency-grant').value.trim();
     await apiFetch(`/admin/identity-governance/emergency-access/${encodeURIComponent(grantId)}/closure`, { method: 'POST', body: JSON.stringify({ closureEvidenceRef: document.getElementById('iam-emergency-closure-ref').value.trim() }) });
-    showToast('Emergency access closed with evidence retained.', 'success'); await loadIamWorkspace();
+    showToast('Emergency access closed with evidence retained.', 'success');
+    document.getElementById('iam-emergency-grant').value = '';
+    await loadIamWorkspace();
   } catch (err) { showToast(`Emergency-access closure failed: ${err.message}`, 'error'); }
 });
 
@@ -2759,14 +2841,18 @@ document.getElementById('btn-identity-ops-refresh').addEventListener('click', lo
 document.getElementById('btn-conformance-candidate').addEventListener('click', async () => {
   try {
     await apiFetch('/admin/conformance/candidates', { method: 'POST', body: JSON.stringify({ profileId: document.getElementById('conformance-candidate-id').value.trim(), providerName: document.getElementById('conformance-provider-name').value.trim(), providerCategory: document.getElementById('conformance-provider-category').value.trim(), adapterContractVersion: document.getElementById('conformance-adapter-version').value.trim(), simulatorConfigurationRef: document.getElementById('conformance-simulator-ref').value.trim(), dueDiligenceRef: document.getElementById('conformance-diligence-ref').value.trim(), organisationAdmissionIntegrationIds: parseCommaList(document.getElementById('conformance-admission-scopes').value), enterprisePlatformFamilies: parseCommaList(document.getElementById('conformance-enterprise-scopes').value) }) });
-    showToast('Simulator candidate profile registered with immutable scope.', 'success'); await loadIdentityOperations();
+    showToast('Simulator candidate profile registered with immutable scope.', 'success');
+    document.getElementById('conformance-candidate-id').value = '';
+    await loadIdentityOperations();
   } catch (err) { showToast(`Candidate registration failed: ${err.message}`, 'error'); }
 });
 
 document.getElementById('btn-conformance-propose').addEventListener('click', async () => {
   try {
     await apiFetch('/admin/conformance/campaigns/proposals', { method: 'POST', body: JSON.stringify({ campaignId: document.getElementById('conformance-campaign-id').value.trim(), profileId: document.getElementById('conformance-profile-id').value.trim(), targetType: document.getElementById('conformance-target-type').value, targetId: document.getElementById('conformance-target-id').value.trim(), validityDays: Number(document.getElementById('conformance-validity-days').value), proposalRef: document.getElementById('conformance-proposal-ref').value.trim() }) });
-    showToast('Canonical conformance campaign proposed; independent approval is required.', 'success'); await loadIdentityOperations();
+    showToast('Canonical conformance campaign proposed; independent approval is required.', 'success');
+    document.getElementById('conformance-campaign-id').value = '';
+    await loadIdentityOperations();
   } catch (err) { showToast(`Campaign proposal failed: ${err.message}`, 'error'); }
 });
 
@@ -2789,7 +2875,9 @@ document.getElementById('btn-conformance-assess').addEventListener('click', asyn
 document.getElementById('btn-identity-worker-schedule').addEventListener('click', async () => {
   try {
     await apiFetch('/admin/identity-operations/worker/jobs', { method: 'POST', body: JSON.stringify({ jobId: document.getElementById('identity-worker-job-id').value.trim(), type: document.getElementById('identity-worker-job-type').value, serviceCredentialId: document.getElementById('identity-worker-credential').value.trim(), purpose: document.getElementById('identity-worker-purpose').value.trim(), idempotencyKey: document.getElementById('identity-worker-idempotency').value.trim(), payload: { policyRef: document.getElementById('identity-worker-policy-ref').value.trim() } }) });
-    showToast('Durable identity operations job scheduled.', 'success'); await loadIdentityOperations();
+    showToast('Durable identity operations job scheduled.', 'success');
+    document.getElementById('identity-worker-job-id').value = '';
+    await loadIdentityOperations();
   } catch (err) { showToast(`Worker scheduling failed: ${err.message}`, 'error'); }
 });
 
@@ -3359,4 +3447,6 @@ window.addEventListener('DOMContentLoaded', () => {
   }
   initConfig();
   setOnboardingStep(0);
+  setupSubtabs('.iam-subtab', '.iam-subpanel', 'data-iam-subtab', 'data-iam-subpanel');
+  setupSubtabs('.identity-subtab', '.identity-subpanel', 'data-identity-subtab', 'data-identity-subpanel');
 });

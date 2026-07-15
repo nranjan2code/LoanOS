@@ -8,6 +8,7 @@ import {
   createEmptyState,
   ensureBootstrapTenants
 } from "../apps/api/src/file-store.js";
+import { verifyPassword } from "../apps/api/src/identity.js";
 import {
   DEMO_INTEGRATION_KEYS,
   DEMO_PERSONAS,
@@ -118,6 +119,34 @@ test("bootstrap installs the governed showcase catalogue and all demo personas",
   assert.deepEqual(
     DEMO_PERSONAS.map((persona) => persona.userId).filter((userId) => !stored.tenants.dev.users[userId]),
     []
+  );
+  assert.equal(stored.controlPlane.platformUsers.platform_admin_1.email, "admin@platform.local");
+  assert.equal(
+    verifyPassword("platform-admin-password", stored.controlPlane.platformUsers.platform_admin_1.passwordHash),
+    true
+  );
+
+  const expectedTenantLogins = [
+    "admin@dev.local",
+    "credit-maker-1@dev.local",
+    "credit-checker-1@dev.local",
+    "credit-lead-1@dev.local",
+    "credit-reviewer-1@dev.local",
+    "loan-officer-1@dev.local",
+    "disbursement-maker-1@dev.local",
+    "compliance-analyst-1@dev.local",
+    "collections-manager-1@dev.local",
+    "collections-lead-1@dev.local",
+    "portfolio-risk-1@dev.local",
+    "grievance-officer-1@dev.local",
+    "grievance-lead-1@dev.local",
+    "kyc-officer-1@dev.local"
+  ];
+  const seededUsers = Object.values(stored.tenants.dev.users);
+  assert.deepEqual(seededUsers.map((user) => user.email).sort(), [...expectedTenantLogins].sort());
+  assert.equal(
+    seededUsers.every((user) => verifyPassword("dev-admin-password", user.passwordHash)),
+    true
   );
 });
 

@@ -471,8 +471,11 @@
 
   <dialog id="dialog-admin" class="admin-dialog">
     <div class="dialog-header">
-      <h3 id="admin-dialog-title">Administration</h3>
-      <p id="admin-dialog-subtitle">Provision users, run access reviews, and govern service access.</p>
+      <div class="dialog-header-text">
+        <h3 id="admin-dialog-title">Administration</h3>
+        <p id="admin-dialog-subtitle">Provision users, run access reviews, and govern service access.</p>
+      </div>
+      <button class="btn btn-secondary" id="btn-admin-close">Close Console</button>
     </div>
     <div class="admin-layout">
       <nav class="admin-tabs" aria-label="Admin sections">
@@ -583,172 +586,189 @@
           <button id="btn-iam-refresh" class="btn btn-secondary" type="button">Refresh governance state</button>
         </div>
 
-        <details class="admin-form iam-workspace-section" open>
-          <summary><strong>Principals and effective access</strong></summary>
-          <p>Review effective grants and removal impact before suspension or retirement. Forensic identity records are retained.</p>
-          <div class="admin-form-grid admin-form-grid-wide">
-            <input id="iam-status-principal" placeholder="Principal ID">
-            <select id="iam-principal-status"><option value="suspended">Suspend immediately</option><option value="inactive">Retire identity</option><option value="active">Reactivate</option></select>
-            <input id="iam-status-reason" placeholder="Reason">
-            <input id="iam-status-evidence" placeholder="Evidence / incident ref">
-            <button id="btn-iam-removal-impact" class="btn btn-secondary" type="button">Assess removal impact</button>
-            <button id="btn-iam-status" class="btn btn-warning" type="button">Apply principal status</button>
-          </div>
-          <div class="admin-list" id="iam-principals-list"></div>
-        </details>
+        <div class="admin-subtabs" role="tablist" aria-label="Access governance subtabs">
+          <button class="admin-subtab iam-subtab active" type="button" data-iam-subtab="roles">Roles & Access</button>
+          <button class="admin-subtab iam-subtab" type="button" data-iam-subtab="staffing">Feature Staffing</button>
+          <button class="admin-subtab iam-subtab" type="button" data-iam-subtab="identity">Agents & Identity</button>
+          <button class="admin-subtab iam-subtab" type="button" data-iam-subtab="emergency">Emergency Access</button>
+        </div>
 
-        <details class="admin-form iam-workspace-section" open>
-          <summary><strong>Canonical role catalogue and hard segregation of duties</strong></summary>
-          <div class="admin-form-grid">
-            <input id="iam-role-filter" type="search" placeholder="Filter roles, domains or actions">
-          </div>
-          <div class="iam-catalogue-grid">
-            <div class="admin-list" id="iam-role-catalogue"></div>
-            <div class="admin-list" id="iam-sod-catalogue"></div>
-          </div>
-        </details>
-
-        <details class="admin-form iam-workspace-section" open>
-          <summary><strong>Role grants and revocations · maker-checker</strong></summary>
-          <div class="iam-action-columns">
-            <div>
-              <h5>Propose grant</h5>
-              <div class="admin-form-grid">
-                <input id="iam-grant-request" placeholder="Grant request ID">
-                <input id="iam-grant-principal" placeholder="Target principal ID">
-                <select id="iam-grant-roles" multiple size="7" aria-label="Canonical roles"></select>
-                <select id="iam-grant-scope-type"><option value="tenant">Tenant scope</option><option value="product">Product scope</option></select>
-                <input id="iam-grant-scope-id" placeholder="Scope ID (defaults to tenant)">
-                <input id="iam-grant-reason" placeholder="Business reason">
-                <button id="btn-iam-grant-propose" class="btn btn-secondary" type="button">Propose role grant</button>
-              </div>
+        <div class="iam-subpanel active" data-iam-subpanel="roles">
+          <details class="admin-form iam-workspace-section" open>
+            <summary><strong>Principals and effective access</strong></summary>
+            <p>Review effective grants and removal impact before suspension or retirement. Forensic identity records are retained.</p>
+            <div class="admin-form-grid admin-form-grid-wide">
+              <input id="iam-status-principal" placeholder="Principal ID">
+              <select id="iam-principal-status"><option value="suspended">Suspend immediately</option><option value="inactive">Retire identity</option><option value="active">Reactivate</option></select>
+              <input id="iam-status-reason" placeholder="Reason">
+              <input id="iam-status-evidence" placeholder="Evidence / incident ref">
+              <button id="btn-iam-removal-impact" class="btn btn-secondary" type="button">Assess removal impact</button>
+              <button id="btn-iam-status" class="btn btn-warning" type="button">Apply principal status</button>
             </div>
-            <div>
-              <h5>Propose revocation</h5>
-              <div class="admin-form-grid">
-                <input id="iam-revoke-request" placeholder="Revocation request ID">
-                <input id="iam-revoke-grants" placeholder="Active grant IDs, comma separated">
-                <input id="iam-revoke-reason" placeholder="Revocation reason">
-                <button id="btn-iam-revoke-propose" class="btn btn-warning" type="button">Propose revocation</button>
-              </div>
-              <h5>Independent approval</h5>
-              <div class="admin-form-grid">
-                <input id="iam-approval-request" placeholder="Pending request ID">
-                <select id="iam-approval-kind"><option value="grant">Grant approval</option><option value="revoke">Revocation approval</option></select>
-                <input id="iam-approval-ref" placeholder="Approval evidence ref">
-                <input id="iam-grant-effective" type="datetime-local" aria-label="Grant effective from">
-                <input id="iam-grant-valid-until" type="datetime-local" aria-label="Grant valid until, optional">
-                <button id="btn-iam-role-approve" class="btn btn-primary" type="button">Approve independently</button>
-              </div>
-            </div>
-          </div>
-          <div class="admin-list" id="iam-role-requests-list"></div>
-        </details>
+            <div class="admin-list" id="iam-principals-list"></div>
+          </details>
 
-        <details class="admin-form iam-workspace-section">
-          <summary><strong>Feature staffing and operational readiness</strong></summary>
-          <p>Enabling a protected feature requires both the configured human staffing and an allow decision from the isolated control engine.</p>
-          <div class="iam-action-columns">
-            <div>
-              <h5>Propose configuration</h5>
-              <div class="admin-form-grid">
-                <input id="iam-staffing-request" placeholder="Staffing request ID">
-                <select id="iam-staffing-feature"></select>
-                <select id="iam-staffing-status"><option value="enabled">Enable feature</option><option value="disabled">Disable feature</option></select>
-                <select id="iam-staffing-scope-type"><option value="tenant">Tenant scope</option><option value="product">Product scope</option></select>
-                <input id="iam-staffing-scope-id" placeholder="Scope ID (defaults to tenant)">
-                <input id="iam-staffing-reason" placeholder="Configuration reason">
-                <button id="btn-iam-staffing-propose" class="btn btn-secondary" type="button">Propose staffing change</button>
-              </div>
-            </div>
-            <div>
-              <h5>Approve configuration</h5>
-              <div class="admin-form-grid">
-                <input id="iam-staffing-approval-request" placeholder="Pending staffing request ID">
-                <input id="iam-staffing-approval-ref" placeholder="Independent approval ref">
-                <button id="btn-iam-staffing-approve" class="btn btn-primary" type="button">Approve through control engine</button>
-              </div>
-            </div>
-          </div>
-          <div class="admin-list" id="iam-feature-readiness-list"></div>
-        </details>
-
-        <details class="admin-form iam-workspace-section">
-          <summary><strong>Staffing escalations</strong></summary>
-          <p>Containment is immediate. A pause may close only after staffing is restored and a different approver confirms the evidence.</p>
-          <div class="admin-form-grid admin-form-grid-wide">
-            <input id="iam-escalation-request" placeholder="Closure request ID">
-            <input id="iam-escalation-id" placeholder="Open escalation ID">
-            <input id="iam-escalation-resolution" placeholder="Resolution evidence ref">
-            <button id="btn-iam-escalation-propose" class="btn btn-secondary" type="button">Propose closure</button>
-            <input id="iam-escalation-approval-request" placeholder="Pending closure request ID">
-            <input id="iam-escalation-approval-ref" placeholder="Independent approval ref">
-            <button id="btn-iam-escalation-approve" class="btn btn-primary" type="button">Approve closure</button>
-          </div>
-          <div class="admin-list" id="iam-escalations-list"></div>
-        </details>
-
-        <details class="admin-form iam-workspace-section">
-          <summary><strong>AI and automation principals</strong></summary>
-          <p>Agents are first-class principals with verified workload identity, a human sponsor and only dedicated agent roles. Dynamic agents expire within 24 hours.</p>
-          <div class="admin-form-grid admin-form-grid-wide">
-            <input id="iam-agent-id" placeholder="Agent principal ID">
-            <input id="iam-agent-name" placeholder="Display name">
-            <select id="iam-agent-type"><option value="fixed_agent">Fixed agent</option><option value="dynamic_agent">Dynamic agent</option></select>
-            <input id="iam-agent-definition" placeholder="Immutable agent definition ref">
-            <input id="iam-agent-model" placeholder="Model ref, optional">
-            <input id="iam-agent-workload" placeholder="Verified workload identity ref">
-            <input id="iam-agent-evidence" placeholder="Identity evidence ref">
-            <input id="iam-agent-expires" type="datetime-local" aria-label="Dynamic agent expiry">
-            <button id="btn-iam-agent-register" class="btn btn-primary" type="button">Register governed agent</button>
-          </div>
-        </details>
-
-        <details class="admin-form iam-workspace-section">
-          <summary><strong>Organisation ownership transfer</strong></summary>
-          <div class="iam-action-columns">
+          <details class="admin-form iam-workspace-section" open>
+            <summary><strong>Canonical role catalogue and hard segregation of duties</strong></summary>
             <div class="admin-form-grid">
-              <input id="iam-owner-request" placeholder="Transfer request ID">
-              <input id="iam-owner-target" placeholder="New owner principal ID">
-              <input id="iam-owner-acceptance" placeholder="Target acceptance evidence ref">
-              <input id="iam-owner-reason" placeholder="Transfer reason">
-              <button id="btn-iam-owner-propose" class="btn btn-secondary" type="button">Propose ownership transfer</button>
+              <input id="iam-role-filter" type="search" placeholder="Filter roles, domains or actions">
             </div>
-            <div class="admin-form-grid">
-              <input id="iam-owner-approval-request" placeholder="Pending transfer request ID">
-              <input id="iam-owner-approval-ref" placeholder="Independent approval ref">
-              <button id="btn-iam-owner-approve" class="btn btn-primary" type="button">Approve transfer</button>
+            <div class="iam-catalogue-grid">
+              <div class="admin-list" id="iam-role-catalogue"></div>
+              <div class="admin-list" id="iam-sod-catalogue"></div>
             </div>
-          </div>
-          <div class="admin-list" id="iam-ownership-list"></div>
-        </details>
+          </details>
 
-        <details class="admin-form iam-workspace-section">
-          <summary><strong>Tenant emergency access</strong></summary>
-          <p>Emergency authority is action-scoped, independent-approved, limited to four hours, visible below and explicitly closed with evidence.</p>
-          <div class="iam-action-columns">
-            <div class="admin-form-grid">
-              <input id="iam-emergency-request" placeholder="Emergency request ID">
-              <input id="iam-emergency-beneficiary" placeholder="Beneficiary principal ID">
-              <select id="iam-emergency-actions" multiple size="6" aria-label="Emergency actions">
-                <option value="user.unlock">Unlock user</option><option value="integration.disable">Disable integration</option><option value="session.revoke">Revoke session</option><option value="security.contain">Security containment</option><option value="service.fail_closed">Fail service closed</option><option value="audit.read">Read audit evidence</option>
-              </select>
-              <input id="iam-emergency-incident" placeholder="Incident ref">
-              <input id="iam-emergency-reason" placeholder="Emergency reason">
-              <input id="iam-emergency-expires" type="datetime-local" aria-label="Expires within four hours">
-              <button id="btn-iam-emergency-propose" class="btn btn-warning" type="button">Request emergency access</button>
+          <details class="admin-form iam-workspace-section" open>
+            <summary><strong>Role grants and revocations · maker-checker</strong></summary>
+            <div class="iam-action-columns">
+              <div>
+                <h5>Propose grant</h5>
+                <div class="admin-form-grid">
+                  <input id="iam-grant-request" placeholder="Grant request ID">
+                  <input id="iam-grant-principal" list="principal-list" placeholder="Target principal ID">
+                  <select id="iam-grant-roles" multiple size="7" aria-label="Canonical roles"></select>
+                  <select id="iam-grant-scope-type"><option value="tenant">Tenant scope</option><option value="product">Product scope</option></select>
+                  <input id="iam-grant-scope-id" placeholder="Scope ID (defaults to tenant)">
+                  <input id="iam-grant-reason" placeholder="Business reason">
+                  <button id="btn-iam-grant-propose" class="btn btn-secondary" type="button">Propose role grant</button>
+                </div>
+              </div>
+              <div>
+                <h5>Propose revocation</h5>
+                <div class="admin-form-grid">
+                  <input id="iam-revoke-request" placeholder="Revocation request ID">
+                  <input id="iam-revoke-grants" placeholder="Active grant IDs, comma separated">
+                  <input id="iam-revoke-reason" placeholder="Revocation reason">
+                  <button id="btn-iam-revoke-propose" class="btn btn-warning" type="button">Propose revocation</button>
+                </div>
+              </div>
+              <div>
+                <h5>Independent approval</h5>
+                <div class="admin-form-grid">
+                  <input id="iam-approval-request" placeholder="Pending request ID">
+                  <select id="iam-approval-kind"><option value="grant">Grant approval</option><option value="revoke">Revocation approval</option></select>
+                  <input id="iam-approval-ref" placeholder="Approval evidence ref">
+                  <input id="iam-grant-effective" type="datetime-local" aria-label="Grant effective from">
+                  <input id="iam-grant-valid-until" type="datetime-local" aria-label="Grant valid until, optional">
+                  <button id="btn-iam-role-approve" class="btn btn-primary" type="button">Approve independently</button>
+                </div>
+              </div>
             </div>
-            <div class="admin-form-grid">
-              <input id="iam-emergency-approval-request" placeholder="Pending request ID">
-              <input id="iam-emergency-approval-ref" placeholder="Independent approval ref">
-              <button id="btn-iam-emergency-approve" class="btn btn-primary" type="button">Approve emergency access</button>
-              <input id="iam-emergency-grant" placeholder="Active emergency grant ID">
-              <input id="iam-emergency-closure-ref" placeholder="Closure evidence ref">
-              <button id="btn-iam-emergency-close" class="btn btn-secondary" type="button">Close emergency access</button>
+            <div class="admin-list" id="iam-role-requests-list"></div>
+          </details>
+        </div>
+
+        <div class="iam-subpanel hidden" data-iam-subpanel="staffing">
+          <details class="admin-form iam-workspace-section" open>
+            <summary><strong>Feature staffing and operational readiness</strong></summary>
+            <p>Enabling a protected feature requires both the configured human staffing and an allow decision from the isolated control engine.</p>
+            <div class="iam-action-columns">
+              <div>
+                <h5>Propose configuration</h5>
+                <div class="admin-form-grid">
+                  <input id="iam-staffing-request" placeholder="Staffing request ID">
+                  <select id="iam-staffing-feature"></select>
+                  <select id="iam-staffing-status"><option value="enabled">Enable feature</option><option value="disabled">Disable feature</option></select>
+                  <select id="iam-staffing-scope-type"><option value="tenant">Tenant scope</option><option value="product">Product scope</option></select>
+                  <input id="iam-staffing-scope-id" placeholder="Scope ID (defaults to tenant)">
+                  <input id="iam-staffing-reason" placeholder="Configuration reason">
+                  <button id="btn-iam-staffing-propose" class="btn btn-secondary" type="button">Propose staffing change</button>
+                </div>
+              </div>
+              <div>
+                <h5>Approve configuration</h5>
+                <div class="admin-form-grid">
+                  <input id="iam-staffing-approval-request" placeholder="Pending staffing request ID">
+                  <input id="iam-staffing-approval-ref" placeholder="Independent approval ref">
+                  <button id="btn-iam-staffing-approve" class="btn btn-primary" type="button">Approve through control engine</button>
+                </div>
+              </div>
             </div>
-          </div>
-          <div class="admin-list" id="iam-emergency-list"></div>
-        </details>
+            <div class="admin-list" id="iam-feature-readiness-list"></div>
+          </details>
+
+          <details class="admin-form iam-workspace-section" open>
+            <summary><strong>Staffing escalations</strong></summary>
+            <p>Containment is immediate. A pause may close only after staffing is restored and a different approver confirms the evidence.</p>
+            <div class="admin-form-grid admin-form-grid-wide">
+              <input id="iam-escalation-request" placeholder="Closure request ID">
+              <input id="iam-escalation-id" placeholder="Open escalation ID">
+              <input id="iam-escalation-resolution" placeholder="Resolution evidence ref">
+              <button id="btn-iam-escalation-propose" class="btn btn-secondary" type="button">Propose closure</button>
+              <input id="iam-escalation-approval-request" placeholder="Pending closure request ID">
+              <input id="iam-escalation-approval-ref" placeholder="Independent approval ref">
+              <button id="btn-iam-escalation-approve" class="btn btn-primary" type="button">Approve closure</button>
+            </div>
+            <div class="admin-list" id="iam-escalations-list"></div>
+          </details>
+        </div>
+
+        <div class="iam-subpanel hidden" data-iam-subpanel="identity">
+          <details class="admin-form iam-workspace-section" open>
+            <summary><strong>AI and automation principals</strong></summary>
+            <p>Agents are first-class principals with verified workload identity, a human sponsor and only dedicated agent roles. Dynamic agents expire within 24 hours.</p>
+            <div class="admin-form-grid admin-form-grid-wide">
+              <input id="iam-agent-id" placeholder="Agent principal ID">
+              <input id="iam-agent-name" placeholder="Display name">
+              <select id="iam-agent-type"><option value="fixed_agent">Fixed agent</option><option value="dynamic_agent">Dynamic agent</option></select>
+              <input id="iam-agent-definition" placeholder="Immutable agent definition ref">
+              <input id="iam-agent-model" placeholder="Model ref, optional">
+              <input id="iam-agent-workload" placeholder="Verified workload identity ref">
+              <input id="iam-agent-evidence" placeholder="Identity evidence ref">
+              <input id="iam-agent-expires" type="datetime-local" aria-label="Dynamic agent expiry">
+              <button id="btn-iam-agent-register" class="btn btn-primary" type="button">Register governed agent</button>
+            </div>
+          </details>
+
+          <details class="admin-form iam-workspace-section" open>
+            <summary><strong>Organisation ownership transfer</strong></summary>
+            <div class="iam-action-columns">
+              <div class="admin-form-grid">
+                <input id="iam-owner-request" placeholder="Transfer request ID">
+                <input id="iam-owner-target" placeholder="New owner principal ID">
+                <input id="iam-owner-acceptance" placeholder="Target acceptance evidence ref">
+                <input id="iam-owner-reason" placeholder="Transfer reason">
+                <button id="btn-iam-owner-propose" class="btn btn-secondary" type="button">Propose ownership transfer</button>
+              </div>
+              <div class="admin-form-grid">
+                <input id="iam-owner-approval-request" placeholder="Pending transfer request ID">
+                <input id="iam-owner-approval-ref" placeholder="Independent approval ref">
+                <button id="btn-iam-owner-approve" class="btn btn-primary" type="button">Approve transfer</button>
+              </div>
+            </div>
+            <div class="admin-list" id="iam-ownership-list"></div>
+          </details>
+        </div>
+
+        <div class="iam-subpanel hidden" data-iam-subpanel="emergency">
+          <details class="admin-form iam-workspace-section" open>
+            <summary><strong>Tenant emergency access</strong></summary>
+            <p>Emergency authority is action-scoped, independent-approved, limited to four hours, visible below and explicitly closed with evidence.</p>
+            <div class="iam-action-columns">
+              <div class="admin-form-grid">
+                <input id="iam-emergency-request" placeholder="Emergency request ID">
+                <input id="iam-emergency-beneficiary" list="principal-list" placeholder="Beneficiary principal ID">
+                <select id="iam-emergency-actions" multiple size="6" aria-label="Emergency actions">
+                  <option value="user.unlock">Unlock user</option><option value="integration.disable">Disable integration</option><option value="session.revoke">Revoke session</option><option value="security.contain">Security containment</option><option value="service.fail_closed">Fail service closed</option><option value="audit.read">Read audit evidence</option>
+                </select>
+                <input id="iam-emergency-incident" placeholder="Incident ref">
+                <input id="iam-emergency-reason" placeholder="Emergency reason">
+                <input id="iam-emergency-expires" type="datetime-local" aria-label="Expires within four hours">
+                <button id="btn-iam-emergency-propose" class="btn btn-warning" type="button">Request emergency access</button>
+              </div>
+              <div class="admin-form-grid">
+                <input id="iam-emergency-approval-request" placeholder="Pending request ID">
+                <input id="iam-emergency-approval-ref" placeholder="Independent approval ref">
+                <button id="btn-iam-emergency-approve" class="btn btn-primary" type="button">Approve emergency access</button>
+                <input id="iam-emergency-grant" placeholder="Active emergency grant ID">
+                <input id="iam-emergency-closure-ref" placeholder="Closure evidence ref">
+                <button id="btn-iam-emergency-close" class="btn btn-secondary" type="button">Close emergency access</button>
+              </div>
+            </div>
+            <div class="admin-list" id="iam-emergency-list"></div>
+          </details>
+        </div>
       </section>
 
       <section class="admin-panel" id="admin-panel-identity-ops">
@@ -758,169 +778,188 @@
           <p><strong>Integration state: simulated only.</strong> Conformance here certifies the LoanOS contract and deterministic simulator; it does not claim that an IdP, SIEM, WORM store, device provider, or control-engine connection is commercially live.</p>
           <button id="btn-identity-ops-refresh" class="btn btn-secondary" type="button">Refresh control room</button>
         </div>
-        <div class="admin-form">
-          <h4>Operations automation and resilience drills</h4>
-          <p>Run deterministic readiness checks and retain witnessed outage/compromise/recovery evidence. These records are simulator and control evidence, not a claim of live-provider certification.</p>
-          <div class="iam-action-columns">
-            <div class="admin-form-grid">
-              <input id="identity-automation-run" placeholder="Automation run ID">
-              <input id="identity-automation-evidence" placeholder="Execution evidence ref">
-              <button id="btn-identity-automation-run" class="btn btn-secondary" type="button">Run readiness automation</button>
+
+        <div class="admin-subtabs" role="tablist" aria-label="Identity operations subtabs">
+          <button class="admin-subtab identity-subtab active" type="button" data-identity-subtab="resilience">Resilience & Checks</button>
+          <button class="admin-subtab identity-subtab" type="button" data-identity-subtab="security">Session & Recovery</button>
+          <button class="admin-subtab identity-subtab" type="button" data-identity-subtab="conformance">Conformance Lab</button>
+          <button class="admin-subtab identity-subtab" type="button" data-identity-subtab="workers">Durable Workers</button>
+        </div>
+
+        <div class="identity-subpanel active" data-identity-subpanel="resilience">
+          <div class="admin-form">
+            <h4>Operations automation and resilience drills</h4>
+            <p>Run deterministic readiness checks and retain witnessed outage/compromise/recovery evidence. These records are simulator and control evidence, not a claim of live-provider certification.</p>
+            <div class="iam-action-columns">
+              <div class="admin-form-grid">
+                <input id="identity-automation-run" placeholder="Automation run ID">
+                <input id="identity-automation-evidence" placeholder="Execution evidence ref">
+                <button id="btn-identity-automation-run" class="btn btn-secondary" type="button">Run readiness automation</button>
+              </div>
+              <div class="admin-form-grid">
+                <input id="identity-drill-id" placeholder="Drill ID">
+                <select id="identity-drill-scenario" aria-label="Resilience drill scenario">
+                  <option value="idp_outage">IdP outage</option>
+                  <option value="signing_key_compromise">Signing-key compromise</option>
+                  <option value="scim_credential_compromise">SCIM-credential compromise</option>
+                  <option value="leaver_containment">Leaver containment</option>
+                  <option value="control_engine_outage">Control-engine outage</option>
+                  <option value="siem_worm_outage">SIEM/WORM outage</option>
+                  <option value="metadata_rollover">Metadata rollover</option>
+                  <option value="directory_drift">Directory drift</option>
+                </select>
+                <input id="identity-drill-objective" placeholder="Drill objective">
+                <input id="identity-drill-runbook" placeholder="Approved runbook ref">
+                <input id="identity-drill-target-detection" type="number" min="1" value="300000" aria-label="Target detection milliseconds">
+                <input id="identity-drill-target-containment" type="number" min="1" value="900000" aria-label="Target containment milliseconds">
+                <input id="identity-drill-target-recovery" type="number" min="1" value="3600000" aria-label="Target recovery milliseconds">
+                <button id="btn-identity-drill-propose" class="btn btn-secondary" type="button">Propose drill</button>
+                <input id="identity-drill-execution" placeholder="Execution evidence ref">
+                <input id="identity-drill-recovery" placeholder="Recovery evidence ref">
+                <input id="identity-drill-detection" type="number" min="0" placeholder="Observed detection ms">
+                <input id="identity-drill-containment" type="number" min="0" placeholder="Observed containment ms">
+                <input id="identity-drill-recovery-ms" type="number" min="0" placeholder="Observed recovery ms">
+                <label><input id="identity-drill-fail-closed" type="checkbox"> Fail-closed observed</label>
+                <label><input id="identity-drill-audit-complete" type="checkbox"> Audit evidence complete</label>
+                <input id="identity-drill-observations" placeholder="Witness observations">
+                <button id="btn-identity-drill-witness" class="btn btn-primary" type="button">Record witnessed outcome</button>
+              </div>
             </div>
+            <div class="admin-list" id="identity-automation-list"></div>
+          </div>
+        </div>
+
+        <div class="identity-subpanel hidden" data-identity-subpanel="security">
+          <div class="admin-form">
+            <h4>Immediate session containment</h4>
+            <p>Revoke every active session for one tenant user. In-flight work is stopped and the action is retained in the audit chain.</p>
             <div class="admin-form-grid">
-              <input id="identity-drill-id" placeholder="Drill ID">
-              <select id="identity-drill-scenario" aria-label="Resilience drill scenario">
-                <option value="idp_outage">IdP outage</option>
-                <option value="signing_key_compromise">Signing-key compromise</option>
-                <option value="scim_credential_compromise">SCIM-credential compromise</option>
-                <option value="leaver_containment">Leaver containment</option>
-                <option value="control_engine_outage">Control-engine outage</option>
-                <option value="siem_worm_outage">SIEM/WORM outage</option>
-                <option value="metadata_rollover">Metadata rollover</option>
-                <option value="directory_drift">Directory drift</option>
+              <input id="identity-revoke-user" list="principal-list" placeholder="User / principal ID" required>
+              <input id="identity-revoke-reason" placeholder="Incident or containment reason" required>
+              <button id="btn-identity-revoke" class="btn btn-warning" type="button">Revoke all sessions</button>
+            </div>
+          </div>
+          <div class="admin-form">
+            <h4>Authenticator recovery · maker-checker</h4>
+            <div class="admin-form-grid">
+              <input id="identity-recovery-id" placeholder="Recovery request ID">
+              <input id="identity-recovery-user" list="principal-list" placeholder="User / principal ID">
+              <input id="identity-recovery-evidence" placeholder="Identity verification evidence ref">
+              <input id="identity-recovery-reason" placeholder="Recovery reason">
+              <button id="btn-identity-recovery-propose" class="btn btn-secondary" type="button">Propose recovery</button>
+              <input id="identity-recovery-approval-ref" placeholder="Independent approval ref">
+              <button id="btn-identity-recovery-approve" class="btn btn-primary" type="button">Approve and revoke sessions</button>
+            </div>
+          </div>
+          <div class="admin-form">
+            <h4>Federation rotation and emergency suspension</h4>
+            <p>Planned metadata/key rotation is maker-checker. Emergency suspension is immediate and revokes affected sessions.</p>
+            <div class="admin-form-grid">
+              <input id="identity-federation-policy" placeholder="Federation policy ID">
+              <input id="identity-rotation-id" placeholder="Rotation request ID">
+              <textarea id="identity-rotation-metadata" rows="3" placeholder="Proposed metadata or canonical metadata document"></textarea>
+              <input id="identity-rotation-valid-until" placeholder="Metadata valid until (ISO date-time)">
+              <input id="identity-rotation-keys" placeholder="Signing key IDs, comma separated">
+              <input id="identity-rotation-overlap-start" placeholder="Key overlap starts (ISO date-time)">
+              <input id="identity-rotation-overlap-end" placeholder="Key overlap ends (ISO date-time)">
+              <input id="identity-rotation-reason" placeholder="Rotation reason">
+              <button id="btn-identity-rotation-propose" class="btn btn-secondary" type="button">Propose rotation</button>
+              <input id="identity-rotation-approval" placeholder="Independent approval ref">
+              <input id="identity-rotation-conformance" placeholder="Conformance evidence ref">
+              <button id="btn-identity-rotation-approve" class="btn btn-primary" type="button">Approve rotation</button>
+              <input id="identity-suspension-reason" placeholder="Emergency suspension reason">
+              <input id="identity-suspension-evidence" placeholder="Incident / evidence ref">
+              <button id="btn-identity-suspend" class="btn btn-warning" type="button">Suspend federation now</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="identity-subpanel hidden" data-identity-subpanel="conformance">
+          <div class="admin-form">
+            <h4>Vendor-neutral conformance lab</h4>
+            <p>Every mandatory positive, negative, replay, stale-evidence, cross-tenant, rollover, and outage scenario is run by the deterministic simulator.</p>
+            <div class="admin-form-grid">
+              <input id="identity-campaign-id" placeholder="Campaign ID">
+              <select id="identity-campaign-family">
+                <option value="oidc">OIDC</option><option value="saml_gateway">SAML gateway</option><option value="scim">SCIM</option><option value="device_posture">Device posture</option><option value="control_engine">Control engine</option><option value="siem_worm">SIEM / WORM custody</option>
               </select>
-              <input id="identity-drill-objective" placeholder="Drill objective">
-              <input id="identity-drill-runbook" placeholder="Approved runbook ref">
-              <input id="identity-drill-target-detection" type="number" min="1" value="300000" aria-label="Target detection milliseconds">
-              <input id="identity-drill-target-containment" type="number" min="1" value="900000" aria-label="Target containment milliseconds">
-              <input id="identity-drill-target-recovery" type="number" min="1" value="3600000" aria-label="Target recovery milliseconds">
-              <button id="btn-identity-drill-propose" class="btn btn-secondary" type="button">Propose drill</button>
-              <input id="identity-drill-execution" placeholder="Execution evidence ref">
-              <input id="identity-drill-recovery" placeholder="Recovery evidence ref">
-              <input id="identity-drill-detection" type="number" min="0" placeholder="Observed detection ms">
-              <input id="identity-drill-containment" type="number" min="0" placeholder="Observed containment ms">
-              <input id="identity-drill-recovery-ms" type="number" min="0" placeholder="Observed recovery ms">
-              <label><input id="identity-drill-fail-closed" type="checkbox"> Fail-closed observed</label>
-              <label><input id="identity-drill-audit-complete" type="checkbox"> Audit evidence complete</label>
-              <input id="identity-drill-observations" placeholder="Witness observations">
-              <button id="btn-identity-drill-witness" class="btn btn-primary" type="button">Record witnessed outcome</button>
+              <input id="identity-provider-ref" placeholder="Vendor/profile reference">
+              <button id="btn-identity-campaign-propose" class="btn btn-secondary" type="button">Propose campaign</button>
+              <input id="identity-campaign-approval-ref" placeholder="Independent approval ref">
+              <button id="btn-identity-campaign-approve" class="btn btn-primary" type="button">Approve campaign</button>
+              <button id="btn-identity-campaign-run" class="btn btn-warning" type="button">Run complete simulator pack</button>
             </div>
           </div>
-          <div class="admin-list" id="identity-automation-list"></div>
-        </div>
-        <div class="admin-form">
-          <h4>Immediate session containment</h4>
-          <p>Revoke every active session for one tenant user. In-flight work is stopped and the action is retained in the audit chain.</p>
-          <div class="admin-form-grid">
-            <input id="identity-revoke-user" placeholder="User / principal ID" required>
-            <input id="identity-revoke-reason" placeholder="Incident or containment reason" required>
-            <button id="btn-identity-revoke" class="btn btn-warning" type="button">Revoke all sessions</button>
-          </div>
-        </div>
-        <div class="admin-form">
-          <h4>Authenticator recovery · maker-checker</h4>
-          <div class="admin-form-grid">
-            <input id="identity-recovery-id" placeholder="Recovery request ID">
-            <input id="identity-recovery-user" placeholder="User / principal ID">
-            <input id="identity-recovery-evidence" placeholder="Identity verification evidence ref">
-            <input id="identity-recovery-reason" placeholder="Recovery reason">
-            <button id="btn-identity-recovery-propose" class="btn btn-secondary" type="button">Propose recovery</button>
-            <input id="identity-recovery-approval-ref" placeholder="Independent approval ref">
-            <button id="btn-identity-recovery-approve" class="btn btn-primary" type="button">Approve and revoke sessions</button>
-          </div>
-        </div>
-        <div class="admin-form">
-          <h4>Federation rotation and emergency suspension</h4>
-          <p>Planned metadata/key rotation is maker-checker. Emergency suspension is immediate and revokes affected sessions.</p>
-          <div class="admin-form-grid">
-            <input id="identity-federation-policy" placeholder="Federation policy ID">
-            <input id="identity-rotation-id" placeholder="Rotation request ID">
-            <textarea id="identity-rotation-metadata" rows="3" placeholder="Proposed metadata or canonical metadata document"></textarea>
-            <input id="identity-rotation-valid-until" placeholder="Metadata valid until (ISO date-time)">
-            <input id="identity-rotation-keys" placeholder="Signing key IDs, comma separated">
-            <input id="identity-rotation-overlap-start" placeholder="Key overlap starts (ISO date-time)">
-            <input id="identity-rotation-overlap-end" placeholder="Key overlap ends (ISO date-time)">
-            <input id="identity-rotation-reason" placeholder="Rotation reason">
-            <button id="btn-identity-rotation-propose" class="btn btn-secondary" type="button">Propose rotation</button>
-            <input id="identity-rotation-approval" placeholder="Independent approval ref">
-            <input id="identity-rotation-conformance" placeholder="Conformance evidence ref">
-            <button id="btn-identity-rotation-approve" class="btn btn-primary" type="button">Approve rotation</button>
-            <input id="identity-suspension-reason" placeholder="Emergency suspension reason">
-            <input id="identity-suspension-evidence" placeholder="Incident / evidence ref">
-            <button id="btn-identity-suspend" class="btn btn-warning" type="button">Suspend federation now</button>
-          </div>
-        </div>
-        <div class="admin-form">
-          <h4>Vendor-neutral conformance lab</h4>
-          <p>Every mandatory positive, negative, replay, stale-evidence, cross-tenant, rollover, and outage scenario is run by the deterministic simulator.</p>
-          <div class="admin-form-grid">
-            <input id="identity-campaign-id" placeholder="Campaign ID">
-            <select id="identity-campaign-family">
-              <option value="oidc">OIDC</option><option value="saml_gateway">SAML gateway</option><option value="scim">SCIM</option><option value="device_posture">Device posture</option><option value="control_engine">Control engine</option><option value="siem_worm">SIEM / WORM custody</option>
-            </select>
-            <input id="identity-provider-ref" placeholder="Vendor/profile reference">
-            <button id="btn-identity-campaign-propose" class="btn btn-secondary" type="button">Propose campaign</button>
-            <input id="identity-campaign-approval-ref" placeholder="Independent approval ref">
-            <button id="btn-identity-campaign-approve" class="btn btn-primary" type="button">Approve campaign</button>
-            <button id="btn-identity-campaign-run" class="btn btn-warning" type="button">Run complete simulator pack</button>
-          </div>
-        </div>
-        <details class="admin-form iam-workspace-section" open>
-          <summary><strong>Cross-platform conformance administration</strong></summary>
-          <p>Register non-live provider candidates and govern canonical organisation-admission or enterprise-platform campaign manifests. Registration and campaign activation never establish commercial production approval.</p>
-          <div class="iam-action-columns">
+          <details class="admin-form iam-workspace-section" open>
+            <summary><strong>Cross-platform conformance administration</strong></summary>
+            <p>Register non-live provider candidates and govern canonical organisation-admission or enterprise-platform campaign manifests. Registration and campaign activation never establish commercial production approval.</p>
+            <div class="iam-action-columns">
+              <div class="admin-form-grid">
+                <h5>Register simulator candidate</h5>
+                <input id="conformance-candidate-id" placeholder="Candidate profile ID">
+                <input id="conformance-provider-name" placeholder="Provider / proxy name">
+                <input id="conformance-provider-category" placeholder="Provider category">
+                <input id="conformance-adapter-version" placeholder="Adapter contract version" value="adapter/v1">
+                <input id="conformance-simulator-ref" placeholder="Simulator configuration ref">
+                <input id="conformance-diligence-ref" placeholder="Due-diligence evidence ref">
+                <input id="conformance-admission-scopes" placeholder="Admission integration IDs, comma separated">
+                <input id="conformance-enterprise-scopes" placeholder="Enterprise platform families, comma separated">
+                <button id="btn-conformance-candidate" class="btn btn-secondary" type="button">Register candidate</button>
+              </div>
+              <div class="admin-form-grid">
+                <h5>Govern campaign</h5>
+                <input id="conformance-campaign-id" placeholder="Campaign ID">
+                <input id="conformance-profile-id" placeholder="Candidate profile ID">
+                <select id="conformance-target-type"><option value="organisation_admission">Organisation admission</option><option value="enterprise_platform">Enterprise platform</option></select>
+                <input id="conformance-target-id" placeholder="Canonical integration / family ID">
+                <input id="conformance-validity-days" type="number" min="1" max="366" value="90">
+                <input id="conformance-proposal-ref" placeholder="Proposal / change ref">
+                <button id="btn-conformance-propose" class="btn btn-secondary" type="button">Propose campaign</button>
+                <input id="conformance-approval-ref" placeholder="Independent approval ref">
+                <button id="btn-conformance-approve" class="btn btn-primary" type="button">Approve campaign</button>
+                <input id="conformance-assessment-ref" placeholder="Assessment evidence ref">
+                <button id="btn-conformance-assess" class="btn btn-warning" type="button">Assess recorded evidence</button>
+              </div>
+            </div>
+            <div class="admin-list" id="conformance-campaigns-list"></div>
+          </details>
+          <div class="admin-form">
+            <h4>Federated directory reconciliation</h4>
+            <p>Paste the provider snapshot. Provider-supplied roles are detected and never applied as LoanOS access grants.</p>
             <div class="admin-form-grid">
-              <h5>Register simulator candidate</h5>
-              <input id="conformance-candidate-id" placeholder="Candidate profile ID">
-              <input id="conformance-provider-name" placeholder="Provider / proxy name">
-              <input id="conformance-provider-category" placeholder="Provider category">
-              <input id="conformance-adapter-version" placeholder="Adapter contract version" value="adapter/v1">
-              <input id="conformance-simulator-ref" placeholder="Simulator configuration ref">
-              <input id="conformance-diligence-ref" placeholder="Due-diligence evidence ref">
-              <input id="conformance-admission-scopes" placeholder="Admission integration IDs, comma separated">
-              <input id="conformance-enterprise-scopes" placeholder="Enterprise platform families, comma separated">
-              <button id="btn-conformance-candidate" class="btn btn-secondary" type="button">Register candidate</button>
-            </div>
-            <div class="admin-form-grid">
-              <h5>Govern campaign</h5>
-              <input id="conformance-campaign-id" placeholder="Campaign ID">
-              <input id="conformance-profile-id" placeholder="Candidate profile ID">
-              <select id="conformance-target-type"><option value="organisation_admission">Organisation admission</option><option value="enterprise_platform">Enterprise platform</option></select>
-              <input id="conformance-target-id" placeholder="Canonical integration / family ID">
-              <input id="conformance-validity-days" type="number" min="1" max="366" value="90">
-              <input id="conformance-proposal-ref" placeholder="Proposal / change ref">
-              <button id="btn-conformance-propose" class="btn btn-secondary" type="button">Propose campaign</button>
-              <input id="conformance-approval-ref" placeholder="Independent approval ref">
-              <button id="btn-conformance-approve" class="btn btn-primary" type="button">Approve campaign</button>
-              <input id="conformance-assessment-ref" placeholder="Assessment evidence ref">
-              <button id="btn-conformance-assess" class="btn btn-warning" type="button">Assess recorded evidence</button>
+              <input id="identity-recon-id" placeholder="Reconciliation ID">
+              <input id="identity-recon-policy" placeholder="Federation policy ID">
+              <input id="identity-recon-evidence" placeholder="Provider export evidence ref">
+              <textarea id="identity-recon-users" rows="5" placeholder='[{"externalId":"idp-123","active":true,"roles":[]}]'></textarea>
+              <button id="btn-identity-reconcile" class="btn btn-secondary" type="button">Run reconciliation</button>
             </div>
           </div>
-          <div class="admin-list" id="conformance-campaigns-list"></div>
-        </details>
-        <details class="admin-form iam-workspace-section" open>
-          <summary><strong>Durable identity operations worker</strong></summary>
-          <p>Schedule reference-only work for a named tenant service credential. Claims are lease-fenced; exhausted work enters a visible dead-letter and escalation queue.</p>
-          <div class="admin-form-grid admin-form-grid-wide">
-            <input id="identity-worker-job-id" placeholder="Job ID">
-            <select id="identity-worker-job-type"><option value="identity_readiness_assessment">Identity readiness</option><option value="directory_reconciliation">Directory reconciliation</option><option value="federation_metadata_validation">Federation metadata validation</option><option value="activity_custody_verification">Activity custody verification</option></select>
-            <input id="identity-worker-credential" placeholder="Service credential ID" value="svc_default">
-            <input id="identity-worker-purpose" placeholder="Operational purpose">
-            <input id="identity-worker-idempotency" placeholder="Idempotency key">
-            <input id="identity-worker-policy-ref" placeholder="Policy / evidence reference">
-            <button id="btn-identity-worker-schedule" class="btn btn-secondary" type="button">Schedule durable job</button>
-          </div>
-          <div class="admin-list" id="identity-worker-list"></div>
-        </details>
-        <details class="admin-form iam-workspace-section">
-          <summary><strong>Unified tenant activation gate</strong></summary>
-          <p>Assessment requires checksummed, current, same-tenant evidence for admission, IAM staffing, products, integrations, deployment, security, UAT and drills. Simulator evidence can reach sandbox readiness only.</p>
-          <textarea id="tenant-activation-assessment-json" rows="7" placeholder='{"assessmentId":"...","selectedProductIds":[],"requiredIntegrationIds":[],"requiredDeploymentComponentIds":[],"requiredSecurityControlIds":[],"requiredDrillScenarioIds":[],"evidence":{}}'></textarea>
-          <button id="btn-tenant-activation-assess" class="btn btn-warning" type="button">Run activation assessment</button>
-          <div class="admin-list" id="tenant-activation-list"></div>
-        </details>
-        <div class="admin-form">
-          <h4>Federated directory reconciliation</h4>
-          <p>Paste the provider snapshot. Provider-supplied roles are detected and never applied as LoanOS access grants.</p>
-          <div class="admin-form-grid">
-            <input id="identity-recon-id" placeholder="Reconciliation ID">
-            <input id="identity-recon-policy" placeholder="Federation policy ID">
-            <input id="identity-recon-evidence" placeholder="Provider export evidence ref">
-            <textarea id="identity-recon-users" rows="5" placeholder='[{"externalId":"idp-123","active":true,"roles":[]}]'></textarea>
-            <button id="btn-identity-reconcile" class="btn btn-secondary" type="button">Run reconciliation</button>
-          </div>
+          <div class="admin-list" id="identity-campaigns-list"></div>
         </div>
-        <div class="admin-list" id="identity-campaigns-list"></div>
+
+        <div class="identity-subpanel hidden" data-identity-subpanel="workers">
+          <details class="admin-form iam-workspace-section" open>
+            <summary><strong>Durable identity operations worker</strong></summary>
+            <p>Schedule reference-only work for a named tenant service credential. Claims are lease-fenced; exhausted work enters a visible dead-letter and escalation queue.</p>
+            <div class="admin-form-grid admin-form-grid-wide">
+              <input id="identity-worker-job-id" placeholder="Job ID">
+              <select id="identity-worker-job-type"><option value="identity_readiness_assessment">Identity readiness</option><option value="directory_reconciliation">Directory reconciliation</option><option value="federation_metadata_validation">Federation metadata validation</option><option value="activity_custody_verification">Activity custody verification</option></select>
+              <input id="identity-worker-credential" placeholder="Service credential ID" value="svc_default">
+              <input id="identity-worker-purpose" placeholder="Operational purpose">
+              <input id="identity-worker-idempotency" placeholder="Idempotency key">
+              <input id="identity-worker-policy-ref" placeholder="Policy / evidence reference">
+              <button id="btn-identity-worker-schedule" class="btn btn-secondary" type="button">Schedule durable job</button>
+            </div>
+            <div class="admin-list" id="identity-worker-list"></div>
+          </details>
+          <details class="admin-form iam-workspace-section" open>
+            <summary><strong>Unified tenant activation gate</strong></summary>
+            <p>Assessment requires checksummed, current, same-tenant evidence for admission, IAM staffing, products, integrations, deployment, security, UAT and drills. Simulator evidence can reach sandbox readiness only.</p>
+            <textarea id="tenant-activation-assessment-json" rows="7" placeholder='{"assessmentId":"...","selectedProductIds":[],"requiredIntegrationIds":[],"requiredDeploymentComponentIds":[],"requiredSecurityControlIds":[],"requiredDrillScenarioIds":[],"evidence":{}}'></textarea>
+            <button id="btn-tenant-activation-assess" class="btn btn-warning" type="button">Run activation assessment</button>
+            <div class="admin-list" id="tenant-activation-list"></div>
+          </details>
+        </div>
       </section>
 
       <section class="admin-panel" id="admin-panel-platform">
@@ -1115,16 +1154,16 @@
         <div class="admin-list" id="break-glass-list"></div>
       </section>
     </div>
-    <div class="dialog-footer">
-      <button class="btn btn-secondary" id="btn-admin-close">Close</button>
-    </div>
   </dialog>
 
   <!-- ═══ Account Security Settings ═══ -->
   <dialog id="dialog-account" class="admin-dialog">
     <div class="dialog-header">
-      <h3>Account Security</h3>
-      <p id="account-dialog-subtitle">Manage your own password and multi-factor authentication.</p>
+      <div class="dialog-header-text">
+        <h3>Account Security</h3>
+        <p id="account-dialog-subtitle">Manage your own password and multi-factor authentication.</p>
+      </div>
+      <button class="btn btn-secondary" id="btn-account-close">Close Settings</button>
     </div>
     <div class="admin-layout">
       <nav class="admin-tabs" aria-label="Account sections">
@@ -1181,9 +1220,6 @@
           </div>
         </form>
       </section>
-    </div>
-    <div class="dialog-footer">
-      <button class="btn btn-secondary" id="btn-account-close">Close</button>
     </div>
   </dialog>
 
@@ -1262,6 +1298,8 @@
 
   <!-- Notification Toast Container -->
   <div class="toast-container" id="toast-container" aria-live="polite"></div>
+
+  <datalist id="principal-list"></datalist>
 
   <script src="/dashboard/index.js"></script>
 </body>
