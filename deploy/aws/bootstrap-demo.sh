@@ -266,7 +266,7 @@ CREDENTIALS_JSON=$(jq -n \
   --arg tenantAdminEmail "admin@dev.loanos.local" \
   --arg tenantAdminPassword "$TENANT_ADMIN_PASSWORD" \
   --arg tenantApiKey "$TENANT_API_KEY" \
-  --arg platformAdminEmail "admin@loanos.local" \
+  --arg platformAdminEmail "admin@platform.local" \
   --arg platformAdminPassword "$PLATFORM_ADMIN_PASSWORD" \
   --arg platformAdminKey "$PLATFORM_ADMIN_KEY" \
   '{environment:$environment, tenantId:$tenantId, tenantAdminEmail:$tenantAdminEmail, tenantAdminPassword:$tenantAdminPassword, tenantApiKey:$tenantApiKey, platformAdminEmail:$platformAdminEmail, platformAdminPassword:$platformAdminPassword, platformAdminKey:$platformAdminKey}')

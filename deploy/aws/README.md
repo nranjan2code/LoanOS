@@ -287,6 +287,15 @@ Tenant staff login:
 - email: `admin@dev.loanos.local`;
 - password: `tenantAdminPassword` from the secure parameter.
 
+Platform administration login:
+
+- URL: `/t/dev/staff/`; choose **Platform administration** on the sign-in page;
+- email: `admin@platform.local`;
+- password: `platformAdminPassword` from the secure parameter.
+
+`platformAdminKey` is an integration credential. It is not accepted by the
+browser sign-in form.
+
 The same parameter contains synthetic-demo API and platform credentials for
 automated testing. Treat them as secrets even though the data is synthetic.
 

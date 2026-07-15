@@ -175,9 +175,13 @@ Before the customer joins:
 
 1. Confirm CloudFormation and SSM status are `CREATE_COMPLETE` and `COMPLETE`.
 2. Run the public and local smoke checks.
-3. Privately retrieve the tenant administrator credential from the stack's
+3. Privately retrieve the required administrator credential from the stack's
    `CredentialsParameter`.
-4. Sign in at `/t/dev/staff/`; never expose the password or API key on screen.
+4. For the tenant workspace, sign in at `/t/dev/staff/` as
+   `admin@dev.loanos.local` using `tenantAdminPassword`. For the platform
+   workspace, select **Platform administration** on the same page and sign in
+   as `admin@platform.local` using `platformAdminPassword`. Never expose a
+   password or API key on screen; `platformAdminKey` is not a browser password.
 5. Open the two or three journeys that match discovery. Do not attempt to
    demonstrate all 21 in one meeting.
 6. Prepare one fail-closed moment, one maker-checker moment, and one evidence
