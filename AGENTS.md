@@ -5,7 +5,7 @@ LoanOS is a multi-tenant, RBI-compliance-first lending platform (LOS + LMS + LWS
 ## Architecture in one view
 
 ```
-apps/web, apps/tenant, apps/customer, apps/dashboard   static frontends
+apps/web, apps/tenant, apps/customer, apps/dashboard, apps/help   static frontends
 apps/api          Node HTTP API (no framework), multi-tenant, session/API-key auth
 packages/core     domain kernel: compliance controls, KYC, KFS, loan policy,
                   audit hash chain, model governance (kill-switch source of truth)
@@ -29,6 +29,7 @@ They meet at two deliberately isolated gateways: `apps/api/src/rules-engine.js` 
 | `docs/architecture/decision-engine-design.md` | Source of truth for the engine. Requirements carry stable IDs — INV-n (invariants = test obligations), DEC-n (design decisions), SEC-n (security controls), PH-n (phases). If code and doc disagree, the doc wins until amended. Cite IDs in commits. |
 | `docs/decisions/000*.md` | ADRs: compliance-first foundation, multi-tenant SaaS delivery, per-tenant pure-Rust engine. |
 | `docs/architecture/current-implementation.md` | What exists today and where each control lives. |
+| `docs/architecture/help-centre-and-academy.md` | Canonical human guidance contract, verification metadata and future tenant/RE overlay boundary. |
 | `docs/architecture/tenant-role-staffing-and-feature-gating.md` | Canonical roles, feature staffing, IdP/SCIM, agents, revocation/pause and activity-attribution source. |
 | `docs/compliance/india-regulatory-register.md` | Regulatory control families (RBI Digital Lending Directions 2025 etc.). |
 | `docs/README.md` | Documentation map + definition of done: features are incomplete until the relevant docs are updated. |
@@ -41,7 +42,7 @@ They meet at two deliberately isolated gateways: `apps/api/src/rules-engine.js` 
 - **Policy is data.** New lending/guardrail policy becomes a decision model (JSON) with a golden corpus — not engine code, not scattered `if`s in `server.js`.
 - **Determinism and lineage.** Engine evaluation reads no clock, no RNG, no I/O; every decision is replayable byte-identically from its audit record (INV-1/8/12).
 - **AI is gated.** Model outputs enter decisions only as provenance-tagged facts (DEC-4); the kill switch (`packages/core/src/model-governance.js` is the state source; the engine enforces) degrades model-dependent decisions to manual review. Agent actions go through `guardrail.*` decisions (`allow/deny/require_human`).
-- **Docs are part of done.** Architecture change → update `docs/architecture/`; irreversible choice → new ADR; engine change → check the design doc's INV/DEC tables.
+- **Docs are part of done.** Architecture change → update `docs/architecture/`; irreversible choice → new ADR; engine change → check the design doc's INV/DEC tables; user-visible workflow change → update the canonical Guide & Academy content and verification date.
 
 ## Commands
 

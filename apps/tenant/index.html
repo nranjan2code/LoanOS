@@ -16,7 +16,7 @@
     .brand { display:flex; align-items:center; gap:12px; }
     .mark { width:40px; height:40px; display:grid; place-items:center; border-radius:50% 50% 50% 12px; background:var(--forest); color:var(--lime); font-family:var(--serif); font-size:1.25rem; transform:rotate(-8deg); }
     .mark span { transform:rotate(8deg); } .name { font-weight:700; letter-spacing:-.02em; } .type { color:var(--muted); font-size:.66rem; font-weight:700; letter-spacing:.1em; text-transform:uppercase; }
-    .powered { color:var(--muted); font-size:.75rem; text-decoration:none; } .powered strong { color:var(--forest); }
+    .header-links { display:flex; align-items:center; gap:18px; } .powered { color:var(--muted); font-size:.75rem; text-decoration:none; } .powered strong { color:var(--forest); }
     main { flex:1; padding:34px 0 74px; }
     .hero { display:grid; grid-template-columns:1.04fr .96fr; min-height:660px; overflow:hidden; border-radius:26px; background:var(--sand); }
     .copy { padding:74px 66px; display:flex; flex-direction:column; align-items:flex-start; justify-content:center; }
@@ -50,7 +50,7 @@
   <div id="loading" class="loading">Preparing your secure lending portal…</div>
   <div id="error" class="error"><div><p class="eyebrow">We could not find this organisation</p><h1>Please check the link.</h1><a class="back" href="/">Return to LoanOS</a></div></div>
   <div id="main" class="shell" hidden>
-    <header><div class="wrap nav"><div class="brand"><div class="mark" id="brand-mark"><span>L</span></div><div><div class="name" id="brand-name">Lending partner</div><div class="type" id="brand-type">Regulated lending institution</div></div></div><a class="powered" href="/">Experience powered by <strong>LoanOS</strong></a></div></header>
+    <header><div class="wrap nav"><div class="brand"><div class="mark" id="brand-mark"><span>L</span></div><div><div class="name" id="brand-name">Lending partner</div><div class="type" id="brand-type">Regulated lending institution</div></div></div><div class="header-links"><a class="powered" href="/help/">Guide &amp; Academy</a><a class="powered" href="/">Experience powered by <strong>LoanOS</strong></a></div></div></header>
     <main><div class="wrap"><section class="hero">
       <div class="copy"><p class="eyebrow">Welcome to your lending services</p><h1 id="hero-title">How can we help today?</h1><p class="intro" id="hero-subtitle">A secure place to manage your loan or continue to your team workspace.</p><div class="choices">
         <a class="choice" id="cta-customer" href="#"><span class="choice-icon">₹</span><span><strong>I’m a customer</strong><small>Applications, repayments, documents and support</small></span><b>→</b></a>

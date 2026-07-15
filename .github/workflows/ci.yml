@@ -44,6 +44,8 @@ jobs:
         run: npm run docs:check
       - name: Capability evidence integrity gate
         run: npm run trace:validate
+      - name: Dashboard source and artifact integrity gate
+        run: npm run dashboard:check
       - name: Public-site content gate
         run: npm run web:content:check
       - run: npm test

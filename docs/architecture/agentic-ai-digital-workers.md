@@ -36,9 +36,9 @@ The repository now implements the provider-neutral governance and commercial bou
 - local model-registry and global/model kill-switch checks plus isolated business-engine decisions for `guardrail.model_consumption` and `guardrail.agent_action` before every execution;
 - hash-sealed input/output/configuration lineage, proposal-only outcomes, append-only audit events, usage/cost records, emergency suspension, and tenant governance reports.
 
-The implementation anchors are `packages/core/src/ai-agent-platform.js`, `apps/api/src/routes/ai-agent-platform.js`, and `rules/fixtures/guardrail-agent-action.json`. It intentionally does **not** call an LLM yet. The Bedrock/Strands provider adapter, durable worker, India-region AWS infrastructure, evaluation service, tenant UI, invoice integration, and live-provider conformance remain production gaps.
+The implementation anchors are `packages/core/src/ai-agent-platform.js`, `apps/api/src/routes/ai-agent-platform.js`, `packages/core/src/digital-worker-provider.js`, and the domain guardrail fixtures. It intentionally does **not** call an LLM yet. The injected Bedrock/Strands-compatible provider boundary, commercial budgets and invoice-ready records are implemented; durable worker, India-region AWS infrastructure, evaluation service, tenant UI, legal invoice integration, and live-provider conformance remain production gaps.
 
-Operational lifecycle, API sequence, pricing semantics, incident procedure and production-admission evidence are maintained in [AI-Agent Platform Operations](ai-agent-platform-operations.md).
+Operational lifecycle, API sequence, pricing semantics, incident procedure and production-admission evidence are maintained in [AI-Agent Platform Operations](ai-agent-platform-operations.md). The injected, fail-closed live-provider boundary is specified in [Digital Worker Provider Contract](digital-worker-provider-contract.md); it is not a live Bedrock/Strands integration.
 
 ## 2. Why Digital Workers Fit LoanOS
 
@@ -322,7 +322,7 @@ Commercial rates are contract data, not source-code list prices. The initial cal
 
 `charge_paise = per_execution_paise + ceil(input_tokens / 1000) × input_rate + ceil(output_tokens / 1000) × output_rate`
 
-Monthly fees and included quotas are represented in the contract schema but invoice-cycle aggregation and quota offsets are not yet implemented. Sales therefore must not claim automated invoicing or a fixed published price.
+Monthly fees and included quotas now feed hash-sealed invoice-ready aggregation. An active budget reserves estimated tokens and cost before execution, and actual metering cannot exceed that reservation. These records remain non-legal commercial records pending tenant tax validation, e-invoicing/IRP applicability, accounting export, payment and reconciliation; sales must not claim automated legal invoicing or a fixed published price.
 
 ## 12. Source Baseline
 

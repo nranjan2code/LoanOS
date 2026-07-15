@@ -16,6 +16,7 @@ import { routeTenantActivation } from "./routes/tenant-activation.js";
 import { routeProductJourneyConformance } from "./routes/product-journey-conformance.js";
 import { routeSpecialistJourneys } from "./routes/specialist-journeys.js";
 import { routeJourneyWorkspaces } from "./routes/journey-workspaces.js";
+import { routeComposedJourneys } from "./routes/composed-journeys.js";
 import { routeConformanceAdministration } from "./routes/conformance-administration.js";
 import { routeAiAgentPlatform } from "./routes/ai-agent-platform.js";
 import { enforceUniversalMutationStaffing } from "./mutation-staffing-policy.js";
@@ -765,6 +766,7 @@ async function route(req, res, dataDir, platformAdminKey, observability, allowDi
   //   /t/{tenantId}/staff/       → Tenant staff workspace (apps/dashboard/)
   //   /t/{tenantId}/portal/      → White-labeled borrower portal (apps/customer/)
   //   /t/{tenantId}/partners/    → Branch and authorised-partner workspace (apps/partner/)
+  //   /help/                     → LoanOS Guide & Academy (apps/help/)
   //   /shared/                   → Shared design tokens (apps/shared/)
   // ──────────────────────────────────────────────────────────────────────
 
@@ -776,6 +778,15 @@ async function route(req, res, dataDir, platformAdminKey, observability, allowDi
   }
   if (method === "GET" && path.startsWith("/journey-workspace/")) {
     return serveStaticFile(res, appsRoot, "journey-workspace", path, "/journey-workspace/");
+  }
+
+  // --- Canonical LoanOS Guide & Academy. Tenant/RE overlays will be added
+  // only through an explicitly authorised, tenant-isolated content boundary. ---
+  if (method === "GET" && (path === "/help" || path === "/help/")) {
+    return serveStaticFile(res, appsRoot, "help", "/index.html", "/help/");
+  }
+  if (method === "GET" && path.startsWith("/help/")) {
+    return serveStaticFile(res, appsRoot, "help", path, "/help/");
   }
 
   // --- Platform SaaS website at / ---
@@ -1287,6 +1298,7 @@ async function route(req, res, dataDir, platformAdminKey, observability, allowDi
   if (await routeProductJourneyConformance({ method, path, req, res, tenant, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
   if (await routeSpecialistJourneys({ method, path, req, res, tenant, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
   if (await routeJourneyWorkspaces({ method, path, req, res, tenant, store, readJson, sendJson, appendEvent, authContext, authActor })) return;
+  if (await routeComposedJourneys({ method, path, req, res, tenant, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
   if (await routeConformanceAdministration({ method, path, req, res, tenant, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
   if (await routeRiskAmlControls({ method, path, req, res, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
   if (await routeImplementationControls({ method, path, req, res, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;

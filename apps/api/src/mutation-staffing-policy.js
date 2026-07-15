@@ -10,7 +10,7 @@ const SELF_GOVERNED_PREFIXES = ["/activity/screen-events", "/admin/identity-gove
 export const MUTATION_STAFFING_ROUTE_RULES = Object.freeze([
   rule("FST-001", /^\/(admin\/(users|invites|access-reviews|federation|scim|identity-operations|sessions|service-credentials|service-credential-compromises|api-key)|identity-operations-worker\/v1)/),
   rule("FST-002", /^\/(products|product-configurations|journeys|pricing-policies|loans\/marketplace-offers)/),
-  rule("FST-003", /^\/(loans\/(applications|decisions|sanctions|eligibility)|channels\/leads|journey-workspaces)/),
+  rule("FST-003", /^\/(loans\/(applications|decisions|sanctions|eligibility)|channels\/leads|journey-workspaces|admin\/composed-journeys)/),
   rule("FST-004", /^\/(borrowers(?:\/|$)|kyc|ckyc|aml\/customer|reporting\/ckycrr)/),
   rule("FST-005", /^\/(decisions\/[^/]+\/(override|human-review)|loans\/applications\/[^/]+\/override)/),
   rule("FST-006", /^\/(disbursements|loans\/applications\/[^/]+\/(document-packet|esign|disbursement)|loan-accounts\/[^/]+\/disburse)/),

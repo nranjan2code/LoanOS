@@ -1,8 +1,12 @@
 import {
   activateTenantAiAgent, approveAiAgentPricingContract, authorizeAiAgentExecution, buildAiAgentGovernanceReport,
   completeAiAgentExecution, installTenantAiAgent, projectAiAgentMarketplace,
-  proposeAiAgentPricingContract, recordAiAgentUsage, recordTenantAiAgentApproval, suspendTenantAiAgent
+  proposeAiAgentPricingContract, recordAiAgentUsage, recordTenantAiAgentApproval, suspendTenantAiAgent,
+  approveAiAgentUsageBudget, proposeAiAgentUsageBudget, reserveAiAgentUsageBudget,
+  approveAiAgentInvoice, proposeAiAgentInvoice
 } from "../../../../packages/core/src/ai-agent-platform.js";
+import { invokeDigitalWorkerProvider } from "../../../../packages/core/src/digital-worker-provider.js";
+import { createDemoDigitalWorkerProvider } from "../../../../packages/core/src/digital-worker-demo-provider.js";
 import { authorizeStaffedFeatureAction, projectTenantFeatureStaffing } from "../../../../packages/core/src/saas-identity-governance.js";
 import { decidePlatformControlStaffing } from "../control-rules-engine.js";
 import { decideAiAgentAction, decideAiModelConsumption } from "../rules-engine.js";
@@ -30,6 +34,11 @@ export async function routeAiAgentPlatform(context) {
     let outcome;
     if (path === "/ai/pricing-contracts") outcome = proposeAiAgentPricingContract(state.aiAgentPlatform, { ...body, tenantId, proposedBy: actor });
     else if (match(path, "/ai/pricing-contracts/:id/approve")) outcome = approveAiAgentPricingContract(state.aiAgentPlatform, { ...body, contractId: idOf(path, 3), tenantId, approvedBy: actor });
+    else if (path === "/ai/usage-budgets") outcome = proposeAiAgentUsageBudget(state.aiAgentPlatform, { ...body, tenantId, proposedBy: actor });
+    else if (match(path, "/ai/usage-budgets/:id/approve")) outcome = approveAiAgentUsageBudget(state.aiAgentPlatform, { ...body, budgetId: idOf(path, 3), tenantId, approvedBy: actor });
+    else if (path === "/ai/usage-budgets/reservations") outcome = reserveAiAgentUsageBudget(state.aiAgentPlatform, { ...body, tenantId });
+    else if (path === "/ai/invoices") outcome = proposeAiAgentInvoice(state.aiAgentPlatform, { ...body, tenantId, proposedBy: actor });
+    else if (match(path, "/ai/invoices/:id/approve")) outcome = approveAiAgentInvoice(state.aiAgentPlatform, { ...body, invoiceId: idOf(path, 3), tenantId, approvedBy: actor });
     else if (path === "/ai/agents/installations") outcome = installTenantAiAgent(state.aiAgentPlatform, state.modelRegistry, { ...body, tenantId, proposedBy: actor });
     else if (match(path, "/ai/agents/installations/:id/approvals/:role")) {
       const role = idOf(path, 6);
@@ -53,6 +62,9 @@ export async function routeAiAgentPlatform(context) {
       }});
       outcome = authorizeAiAgentExecution(state.aiAgentPlatform, state.modelRegistry, { ...body, tenantId, modelConsumptionDecision: modelDecision, actionGuardrailDecision: actionDecision });
     }
+    else if (match(path, "/ai/agents/executions/:id/demo-run")) {
+      outcome = await runDemoExecution(state, tenantId, idOf(path, 4), body.scenario);
+    }
     else if (match(path, "/ai/agents/executions/:id/complete")) outcome = completeAiAgentExecution(state.aiAgentPlatform, { ...body, executionId: idOf(path, 4), tenantId });
     else if (path === "/ai/agents/usage") outcome = recordAiAgentUsage(state.aiAgentPlatform, { ...body, tenantId });
     else return false;
@@ -67,7 +79,31 @@ export async function routeAiAgentPlatform(context) {
   }
 }
 
-function workspace(platform = {}, tenantId) { const own = (values) => Object.values(values ?? {}).filter((x) => x.tenantId === tenantId); return { marketplace: projectAiAgentMarketplace(), pricingContracts: own(platform.pricingContracts), installations: own(platform.installations), executions: own(platform.executions), usage: own(platform.usageLedger) }; }
-function resourceId(record) { return record.installationId ?? record.executionId ?? record.usageId ?? record.contractId; }
+function workspace(platform = {}, tenantId) { const own = (values) => Object.values(values ?? {}).filter((x) => x.tenantId === tenantId); return { marketplace: projectAiAgentMarketplace(), pricingContracts: own(platform.pricingContracts), usageBudgets: own(platform.usageBudgets), budgetReservations: own(platform.budgetReservations), invoices: own(platform.invoices), installations: own(platform.installations), executions: own(platform.executions), usage: own(platform.usageLedger) }; }
+function resourceId(record) { return record.installationId ?? record.executionId ?? record.usageId ?? record.contractId ?? record.budgetId ?? record.reservationId ?? record.invoiceId; }
 function match(path, pattern) { const a = path.split("/"), b = pattern.split("/"); return a.length === b.length && b.every((x, i) => x.startsWith(":") || x === a[i]); }
 function idOf(path, index) { return decodeURIComponent(path.split("/")[index]); }
+
+async function runDemoExecution(state, tenantId, executionId, scenario = "standard") {
+  if (process.env.LOANOS_AI_DEMO_MODE !== "true") throw Object.assign(new Error("AI demo mode is disabled."), { code: "ai_agent_demo_mode_disabled", status: 403 });
+  const execution = state.aiAgentPlatform?.executions?.[executionId];
+  if (!execution || execution.tenantId !== tenantId) throw Object.assign(new Error("A same-tenant authorized execution is required."), { code: "ai_agent_execution_missing", status: 404 });
+  if (execution.status !== "authorized") throw Object.assign(new Error("Only an authorized execution may run in demo mode."), { code: "ai_agent_execution_not_authorized", status: 409 });
+  const installation = state.aiAgentPlatform.installations?.[execution.installationId];
+  if (!installation || installation.tenantId !== tenantId) throw Object.assign(new Error("A same-tenant installation is required."), { code: "ai_agent_installation_missing", status: 404 });
+  const provider = createDemoDigitalWorkerProvider({ scenario });
+  const runtime = await invokeDigitalWorkerProvider(provider, {
+    requestId: `demo:${executionId}`, tenantId, executionId, installationId: installation.installationId,
+    action: execution.action, purpose: execution.purpose, inputRef: execution.inputRef, inputHash: execution.inputHash,
+    promptHash: execution.promptHash, region: installation.dataRegion, modelId: execution.modelId, modelVersion: execution.modelVersion,
+    providerAllowlist: [provider.id], modelAllowlist: [{ modelId: execution.modelId, version: execution.modelVersion }],
+    authorization: { modelConsumptionTraceRef: execution.modelConsumptionDecision.traceRef, actionGuardrailTraceRef: execution.actionGuardrailDecision.traceRef, proposalOnly: true },
+    outputSchema: demoOutputSchema()
+  });
+  const completed = completeAiAgentExecution(state.aiAgentPlatform, { executionId, tenantId, outputRef: `demo://${executionId}/${scenario}`, outputHash: runtime.evidence.proposalChecksum, outcome: "proposal_created", citations: [] }).state;
+  const usage = recordAiAgentUsage(completed, { usageId: `demo-usage:${executionId}`, executionId, tenantId, ...runtime.evidence.usage }).state;
+  const usageRecord = usage.usageLedger[`demo-usage:${executionId}`];
+  return { state: usage, record: { ...usageRecord, demo: { simulated: true, commerciallyLive: false, scenario, proposal: runtime.proposal, providerEvidence: runtime.evidence } } };
+}
+
+function demoOutputSchema() { return { type: "object", required: ["proposalType", "summary", "evidenceGaps", "needsHumanReview", "simulated", "commerciallyLive"], additionalProperties: false, properties: { proposalType: { type: "string" }, summary: { type: "string" }, evidenceGaps: { type: "array" }, needsHumanReview: { type: "boolean" }, simulated: { type: "boolean" }, commerciallyLive: { type: "boolean" } } }; }

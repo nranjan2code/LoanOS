@@ -44,5 +44,25 @@ export function parseBacklogEpics(markdown) {
 export function parseTapSummary(output) {
   const value = (key) => { const matches = [...output.matchAll(new RegExp(`^[#ℹ]\\s*${key}\\s+(\\d+)\\s*$`, 'gm'))]; return matches.length ? Number(matches.at(-1)[1]) : null; };
   const total = value('tests'); const pass = value('pass'); const fail = value('fail'); const skipped = value('skipped');
-  return { pass, fail, skipped, total, ran: total !== null, source: 'live' };
+  const cancelled = value('cancelled'); const todo = value('todo');
+  const duration = [...output.matchAll(/^[#ℹ]\s*duration_ms\s+([\d.]+)\s*$/gm)];
+  return {
+    pass, fail, skipped, cancelled, todo, total,
+    durationMs: duration.length ? Number(duration.at(-1)[1]) : null,
+    ran: total !== null,
+    source: 'live',
+  };
+}
+
+export function parseCatalogueSnapshot(markdown) {
+  const match = markdown.match(/The detailed register contains \*\*(\d+) individually identified capabilities\*\*\. At this snapshot, ([^\n]+)/);
+  if (!match) throw new Error('Capability catalogue is missing its detailed-register snapshot summary.');
+  const counts = {};
+  for (const status of DASHBOARD_STATUSES) {
+    const escaped = status.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const statusMatch = match[2].match(new RegExp(`(\\d+) (?:are )?\`${escaped}\``));
+    if (!statusMatch) throw new Error(`Capability catalogue snapshot is missing the ${status} count.`);
+    counts[status] = Number(statusMatch[1]);
+  }
+  return { total: Number(match[1]), counts };
 }

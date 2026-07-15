@@ -61,6 +61,8 @@ Bundles AE–AJ status: vendor mapping/transports/crypto workers, product-journe
 
 Bundle AK status: the identity-worker plane now has a runnable bounded scheduler, service-plane client, explicit non-commercial simulator, injected live-port boundary, health/readiness/Prometheus telemetry, opt-in container deployment and operational runbook. Claims, outcomes, finalization and audit share the tenant-scoped PostgreSQL advisory-lock transaction and RLS path; an environment-gated database race test proves the expected single-winner claim. Commercial adapters, selected-provider credentials/contracts, managed scheduling/alert routing, selected-database execution evidence, production soak/chaos and institution-witnessed operation remain external.
 
+Guide and Academy status: the canonical platform-owned help surface is implemented with role-based discovery, search, learning paths and maturity/environment/control labels. Governed tenant/RE overlays, formal assignments, assessments, certification expiry and external LMS interoperability remain future adoption work.
+
 ## Cross-Cutting Workstream: SaaS Tenancy and Vendor Posture
 
 Status: S1–S9 first slice complete for every task (tenant partitioning, tenant-scoped service auth, tenant/platform human sessions, tenant user admin, access reviews, service-key rotation, isolation suite, hash-chained audit spine + evidence export, tenant portability export + evidenced offboarding, disclosed sub-processor register, 6-hour incident-notification workflow, audited platform-staff break-glass access, uniform audit provenance stamping, artifact-bound security assurance, governed SOC investigation records, and compliance-control assurance/audit evidence).
@@ -195,7 +197,7 @@ Exit criteria:
 
 ## Phase 5: AI Governance and Model Risk Hardening
 
-Status: started, with governed model-risk and digital-worker control-plane slices implemented. The platform now has model-use gates, kill switches, lifecycle/validation controls, drift-triggered suspension, generative-model evidence gates, customer disclosure/handoff, incident review, four proposal-only worker templates, tenant pricing/installations, four-role approval, dual decision-engine authorization, and execution/usage lineage. No external LLM or agent runtime is connected; these controls do not constitute production deployment or regulatory certification.
+Status: started, with governed model-risk, digital-worker control-plane, provider-boundary, domain-policy, and commercial-control slices implemented. The platform has model-use gates, kill switches, lifecycle/validation controls, drift-triggered suspension, generative-model evidence gates, customer disclosure/handoff, incident review, four proposal-only worker templates, tenant pricing/installations, four-role approval, dual decision-engine authorization, usage budgets, invoice-ready commercial records, a Mumbai-only injected provider contract, and execution/usage lineage. No live external LLM or agent runtime is connected; these controls do not constitute production deployment or regulatory certification.
 
 Deliverables:
 
@@ -206,10 +208,10 @@ Deliverables:
 - AI incident reporting and sectoral risk intelligence pack. Kill-switch incident record first slice done; sectoral risk intelligence pack planned.
 - Global/model/workflow kill switch with post-incident review. First slice done: clearing the global switch requires a recorded post-incident review.
 - Governed digital-worker marketplace. First slice done: CAM preparation, underwriting review, document/compliance review, and service-support triage templates are versioned, tenant installable, proposal only, and bound to approved actions.
-- Tenant commercial and customization controls. First slice done: maker-checker exact-paise pricing contracts, pinned model/prompt/knowledge/action configuration, immutable rated usage, and tenant/platform reports; invoicing, quotas, credits, and marketplace UI remain.
+- Tenant commercial and customization controls. First slice done: maker-checker exact-paise pricing contracts, pinned model/prompt/knowledge/action configuration, immutable rated usage, usage-budget reservations, tenant/platform reports, and hash-sealed GST-ready commercial records with independent approval; credits, payment/accounting integration, tax validation, legal invoicing, and marketplace UI remain.
 - Material-agent activation. First slice done: four distinct authenticated human roles plus a fresh control-engine decision are required before activation.
 - Runtime agent authorization and traceability. Control-boundary slice done: both model-consumption and agent-action decisions must allow each run, and execution/output/usage lineage is checksum and audit bound.
-- India-resident model/agent runtime and evaluation programme. Planned: provider adapter, AWS India deployment, specialized guardrails, task-quality suites, red-team/regression gates, continuous worker monitoring, and automatic suspension.
+- India-resident model/agent runtime and evaluation programme. Provider-boundary and specialized-policy slices done: the injected adapter enforces Mumbai, tenant/model allowlists, dual traces, constrained proposal output, checksums, timeout/cancellation and metering; retrieval/data-access, outbound communication, underwriting influence and case mutation policies have golden corpora. Planned: approved provider registration/deployment, durable worker, domain call-site integration, task-quality suites, red-team/regression gates, continuous worker monitoring, and automatic suspension.
 
 Exit criteria:
 

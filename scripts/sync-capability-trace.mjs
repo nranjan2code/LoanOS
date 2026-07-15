@@ -52,7 +52,9 @@ for (const id of Object.keys(existing)) {
 
 // stable sort by ID for clean diffs
 const sorted = Object.fromEntries(Object.keys(out).sort().map((k) => [k, out[k]]));
-writeFileSync(REG, JSON.stringify(sorted, null, 2) + '\n');
+const next = JSON.stringify(sorted, null, 2) + '\n';
+const changed = !existsSync(REG) || readFileSync(REG, 'utf8') !== next;
+if (changed) writeFileSync(REG, next);
 
 const withEvidence = Object.values(sorted).filter((e) => e.evidence && e.evidence.length).length;
-console.log(`capability-trace.json · ${liveIds.size} capabilities · +${added} new · ${orphaned} orphaned · ${withEvidence} with evidence`);
+console.log(`capability-trace.json · ${liveIds.size} capabilities · +${added} new · ${orphaned} orphaned · ${withEvidence} with evidence · ${changed ? 'updated' : 'no change'}`);

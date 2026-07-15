@@ -100,6 +100,8 @@ Core capabilities:
 | Regulated entity leadership | Board packs, policy status, risk metrics, vendor posture, kill-switch readiness. |
 | LSP/vendor | Limited scoped workflows, no unauthorized fund control, audit-ready handoffs. |
 
+All institutional roles use the canonical LoanOS Guide and Academy for searchable task guidance, role-based learning paths and sandbox-first control education. The guide complements—not overrides—the platform's executable policies and approval outcomes.
+
 ## India-Only Boundary
 
 The platform is only for India lending.
@@ -157,6 +159,7 @@ The current codebase contains Phase 0 executable controls:
 - Complaint registry with acknowledgement evidence, grievance-officer workflow, 30-day RBI clock, and RBI CMS escalation evidence.
 - Borrower-backed applications that can inherit borrower/KYC/consent/economic facts by reference.
 - White-labelled borrower journey portal with one-time-code access, a prioritised next action, visual application milestones, repayment schedules, a document centre, short educational media, grievance tracking, and DPDP access/correction/erasure controls.
+- Canonical LoanOS Guide and Academy with role-based discovery, task search, learning paths, control/environment/maturity labels and verified operating guides, linked from the staff workspace, tenant landing and public resource room.
 - LOS workflow state machine with KFS readiness, material-AI human review, decision proposal, maker-checker approval, and disbursement transition.
 - LWS derived task queues for compliance exceptions, KFS evidence, credit decisions, AI human review, checker approval, disbursement, collections, NPA review, grievance resolution, and RBI CMS escalation, with SLA clocks, role checks, and assignment/start/release/comment audit.
 - LMS loan account model that opens on disbursement, generates a repayment schedule, records ledger events, reconstructs balance, accrues interest, posts payments, supports part-prepayment, foreclosure, closure NOC, borrower statements and statement documents, controls charges/waivers/reversals, computes delinquency, classifies assets, generates CIC-ready snapshots, and enforces noticed recovery plus same-day cash posting.
@@ -188,7 +191,7 @@ Recently completed: SaaS tenancy groundwork, tenant onboarding, human login/admi
 Immediate next build:
 
 1. Connect a provider-neutral model/agent adapter to an approved AWS India runtime while preserving model inventory, kill-switch, tenant isolation, dual guardrails, and complete request/response lineage.
-2. Add specialized deterministic guardrails for tenant-scoped retrieval, data minimization, outbound communications, eligibility/decision influence, and domain mutations, each with a golden corpus.
+2. Wire the implemented specialized deterministic guardrails for tenant-scoped retrieval/data minimization, outbound communications, eligibility/decision influence and domain mutations into the provider runtime and domain workflows; maintain their golden/adverse regression corpus.
 3. Establish worker-specific evaluation and monitoring: versioned task suites, groundedness/completeness/safety thresholds, red-team and regression evidence, cohort reports, alerts, and automatic suspension.
 4. Build marketplace and tenant administration journeys for catalogue discovery, pricing approval, installation diff, staffing readiness, activation, usage budgets, reporting, and uninstall/export.
 5. Complete commercial operations with quotas, invoice aggregation, GST/tax treatment, credits, reconciliation, and contract-entitlement enforcement.

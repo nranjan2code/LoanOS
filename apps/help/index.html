@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Role-based guidance and learning for LoanOS India.">
+  <title>LoanOS Guide & Academy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/shared/design-tokens.css">
+  <link rel="stylesheet" href="/help/help.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to guidance</a>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="LoanOS home"><span class="brand-mark">L</span><span><strong>LoanOS</strong><small>Guide & Academy</small></span></a>
+    <nav aria-label="Help centre"><button class="nav-link active" data-view="home">Explore</button><button class="nav-link" data-view="academy">My learning</button><a class="nav-link" href="/resources/">Resources</a></nav>
+    <button class="support-button" id="support-button">Get support</button>
+  </header>
+
+  <main id="main">
+    <section id="home-view">
+      <div class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Guidance for governed lending</p>
+          <h1>What would you like to accomplish?</h1>
+          <p>Find clear, verified guidance for configuring, operating and assuring LoanOS.</p>
+          <form class="search" id="search-form" role="search"><span aria-hidden="true">⌕</span><label class="sr-only" for="search-input">Search guidance</label><input id="search-input" type="search" placeholder="Try “activate a tenant” or “export an evidence pack”" autocomplete="off"><kbd>⌘ K</kbd></form>
+          <div class="quick-links"><span>Popular:</span><button data-query="first compliant loan">First compliant loan</button><button data-query="KFS">KFS</button><button data-query="evidence pack">Evidence pack</button></div>
+        </div>
+        <aside class="journey-card">
+          <p class="eyebrow">Recommended start</p><h2>Your first compliant loan</h2>
+          <p>Follow one application from consent and KYC through KFS, sanction and servicing.</p>
+          <div class="progress-label"><span>6 guided lessons</span><strong>35 min</strong></div><div class="progress"><i style="width:0%"></i></div>
+          <button class="primary" data-open="first-compliant-loan">Start learning path <span>→</span></button>
+        </aside>
+      </div>
+
+      <section class="section role-section"><div class="section-heading"><div><p class="eyebrow">Learn by responsibility</p><h2>Guidance shaped around your work</h2></div><p>Choose a role to see the tasks, controls and learning paths that matter most.</p></div><div class="role-grid" id="role-grid"></div></section>
+      <section class="section browse-section"><div class="section-heading"><div><p class="eyebrow">Browse the library</p><h2>Recently verified guidance</h2></div><button class="text-button" id="view-all">View all guidance →</button></div><div class="filter-row" id="filters"></div><div class="article-grid" id="article-grid"></div></section>
+    </section>
+
+    <section id="results-view" class="page-view" hidden><button class="back" data-back>← Back to explore</button><div class="results-heading"><p class="eyebrow">Knowledge library</p><h1 id="results-title">All guidance</h1><p id="results-count"></p></div><div class="article-grid" id="results-grid"></div></section>
+
+    <section id="article-view" class="page-view" hidden><button class="back" data-back>← Back to guidance</button><article class="guide"><div class="guide-head"><div id="article-tags" class="tags"></div><h1 id="article-title"></h1><p id="article-summary"></p><div id="article-meta" class="article-meta"></div></div><div class="guide-layout"><aside><strong>On this page</strong><ol id="article-toc"></ol></aside><div id="article-body" class="guide-body"></div></div></article></section>
+
+    <section id="academy-view" class="page-view" hidden><button class="back" data-back>← Back to explore</button><div class="academy-hero"><p class="eyebrow">LoanOS Academy</p><h1>Build confidence, one governed task at a time.</h1><p>Role-based learning paths combine product guidance, sandbox practice and control awareness.</p></div><div class="learning-grid" id="learning-grid"></div></section>
+  </main>
+
+  <dialog id="support-dialog"><button class="dialog-close" aria-label="Close support dialog">×</button><p class="eyebrow">LoanOS support</p><h2>How can we help?</h2><p>Search the guide first. For operational or security incidents, follow your organisation's approved escalation process.</p><button class="primary" id="dialog-search">Search guidance</button><a class="secondary" href="mailto:support@loanos.in">Email support</a></dialog>
+  <footer><span>LoanOS India</span><p>Verified guidance for compliance-first lending operations.</p><a href="/trust/">Trust centre</a><a href="/resources/">Resources</a></footer>
+  <script src="/help/help.js" type="module"></script>
+</body>
+</html>

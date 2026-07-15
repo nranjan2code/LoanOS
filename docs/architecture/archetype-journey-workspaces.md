@@ -97,7 +97,7 @@ The audit event records resource ID, actor, journey/channel, schema lineage and 
 
 Static consumers are mounted at `/t/{tenant}/portal/journeys/`, `/staff/journeys/`, `/partners/journeys/` and `/field/journeys/`. Staff can select branch, credit, operations or control mode, subject to server authorization.
 
-Guide & Academy decision: JD-03 uses schema-derived field help, evidence labels, privacy status and authorised-action labels inside the workspace because the exact instructions vary by product, channel and schema version. A standalone canonical operating article would become stale or imply lifecycle completion. JD-04 must add role-specific end-to-end Academy exercises once the schema, specialist service and common lifecycle are composed; this decision is recorded here in place of an interim article.
+Guide & Academy decision: JD-03 uses schema-derived field help, evidence labels, privacy status and authorised-action labels inside the workspace because the exact instructions vary by product, channel and schema version. JD-04 now supplies an administration/API composition boundary without adding a new interactive screen, so the existing “Trace the first compliant loan” overview remains current. A released staff lifecycle timeline, approval, pause/recovery or escalation screen must add role-specific canonical guidance and refresh its verification date.
 
 ## Privacy, security, offline and accessibility
 
@@ -120,7 +120,7 @@ Guide & Academy decision: JD-03 uses schema-derived field help, evidence labels,
 | duplicate retry | return the checksum-identical record; conflict on changed content |
 | actor/tenant mismatch | indistinguishable 404-style draft failure; no cross-actor detail |
 | product suspension or expiry | remove it from subsequent catalogue projections; in-flight lifecycle pause is composed in JD-04 |
-| access revocation | central session revocation blocks the next request immediately; JD-02 pauses assigned specialist work |
+| access revocation | central session revocation blocks the next request immediately; JD-02 pauses assigned specialist work and JD-04 pauses/invalidates assigned composed work |
 | corrupted/tampered lineage | checksum validation blocks downstream reliance; incident and evidence-custody procedures apply |
 
 Operators investigate with authenticated activity evidence and the tenant audit chain, not browser logs or captured request bodies. A schema update is additive only through a new version/checksum; existing drafts retain their original lineage and require an explicit governed migration or restart policy.
@@ -131,4 +131,4 @@ Operators investigate with authenticated activity evidence and the tenant audit 
 - `tests/journey-workspace-api.test.js`: authenticated API, role/channel boundary, service-key denial, persistence, static mount and audit-value exclusion.
 - `tests/journey-workspace-ui.test.js`: accessibility hooks, multilingual rendering, safe DOM construction and browser/offline privacy constraints.
 
-JD-03 is complete at the schema/workspace slice when these tests and the product-depth audit pass. Production rollout still requires JD-04 common-lifecycle composition, JD-05 generated full-stack adverse journeys, JD-06 selected provider/operations evidence, tenant UAT and independent accessibility/security/privacy acceptance.
+JD-03 is complete at the schema/workspace slice when these tests and the product-depth audit pass. JD-04 now consumes this boundary. Production rollout still requires JD-05 generated full-stack adverse journeys, JD-06 selected provider/operations evidence, tenant UAT and independent accessibility/security/privacy acceptance.

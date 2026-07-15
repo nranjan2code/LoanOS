@@ -11,6 +11,7 @@ This folder is the working documentation set for the LoanOS India build. It expl
 5. [Complete-system capability catalogue](product/complete-system-capability-catalog.md)
 6. [Platform module integration and API map](architecture/platform-module-integration-api-map.md)
 7. [Build backlog](product/build-backlog.md)
+8. [Documentation governance and audit](documentation-governance.md)
 
 Section indexes: [Architecture](architecture/README.md) · [Product](product/README.md) · [Compliance](compliance/README.md) · [Decision records](decisions/README.md) · [GTM](gtm/README.md)
 
@@ -24,6 +25,9 @@ Section indexes: [Architecture](architecture/README.md) · [Product](product/REA
 | [Product journey platform-depth audit](product/product-journey-platform-depth-audit.md) | Machine-checked deep readiness across tenant administration, domain kernels, APIs, experiences, lifecycle composition, tests, integrations and operations for all 21 journeys, grouped into shared remediation batches. |
 | [Persistent specialist journey service](architecture/persistent-specialist-journey-service.md) | JD-02 architecture, state, APIs, maker-checker execution, exception recovery, identity containment, persistence/RLS and remaining production boundaries for 17 journeys. |
 | [Archetype journey workspaces](architecture/archetype-journey-workspaces.md) | JD-03 architecture, data design, entitlement/channel projection, 21-to-11 schema map, persistent drafts, privacy/accessibility controls, APIs, failure operations and remaining lifecycle/production boundaries. |
+| [Composed product-journey lifecycle](architecture/composed-product-journey-lifecycle.md) | JD-04 architecture, state machine, version/evidence contract, maker-checker transitions, pause/revocation containment, compensation, APIs and operations boundary for all 21 journeys. |
+| [LoanOS Guide and Academy](architecture/help-centre-and-academy.md) | Platform-owned role-based help, interactive learning boundary, governed content contract, and the future tenant/RE customization model. |
+| [Documentation governance and audit](documentation-governance.md) | Audience map, source hierarchy, required update matrix, latest repository-wide documentation audit and known follow-on work. |
 | [Capability & build dashboard](dashboard.md) | How `docs/dashboard.html` is generated: plane/category/feature status view, completion scoring, product-plane mapping, and how it auto-updates on `./loanos.sh build`. |
 | [Roadmap](product/roadmap.md) | Phased delivery plan from compliance foundation to AI governance hardening. |
 | [Build backlog](product/build-backlog.md) | Actionable engineering backlog grouped by epic. |
@@ -79,3 +83,5 @@ A feature is not considered complete unless it updates the relevant docs:
 - Compliance or risk control: update `docs/compliance/`.
 - Major irreversible technical choice: add a decision record under `docs/decisions/`.
 - Externally-visible capability that changes what Sales/Marketing may claim: update the claim's Status/Evidence in `docs/gtm/strategy/claims-and-backlog-sync.md` and re-run `node docs/gtm/automation/gtm-backlog-sync.mjs`.
+- User-visible workflow: update its Guide & Academy article, maturity/environment/control labels and `last verified` date; if no article is needed, record that decision in the implementation document.
+- AI-agent operating rule or repository map: update `AGENTS.md` and any load-bearing document it points to.

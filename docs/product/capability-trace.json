@@ -932,7 +932,7 @@
       "FIN-013",
       "AUD-001"
     ],
-    "notes": "Remaining gap: quotas, invoice aggregation, GST/tax, credits, collections and accounting export are not yet implemented.",
+    "notes": "Remaining gap: budgets/reservations and GST-ready invoice aggregation are implemented, but tax validation, legal invoicing, credits, collections and accounting export are not yet implemented.",
     "lastReviewed": "2026-07-15"
   },
   "AIG-018": {
@@ -1091,9 +1091,14 @@
         "note": "Runtime procurement, residency and commercial evidence requirements."
       },
       {
+        "type": "code",
+        "ref": "packages/core/src/digital-worker-provider.js",
+        "note": "Injected Mumbai-only provider boundary with tenant/model allowlists, output validation, timeout and checksums."
+      },
+      {
         "type": "test",
-        "ref": "tests/ai-agent-platform.test.js",
-        "note": "Control-boundary behavior that a future adapter must preserve."
+        "ref": "tests/digital-worker-provider.test.js",
+        "note": "Executable provider-boundary failure and evidence coverage."
       }
     ],
     "acceptance": "An approved adapter invokes only allowlisted model versions in an approved India region, preserves tenant isolation and both authorization traces, validates structured output, meters provider usage, and retains security, residency, continuity and exit evidence.",
@@ -1102,7 +1107,7 @@
       "INT-011",
       "SEC-006"
     ],
-    "notes": "Remaining gap: no external foundation-model, agent, vector or evaluation runtime is connected; AWS service/model region availability and contracts require current verification.",
+    "notes": "Remaining gap: the provider boundary is implemented, but no external foundation-model, agent, vector or evaluation runtime is connected; AWS service/model region availability and contracts require current verification.",
     "lastReviewed": "2026-07-15"
   },
   "AIG-023": {
@@ -1157,9 +1162,29 @@
         "note": "Specialized collections communication/action fixture."
       },
       {
+        "type": "code",
+        "ref": "rules/fixtures/guardrail-data-access.json",
+        "note": "Tenant/purpose/consent/minimum-data retrieval policy."
+      },
+      {
+        "type": "code",
+        "ref": "rules/fixtures/guardrail-outbound-communication.json",
+        "note": "Proposal-only outbound communication and human dispatch-approval policy."
+      },
+      {
+        "type": "code",
+        "ref": "rules/fixtures/guardrail-underwriting-influence.json",
+        "note": "Proposal-only underwriting influence and human-review policy."
+      },
+      {
+        "type": "code",
+        "ref": "rules/fixtures/guardrail-case-mutation.json",
+        "note": "Case-scope, workflow approval and no-direct-write policy."
+      },
+      {
         "type": "test",
-        "ref": "tests/ai-agent-platform.test.js",
-        "note": "Action-scope and fail-closed agent authorization coverage."
+        "ref": "rules/crates/rules-service/tests/ai_control.rs",
+        "note": "Golden/adverse allow, deny, require-human and malformed-fact corpus for every specialized policy."
       },
       {
         "type": "doc",
@@ -1173,7 +1198,7 @@
       "DEC-001",
       "SEC-005"
     ],
-    "notes": "Remaining gap: generic agent-action and collections policies exist; dedicated retrieval/data-minimization, outbound-communication, eligibility-influence and domain-mutation bundles are not yet complete.",
+    "notes": "First policy-bundle slice is implemented and directly callable. Remaining gap: a live model/agent runtime and domain workflows must invoke the applicable guardrail before retrieval, dispatch, credit workflow handoff or case mutation.",
     "lastReviewed": "2026-07-15"
   },
   "AUD-001": {
@@ -12772,6 +12797,16 @@
         "note": "Executable 21-to-11 schema, entitlement, exact-money, ownership and submission validation evidence."
       },
       {
+        "type": "code",
+        "ref": "packages/core/src/composed-journey-lifecycle.js",
+        "note": "The submitted workspace lineage enters one evidence-bound, tenant-persistent lifecycle shared by all 21 journeys."
+      },
+      {
+        "type": "test",
+        "ref": "tests/composed-journey-lifecycle.test.js",
+        "note": "Executable entitlement, exact-lineage, evidence, four-eyes, pause, recovery and 21-product composition coverage."
+      },
+      {
         "type": "test",
         "ref": "tests/operational-workspaces.test.js",
         "note": "Executable acceptance evidence for borrower application and onboarding journey."
@@ -12829,6 +12864,16 @@
         "type": "test",
         "ref": "tests/compliance.test.js",
         "note": "Executable acceptance evidence for borrower kfs, document, agreement, and signature journey."
+      },
+      {
+        "type": "code",
+        "ref": "packages/core/src/composed-journey-lifecycle.js",
+        "note": "KFS acceptance and contracting are ordered evidence gates; stale or incomplete transitions fail closed."
+      },
+      {
+        "type": "test",
+        "ref": "tests/composed-journey-lifecycle.test.js",
+        "note": "Lifecycle tests prove ordered immutable evidence and independent transition approval."
       }
     ],
     "acceptance": "The cited implementation and tests demonstrate a controlled first slice of borrower kfs, document, agreement, and signature journey.",
@@ -12856,6 +12901,16 @@
         "type": "test",
         "ref": "tests/compliance.test.js",
         "note": "Executable acceptance evidence for borrower repayment, statement, payment, mandate, and receipt journey."
+      },
+      {
+        "type": "code",
+        "ref": "packages/core/src/composed-journey-lifecycle.js",
+        "note": "LMS/accounting, servicing, collections, reporting and closure are explicit ordered composition stages."
+      },
+      {
+        "type": "test",
+        "ref": "tests/composed-journey-api.test.js",
+        "note": "Authenticated API evidence covers persistent stage projection, failure containment and governed recovery."
       }
     ],
     "acceptance": "The cited implementation and tests demonstrate a controlled first slice of borrower repayment, statement, payment, mandate, and receipt journey.",
@@ -12949,6 +13004,16 @@
         "note": "Operations channel projections expose product-specific documents and actions under role and maker-checker metadata."
       },
       {
+        "type": "code",
+        "ref": "apps/api/src/routes/composed-journeys.js",
+        "note": "Human-only operations APIs expose evidence-bound transition, pause, escalation and recovery work without actor spoofing."
+      },
+      {
+        "type": "test",
+        "ref": "tests/composed-journey-api.test.js",
+        "note": "API tests prove human authority, four-eyes execution, restart persistence, cross-tenant denial and minimized audit values."
+      },
+      {
         "type": "test",
         "ref": "tests/operational-workspaces.test.js",
         "note": "Executable acceptance evidence for operations/disbursement task workspace."
@@ -13028,6 +13093,16 @@
         "type": "code",
         "ref": "apps/dashboard/workspaces.js",
         "note": "Implementation evidence for compliance, cco, risk, finance, and audit dashboards."
+      },
+      {
+        "type": "code",
+        "ref": "packages/core/src/composed-journey-lifecycle.js",
+        "note": "Portfolio projection exposes current stage, open transition, pause and critical escalation state by tenant."
+      },
+      {
+        "type": "test",
+        "ref": "tests/composed-journey-lifecycle.test.js",
+        "note": "Tests prove tenant-filtered portfolio projection and immediate principal-containment visibility."
       },
       {
         "type": "test",
@@ -13211,6 +13286,38 @@
       "Institution operating model"
     ],
     "notes": "Institution-approved content, assisted-channel certification, production rollout, and observed adoption evidence remain outstanding.",
+    "lastReviewed": "2026-07-15"
+  },
+  "UX-018": {
+    "capability": "Role-based Guide and Academy with searchable, control-aware operating guidance",
+    "category": "32. Borrower, Staff, Branch, Partner, and Field Experiences",
+    "plane": "Experience & Adoption",
+    "applicability": "Core",
+    "status": "Implemented",
+    "owner": "Product Enablement",
+    "evidence": [
+      {
+        "type": "code",
+        "ref": "apps/help/help.js",
+        "note": "Role-based search, learning paths and control-aware canonical guidance implementation."
+      },
+      {
+        "type": "test",
+        "ref": "tests/help-centre.test.js",
+        "note": "Executable coverage for required guidance labels, role paths, privacy-safe browser behavior and platform navigation."
+      },
+      {
+        "type": "doc",
+        "ref": "docs/architecture/help-centre-and-academy.md",
+        "note": "Governed content contract and future tenant/RE overlay boundary."
+      }
+    ],
+    "acceptance": "Platform users can reach the canonical Guide and Academy, search verified task guidance by role and inspect maturity, environment and control-impact labels without browser-side data retention.",
+    "dependencies": [
+      "Canonical LoanOS content ownership",
+      "Documentation verification cadence"
+    ],
+    "notes": "The implemented slice is canonical and platform-owned; tenant/RE overlays, formal assessments, certification expiry and external LMS interoperability remain planned.",
     "lastReviewed": "2026-07-15"
   }
 }

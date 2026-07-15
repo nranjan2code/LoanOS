@@ -45,6 +45,7 @@ Required tenant objects:
 | AI governance service | Control | Inventory, validation, monitoring, incident reporting, kill switch |
 | Audit evidence service | Control | Immutable event log, policy snapshots, decision lineage, export packs |
 | Regulatory reporting service | Control | CIC, CIMS DLA, CKYC, CERSAI, FIU-IND support, board/committee packs |
+| Guide and Academy service | Shared experience | Role-based task guidance, sandbox learning paths, control-impact explanations and verified operating instructions |
 
 ## Loan Lifecycle
 
@@ -138,4 +139,3 @@ Every service must emit:
 5. LWS MVP: maker-checker, exceptions, grievance, fraud, vendor review.
 6. Integrations: CKYC, bureaus/CIC, bank account verification, UPI/NACH/payment rails, eSign, document vault.
 7. Supervisory packs: CIMS DLA export, board/risk/compliance packs, audit trails, data-retention evidence.
-

@@ -1,0 +1,21 @@
+{
+  "key": "guardrail.underwriting_influence",
+  "bindings": [
+    { "name": "tenant_match", "path": "/assessment/tenant_match", "type": "bool", "required": true },
+    { "name": "installation_approved", "path": "/assessment/installation_approved", "type": "bool", "required": true },
+    { "name": "proposal_only", "path": "/assessment/proposal_only", "type": "bool", "required": true },
+    { "name": "attempts_decision_authority", "path": "/assessment/attempts_decision_authority", "type": "bool", "required": true },
+    { "name": "influences_eligibility", "path": "/assessment/influences_eligibility", "type": "bool", "required": true },
+    { "name": "human_reviewer_recorded", "path": "/assessment/human_reviewer_recorded", "type": "bool", "required": true }
+  ],
+  "expressions": [],
+  "findings": [
+    { "id": "underwriting_tenant_mismatch", "when": ["not tenant_match"], "severity": "error", "code": "UNDERWRITING_TENANT_MISMATCH", "regulation": "RBI-IT-23", "message": "The underwriting assessment crosses the tenant boundary.", "path": "assessment.tenant_match", "audience": "internal" },
+    { "id": "underwriting_installation_unapproved", "when": ["not installation_approved"], "severity": "error", "code": "UNDERWRITING_INSTALLATION_UNAPPROVED", "regulation": "RBI-IT-23", "message": "This worker installation is not approved for underwriting assistance.", "path": "assessment.installation_approved", "audience": "internal" },
+    { "id": "underwriting_not_proposal", "when": ["not proposal_only"], "severity": "error", "code": "UNDERWRITING_PROPOSAL_ONLY", "regulation": "RBI-DL-2025", "message": "AI underwriting output must remain a proposal for human review.", "path": "assessment.proposal_only", "audience": "tenant_ops" },
+    { "id": "underwriting_decision_authority", "when": ["attempts_decision_authority"], "severity": "error", "code": "UNDERWRITING_DECISION_AUTHORITY_DENIED", "regulation": "RBI-DL-2025", "message": "A digital worker may not approve, decline or set credit terms.", "path": "assessment.attempts_decision_authority", "audience": "internal" },
+    { "id": "underwriting_human_review", "when": ["influences_eligibility", "not human_reviewer_recorded"], "severity": "warn", "code": "UNDERWRITING_HUMAN_REVIEW_REQUIRED", "regulation": "MODEL-HUMAN-OVERSIGHT", "message": "Eligibility-influencing AI output requires a recorded human reviewer.", "path": "assessment.human_reviewer_recorded", "audience": "tenant_ops" }
+  ],
+  "outcome": "severity_fold",
+  "outputs": {}
+}

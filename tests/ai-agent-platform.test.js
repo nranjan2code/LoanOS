@@ -4,7 +4,8 @@ import {
   activateTenantAiAgent, approveAiAgentPricingContract, authorizeAiAgentExecution, buildAiAgentGovernanceReport,
   completeAiAgentExecution, createAiAgentPlatformState,
   installTenantAiAgent, projectAiAgentMarketplace, proposeAiAgentPricingContract, recordAiAgentUsage,
-  recordTenantAiAgentApproval, suspendTenantAiAgent
+  recordTenantAiAgentApproval, suspendTenantAiAgent, proposeAiAgentUsageBudget, approveAiAgentUsageBudget,
+  reserveAiAgentUsageBudget, proposeAiAgentInvoice, approveAiAgentInvoice
 } from "../packages/core/src/ai-agent-platform.js";
 import { routeAiAgentPlatform } from "../apps/api/src/routes/ai-agent-platform.js";
 
@@ -89,4 +90,62 @@ test("emergency suspension immediately blocks new work", () => {
   let state = active(proposed(contracted()));
   state = suspendTenantAiAgent(state, { installationId: "agent1", tenantId: "re1", reason: "drift alert", actor: "risk", incidentRef: "incident/1" }, NOW).state;
   assert.throws(() => authorizeAiAgentExecution(state, registry(), { executionId: "run2", tenantId: "re1", installationId: "agent1", action: "cam.draft", purpose: "x", inputRef: "a", inputHash: H, modelConsumptionDecision: decision("guardrail.model_consumption"), actionGuardrailDecision: decision("guardrail.agent_action") }, NOW), (e) => e.code === "ai_agent_installation_inactive");
+});
+
+test("approved tenant budget reserves exact paise before model work and cannot be exceeded", () => {
+  let state = active(proposed(contracted()));
+  state = proposeAiAgentUsageBudget(state, { budgetId: "budget1", tenantId: "re1", contractId: "price1", effectiveFrom: "2026-07-01", validUntil: "2026-08-01", proposedBy: "commercial_maker", limits: { maxExecutions: "1", maxInputTokens: "1001", maxOutputTokens: "999", maxChargePaise: "65" } }, NOW).state;
+  state = approveAiAgentUsageBudget(state, { budgetId: "budget1", tenantId: "re1", approvedBy: "commercial_checker", commercialApprovalRef: "budget/approval/1" }, NOW).state;
+  assert.throws(() => reserveAiAgentUsageBudget(state, { reservationId: "too-much", tenantId: "re1", installationId: "agent1", expectedInputTokens: "1002", expectedOutputTokens: "999" }, NOW), (e) => e.code === "ai_agent_budget_exceeded");
+  state = reserveAiAgentUsageBudget(state, { reservationId: "reserve1", tenantId: "re1", installationId: "agent1", expectedInputTokens: "1001", expectedOutputTokens: "999" }, NOW).state;
+  let outcome = authorizeAiAgentExecution(state, registry(), { executionId: "budget-run", tenantId: "re1", installationId: "agent1", action: "cam.draft", purpose: "CAM", inputRef: "app/1", inputHash: H, usageReservationId: "reserve1", modelConsumptionDecision: decision("guardrail.model_consumption"), actionGuardrailDecision: decision("guardrail.agent_action") }, NOW);
+  state = outcome.state;
+  state = completeAiAgentExecution(state, { executionId: "budget-run", tenantId: "re1", outputRef: "proposal/1", outputHash: H, outcome: "proposal_created" }, NOW).state;
+  assert.throws(() => recordAiAgentUsage(state, { usageId: "bad-use", executionId: "budget-run", tenantId: "re1", inputTokens: "1002", outputTokens: "999" }, NOW), (e) => e.code === "ai_agent_budget_reservation_exceeded");
+  state = recordAiAgentUsage(state, { usageId: "good-use", executionId: "budget-run", tenantId: "re1", inputTokens: "1001", outputTokens: "999" }, NOW).state;
+  assert.equal(state.budgetReservations.reserve1.status, "consumed");
+});
+
+test("GST-ready invoice uses immutable ledger lineage and independent commercial approval", () => {
+  let state = active(proposed(contracted()));
+  let outcome = authorizeAiAgentExecution(state, registry(), { executionId: "invoice-run", tenantId: "re1", installationId: "agent1", action: "cam.draft", purpose: "CAM", inputRef: "app/1", inputHash: H, modelConsumptionDecision: decision("guardrail.model_consumption"), actionGuardrailDecision: decision("guardrail.agent_action") }, NOW);
+  state = completeAiAgentExecution(outcome.state, { executionId: "invoice-run", tenantId: "re1", outputRef: "proposal/1", outputHash: H, outcome: "proposal_created" }, NOW).state;
+  state = recordAiAgentUsage(state, { usageId: "invoice-use", executionId: "invoice-run", tenantId: "re1", inputTokens: "1001", outputTokens: "999" }, NOW).state;
+  outcome = proposeAiAgentInvoice(state, { invoiceId: "inv1", tenantId: "re1", contractId: "price1", periodFrom: "2026-07-01", periodTo: "2026-08-01", proposedBy: "billing_maker", tax: { supplyType: "intra_state", rateBasisPoints: "1800", supplierGstinRef: "tax/supplier", recipientGstinRef: "tax/recipient", placeOfSupplyState: "KA" } }, NOW);
+  state = outcome.state;
+  assert.equal(outcome.record.charges.subtotalPaise, "65");
+  assert.equal(outcome.record.tax.totalTaxPaise, "12");
+  assert.equal(outcome.record.tax.cgstPaise, "6");
+  assert.equal(outcome.record.usage.ledgerEntries[0].usageId, "invoice-use");
+  assert.throws(() => approveAiAgentInvoice(state, { invoiceId: "inv1", tenantId: "re1", approvedBy: "billing_maker", commercialApprovalRef: "bad" }, NOW), (e) => e.code === "ai_agent_invoice_self_approval");
+  outcome = approveAiAgentInvoice(state, { invoiceId: "inv1", tenantId: "re1", approvedBy: "billing_checker", commercialApprovalRef: "billing/approval/1" }, NOW);
+  assert.equal(outcome.record.status, "approved");
+  assert.equal(outcome.record.totalPaise, "77");
+});
+
+test("explicit demo mode runs an already-authorized execution through the mock provider only", async () => {
+  let platform = active(proposed(contracted()));
+  platform = authorizeAiAgentExecution(platform, registry(), { executionId: "demo-run", tenantId: "re1", installationId: "agent1", action: "cam.draft", purpose: "CAM", inputRef: "synthetic/application/1", inputHash: H, modelConsumptionDecision: decision("guardrail.model_consumption"), actionGuardrailDecision: decision("guardrail.agent_action") }, NOW).state;
+  let tenantState = { aiAgentPlatform: platform, modelRegistry: registry(), events: [] };
+  const store = { load: async () => tenantState, save: async (next) => { tenantState = next; } };
+  const call = async () => {
+    let response;
+    await routeAiAgentPlatform({ method: "POST", path: "/ai/agents/executions/demo-run/demo-run", req: { url: "/ai/agents/executions/demo-run/demo-run", _loanosRequestId: "demo-request" }, res: {}, store,
+      readJson: async () => ({ scenario: "incomplete_evidence" }), sendJson: (_res, status, payload) => { response = { status, payload }; }, appendEvent: (state) => state,
+      authContext: { tenantId: "re1" }, hasTenantAdminRole: () => true, authActor: () => "demo_operator" });
+    return response;
+  };
+  const original = process.env.LOANOS_AI_DEMO_MODE;
+  delete process.env.LOANOS_AI_DEMO_MODE;
+  let response = await call();
+  assert.equal(response.status, 403);
+  process.env.LOANOS_AI_DEMO_MODE = "true";
+  response = await call();
+  if (original === undefined) delete process.env.LOANOS_AI_DEMO_MODE; else process.env.LOANOS_AI_DEMO_MODE = original;
+  assert.equal(response.status, 201);
+  assert.equal(response.payload.demo.simulated, true);
+  assert.equal(response.payload.demo.commerciallyLive, false);
+  assert.equal(response.payload.demo.proposal.needsHumanReview, true);
+  assert.equal(tenantState.aiAgentPlatform.executions["demo-run"].status, "completed");
+  assert.ok(tenantState.aiAgentPlatform.usageLedger["demo-usage:demo-run"]);
 });

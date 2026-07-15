@@ -69,7 +69,7 @@ LoanOS currently has a strong compliance-first domain foundation and executable 
 
 The principal gaps before bank production are live integrations, downstream GL certification, regulatory submission formats, product-specific lending depth, repossession/auction and legal-expense depth, live IdP/KMS/SIEM/database/deployment infrastructure, and independent bank-assurance evidence. The product now includes certified-policy OIDC code/PKCE/JWKS verification, a SAML validation boundary, scoped SCIM protocol operations with explicit persisted-session revocation, exact-byte RS256/ES256 provider-revocation verification against maker-checker public-key profiles, assurance-bearing sessions, an 85-role canonical catalogue, 34 per-feature verified-human staffing policies, immediate revocation pause/escalation, maker-checker authenticator recovery and federation key rotation, a complete tenant IAM administration workspace, provider-directory reconciliation, checksum-sealed containment-only operational runs, a durable tenant/workload-fenced identity worker plane with bounded retry/DLQ/replay, a runnable bounded scheduler with explicit simulator/live boundaries and health metrics, independent measured resilience drills, six exhaustive vendor-neutral identity/security simulator packs, 85 enterprise-platform emulator scenarios and 153 `INT-ADM-01..10` organisation-admission scenarios. Candidate/campaign state is now persistent, expiring and reassessable, and one unified eight-dimension activation assessment prevents simulator evidence from producing a production-ready tenant. It also includes human-sponsored agents, deny-by-default staff-mutation classification, isolated platform-control routing with mTLS/KMS identity requirements, exact activity export/WORM custody reconciliation, purpose-attested keys, PostgreSQL tenant-lock/RLS atomic claims plus an environment-gated database conformance test, API/event/webhook contracts and deployment readiness. Commercial IdP/MDM/SAML-gateway connectivity, provider-native signed logout/token revocation and witnessed key rollover, selected admission/direct-authority services, certified live worker handlers, per-tenant shadow/cutover evidence, a separately deployed control fleet, direct KMS grants, live SIEM/WORM/NTP collectors, managed replication/WAL/PITR, cloud rollout controllers, institutional control methodology, pen tests, ITSM/paging, 24x7 staffing, production-scale soak/chaos, contract enforcement, real failover/failback and exercised continuity remain open. Simulator certification never means a commercial connection is live. Public positioning must remain narrower than this catalogue until each advertised journey reaches agreed maturity.
 
-The detailed register contains **462 individually identified capabilities**. At this snapshot, 92 are `Implemented`, 343 `Partial`, 11 `Partial/Mock`, 7 `Mock`, 0 `Missing`, 3 `Partner`, and 6 `External`. These counts measure scope coverage, not delivery percentage: a single partial ledger, reconciliation, security, integration, agent-runtime or recovery control can block production even when no capability remains unclassified as missing.
+The detailed register contains **463 individually identified capabilities**. At this snapshot, 93 are `Implemented`, 343 `Partial`, 11 `Partial/Mock`, 7 `Mock`, 0 `Missing`, 3 `Partner`, and 6 `External`. These counts measure scope coverage, not delivery percentage: a single partial ledger, reconciliation, security, integration, agent-runtime or recovery control can block production even when no capability remains unclassified as missing.
 
 ## Capability Index
 
@@ -718,6 +718,7 @@ The detailed register contains **462 individually identified capabilities**. At 
 | UX-015 | Multilingual Indian-language content and templates | Core | Partial |
 | UX-016 | Accessibility testing, assisted journeys, and reduced-motion support | Core | Partial |
 | UX-017 | Mobile/PWA/offline capability | Channel | Partial |
+| UX-018 | Role-based Guide and Academy with searchable, control-aware operating guidance | Core | Implemented |
 
 ### 33. Implementation, Migration, and Customer Adoption
 
@@ -741,7 +742,7 @@ The detailed register contains **462 individually identified capabilities**. At 
 
 The complete-system catalogue must be filtered into a product pack before a product is advertised or committed. Each pack inherits all applicable `Core` capabilities and adds its specific requirements.
 
-JD-02 provides a governed tenant-persistent backend service for the 13 specialised and four trade packs: exact version binding, independently approved configuration/actions, exceptions, workflow tasks and revocation pause. JD-03 now maps all 21 products into 11 governed schema/workspace archetypes across borrower, branch, partner, field, credit, operations and control channels, including tenant entitlement, field/document/action classification, exact schema lineage, server-side drafts, redaction, accessibility and offline privacy controls. JD-04 common origination-to-closure composition and JD-05/JD-06 production evidence remain.
+JD-02 provides a governed tenant-persistent backend service for the 13 specialised and four trade packs. JD-03 maps all 21 products into 11 governed schema/workspace archetypes across seven channels. JD-04 now composes their exact evidence into a tenant-persistent common lifecycle from capture through closure, with version binding, maker-checker transitions, fail-closed pause, escalation and compensation. This is a controlled platform boundary: each pack still retains its capability-level `Partial`/`Missing`/`External` status, while JD-01 administration completeness, JD-05 generated full-stack execution and JD-06 live-provider/deployment evidence remain.
 
 ### Unsecured personal term loan
 
@@ -770,7 +771,7 @@ JD-02 provides a governed tenant-persistent backend service for the 13 specialis
 ### Gold loan
 
 - Assaying, purity/net-weight valuation, LTV monitoring, dual-control custody, packet/barcode, branch vault, auction notices, auction execution, surplus refund, and collateral release.
-- The assay/weight/custody/LTV kernel is now reachable through the governed persistent specialist service. Branch assay/custody/auction workspaces and common origination-to-closure composition remain missing.
+- The assay/weight/custody/LTV kernel is reachable through the governed persistent specialist service, its branch/control data is schema-projected, and its evidence can enter the composed lifecycle. Full custody/auction experience depth and production provider/operational evidence remain missing.
 
 ### Education loan
 

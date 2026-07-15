@@ -1,0 +1,22 @@
+{
+  "key": "guardrail.data_access",
+  "bindings": [
+    { "name": "tenant_match", "path": "/request/tenant_match", "type": "bool", "required": true },
+    { "name": "purpose_approved", "path": "/request/purpose_approved", "type": "bool", "required": true },
+    { "name": "consent_required", "path": "/request/consent_required", "type": "bool", "required": true },
+    { "name": "consent_present", "path": "/request/consent_present", "type": "bool", "required": true },
+    { "name": "minimum_fields_only", "path": "/request/minimum_fields_only", "type": "bool", "required": true },
+    { "name": "sensitive_data", "path": "/request/sensitive_data", "type": "bool", "required": true },
+    { "name": "human_approval_recorded", "path": "/request/human_approval_recorded", "type": "bool", "required": true }
+  ],
+  "expressions": [],
+  "findings": [
+    { "id": "data_access_tenant_mismatch", "when": ["not tenant_match"], "severity": "error", "code": "DATA_ACCESS_TENANT_MISMATCH", "regulation": "RBI-IT-23", "message": "The requested retrieval crosses the tenant boundary.", "path": "request.tenant_match", "audience": "internal" },
+    { "id": "data_access_purpose_unapproved", "when": ["not purpose_approved"], "severity": "error", "code": "DATA_ACCESS_PURPOSE_UNAPPROVED", "regulation": "DPDP-2023", "message": "The data-access purpose is not approved for this worker installation.", "path": "request.purpose_approved", "audience": "internal" },
+    { "id": "data_access_consent_missing", "when": ["consent_required", "not consent_present"], "severity": "error", "code": "DATA_ACCESS_CONSENT_MISSING", "regulation": "DPDP-2023", "message": "Required consent evidence is absent for the requested retrieval.", "path": "request.consent_present", "audience": "tenant_ops" },
+    { "id": "data_access_not_minimized", "when": ["not minimum_fields_only"], "severity": "error", "code": "DATA_ACCESS_NOT_MINIMIZED", "regulation": "DPDP-2023", "message": "The retrieval exceeds the approved minimum data fields.", "path": "request.minimum_fields_only", "audience": "internal" },
+    { "id": "data_access_sensitive_review", "when": ["sensitive_data", "not human_approval_recorded"], "severity": "warn", "code": "DATA_ACCESS_SENSITIVE_REVIEW", "regulation": "DPDP-2023", "message": "Sensitive-data retrieval requires recorded human approval.", "path": "request.human_approval_recorded", "audience": "tenant_ops" }
+  ],
+  "outcome": "severity_fold",
+  "outputs": {}
+}

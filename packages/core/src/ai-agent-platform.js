@@ -18,14 +18,15 @@ export const AI_AGENT_PRICING_DIMENSIONS = Object.freeze([
 ]);
 
 export function createAiAgentPlatformState() {
-  return { pricingContracts: {}, installations: {}, executions: {}, usageLedger: {}, events: [] };
+  return { pricingContracts: {}, installations: {}, executions: {}, usageLedger: {}, usageBudgets: {}, budgetReservations: {}, invoices: {}, events: [] };
 }
 
 export function normalizeAiAgentPlatformState(state) {
   const empty = createAiAgentPlatformState();
   return state && typeof state === "object" ? {
     pricingContracts: state.pricingContracts ?? {}, installations: state.installations ?? {},
-    executions: state.executions ?? {}, usageLedger: state.usageLedger ?? {},
+    executions: state.executions ?? {}, usageLedger: state.usageLedger ?? {}, usageBudgets: state.usageBudgets ?? {},
+    budgetReservations: state.budgetReservations ?? {}, invoices: state.invoices ?? {},
     events: Array.isArray(state.events) ? state.events : []
   } : empty;
 }
@@ -60,6 +61,47 @@ export function approveAiAgentPricingContract(state, input, now = new Date()) {
   independent(contract.proposedBy, input.approvedBy, "ai_agent_pricing_self_approval");
   const approved = seal({ ...contract, status: "active", approvedBy: input.approvedBy, commercialApprovalRef: input.commercialApprovalRef, approvedAt: now.toISOString() });
   return result(platform, "pricingContracts", approved.contractId, approved, "ai_agent.pricing_contract_approved", now);
+}
+
+// A budget is an opt-in hard commercial control. Its limits are reserved before a
+// model call, rather than discovered after a provider has already incurred cost.
+export function proposeAiAgentUsageBudget(state, input, now = new Date()) {
+  const platform = normalizeAiAgentPlatformState(state);
+  required(input, ["budgetId", "tenantId", "contractId", "effectiveFrom", "validUntil", "proposedBy", "limits"]);
+  if (platform.usageBudgets[input.budgetId]) fail("ai_agent_budget_exists", "Usage budget already exists.", 409);
+  const contract = tenantRecord(platform.pricingContracts[input.contractId], input.tenantId, "ai_agent_pricing_contract_invalid");
+  if (contract.status !== "active") fail("ai_agent_pricing_contract_inactive", "A budget requires an active pricing contract.", 403);
+  const budget = seal({ budgetId: input.budgetId, tenantId: input.tenantId, contractId: contract.contractId,
+    effectiveFrom: iso(input.effectiveFrom), validUntil: iso(input.validUntil), limits: budgetLimits(input.limits),
+    proposedBy: input.proposedBy, approvedBy: null, commercialApprovalRef: null, status: "pending_approval", createdAt: now.toISOString() });
+  if (Date.parse(budget.validUntil) <= Date.parse(budget.effectiveFrom)) fail("ai_agent_budget_period_invalid", "Budget validUntil must be after effectiveFrom.");
+  return result(platform, "usageBudgets", budget.budgetId, budget, "ai_agent.usage_budget_proposed", now);
+}
+
+export function approveAiAgentUsageBudget(state, input, now = new Date()) {
+  const platform = normalizeAiAgentPlatformState(state);
+  required(input, ["budgetId", "tenantId", "approvedBy", "commercialApprovalRef"]);
+  const budget = tenantRecord(platform.usageBudgets[input.budgetId], input.tenantId, "ai_agent_usage_budget_invalid");
+  if (budget.status !== "pending_approval") fail("ai_agent_usage_budget_not_pending", "Usage budget is not pending approval.", 409);
+  independent(budget.proposedBy, input.approvedBy, "ai_agent_usage_budget_self_approval");
+  const approved = seal({ ...budget, status: "active", approvedBy: input.approvedBy, commercialApprovalRef: input.commercialApprovalRef, approvedAt: now.toISOString() });
+  return result(platform, "usageBudgets", approved.budgetId, approved, "ai_agent.usage_budget_approved", now);
+}
+
+export function reserveAiAgentUsageBudget(state, input, now = new Date()) {
+  const platform = normalizeAiAgentPlatformState(state);
+  required(input, ["reservationId", "tenantId", "installationId", "expectedInputTokens", "expectedOutputTokens"]);
+  if (platform.budgetReservations[input.reservationId]) fail("ai_agent_budget_reservation_exists", "Budget reservation already exists.", 409);
+  const installation = tenantRecord(platform.installations[input.installationId], input.tenantId, "ai_agent_installation_missing");
+  const contract = tenantRecord(platform.pricingContracts[installation.contractId], input.tenantId, "ai_agent_pricing_contract_invalid");
+  const budget = activeBudget(platform, input.tenantId, contract.contractId, now);
+  if (!budget) fail("ai_agent_budget_not_active", "No active usage budget exists for this installation's contract.", 403);
+  const metrics = { executions: "1", inputTokens: integerString(input.expectedInputTokens, "expectedInputTokens"), outputTokens: integerString(input.expectedOutputTokens, "expectedOutputTokens") };
+  const chargePaise = priceUsage(metrics, contract.pricing).toString();
+  const totals = budgetCommitted(platform, budget.budgetId);
+  enforceBudget(budget, addMetrics(totals, { ...metrics, chargePaise }));
+  const reservation = seal({ reservationId: input.reservationId, tenantId: input.tenantId, budgetId: budget.budgetId, contractId: contract.contractId, installationId: installation.installationId, metrics, chargePaise, status: "reserved", reservedAt: now.toISOString(), expiresAt: new Date(now.getTime() + 15 * 60_000).toISOString() });
+  return result(platform, "budgetReservations", reservation.reservationId, reservation, "ai_agent.usage_budget_reserved", now);
 }
 
 export function installTenantAiAgent(state, modelRegistry, input, now = new Date()) {
@@ -130,6 +172,14 @@ export function authorizeAiAgentExecution(state, modelRegistry, input, now = new
   const contract = tenantRecord(platform.pricingContracts[installation.contractId], input.tenantId, "ai_agent_pricing_contract_invalid");
   if (contract.status !== "active" || now.getTime() < Date.parse(contract.effectiveFrom) || now.getTime() > Date.parse(contract.validUntil)) fail("ai_agent_pricing_contract_inactive", "Agent execution requires a current active pricing contract.", 403);
   if (!installation.allowedActions.includes(input.action)) fail("ai_agent_action_not_allowed", "Requested action is outside the approved customization.", 403);
+  const budget = activeBudget(platform, input.tenantId, contract.contractId, now);
+  let reservationId = null;
+  if (budget) {
+    required(input, ["usageReservationId"]);
+    const reservation = tenantRecord(platform.budgetReservations[input.usageReservationId], input.tenantId, "ai_agent_budget_reservation_invalid");
+    if (reservation.status !== "reserved" || reservation.budgetId !== budget.budgetId || reservation.installationId !== installation.installationId || Date.parse(reservation.expiresAt) < now.getTime()) fail("ai_agent_budget_reservation_invalid", "A current matching budget reservation is required.", 403);
+    reservationId = reservation.reservationId;
+  }
   if (!/^[a-f0-9]{64}$/i.test(input.inputHash)) fail("ai_agent_input_hash_invalid", "inputHash must be SHA-256 hex.");
   const modelUse = evaluateModelUse(modelRegistry, { modelId: installation.modelId, humanReviewRef: input.humanReviewRef, customerDisclosureRef: input.customerDisclosureRef });
   if (!modelUse.allowed) fail("ai_agent_model_not_usable", "Model use is blocked by governance or kill switch.", 409, { findings: modelUse.findings });
@@ -137,7 +187,7 @@ export function authorizeAiAgentExecution(state, modelRegistry, input, now = new
   if (installation.customerFacing && !input.customerDisclosureRef) fail("ai_agent_disclosure_required", "Customer-facing execution requires an AI disclosure reference.");
   trustedDecision(input.modelConsumptionDecision, "allow", "ai_agent_model_consumption_denied");
   trustedDecision(input.actionGuardrailDecision, "allow", "ai_agent_action_guardrail_denied");
-  const execution = seal({ executionId: input.executionId, tenantId: input.tenantId, installationId: input.installationId, templateId: installation.templateId, action: input.action, purpose: input.purpose, inputRef: input.inputRef, inputHash: input.inputHash.toLowerCase(), modelId: installation.modelId, modelVersion: installation.modelVersion, promptHash: installation.promptHash, configurationRef: installation.configurationRef, workloadPrincipalId: installation.workloadPrincipalId, humanSponsorPrincipalId: installation.humanSponsorPrincipalId, modelConsumptionDecision: decisionProjection(input.modelConsumptionDecision), actionGuardrailDecision: decisionProjection(input.actionGuardrailDecision), humanReviewRef: input.humanReviewRef ?? null, customerDisclosureRef: input.customerDisclosureRef ?? null, status: "authorized", dataRegion: IST_REGION, authorizedAt: now.toISOString(), completedAt: null, outputRef: null, outputHash: null });
+  const execution = seal({ executionId: input.executionId, tenantId: input.tenantId, installationId: input.installationId, templateId: installation.templateId, action: input.action, purpose: input.purpose, inputRef: input.inputRef, inputHash: input.inputHash.toLowerCase(), modelId: installation.modelId, modelVersion: installation.modelVersion, promptHash: installation.promptHash, configurationRef: installation.configurationRef, workloadPrincipalId: installation.workloadPrincipalId, humanSponsorPrincipalId: installation.humanSponsorPrincipalId, modelConsumptionDecision: decisionProjection(input.modelConsumptionDecision), actionGuardrailDecision: decisionProjection(input.actionGuardrailDecision), humanReviewRef: input.humanReviewRef ?? null, customerDisclosureRef: input.customerDisclosureRef ?? null, usageReservationId: reservationId, status: "authorized", dataRegion: IST_REGION, authorizedAt: now.toISOString(), completedAt: null, outputRef: null, outputHash: null });
   return result(platform, "executions", execution.executionId, execution, "ai_agent.execution_authorized", now);
 }
 
@@ -163,9 +213,47 @@ export function recordAiAgentUsage(state, input, now = new Date()) {
   const contract = tenantRecord(platform.pricingContracts[installation.contractId], input.tenantId, "ai_agent_pricing_contract_invalid");
   const metrics = { executions: "1", inputTokens: integerString(input.inputTokens ?? "0", "inputTokens"), outputTokens: integerString(input.outputTokens ?? "0", "outputTokens"), toolCalls: integerString(input.toolCalls ?? "0", "toolCalls") };
   const p = contract.pricing;
-  const chargePaise = BigInt(p.per_execution_paise) + perThousand(metrics.inputTokens, p.per_1k_input_tokens_paise) + perThousand(metrics.outputTokens, p.per_1k_output_tokens_paise);
-  const usage = seal({ usageId: input.usageId, tenantId: input.tenantId, executionId: input.executionId, installationId: installation.installationId, contractId: contract.contractId, modelId: execution.modelId, modelVersion: execution.modelVersion, region: IST_REGION, metrics, currency: "INR", chargePaise: chargePaise.toString(), recordedAt: now.toISOString() });
-  return result(platform, "usageLedger", usage.usageId, usage, "ai_agent.usage_recorded", now);
+  const chargePaise = BigInt(priceUsage(metrics, p));
+  let reservations = platform.budgetReservations;
+  if (execution.usageReservationId) {
+    const reservation = tenantRecord(reservations[execution.usageReservationId], input.tenantId, "ai_agent_budget_reservation_invalid");
+    if (reservation.status !== "reserved") fail("ai_agent_budget_reservation_not_available", "Usage budget reservation is not available.", 409);
+    // Reservation is deliberately conservative: actual usage may not exceed the approved estimate.
+    if (BigInt(metrics.inputTokens) > BigInt(reservation.metrics.inputTokens) || BigInt(metrics.outputTokens) > BigInt(reservation.metrics.outputTokens) || chargePaise > BigInt(reservation.chargePaise)) fail("ai_agent_budget_reservation_exceeded", "Actual usage exceeded the pre-authorized budget reservation.", 403);
+    reservations = { ...reservations, [reservation.reservationId]: seal({ ...reservation, status: "consumed", executionId: execution.executionId, usageId: input.usageId, actualMetrics: metrics, actualChargePaise: chargePaise.toString(), consumedAt: now.toISOString() }) };
+  }
+  const usage = seal({ usageId: input.usageId, tenantId: input.tenantId, executionId: input.executionId, installationId: installation.installationId, contractId: contract.contractId, budgetId: execution.usageReservationId ? platform.budgetReservations[execution.usageReservationId]?.budgetId ?? null : null, modelId: execution.modelId, modelVersion: execution.modelVersion, region: IST_REGION, metrics, currency: "INR", chargePaise: chargePaise.toString(), recordedAt: now.toISOString() });
+  const next = { ...platform, budgetReservations: reservations };
+  return result(next, "usageLedger", usage.usageId, usage, "ai_agent.usage_recorded", now);
+}
+
+export function proposeAiAgentInvoice(state, input, now = new Date()) {
+  const platform = normalizeAiAgentPlatformState(state);
+  required(input, ["invoiceId", "tenantId", "contractId", "periodFrom", "periodTo", "proposedBy", "tax"]);
+  if (platform.invoices[input.invoiceId]) fail("ai_agent_invoice_exists", "Invoice already exists.", 409);
+  const contract = tenantRecord(platform.pricingContracts[input.contractId], input.tenantId, "ai_agent_pricing_contract_invalid");
+  const periodFrom = iso(input.periodFrom), periodTo = iso(input.periodTo);
+  if (Date.parse(periodTo) <= Date.parse(periodFrom)) fail("ai_agent_invoice_period_invalid", "Invoice periodTo must be after periodFrom.");
+  const prior = Object.values(platform.invoices).find((x) => x.tenantId === input.tenantId && x.contractId === contract.contractId && x.periodFrom === periodFrom && x.periodTo === periodTo);
+  if (prior) fail("ai_agent_invoice_period_exists", "An invoice already exists for this contract and period.", 409);
+  const usage = Object.values(platform.usageLedger).filter((x) => x.tenantId === input.tenantId && x.contractId === contract.contractId && Date.parse(x.recordedAt) >= Date.parse(periodFrom) && Date.parse(x.recordedAt) < Date.parse(periodTo));
+  const totals = usageTotals(usage);
+  const charges = invoiceCharges(totals, contract.pricing);
+  const tax = invoiceTax(input.tax, charges.subtotalPaise);
+  const invoice = seal({ invoiceId: input.invoiceId, tenantId: input.tenantId, contractId: contract.contractId, currency: "INR", periodFrom, periodTo,
+    usage: { ...totals, ledgerEntries: usage.map((x) => ({ usageId: x.usageId, recordHash: x.recordHash })) }, charges, tax,
+    totalPaise: (BigInt(charges.subtotalPaise) + BigInt(tax.totalTaxPaise)).toString(), status: "pending_approval", proposedBy: input.proposedBy, approvedBy: null, commercialApprovalRef: null, createdAt: now.toISOString() });
+  return result(platform, "invoices", invoice.invoiceId, invoice, "ai_agent.invoice_proposed", now);
+}
+
+export function approveAiAgentInvoice(state, input, now = new Date()) {
+  const platform = normalizeAiAgentPlatformState(state);
+  required(input, ["invoiceId", "tenantId", "approvedBy", "commercialApprovalRef"]);
+  const invoice = tenantRecord(platform.invoices[input.invoiceId], input.tenantId, "ai_agent_invoice_invalid");
+  if (invoice.status !== "pending_approval") fail("ai_agent_invoice_not_pending", "Invoice is not pending approval.", 409);
+  independent(invoice.proposedBy, input.approvedBy, "ai_agent_invoice_self_approval");
+  const approved = seal({ ...invoice, status: "approved", approvedBy: input.approvedBy, commercialApprovalRef: input.commercialApprovalRef, approvedAt: now.toISOString() });
+  return result(platform, "invoices", approved.invoiceId, approved, "ai_agent.invoice_approved", now);
 }
 
 export function suspendTenantAiAgent(state, input, now = new Date()) {
@@ -201,6 +289,17 @@ function unique(values = []) { if (!Array.isArray(values)) fail("ai_agent_array_
 function integerString(value, path) { const text = String(value); if (!/^\d+$/.test(text)) fail("ai_agent_pricing_value_invalid", `${path} must be a non-negative integer string.`); return BigInt(text).toString(); }
 function iso(value) { const at = new Date(value); if (!Number.isFinite(at.getTime())) fail("ai_agent_date_invalid", "Date must be a valid ISO value."); return at.toISOString(); }
 function perThousand(units, rate) { const count = BigInt(units); return ((count + 999n) / 1000n) * BigInt(rate); }
+function priceUsage(metrics, pricing) { return (BigInt(pricing.per_execution_paise) * BigInt(metrics.executions)) + perThousand(metrics.inputTokens, pricing.per_1k_input_tokens_paise) + perThousand(metrics.outputTokens, pricing.per_1k_output_tokens_paise); }
+function budgetLimits(limits) { return Object.fromEntries(["maxExecutions", "maxInputTokens", "maxOutputTokens", "maxChargePaise"].map((key) => [key, integerString(limits[key] ?? "0", `limits.${key}`)])); }
+function activeBudget(platform, tenantId, contractId, now) { return Object.values(platform.usageBudgets).find((x) => x.tenantId === tenantId && x.contractId === contractId && x.status === "active" && Date.parse(x.effectiveFrom) <= now.getTime() && now.getTime() <= Date.parse(x.validUntil)); }
+function budgetCommitted(platform, budgetId) { const blank = { executions: "0", inputTokens: "0", outputTokens: "0", chargePaise: "0" }; const used = Object.values(platform.usageLedger).filter((x) => x.budgetId === budgetId).reduce((total, x) => addMetrics(total, { ...x.metrics, chargePaise: x.chargePaise }), blank); return Object.values(platform.budgetReservations).filter((x) => x.budgetId === budgetId && x.status === "reserved").reduce((total, x) => addMetrics(total, { ...x.metrics, chargePaise: x.chargePaise }), used); }
+function addMetrics(left, right) { return Object.fromEntries(["executions", "inputTokens", "outputTokens", "chargePaise"].map((key) => [key, (BigInt(left[key] ?? "0") + BigInt(right[key] ?? "0")).toString()])); }
+function enforceBudget(budget, total) { const pairs = [["maxExecutions", "executions"], ["maxInputTokens", "inputTokens"], ["maxOutputTokens", "outputTokens"], ["maxChargePaise", "chargePaise"]]; for (const [limit, actual] of pairs) if (BigInt(total[actual]) > BigInt(budget.limits[limit])) fail("ai_agent_budget_exceeded", `Usage budget ${limit} would be exceeded.`, 403, { budgetId: budget.budgetId, limit, allowed: budget.limits[limit], requested: total[actual] }); }
+function usageTotals(usage) { return usage.reduce((total, x) => addMetrics(total, { ...x.metrics, chargePaise: x.chargePaise }), { executions: "0", inputTokens: "0", outputTokens: "0", chargePaise: "0" }); }
+function invoiceCharges(totals, pricing) { const overageExecutions = maxZero(totals.executions, pricing.included_executions); const overageInputTokens = maxZero(totals.inputTokens, pricing.included_input_tokens); const overageOutputTokens = maxZero(totals.outputTokens, pricing.included_output_tokens); const platformFeePaise = BigInt(pricing.monthly_platform_fee_paise); const executionPaise = BigInt(overageExecutions) * BigInt(pricing.per_execution_paise); const inputTokenPaise = perThousand(overageInputTokens, pricing.per_1k_input_tokens_paise); const outputTokenPaise = perThousand(overageOutputTokens, pricing.per_1k_output_tokens_paise); return { platformFeePaise: platformFeePaise.toString(), overageExecutions, overageInputTokens, overageOutputTokens, executionPaise: executionPaise.toString(), inputTokenPaise: inputTokenPaise.toString(), outputTokenPaise: outputTokenPaise.toString(), subtotalPaise: (platformFeePaise + executionPaise + inputTokenPaise + outputTokenPaise).toString() }; }
+function maxZero(value, allowance) { const delta = BigInt(value) - BigInt(allowance); return (delta > 0n ? delta : 0n).toString(); }
+function invoiceTax(value, subtotalPaise) { required(value, ["supplyType", "rateBasisPoints", "supplierGstinRef", "recipientGstinRef", "placeOfSupplyState"]); if (!["intra_state", "inter_state"].includes(value.supplyType)) fail("ai_agent_invoice_supply_type_invalid", "supplyType must be intra_state or inter_state."); const rateBasisPoints = integerString(value.rateBasisPoints, "tax.rateBasisPoints"); const totalTax = divideRoundHalfUp(BigInt(subtotalPaise) * BigInt(rateBasisPoints), 10_000n); const base = { supplyType: value.supplyType, rateBasisPoints, supplierGstinRef: value.supplierGstinRef, recipientGstinRef: value.recipientGstinRef, placeOfSupplyState: value.placeOfSupplyState, totalTaxPaise: totalTax.toString(), rounding: "half_up_to_paise", legalInvoiceStatus: "commercial_record_pending_tax_validation" }; return value.supplyType === "intra_state" ? { ...base, cgstPaise: (totalTax / 2n).toString(), sgstPaise: (totalTax - (totalTax / 2n)).toString(), igstPaise: "0" } : { ...base, cgstPaise: "0", sgstPaise: "0", igstPaise: totalTax.toString() }; }
+function divideRoundHalfUp(numerator, denominator) { return (numerator + (denominator / 2n)) / denominator; }
 function sum(records, key) { return records.reduce((n, x) => n + BigInt(x.metrics[key]), 0n).toString(); }
 function seal(value) { const clean = JSON.parse(JSON.stringify(value)); delete clean.recordHash; return { ...clean, recordHash: hash(clean) }; }
 function hash(value) { return createHash("sha256").update(canonical(value)).digest("hex"); }

@@ -73,6 +73,11 @@ export {
   projectAiAgentMarketplace,
   proposeAiAgentPricingContract,
   approveAiAgentPricingContract,
+  proposeAiAgentUsageBudget,
+  approveAiAgentUsageBudget,
+  reserveAiAgentUsageBudget,
+  proposeAiAgentInvoice,
+  approveAiAgentInvoice,
   installTenantAiAgent,
   recordTenantAiAgentApproval,
   activateTenantAiAgent,
@@ -82,6 +87,16 @@ export {
   suspendTenantAiAgent,
   buildAiAgentGovernanceReport
 } from "./ai-agent-platform.js";
+
+export {
+  INDIA_REGION as DIGITAL_WORKER_INDIA_REGION,
+  invokeDigitalWorkerProvider
+} from "./digital-worker-provider.js";
+
+export {
+  DEMO_SCENARIOS,
+  createDemoDigitalWorkerProvider
+} from "./digital-worker-demo-provider.js";
 
 export {
   ALLOWED_RE_TYPES,
@@ -699,6 +714,7 @@ export { PRODUCT_JOURNEY_TYPES, BUILT_IN_PRODUCT_JOURNEY_TYPES, BUSINESS_PRODUCT
 export { PRODUCT_JOURNEY_CONFORMANCE_BASELINE, PRODUCT_JOURNEY_ARCHETYPES, buildProductJourneyConformanceManifest, registerProductJourneyConformanceCampaign, approveProductJourneyConformanceCampaign, recordProductJourneyConformanceResult, assessProductJourneyConformanceCampaign, projectProductJourneyConformanceCoverage } from "./product-journey-conformance.js";
 
 export { JOURNEY_WORKSPACE_ARCHETYPES, JOURNEY_WORKSPACE_CHANNELS, JOURNEY_WORKSPACE_SCHEMAS, PRODUCT_TO_WORKSPACE_ARCHETYPE, listJourneyWorkspaceDrafts, projectJourneyWorkspaceCatalogue, projectJourneyWorkspaceSchema, resolveEntitledJourneyTypes, saveJourneyWorkspaceDraft, validateJourneyWorkspaceCatalogue } from "./journey-workspace.js";
+export { COMPOSED_JOURNEY_STAGES, COMPOSED_JOURNEY_STAGE_DEFINITIONS, validateComposedJourneyLifecycleCatalogue, createComposedJourneyInstance, proposeComposedJourneyTransition, approveComposedJourneyTransition, pauseComposedJourneyInstance, pauseComposedJourneysForPrincipal, pauseComposedJourneysForProduct, recordComposedJourneyFailure, resumeComposedJourneyInstance, projectComposedJourneyInstance, projectComposedJourneyPortfolio } from "./composed-journey-lifecycle.js";
 export { JOURNEY_SUPPORT_LEVELS, certifyProductJourneySupport, suspendProductJourneySupport, projectProductJourneySupport, assessTenantJourneyActivation } from "./product-journey-certification.js";
 export { SPECIALISED_JOURNEY_FAMILIES, registerSpecialisedJourney, assessSpecialisedJourney } from "./specialised-lending-journeys.js";
 export { TRADE_JOURNEY_TYPES, configureTradeJourneyPack, registerTradeParty, registerTradeAsset, approveTradeFacilityTransaction, drawTradeFacility, settleTradeProceeds } from "./working-capital-trade-journeys.js";

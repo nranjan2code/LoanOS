@@ -1,0 +1,22 @@
+{
+  "key": "guardrail.outbound_communication",
+  "bindings": [
+    { "name": "tenant_match", "path": "/communication/tenant_match", "type": "bool", "required": true },
+    { "name": "channel_approved", "path": "/communication/channel_approved", "type": "bool", "required": true },
+    { "name": "recipient_consent_present", "path": "/communication/recipient_consent_present", "type": "bool", "required": true },
+    { "name": "ai_disclosure_present", "path": "/communication/ai_disclosure_present", "type": "bool", "required": true },
+    { "name": "proposal_only", "path": "/communication/proposal_only", "type": "bool", "required": true },
+    { "name": "human_approval_recorded", "path": "/communication/human_approval_recorded", "type": "bool", "required": true }
+  ],
+  "expressions": [],
+  "findings": [
+    { "id": "outbound_tenant_mismatch", "when": ["not tenant_match"], "severity": "error", "code": "OUTBOUND_TENANT_MISMATCH", "regulation": "RBI-IT-23", "message": "The outbound communication crosses the tenant boundary.", "path": "communication.tenant_match", "audience": "internal" },
+    { "id": "outbound_channel_unapproved", "when": ["not channel_approved"], "severity": "error", "code": "OUTBOUND_CHANNEL_UNAPPROVED", "regulation": "RBI-DL-2025", "message": "The proposed channel is not approved for this communication.", "path": "communication.channel_approved", "audience": "tenant_ops" },
+    { "id": "outbound_consent_missing", "when": ["not recipient_consent_present"], "severity": "error", "code": "OUTBOUND_RECIPIENT_CONSENT_MISSING", "regulation": "DPDP-2023", "message": "Recipient consent is required before outbound communication.", "path": "communication.recipient_consent_present", "audience": "tenant_ops" },
+    { "id": "outbound_disclosure_missing", "when": ["not ai_disclosure_present"], "severity": "error", "code": "OUTBOUND_AI_DISCLOSURE_MISSING", "regulation": "RBI-DL-2025", "message": "Customer-facing AI communication requires disclosure and handoff.", "path": "communication.ai_disclosure_present", "audience": "borrower" },
+    { "id": "outbound_direct_send", "when": ["not proposal_only"], "severity": "error", "code": "OUTBOUND_DIRECT_SEND_DENIED", "regulation": "RBI-DL-2025", "message": "A digital worker may draft communication but may not send it directly.", "path": "communication.proposal_only", "audience": "internal" },
+    { "id": "outbound_human_review", "when": ["not human_approval_recorded"], "severity": "warn", "code": "OUTBOUND_HUMAN_REVIEW_REQUIRED", "regulation": "MODEL-HUMAN-OVERSIGHT", "message": "A human must approve the proposed outbound communication before dispatch.", "path": "communication.human_approval_recorded", "audience": "tenant_ops" }
+  ],
+  "outcome": "severity_fold",
+  "outputs": {}
+}

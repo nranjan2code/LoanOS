@@ -154,23 +154,29 @@ EOF
     TEST_RC=${PIPESTATUS[0]}
     set +o pipefail
 
+    DASHBOARD_RC=0
     echo "==> Syncing capability trace register (docs/product/capability-trace.json)..."
-    node scripts/sync-capability-trace.mjs || echo "Warning: trace sync failed (non-fatal)."
+    if ! node scripts/sync-capability-trace.mjs; then
+        DASHBOARD_RC=1
+    elif ! node scripts/validate-capability-evidence.mjs; then
+        DASHBOARD_RC=1
+    else
+        echo "==> Regenerating capability & build dashboard (docs/dashboard.html)..."
+        if ! DASHBOARD_TEST_LOG=test_output.log node scripts/build-dashboard.mjs; then
+            DASHBOARD_RC=1
+        elif ! node scripts/validate-dashboard.mjs; then
+            DASHBOARD_RC=1
+        fi
+    fi
 
-    echo "==> Regenerating capability & build dashboard (docs/dashboard.html)..."
-    DASHBOARD_TEST_LOG=test_output.log node scripts/build-dashboard.mjs || \
-        echo "Warning: dashboard generation failed (non-fatal)."
-
-    return $TEST_RC
+    if [ "$TEST_RC" -ne 0 ]; then return "$TEST_RC"; fi
+    return "$DASHBOARD_RC"
 }
 
 # Sync the capability trace register (preserving curated evidence) and regenerate
 # docs/dashboard.html from git, the capability catalogue, backlog, and a live test run.
 dashboard() {
-    echo "==> Syncing capability trace register..."
-    node scripts/sync-capability-trace.mjs
-    echo "==> Regenerating capability & build dashboard..."
-    node scripts/build-dashboard.mjs
+    npm run dashboard
 }
 
 start() {

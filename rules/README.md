@@ -25,7 +25,7 @@ Policy is data, not code: a `DecisionModel` (JSON — typed fact bindings, expre
 | `tools/rules-fleet` | Sign bundles, spawn/stop instances, health checks, kill-switch broadcast |
 | `tools/rules-replay` | Determinism canary: replays audit records, requires byte-identical reproduction (INV-8) |
 | `tools/rules-diff` | Shadow divergence report between two models over a corpus |
-| `fixtures/` | `lending-eligibility.json` (the ported credit policy), platform guardrails including `platform-control-staffing.json`, the 542-case differential corpus |
+| `fixtures/` | `lending-eligibility.json` (the ported credit policy), platform guardrails including `platform-control-staffing.json` and specialized agent guardrails, the 542-case differential corpus |
 
 ## Build and test
 
@@ -58,7 +58,10 @@ cargo build
 ./target/debug/rules-fleet sign --kind platform --label platform-r1 \
   --effective "2026-07-01T00:00:00+05:30" --author a --approver b \
   --signing-key <hex32> --out /tmp/platform-bundle.json \
-  fixtures/guardrail-eligibility.json fixtures/guardrail-collections-contact.json
+  fixtures/guardrail-eligibility.json fixtures/guardrail-collections-contact.json \
+  fixtures/guardrail-agent-action.json fixtures/guardrail-data-access.json \
+  fixtures/guardrail-outbound-communication.json fixtures/guardrail-underwriting-influence.json \
+  fixtures/guardrail-case-mutation.json
 
 # 2. Fleet config + boot (see tools/rules-fleet for the config schema)
 ./target/debug/rules-fleet up --config fleet.json

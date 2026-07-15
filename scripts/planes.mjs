@@ -19,15 +19,28 @@ export const PLANE_ORDER = ['LOS', 'LMS', 'LWS', 'Compliance OS', 'Platform & Te
 export function parseRegister(md) {
   const start = md.indexOf('## Detailed Capability Register');
   const end = md.indexOf('## Product-Specific Capability Packs');
+  if (start < 0) throw new Error('Capability catalogue is missing the Detailed Capability Register heading.');
+  if (end < 0 || end <= start) throw new Error('Capability catalogue is missing the Product-Specific Capability Packs boundary.');
   const lines = md.slice(start, end > 0 ? end : undefined).split('\n');
   const categories = [];
   let cur = null;
   for (const line of lines) {
     const h = line.match(/^###\s+(\d+)\.\s+(.+)/);
-    if (h) { cur = { n: Number(h[1]), name: h[2].trim(), plane: PLANE[Number(h[1])] || 'Other', features: [] }; categories.push(cur); continue; }
+    if (h) {
+      const n = Number(h[1]);
+      if (!PLANE[n]) throw new Error(`Capability category ${n} has no product-plane mapping.`);
+      if (categories.some((category) => category.n === n)) throw new Error(`Duplicate capability category number: ${n}`);
+      cur = { n, name: h[2].trim(), plane: PLANE[n], features: [] };
+      categories.push(cur);
+      continue;
+    }
     const m = line.match(/^\|\s*([A-Z]{2,3}-\d{3})\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|$/);
     if (m && cur) cur.features.push({ id: m[1], name: m[2], applicability: m[3], rawStatus: m[4] });
   }
+  if (!categories.length) throw new Error('Capability catalogue register contains no categories.');
+  for (const category of categories) if (!category.features.length) throw new Error(`Capability category ${category.n} contains no capabilities.`);
+  const ids = categories.flatMap((category) => category.features.map((feature) => feature.id));
+  if (new Set(ids).size !== ids.length) throw new Error('Capability catalogue contains duplicate capability IDs.');
   return categories;
 }
 

@@ -45,7 +45,21 @@ Pricing values are non-negative integer strings. Currency is fixed to INR.
 | `per_execution_paise` | Per-authorized-execution rate |
 | `per_1k_input_tokens_paise` / `per_1k_output_tokens_paise` | Rounded-up thousand-token rates |
 
-The current usage record calculates the per-execution variable charge. Monthly fee posting, allowance offsets, GST invoicing, credits/refunds and accounting export are not implemented; the tenant billing integration remains external.
+The current usage record calculates the per-execution variable charge. An invoice uses the contract's monthly fee and included allowances before applying overage rates. Credits/refunds, accounting export, IRP/e-invoicing submission and payment reconciliation remain external integrations.
+
+### Budgets, quotas and invoice-ready records
+
+Budgets are tenant-local, opt-in hard controls. A commercial maker proposes `POST /ai/usage-budgets`; a different authenticated commercial checker approves `POST /ai/usage-budgets/{id}/approve`. A budget contains exact integer limits for executions, input tokens, output tokens and paise. When an in-period active budget applies, the runtime must first call `POST /ai/usage-budgets/reservations` with conservative maximum input/output tokens. The reservation includes the calculated maximum paise and expires after 15 minutes. Execution authorization requires its matching unexpired reservation; final metering refuses actual usage above it. This keeps the budget decision ahead of an external model charge.
+
+`POST /ai/invoices` creates a hash-sealed, tenant-local commercial record for one contract and billing period. It snapshots every usage ID and ledger record hash, applies included allowances and monthly platform fee deterministically, then calculates GST with integer paise and documented half-up rounding. The caller supplies GSTIN references and place-of-supply metadata; it never supplies tax totals. Intra-state records split the total GST between CGST and SGST (with any odd paise assigned deterministically to SGST); inter-state records use IGST. A separate authenticated checker approves `POST /ai/invoices/{id}/approve`.
+
+An approved record is deliberately marked `commercial_record_pending_tax_validation`: it is not a statutory tax invoice, an IRP submission, proof of supply, payment demand, credit note or GST return. Tenant finance and tax controls must validate tax determination, invoice numbering, e-invoicing applicability, accounting export, collections and reconciliation before issuing any legal document.
+
+### Demo mode
+
+Demo mode exercises the same authorized-execution, provider-boundary, completion, metering, budget, audit and reporting paths without a network model call. It is disabled by default and is enabled only with `LOANOS_AI_DEMO_MODE=true`. An already authorized execution may then call `POST /ai/agents/executions/{id}/demo-run` with one declared scenario: `standard`, `needs_human_review`, or `incomplete_evidence`.
+
+The deterministic demo provider accepts no raw borrower payload, emits only a proposal, always sets `simulated: true` and `commerciallyLive: false`, and produces fixed synthetic token usage. It cannot establish provider readiness, production activation, model quality, legal invoicing, regulatory compliance, or permission to process real borrower data. Demo tenants must use synthetic data and retain the normal tenant authorization, suspension, usage-budget and audit controls.
 
 ## 4. Installation and tenant customization
 
@@ -84,10 +98,11 @@ Activation uses `POST /ai/agents/installations/{id}/activate` with evidence refe
 1. installation is active and same tenant;
 2. pricing contract is active and in period;
 3. requested action is within the approved tenant subset;
-4. registered model is still active, validated, not kill-switched and still the exact pinned version;
-5. customer-facing execution includes an AI disclosure reference;
-6. the business engine returns `allow` for `guardrail.model_consumption` with model provenance;
-7. the business engine returns `allow` for `guardrail.agent_action` covering installation, tenant, action scope, proposal-only authority, human-control separation, India region and disclosure.
+4. when an active usage budget applies, a matching unexpired reservation is present;
+5. registered model is still active, validated, not kill-switched and still the exact pinned version;
+6. customer-facing execution includes an AI disclosure reference;
+7. the business engine returns `allow` for `guardrail.model_consumption` with model provenance;
+8. the business engine returns `allow` for `guardrail.agent_action` covering installation, tenant, action scope, proposal-only authority, human-control separation, India region and disclosure.
 
 Both decision traces and ruleset hashes are projected into the execution. Engine timeout, missing tenant routing, malformed response, unknown decision, missing trace or denial fails closed.
 
@@ -130,11 +145,11 @@ The control plane is not a production digital-worker runtime. Production admissi
 - approved Bedrock model/embedding endpoints and Strands/AgentCore proof in `ap-south-1`;
 - evidence that prompts, outputs, traces, evaluations, memory, backups and support paths remain in India;
 - workload IAM, VPC endpoints, network egress denial, KMS/HSM and secret custody;
-- specialized domain guardrails such as data access, communication dispatch, eligibility, collections and case mutation;
+- specialized domain guardrails are executable as platform-pack policy models for tenant-scoped data access/minimization, outbound communication, underwriting influence and case mutation; the future runtime adapter must call the applicable model before retrieval, dispatch or mutation. Collections contact is separately guarded today;
 - representative Indian-language, fairness, hallucination, injection, exfiltration, cross-tenant, excessive-agency and denial-of-wallet evaluation corpora;
 - continuous quality/drift/complaint/override monitoring and automated suspension thresholds;
 - marketplace and tenant-administration UI;
-- quota aggregation, invoice/GST/accounting integration and billing reconciliation;
+- credits/refunds, accounting/IRP/e-invoicing integration, tax validation and payment/billing reconciliation;
 - provider contracting, outsourcing due diligence, incident/BCP/DR, audit/RBI access, portability and exit evidence;
 - tenant UAT, independent model validation, risk/board approval and a witnessed kill-switch/fallback drill.
 

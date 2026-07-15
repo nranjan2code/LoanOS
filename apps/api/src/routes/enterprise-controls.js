@@ -8,6 +8,8 @@ import {
   createFederationPolicy,
   createWebhookSubscription,
   projectEnterprisePlatform,
+  pauseComposedJourneysForPrincipal,
+  pauseSpecialistCasesForPrincipal,
   proposeFederatedRevocationVerifier,
   queueWebhookDelivery,
   recordWebhookOutcome,
@@ -81,6 +83,8 @@ export async function routeEnterpriseTenantControls(context) {
       let principal = next.saasPrincipals?.[principalKey] ?? null;
       let staffingImpact = null;
       let escalations = [];
+      let pausedSpecialistCaseIds = [];
+      let pausedComposedJourneyIds = [];
       if (applied.event.operation === "upsert" && !principal) {
         const registered = registerSaasPrincipal(next, { tenantId: authContext.tenantId, principalId: applied.event.userId, principalType: "human", displayName: userResult.user.displayName, status: "active", emailVerified: true, mfaEnrolled: true, identityEvidenceRef: `scim:${applied.event.eventId}:${applied.event.evidenceChecksumSha256}` });
         next = registered.state;
@@ -92,6 +96,13 @@ export async function routeEnterpriseTenantControls(context) {
         principal = suspended.principal;
         staffingImpact = suspended.staffingImpact;
         escalations = suspended.escalations;
+        const causeRef = `scim:${applied.event.eventId}:${applied.event.evidenceChecksumSha256}`;
+        const specialist = pauseSpecialistCasesForPrincipal(next, { tenantId: authContext.tenantId, principalId: principal.principalId, actor: authActor(authContext), causeType: "identity_provider_deactivation", causeRef });
+        const composed = pauseComposedJourneysForPrincipal(specialist.state, { tenantId: authContext.tenantId, principalId: principal.principalId, actor: authActor(authContext), causeType: "identity_provider_deactivation", causeRef });
+        next = composed.state;
+        pausedSpecialistCaseIds = specialist.affectedCaseIds;
+        pausedComposedJourneyIds = composed.affectedLifecycleIds;
+        escalations = [...escalations, ...specialist.escalations, ...composed.escalations];
       }
       let revokedSessionIds = [];
       if (applied.event.operation === "deactivate") {
@@ -99,8 +110,8 @@ export async function routeEnterpriseTenantControls(context) {
         revokedSessionIds = revoked.revokedSessionIds;
         await stateRef.set({ ...stateRef.get(), controlPlane: { ...stateRef.get().controlPlane, sessions: revoked.sessions } });
       }
-      await store.save(appendEvent(next, { type: `identity.scim.${applied.event.operation}_applied`, eventId: applied.event.eventId, userId: applied.event.userId, policyId: applied.event.policyId, evidenceChecksumSha256: applied.event.evidenceChecksumSha256, requestedCanonicalRoleIds: applied.event.requestedCanonicalRoleIds, canonicalRoleDisposition: applied.event.canonicalRoleDisposition, staffingImpact, revokedSessionIds, actor: authActor(authContext) }));
-      sendJson(res, 201, { event: applied.event, user: userResult.user, principal, staffingImpact, escalations, revokedSessionIds });
+      await store.save(appendEvent(next, { type: `identity.scim.${applied.event.operation}_applied`, eventId: applied.event.eventId, userId: applied.event.userId, policyId: applied.event.policyId, evidenceChecksumSha256: applied.event.evidenceChecksumSha256, requestedCanonicalRoleIds: applied.event.requestedCanonicalRoleIds, canonicalRoleDisposition: applied.event.canonicalRoleDisposition, staffingImpact, pausedSpecialistCaseIds, pausedComposedJourneyIds, revokedSessionIds, actor: authActor(authContext) }));
+      sendJson(res, 201, { event: applied.event, user: userResult.user, principal, staffingImpact, escalations, pausedSpecialistCaseIds, pausedComposedJourneyIds, revokedSessionIds });
     } catch (error) { sendEnterpriseError(res, sendJson, error); } return true;
   }
   return false;
@@ -201,6 +212,8 @@ async function applyScimProtocolEvent(context, input) {
   let next = { ...state, users: userResult.users, scimEvents: applied.events };
   const principalKey = `${authContext.tenantId}:${applied.event.userId}`;
   let principal = next.saasPrincipals?.[principalKey] ?? null;
+  let pausedSpecialistCaseIds = [];
+  let pausedComposedJourneyIds = [];
   if (applied.event.operation === "upsert" && !principal) {
     const registered = registerSaasPrincipal(next, { tenantId: authContext.tenantId, principalId: applied.event.userId, principalType: "human", displayName: userResult.user.displayName, status: "active", emailVerified: true, mfaEnrolled: true, identityEvidenceRef: `scim:${applied.event.eventId}:${applied.event.evidenceChecksumSha256}` });
     next = registered.state; principal = registered.principal;
@@ -208,6 +221,12 @@ async function applyScimProtocolEvent(context, input) {
   if (applied.event.operation === "deactivate" && principal) {
     const suspended = suspendSaasPrincipalFromIdentityProvider(next, { tenantId: authContext.tenantId, principalId: principal.principalId, policyId: applied.event.policyId, evidenceRef: `scim:${applied.event.eventId}:${applied.event.evidenceChecksumSha256}` });
     next = suspended.state; principal = suspended.principal;
+    const causeRef = `scim:${applied.event.eventId}:${applied.event.evidenceChecksumSha256}`;
+    const specialist = pauseSpecialistCasesForPrincipal(next, { tenantId: authContext.tenantId, principalId: principal.principalId, actor: authActor(authContext), causeType: "identity_provider_deactivation", causeRef });
+    const composed = pauseComposedJourneysForPrincipal(specialist.state, { tenantId: authContext.tenantId, principalId: principal.principalId, actor: authActor(authContext), causeType: "identity_provider_deactivation", causeRef });
+    next = composed.state;
+    pausedSpecialistCaseIds = specialist.affectedCaseIds;
+    pausedComposedJourneyIds = composed.affectedLifecycleIds;
   }
   let revokedSessionIds = [];
   if (applied.event.operation === "deactivate") {
@@ -215,8 +234,8 @@ async function applyScimProtocolEvent(context, input) {
     revokedSessionIds = revoked.revokedSessionIds;
     await stateRef.set({ ...stateRef.get(), controlPlane: { ...stateRef.get().controlPlane, sessions: revoked.sessions } });
   }
-  await store.save(appendEvent(next, { type: `identity.scim.${applied.event.operation}_applied`, eventId: applied.event.eventId, userId: applied.event.userId, policyId: applied.event.policyId, evidenceChecksumSha256: applied.event.evidenceChecksumSha256, requestedCanonicalRoleIds: applied.event.requestedCanonicalRoleIds, canonicalRoleDisposition: applied.event.canonicalRoleDisposition, revokedSessionIds, actor: authActor(authContext) }));
-  return { event: applied.event, user: userResult.user, principal, revokedSessionIds, idempotent: false };
+  await store.save(appendEvent(next, { type: `identity.scim.${applied.event.operation}_applied`, eventId: applied.event.eventId, userId: applied.event.userId, policyId: applied.event.policyId, evidenceChecksumSha256: applied.event.evidenceChecksumSha256, requestedCanonicalRoleIds: applied.event.requestedCanonicalRoleIds, canonicalRoleDisposition: applied.event.canonicalRoleDisposition, pausedSpecialistCaseIds, pausedComposedJourneyIds, revokedSessionIds, actor: authActor(authContext) }));
+  return { event: applied.event, user: userResult.user, principal, pausedSpecialistCaseIds, pausedComposedJourneyIds, revokedSessionIds, idempotent: false };
 }
 
 function listResponse(resources) { return { schemas: ["urn:ietf:params:scim:api:messages:2.0:ListResponse"], totalResults: resources.length, startIndex: 1, itemsPerPage: resources.length, Resources: resources }; }

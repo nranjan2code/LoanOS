@@ -8,6 +8,8 @@ This index is the navigation root for LoanOS architecture. The current implement
 - [Current implementation map](current-implementation.md)
 - [Persistent specialist journey service](persistent-specialist-journey-service.md)
 - [Archetype journey workspaces](archetype-journey-workspaces.md)
+- [Composed product-journey lifecycle](composed-product-journey-lifecycle.md)
+- [LoanOS Guide and Academy](help-centre-and-academy.md)
 - [SaaS tenancy and operating model](saas-tenancy-and-operating-model.md)
 - [RE onboarding and product administration](re-tenant-onboarding-and-product-administration.md)
 - [PostgreSQL migration and RLS](postgres-migration.md)
@@ -18,6 +20,7 @@ This index is the navigation root for LoanOS architecture. The current implement
 
 - [Agentic AI digital workers on AWS](agentic-ai-digital-workers.md)
 - [AI-agent platform operations](ai-agent-platform-operations.md)
+- [Digital worker provider contract](digital-worker-provider-contract.md)
 
 ## Organisation admission and identity
 

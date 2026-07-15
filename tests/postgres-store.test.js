@@ -298,6 +298,44 @@ test("Postgres persists specialist journey cases under tenant RLS without cross-
   assert.equal(other.specialistJourneyCases?.[`${tenantId}:case-home`], undefined);
 });
 
+test("Postgres persists composed journey lifecycles under tenant RLS without cross-tenant visibility", { skip: describeSkip && skipReason }, async (t) => {
+  const pg = await import("pg");
+  const { Pool } = pg.default;
+  const adminPool = new Pool({ connectionString: DATABASE_URL_TEST });
+  t.after(() => adminPool.end());
+  await applySchema(adminPool);
+  await resetDatabase(adminPool);
+  for (const tenantId of ["tnt_composed_a", "tnt_composed_b"]) {
+    await adminPool.query(`INSERT INTO tenants (tenant_id, name, api_key_hash, onboarding) VALUES ($1, $2, $3, '{}'::jsonb)`, [tenantId, tenantId, "hash"]);
+  }
+  const postgresStore = await import("../apps/api/src/postgres-store.js");
+  const { createComposedJourneyInstance } = await import("../packages/core/src/composed-journey-lifecycle.js");
+  const { JOURNEY_WORKSPACE_SCHEMAS } = await import("../packages/core/src/journey-workspace.js");
+  const { PRODUCT_TEMPLATE_CATALOGUE } = await import("../packages/core/src/product-template-catalogue.js");
+  await postgresStore.resetPoolForTests(rewriteRole(DATABASE_URL_TEST, "loanos_control_plane"));
+  t.after(() => postgresStore.resetPoolForTests(DATABASE_URL_TEST));
+  const tenantId = "tnt_composed_a", H = "a".repeat(64), template = PRODUCT_TEMPLATE_CATALOGUE.personal_loan, schema = JOURNEY_WORKSPACE_SCHEMAS.term_lending;
+  let state = await postgresStore.loadTenantDataOnly("ignored", tenantId);
+  state.tenantProductSubscriptions = { "subscription-composed": { subscriptionId: "subscription-composed", tenantId, productTypes: ["personal_loan"], effectiveFrom: "2026-01-01T00:00:00.000Z", validUntil: "2030-01-01T00:00:00.000Z", status: "active" } };
+  const created = createComposedJourneyInstance(state, {
+    tenantId, lifecycleId: "lifecycle-postgres-1", journeyType: "personal_loan", subjectRef: "subject/synthetic-1", applicationRef: "application/synthetic-1", requestedAmountPaise: "10000", assignedPrincipalIds: ["maker", "checker"], idempotencyKey: "composed/postgres/1", createdBy: "maker",
+    lineage: {
+      productTemplateRef: template.templateId, productTemplateVersion: template.version, productTemplateChecksumSha256: template.templateChecksumSha256,
+      workspaceSchemaId: schema.schemaId, workspaceSchemaVersion: schema.schemaVersion, workspaceSchemaChecksumSha256: schema.schemaChecksumSha256,
+      policyBundleRef: "policy/personal/v1", policyBundleVersion: 1, policyBundleChecksumSha256: H,
+      workflowRef: "workflow/personal/v1", workflowVersion: 1, workflowChecksumSha256: H,
+      accountingPolicyRef: "accounting/personal/v1", accountingPolicyVersion: 1, accountingPolicyChecksumSha256: H,
+      tenantConfigurationRef: "tenant-config/v1", tenantConfigurationVersion: 1, tenantConfigurationChecksumSha256: H,
+      accessGrantSnapshotRef: "access/snapshot-1", accessGrantSnapshotChecksumSha256: H
+    }
+  }, "2026-07-15T06:30:00.000Z");
+  await postgresStore.saveTenantDataOnly("ignored", tenantId, created.state);
+  state = await postgresStore.loadTenantDataOnly("ignored", tenantId);
+  assert.equal(state.composedJourneyLifecycles["lifecycle-postgres-1"].currentStage, "application_capture");
+  const other = await postgresStore.loadTenantDataOnly("ignored", "tnt_composed_b");
+  assert.equal(other.composedJourneyLifecycles?.["lifecycle-postgres-1"], undefined);
+});
+
 test("storage.js with LOANOS_STORAGE_DRIVER=postgres serves a full multi-tenant API round-trip", { skip: describeSkip && skipReason }, async (t) => {
   const pg = await import("pg");
   const { Pool } = pg.default;

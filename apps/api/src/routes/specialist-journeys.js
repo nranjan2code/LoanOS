@@ -2,6 +2,7 @@ import {
   approveSpecialistJourneyAction,
   approveSpecialistJourneyConfiguration,
   openSpecialistJourneyCase,
+  pauseComposedJourneysForProduct,
   projectSpecialistJourneyWorkspace,
   proposeSpecialistJourneyAction,
   proposeSpecialistJourneyConfiguration,
@@ -44,6 +45,8 @@ export async function routeSpecialistJourneys(context) {
         eventType = "specialist_journey.configuration_approved"; status = 200;
       } else if (configurationSuspension) {
         result = suspendSpecialistJourneyConfiguration(state, { ...body, tenantId: tenant.tenantId, configurationId: configurationSuspension, actor });
+        const composed = pauseComposedJourneysForProduct(result.state, { tenantId: tenant.tenantId, journeyType: result.configuration.journeyType, actor, causeType: "specialist_configuration_suspended", causeRef: body.evidenceRef });
+        result = { ...result, state: composed.state, affectedLifecycleIds: composed.affectedLifecycleIds, composedJourneyEscalations: composed.escalations };
         eventType = "specialist_journey.configuration_suspended"; status = 200;
       } else if (path === `${PREFIX}/cases`) {
         result = openSpecialistJourneyCase(state, { ...body, tenantId: tenant.tenantId, openedBy: actor });
@@ -67,7 +70,7 @@ export async function routeSpecialistJourneys(context) {
 
 function auditEvent(type, actor, result) {
   const record = result.configuration ?? result.request ?? result.case ?? result.action;
-  return { type, actor, resourceId: record?.configurationId ?? record?.requestId ?? record?.caseId ?? record?.actionId, status: record?.status, evidenceChecksumSha256: record?.configurationChecksumSha256 ?? record?.requestChecksumSha256 ?? record?.caseChecksumSha256 ?? record?.actionChecksumSha256, affectedCaseIds: result.affectedCaseIds ?? undefined };
+  return { type, actor, resourceId: record?.configurationId ?? record?.requestId ?? record?.caseId ?? record?.actionId, status: record?.status, evidenceChecksumSha256: record?.configurationChecksumSha256 ?? record?.requestChecksumSha256 ?? record?.caseChecksumSha256 ?? record?.actionChecksumSha256, affectedCaseIds: result.affectedCaseIds ?? undefined, affectedLifecycleIds: result.affectedLifecycleIds ?? undefined };
 }
 function response(result) { const { state, ...body } = result; return body; }
 function match(path, prefix, suffix) { if (!path.startsWith(prefix) || !path.endsWith(suffix)) return null; const value = path.slice(prefix.length, -suffix.length); return value && !value.includes("/") ? decodeURIComponent(value) : null; }

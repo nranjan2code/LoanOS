@@ -5,6 +5,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createLoanOsServer } from "../apps/api/src/server.js";
 import { totpCode } from "../apps/api/src/identity.js";
+import { loadState, saveState } from "../apps/api/src/file-store.js";
+import { createComposedJourneyInstance } from "../packages/core/src/composed-journey-lifecycle.js";
+import { JOURNEY_WORKSPACE_SCHEMAS } from "../packages/core/src/journey-workspace.js";
+import { PRODUCT_TEMPLATE_CATALOGUE } from "../packages/core/src/product-template-catalogue.js";
 
 const TENANT = { tenantId: "tenant_verified_rbac", name: "Verified RBAC Bank", apiKey: "rbac-service-key", organisationSignupId: "signup_verified_rbac" };
 const MFA_SECRET = "JBSWY3DPEHPK3PXP";
@@ -35,6 +39,7 @@ test("canonical SaaS identity API binds verified users and enforces session-boun
   };
   const ownerCookie = await login("owner");
   const checkerCookie = await login("bootstrap-checker");
+  const adminCookie = await login("admin");
   const post = (path, body, cookie = ownerCookie) => fetch(`${base}${path}`, { method: "POST", headers: { "content-type": "application/json", cookie }, body: JSON.stringify(body) });
   const sync = (userId, body = {}) => post(`/admin/identity-governance/principals/${userId}/sync`, { identityEvidenceRef: `verified-user:${userId}`, ...body });
   const expiresAt = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString();
@@ -88,6 +93,31 @@ test("canonical SaaS identity API binds verified users and enforces session-boun
   assert.equal(transition.ownership.status, "active");
   assert.equal(transition.ownership.bootstrapCompletedBy, "owner");
   assert.equal(transition.ownership.bootstrapApprovedBy, "bootstrap-checker");
+
+  let persisted = await loadState(dataDir);
+  let tenantState = persisted.tenants[TENANT.tenantId];
+  const H = "a".repeat(64), template = PRODUCT_TEMPLATE_CATALOGUE.personal_loan, schema = JOURNEY_WORKSPACE_SCHEMAS.term_lending;
+  tenantState.tenantProductSubscriptions = { "subscription-rbac": { subscriptionId: "subscription-rbac", tenantId: TENANT.tenantId, productTypes: ["personal_loan"], effectiveFrom: "2026-01-01T00:00:00.000Z", validUntil: "2030-01-01T00:00:00.000Z", status: "active" } };
+  const lifecycle = createComposedJourneyInstance(tenantState, {
+    tenantId: TENANT.tenantId, lifecycleId: "lifecycle-rbac-1", journeyType: "personal_loan", subjectRef: "subject/synthetic-1", applicationRef: "application/synthetic-1", requestedAmountPaise: "10000", assignedPrincipalIds: ["credit-maker", "credit-checker"], idempotencyKey: "composed/rbac/1", createdBy: "credit-maker",
+    lineage: {
+      productTemplateRef: template.templateId, productTemplateVersion: template.version, productTemplateChecksumSha256: template.templateChecksumSha256,
+      workspaceSchemaId: schema.schemaId, workspaceSchemaVersion: schema.schemaVersion, workspaceSchemaChecksumSha256: schema.schemaChecksumSha256,
+      policyBundleRef: "policy/personal/v1", policyBundleVersion: 1, policyBundleChecksumSha256: H,
+      workflowRef: "workflow/personal/v1", workflowVersion: 1, workflowChecksumSha256: H,
+      accountingPolicyRef: "accounting/personal/v1", accountingPolicyVersion: 1, accountingPolicyChecksumSha256: H,
+      tenantConfigurationRef: "tenant-config/v1", tenantConfigurationVersion: 1, tenantConfigurationChecksumSha256: H,
+      accessGrantSnapshotRef: "access/snapshot-1", accessGrantSnapshotChecksumSha256: H
+    }
+  });
+  persisted.tenants[TENANT.tenantId] = lifecycle.state;
+  await saveState(persisted, dataDir);
+  response = await post("/admin/identity-governance/principals/credit-maker/status", { status: "suspended", reason: "access incident containment", evidenceRef: "incident/rbac-1" }, adminCookie);
+  assert.equal(response.status, 200, await response.clone().text());
+  const containment = await response.json();
+  assert.deepEqual(containment.pausedComposedJourneyIds, ["lifecycle-rbac-1"]);
+  persisted = await loadState(dataDir); tenantState = persisted.tenants[TENANT.tenantId];
+  assert.equal(tenantState.composedJourneyLifecycles["lifecycle-rbac-1"].status, "paused");
 
   response = await post("/activity/screen-events", { activityType: "screen_view", screenId: "staff.identity_governance", clientOccurredAt: new Date().toISOString() });
   assert.equal(response.status, 202, await response.clone().text());

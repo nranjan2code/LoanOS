@@ -1,0 +1,22 @@
+{
+  "key": "guardrail.case_mutation",
+  "bindings": [
+    { "name": "tenant_match", "path": "/mutation/tenant_match", "type": "bool", "required": true },
+    { "name": "case_in_scope", "path": "/mutation/case_in_scope", "type": "bool", "required": true },
+    { "name": "workflow_action_approved", "path": "/mutation/workflow_action_approved", "type": "bool", "required": true },
+    { "name": "proposal_only", "path": "/mutation/proposal_only", "type": "bool", "required": true },
+    { "name": "direct_write_attempt", "path": "/mutation/direct_write_attempt", "type": "bool", "required": true },
+    { "name": "human_approval_recorded", "path": "/mutation/human_approval_recorded", "type": "bool", "required": true }
+  ],
+  "expressions": [],
+  "findings": [
+    { "id": "case_mutation_tenant_mismatch", "when": ["not tenant_match"], "severity": "error", "code": "CASE_MUTATION_TENANT_MISMATCH", "regulation": "RBI-IT-23", "message": "The proposed case mutation crosses the tenant boundary.", "path": "mutation.tenant_match", "audience": "internal" },
+    { "id": "case_mutation_out_of_scope", "when": ["not case_in_scope"], "severity": "error", "code": "CASE_MUTATION_OUT_OF_SCOPE", "regulation": "RBI-IT-23", "message": "The case is outside the worker installation scope.", "path": "mutation.case_in_scope", "audience": "internal" },
+    { "id": "case_mutation_workflow_unapproved", "when": ["not workflow_action_approved"], "severity": "error", "code": "CASE_MUTATION_WORKFLOW_UNAPPROVED", "regulation": "RBI-DL-2025", "message": "The requested case workflow action is not approved.", "path": "mutation.workflow_action_approved", "audience": "tenant_ops" },
+    { "id": "case_mutation_not_proposal", "when": ["not proposal_only"], "severity": "error", "code": "CASE_MUTATION_PROPOSAL_ONLY", "regulation": "RBI-DL-2025", "message": "A digital worker may propose a case change but may not mutate the case directly.", "path": "mutation.proposal_only", "audience": "internal" },
+    { "id": "case_mutation_direct_write", "when": ["direct_write_attempt"], "severity": "error", "code": "CASE_MUTATION_DIRECT_WRITE_DENIED", "regulation": "RBI-IT-23", "message": "Direct case mutation by a digital worker is denied.", "path": "mutation.direct_write_attempt", "audience": "internal" },
+    { "id": "case_mutation_human_review", "when": ["not human_approval_recorded"], "severity": "warn", "code": "CASE_MUTATION_HUMAN_REVIEW_REQUIRED", "regulation": "MODEL-HUMAN-OVERSIGHT", "message": "A human must approve the proposed case change before a workflow performs it.", "path": "mutation.human_approval_recorded", "audience": "tenant_ops" }
+  ],
+  "outcome": "severity_fold",
+  "outputs": {}
+}

@@ -67,6 +67,31 @@ fn agent_action_guardrail() -> DecisionModel {
     .unwrap()
 }
 
+fn data_access_guardrail() -> DecisionModel {
+    serde_json::from_str(include_str!("../../../fixtures/guardrail-data-access.json")).unwrap()
+}
+
+fn outbound_communication_guardrail() -> DecisionModel {
+    serde_json::from_str(include_str!(
+        "../../../fixtures/guardrail-outbound-communication.json"
+    ))
+    .unwrap()
+}
+
+fn underwriting_influence_guardrail() -> DecisionModel {
+    serde_json::from_str(include_str!(
+        "../../../fixtures/guardrail-underwriting-influence.json"
+    ))
+    .unwrap()
+}
+
+fn case_mutation_guardrail() -> DecisionModel {
+    serde_json::from_str(include_str!(
+        "../../../fixtures/guardrail-case-mutation.json"
+    ))
+    .unwrap()
+}
+
 /// A model that emits reasons at every audience level, for INV-10 tests.
 fn audience_model() -> DecisionModel {
     let row = |id: &str, audience: Audience| FindingRow {
@@ -114,7 +139,14 @@ fn instance() -> (Arc<Instance>, MemAudit) {
             author: "a".into(),
             approver: "b".into(),
         },
-        models: vec![collections_guardrail(), agent_action_guardrail()],
+        models: vec![
+            collections_guardrail(),
+            agent_action_guardrail(),
+            data_access_guardrail(),
+            outbound_communication_guardrail(),
+            underwriting_influence_guardrail(),
+            case_mutation_guardrail(),
+        ],
     };
     let audit = MemAudit::default();
     let inst = Instance::new(
@@ -320,6 +352,149 @@ fn agent_action_guardrail_denies_decision_authority_and_allows_bounded_proposals
             ))
             .unwrap()
             .decision,
+        Outcome::Deny
+    );
+}
+
+#[test]
+fn specialized_agent_guardrails_are_tenant_scoped_and_fail_closed() {
+    let (instance, _) = instance();
+    let call = |key: &str, facts: serde_json::Value| {
+        instance
+            .handle(request(key, facts, serde_json::json!({})))
+            .unwrap()
+    };
+
+    let retrieval = |tenant_match: bool, minimized: bool, sensitive: bool, approved: bool| {
+        serde_json::json!({ "request": {
+            "tenant_match": tenant_match,
+            "purpose_approved": true,
+            "consent_required": true,
+            "consent_present": true,
+            "minimum_fields_only": minimized,
+            "sensitive_data": sensitive,
+            "human_approval_recorded": approved
+        }})
+    };
+    assert_eq!(
+        call("guardrail.data_access", retrieval(true, true, false, false)).decision,
+        Outcome::Allow
+    );
+    assert_eq!(
+        call(
+            "guardrail.data_access",
+            retrieval(false, true, false, false)
+        )
+        .decision,
+        Outcome::Deny
+    );
+    assert_eq!(
+        call(
+            "guardrail.data_access",
+            retrieval(true, false, false, false)
+        )
+        .decision,
+        Outcome::Deny
+    );
+    assert_eq!(
+        call("guardrail.data_access", retrieval(true, true, true, false)).decision,
+        Outcome::RequireHuman
+    );
+
+    let communication = |proposal_only: bool, human_approved: bool| {
+        serde_json::json!({
+            "communication": {
+                "tenant_match": true, "channel_approved": true,
+                "recipient_consent_present": true, "ai_disclosure_present": true,
+                "proposal_only": proposal_only, "human_approval_recorded": human_approved
+            }
+        })
+    };
+    assert_eq!(
+        call(
+            "guardrail.outbound_communication",
+            communication(true, false)
+        )
+        .decision,
+        Outcome::RequireHuman
+    );
+    assert_eq!(
+        call(
+            "guardrail.outbound_communication",
+            communication(false, true)
+        )
+        .decision,
+        Outcome::Deny
+    );
+    assert_eq!(
+        call(
+            "guardrail.outbound_communication",
+            communication(true, true)
+        )
+        .decision,
+        Outcome::Allow
+    );
+
+    let underwriting = |authority: bool, reviewed: bool| {
+        serde_json::json!({
+            "assessment": {
+                "tenant_match": true, "installation_approved": true, "proposal_only": true,
+                "attempts_decision_authority": authority, "influences_eligibility": true,
+                "human_reviewer_recorded": reviewed
+            }
+        })
+    };
+    assert_eq!(
+        call(
+            "guardrail.underwriting_influence",
+            underwriting(false, false)
+        )
+        .decision,
+        Outcome::RequireHuman
+    );
+    assert_eq!(
+        call("guardrail.underwriting_influence", underwriting(true, true)).decision,
+        Outcome::Deny
+    );
+    assert_eq!(
+        call(
+            "guardrail.underwriting_influence",
+            underwriting(false, true)
+        )
+        .decision,
+        Outcome::Allow
+    );
+
+    let mutation = |direct_write: bool, approved: bool| {
+        serde_json::json!({
+            "mutation": {
+                "tenant_match": true, "case_in_scope": true, "workflow_action_approved": true,
+                "proposal_only": true, "direct_write_attempt": direct_write,
+                "human_approval_recorded": approved
+            }
+        })
+    };
+    assert_eq!(
+        call("guardrail.case_mutation", mutation(false, false)).decision,
+        Outcome::RequireHuman
+    );
+    assert_eq!(
+        call("guardrail.case_mutation", mutation(true, true)).decision,
+        Outcome::Deny
+    );
+    assert_eq!(
+        call("guardrail.case_mutation", mutation(false, true)).decision,
+        Outcome::Allow
+    );
+
+    // Required facts are intentionally non-optional: malformed retrieval
+    // input must fail closed rather than silently exposing a wider record.
+    assert_eq!(
+        call(
+            "guardrail.data_access",
+            serde_json::json!({ "request": {} })
+        )
+        .decision,
         Outcome::Deny
     );
 }
