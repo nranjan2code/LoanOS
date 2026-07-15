@@ -5,7 +5,7 @@ LoanOS is a multi-tenant, RBI-compliance-first lending platform (LOS + LMS + LWS
 ## Architecture in one view
 
 ```
-apps/web, apps/tenant, apps/customer, apps/dashboard, apps/help   static frontends
+apps/web, apps/tenant, apps/customer, apps/dashboard, apps/help, apps/android-field-ops, apps/android-dsa-ops   frontends & Android apps
 apps/api          Node HTTP API (no framework), multi-tenant, session/API-key auth
 packages/core     domain kernel: compliance controls, KYC, KFS, loan policy,
                   audit hash chain, model governance (kill-switch source of truth)

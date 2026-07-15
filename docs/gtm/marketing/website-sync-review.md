@@ -1,4 +1,4 @@
-# Website Sync Review — `apps/web` (loanos.in)
+# Website Sync Review — `apps/web` (aitailorworkshop.in)
 
 Assessment of the internet-facing marketing site against the new GTM messaging
 house, claims-discipline matrix, and brand guide. Scope: `apps/web/` (home,

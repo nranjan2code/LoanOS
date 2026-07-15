@@ -1,8 +1,8 @@
 {
   "schemaVersion": 2,
-  "generated": "2026-07-15T07:18:32.637Z",
-  "sourceDigest": "7099b73fdc22fbef",
-  "snapshotId": "7f2ac8d2963fb0e5",
+  "generated": "2026-07-15T16:58:50.343Z",
+  "sourceDigest": "e1b2c35e4dff7e68",
+  "snapshotId": "dfbca7c4d8991f8e",
   "sources": {
     "catalogue": "docs/product/complete-system-capability-catalog.md",
     "trace": "docs/product/capability-trace.json",
@@ -12,70 +12,70 @@
   },
   "git": {
     "branch": "main",
-    "sha": "d19963f7f0b2",
-    "count": 196,
+    "sha": "e25c3646b77e",
+    "count": 204,
     "dirty": true,
-    "changeCount": 15,
+    "changeCount": 78,
     "commits": [
+      {
+        "hash": "e25c364",
+        "subject": "feat(demo): update dashboards, portals, and showcase persona documentation",
+        "when": "32 minutes ago"
+      },
+      {
+        "hash": "28f7385",
+        "subject": "fix(demo): align platform admin bootstrap credential",
+        "when": "4 hours ago"
+      },
+      {
+        "hash": "4a5f6d6",
+        "subject": "fix(demo): simplify one-command AWS release",
+        "when": "5 hours ago"
+      },
+      {
+        "hash": "3e03637",
+        "subject": "feat(demo): govern and automate platform showcases",
+        "when": "8 hours ago"
+      },
+      {
+        "hash": "935a8ed",
+        "subject": "fix(web): remove academy from public site",
+        "when": "9 hours ago"
+      },
+      {
+        "hash": "6b04df0",
+        "subject": "fix(web): clean up homepage disclosure links",
+        "when": "9 hours ago"
+      },
+      {
+        "hash": "ca1816b",
+        "subject": "feat(web): rebuild public homepage experience",
+        "when": "9 hours ago"
+      },
+      {
+        "hash": "0293d31",
+        "subject": "feat(delivery): govern human and AI releases",
+        "when": "10 hours ago"
+      },
       {
         "hash": "d19963f",
         "subject": "feat(all): merge and commit all changes, including untracked files",
-        "when": "13 minutes ago"
+        "when": "10 hours ago"
       },
       {
         "hash": "0c03597",
         "subject": "feat(journeys): add archetype channel workspaces",
-        "when": "59 minutes ago"
+        "when": "11 hours ago"
       },
       {
         "hash": "23a5848",
         "subject": "feat(journeys): persist specialist lending operations",
-        "when": "87 minutes ago"
+        "when": "11 hours ago"
       },
       {
         "hash": "17ab3a2",
         "subject": "feat(product): add 21-journey conformance control plane",
-        "when": "2 hours ago"
-      },
-      {
-        "hash": "df417de",
-        "subject": "feat(identity-worker): integrate identity operations worker runtime and update documentation",
-        "when": "3 hours ago"
-      },
-      {
-        "hash": "2f0f3d0",
-        "subject": "feat(ai-agents): add governed tenant worker platform",
-        "when": "3 hours ago"
-      },
-      {
-        "hash": "c88d6e9",
-        "subject": "feat(platform): close persistent activation operations bundle",
-        "when": "4 hours ago"
-      },
-      {
-        "hash": "768e426",
-        "subject": "feat(web): unify public site design system",
-        "when": "4 hours ago"
-      },
-      {
-        "hash": "8f2d000",
-        "subject": "feat(identity): complete platform operations conformance",
-        "when": "4 hours ago"
-      },
-      {
-        "hash": "5ae4e21",
-        "subject": "feat(identity): add tenant operations and conformance lab",
-        "when": "5 hours ago"
-      },
-      {
-        "hash": "f9a7f90",
-        "subject": "feat(identity): harden federation and universal access control",
-        "when": "5 hours ago"
-      },
-      {
-        "hash": "061c783",
-        "subject": "feat(identity): enforce tenant staffing and actor attribution",
-        "when": "9 hours ago"
+        "when": "11 hours ago"
       }
     ]
   },
@@ -25416,7 +25416,7 @@
     "cancelled": 0,
     "todo": 0,
     "total": 638,
-    "durationMs": 22471,
+    "durationMs": 21531.153292,
     "ran": true,
     "source": "provided-log",
     "error": ""

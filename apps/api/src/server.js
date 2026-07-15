@@ -8,6 +8,7 @@ import { routeImplementationControls } from "./routes/implementation-controls.js
 import { routeInstitutionalOperations } from "./routes/institutional-operations.js";
 import { routeCustomerChannelControls } from "./routes/customer-channel-controls.js";
 import { routeCompletionControls } from "./routes/completion-controls.js";
+import { routeCustomerExperienceCompletion } from "./routes/customer-experience-completion.js";
 import { routeCersaiSearch } from "./routes/cersai-search.js";
 import { routeSaasIdentityGovernance } from "./routes/saas-identity-governance.js";
 import { routeAccessActivityCustody } from "./routes/access-activity-custody.js";
@@ -1310,6 +1311,7 @@ async function route(req, res, dataDir, platformAdminKey, observability, allowDi
   if (await routeInstitutionalOperations({ method, path, req, res, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
   if (await routeCustomerChannelControls({ method, path, req, res, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
   if (await routeCompletionControls({ method, path, req, res, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
+  if (await routeCustomerExperienceCompletion({ method, path, req, res, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
   if (await routeAiAgentPlatform({ method, path, req, res, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
 
   // Standing sub-processor disclosure: every authenticated tenant RE can read

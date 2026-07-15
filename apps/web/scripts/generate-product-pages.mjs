@@ -64,11 +64,11 @@ function productPage(product) {
   const stages = journey.stages;
   const schema = JSON.stringify({
     '@context': 'https://schema.org', '@type': 'WebPage', name: `${product.name} journey | LoanOS India`,
-    description: product.description, url: `https://loanos.in/loan-types/${product.slug}/`,
+    description: product.description, url: `https://aitailorworkshop.in/loan-types/${product.slug}/`,
     breadcrumb: { '@type': 'BreadcrumbList', itemListElement: [
-      { '@type': 'ListItem', position: 1, name: 'LoanOS India', item: 'https://loanos.in/' },
-      { '@type': 'ListItem', position: 2, name: 'Loan and product library', item: 'https://loanos.in/loan-types/' },
-      { '@type': 'ListItem', position: 3, name: product.name, item: `https://loanos.in/loan-types/${product.slug}/` }
+      { '@type': 'ListItem', position: 1, name: 'LoanOS India', item: 'https://aitailorworkshop.in/' },
+      { '@type': 'ListItem', position: 2, name: 'Loan and product library', item: 'https://aitailorworkshop.in/loan-types/' },
+      { '@type': 'ListItem', position: 3, name: product.name, item: `https://aitailorworkshop.in/loan-types/${product.slug}/` }
     ] }
   }).replace(/</g, '\\u003c');
   return `<!doctype html>
@@ -76,8 +76,8 @@ function productPage(product) {
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" href="/assets/loanos-logo-mark.png" type="image/svg+xml">
   <title>${escape(product.name)} journey | LoanOS India</title>
   <meta name="description" content="${escape(product.description)} Explore the people, controls, evidence and servicing pattern LoanOS can help institutions configure.">
-  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1"><link rel="canonical" href="https://loanos.in/loan-types/${product.slug}/">
-  <meta property="og:type" content="website"><meta property="og:title" content="${escape(product.name)} journey | LoanOS India"><meta property="og:description" content="${escape(product.description)}"><meta property="og:url" content="https://loanos.in/loan-types/${product.slug}/"><meta property="og:site_name" content="LoanOS India"><meta property="og:image" content="https://loanos.in/assets/images/products/${product.slug}.jpg"><meta name="twitter:card" content="summary_large_image">
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1"><link rel="canonical" href="https://aitailorworkshop.in/loan-types/${product.slug}/">
+  <meta property="og:type" content="website"><meta property="og:title" content="${escape(product.name)} journey | LoanOS India"><meta property="og:description" content="${escape(product.description)}"><meta property="og:url" content="https://aitailorworkshop.in/loan-types/${product.slug}/"><meta property="og:site_name" content="LoanOS India"><meta property="og:image" content="https://aitailorworkshop.in/assets/images/products/${product.slug}.jpg"><meta name="twitter:card" content="summary_large_image">
   <meta name="theme-color" content="#123e32"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet"><link rel="stylesheet" href="/assets/site.css?v=13">
   <script type="application/ld+json">${schema}</script>
 </head><body><div data-site-header></div><main id="main">
@@ -106,6 +106,6 @@ catalogue = catalogue.replace('site.css?v=6', 'site.css?v=13').replace('site.js?
 fs.writeFileSync(cataloguePath, catalogue);
 
 const sitemap = ['/', '/platform/', '/financial-institutions/', '/for-msmes/', '/partners/', '/loan-types/', '/trust/', '/resources/', ...products.map(product => `/loan-types/${product.slug}/`)];
-fs.writeFileSync(path.join(webRoot, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${sitemap.map(url => `  <url><loc>https://loanos.in${url}</loc></url>`).join('\n')}\n</urlset>\n`);
+fs.writeFileSync(path.join(webRoot, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${sitemap.map(url => `  <url><loc>https://aitailorworkshop.in${url}</loc></url>`).join('\n')}\n</urlset>\n`);
 
 console.log(`Generated ${products.length} product pages.`);

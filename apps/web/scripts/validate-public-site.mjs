@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const webRoot = path.resolve(scriptDir, '..');
-const siteRoot = 'https://loanos.in';
+const siteRoot = 'https://aitailorworkshop.in';
 const contactEmail = 'hello@aitailorworkshop.in';
 const stylesheetVersion = 13;
 const errors = [];

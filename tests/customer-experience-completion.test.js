@@ -42,3 +42,21 @@ test("encrypted offline queue rejects plaintext, replay and expiry and surfaces 
   assert.throws(() => reconcileEncryptedOfflineWork(envelope, { tenantId: "tenant-a", currentVersion: "4", reconciledBy: "sync-worker", evidenceRef: "x" }, [applied], NOW), (error) => error.code === "offline_idempotency_replay");
   assert.throws(() => reconcileEncryptedOfflineWork({ ...envelope, expiresAt: NOW.toISOString() }, { tenantId: "tenant-a", currentVersion: "4", reconciledBy: "sync-worker", evidenceRef: "x" }, [], NOW), (error) => error.code === "offline_envelope_expired");
 });
+
+test("offline queue rejects invalid device state or tenant mismatches", () => {
+  const ciphertext = "base64:ciphertext-only";
+  const input = { tenantId: "tenant-a", envelopeId: "env-1", idempotencyKey: "idem-1", aggregateType: "lead", aggregateId: "lead-1", baseVersion: "4", ciphertext, ciphertextSha256: sum(ciphertext), keyId: "kms://field/1", algorithm: "AES-256-GCM", nonce: "nonce-value", authTag: "auth-tag", createdBy: "officer-1", expiresAt: "2026-07-16T10:00:00.000Z" };
+  
+  // 1. Rejects if device is not certified (status is not 'certified')
+  const uncertifiedDevice = { ...device(), status: "revoked" };
+  assert.throws(() => enqueueEncryptedOfflineWork(uncertifiedDevice, input, [], NOW), (error) => error.code === "device_not_certified");
+
+  // 2. Rejects if device certification is expired
+  const expiredDevice = { ...device(), expiresAt: NOW.toISOString() };
+  assert.throws(() => enqueueEncryptedOfflineWork(expiredDevice, input, [], NOW), (error) => error.code === "device_not_certified");
+
+  // 3. Rejects if tenant mismatch between device and envelope
+  const wrongTenantInput = { ...input, tenantId: "tenant-b" };
+  assert.throws(() => enqueueEncryptedOfflineWork(device(), wrongTenantInput, [], NOW), (error) => error.code === "experience_tenant_mismatch");
+});
+

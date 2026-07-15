@@ -9,7 +9,7 @@ not drift.
 ## Brand essence
 
 - **Name:** LoanOS India
-- **Domain / contact:** loanos.in · hello@aitailorworkshop.in
+- **Domain / contact:** aitailorworkshop.in · hello@aitailorworkshop.in
 - **Descriptor:** India-first lending lifecycle SaaS (LOS · LMS · Workflow ·
   Compliance control)
 - **Essence in one line:** *Accountable by construction.* Operational speed with
