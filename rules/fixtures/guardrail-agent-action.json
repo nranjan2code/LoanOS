@@ -1,0 +1,25 @@
+{
+  "key": "guardrail.agent_action",
+  "bindings": [
+    { "name": "installation_active", "path": "/installation/active", "type": "bool", "required": true },
+    { "name": "tenant_match", "path": "/installation/tenant_match", "type": "bool", "required": true },
+    { "name": "action_approved", "path": "/action/approved", "type": "bool", "required": true },
+    { "name": "proposal_only", "path": "/action/proposal_only", "type": "bool", "required": true },
+    { "name": "human_control_attempt", "path": "/action/human_control_attempt", "type": "bool", "required": true },
+    { "name": "india_region", "path": "/data/india_region", "type": "bool", "required": true },
+    { "name": "customer_facing", "path": "/customer/customer_facing", "type": "bool", "required": true },
+    { "name": "disclosure_present", "path": "/customer/disclosure_present", "type": "bool", "required": true }
+  ],
+  "expressions": [],
+  "findings": [
+    { "id": "agent_installation_inactive", "when": ["not installation_active"], "severity": "error", "code": "AGENT_INSTALLATION_INACTIVE", "regulation": "RBI-IT-23", "message": "The tenant agent installation is not active.", "path": "installation.active", "audience": "internal" },
+    { "id": "agent_tenant_mismatch", "when": ["not tenant_match"], "severity": "error", "code": "AGENT_TENANT_MISMATCH", "regulation": "RBI-IT-23", "message": "Agent execution is outside its tenant boundary.", "path": "installation.tenant_match", "audience": "internal" },
+    { "id": "agent_action_unapproved", "when": ["not action_approved"], "severity": "error", "code": "AGENT_ACTION_UNAPPROVED", "regulation": "RBI-IT-23", "message": "Requested action is outside the approved tenant customization.", "path": "action.approved", "audience": "internal" },
+    { "id": "agent_decision_authority", "when": ["not proposal_only"], "severity": "error", "code": "AGENT_DECISION_AUTHORITY_DENIED", "regulation": "RBI-DL-2025", "message": "Digital workers may produce proposals but may not exercise lending decision authority.", "path": "action.proposal_only", "audience": "internal" },
+    { "id": "agent_human_control", "when": ["human_control_attempt"], "severity": "error", "code": "AGENT_HUMAN_CONTROL_DENIED", "regulation": "RBI-IT-23", "message": "An agent may not author, approve, revoke or staff a human control.", "path": "action.human_control_attempt", "audience": "internal" },
+    { "id": "agent_data_region", "when": ["not india_region"], "severity": "error", "code": "AGENT_DATA_REGION_DENIED", "regulation": "RBI-DL-2025", "message": "Regulated agent data must remain in the approved India region.", "path": "data.india_region", "audience": "internal" },
+    { "id": "agent_disclosure", "when": ["customer_facing", "not disclosure_present"], "severity": "error", "code": "AGENT_DISCLOSURE_REQUIRED", "regulation": "FREE-AI-2025", "message": "Customer-facing AI requires disclosure and human handoff capability.", "path": "customer.disclosure_present", "audience": "borrower" }
+  ],
+  "outcome": "severity_fold",
+  "outputs": {}
+}

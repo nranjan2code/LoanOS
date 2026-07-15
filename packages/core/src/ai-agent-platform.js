@@ -1,0 +1,208 @@
+import { createHash } from "node:crypto";
+import { evaluateModelUse } from "./model-governance.js";
+
+const IST_REGION = "ap-south-1";
+const APPROVAL_ROLES = Object.freeze(["model_owner", "model_validator", "human_reviewer", "model_risk_manager"]);
+const REQUIRED_EVIDENCE = Object.freeze(["riskAssessmentRef", "independentValidationRef", "fairnessAssessmentRef", "explainabilityRef", "redTeamRef", "monitoringPlanRef", "incidentRunbookRef", "indiaResidencyRef"]);
+
+export const AI_AGENT_MARKETPLACE_TEMPLATES = Object.freeze({
+  "credit.cam": template("credit.cam", "CAM preparation worker", "credit", "A1", ["cam.draft", "evidence.gap_list"], ["guardrail.model_consumption", "guardrail.agent_action"], false),
+  "credit.underwriting_review": template("credit.underwriting_review", "Underwriting review worker", "credit", "A1", ["underwriting.memo_draft", "policy.exception_list"], ["guardrail.model_consumption", "guardrail.agent_action"], false),
+  "operations.loan_fulfilment": template("operations.loan_fulfilment", "Loan fulfilment worker", "operations", "A2", ["document.request_draft", "workflow.task_draft", "checklist.update_draft"], ["guardrail.model_consumption", "guardrail.agent_action"], false),
+  "service.borrower_support": template("service.borrower_support", "Borrower support worker", "service", "A2", ["response.draft", "handoff.create"], ["guardrail.model_consumption", "guardrail.agent_action"], true)
+});
+
+export const AI_AGENT_PRICING_DIMENSIONS = Object.freeze([
+  "monthly_platform_fee_paise", "included_executions", "included_input_tokens", "included_output_tokens",
+  "per_execution_paise", "per_1k_input_tokens_paise", "per_1k_output_tokens_paise"
+]);
+
+export function createAiAgentPlatformState() {
+  return { pricingContracts: {}, installations: {}, executions: {}, usageLedger: {}, events: [] };
+}
+
+export function normalizeAiAgentPlatformState(state) {
+  const empty = createAiAgentPlatformState();
+  return state && typeof state === "object" ? {
+    pricingContracts: state.pricingContracts ?? {}, installations: state.installations ?? {},
+    executions: state.executions ?? {}, usageLedger: state.usageLedger ?? {},
+    events: Array.isArray(state.events) ? state.events : []
+  } : empty;
+}
+
+export function projectAiAgentMarketplace() {
+  return {
+    catalogueVersion: 1,
+    commercialization: "tenant_contract_required",
+    currency: "INR",
+    pricingDimensions: AI_AGENT_PRICING_DIMENSIONS,
+    templates: Object.values(AI_AGENT_MARKETPLACE_TEMPLATES)
+  };
+}
+
+export function proposeAiAgentPricingContract(state, input, now = new Date()) {
+  const platform = normalizeAiAgentPlatformState(state);
+  required(input, ["contractId", "tenantId", "effectiveFrom", "validUntil", "proposedBy"]);
+  if (platform.pricingContracts[input.contractId]) fail("ai_agent_pricing_contract_exists", "Pricing contract already exists.", 409);
+  const templateIds = unique(input.templateIds);
+  if (!templateIds.length || templateIds.some((id) => !AI_AGENT_MARKETPLACE_TEMPLATES[id])) fail("ai_agent_template_invalid", "Pricing contract contains an unknown marketplace template.");
+  const pricing = Object.fromEntries(AI_AGENT_PRICING_DIMENSIONS.map((key) => [key, integerString(input.pricing?.[key] ?? "0", `pricing.${key}`)]));
+  const contract = seal({ contractId: input.contractId, tenantId: input.tenantId, templateIds, currency: "INR", pricing, effectiveFrom: iso(input.effectiveFrom), validUntil: iso(input.validUntil), proposedBy: input.proposedBy, approvedBy: null, commercialApprovalRef: null, status: "pending_approval", createdAt: now.toISOString() });
+  if (Date.parse(contract.validUntil) <= Date.parse(contract.effectiveFrom)) fail("ai_agent_pricing_period_invalid", "Pricing contract validUntil must be after effectiveFrom.");
+  return result(platform, "pricingContracts", contract.contractId, contract, "ai_agent.pricing_contract_proposed", now);
+}
+
+export function approveAiAgentPricingContract(state, input, now = new Date()) {
+  const platform = normalizeAiAgentPlatformState(state);
+  required(input, ["contractId", "tenantId", "approvedBy", "commercialApprovalRef"]);
+  const contract = tenantRecord(platform.pricingContracts[input.contractId], input.tenantId, "ai_agent_pricing_contract_invalid");
+  if (contract.status !== "pending_approval") fail("ai_agent_pricing_contract_not_pending", "Pricing contract is not pending approval.", 409);
+  independent(contract.proposedBy, input.approvedBy, "ai_agent_pricing_self_approval");
+  const approved = seal({ ...contract, status: "active", approvedBy: input.approvedBy, commercialApprovalRef: input.commercialApprovalRef, approvedAt: now.toISOString() });
+  return result(platform, "pricingContracts", approved.contractId, approved, "ai_agent.pricing_contract_approved", now);
+}
+
+export function installTenantAiAgent(state, modelRegistry, input, now = new Date()) {
+  const platform = normalizeAiAgentPlatformState(state);
+  required(input, ["installationId", "tenantId", "templateId", "contractId", "modelId", "modelVersion", "workloadPrincipalId", "humanSponsorPrincipalId", "promptRef", "promptHash", "configurationRef", "proposedBy"]);
+  if (platform.installations[input.installationId]) fail("ai_agent_installation_exists", "Agent installation already exists.", 409);
+  const templateDef = AI_AGENT_MARKETPLACE_TEMPLATES[input.templateId];
+  if (!templateDef) fail("ai_agent_template_invalid", "Unknown marketplace agent template.");
+  const contract = platform.pricingContracts[input.contractId];
+  tenantRecord(contract, input.tenantId, "ai_agent_pricing_contract_invalid");
+  if (contract.status !== "active" || !contract.templateIds.includes(input.templateId)) fail("ai_agent_not_entitled", "Pricing contract does not entitle this agent template.", 403);
+  if (now.getTime() < Date.parse(contract.effectiveFrom) || now.getTime() > Date.parse(contract.validUntil)) fail("ai_agent_pricing_contract_inactive", "Pricing contract is outside its effective period.", 403);
+  if (!/^[a-f0-9]{64}$/i.test(input.promptHash)) fail("ai_agent_prompt_hash_invalid", "promptHash must be SHA-256 hex.");
+  const modelUse = evaluateModelUse(modelRegistry, { modelId: input.modelId });
+  if (!modelUse.allowed) fail("ai_agent_model_not_usable", "The pinned model is not approved for use.", 409, { findings: modelUse.findings });
+  if (String(modelUse.model.version) !== String(input.modelVersion)) fail("ai_agent_model_version_mismatch", "Installation must pin the exact registered model version.", 409);
+  const actions = unique(input.allowedActions ?? templateDef.allowedActions);
+  if (actions.some((action) => !templateDef.allowedActions.includes(action))) fail("ai_agent_action_scope_expanded", "Tenant customization cannot expand marketplace action scope.");
+  const installation = seal({
+    installationId: input.installationId, tenantId: input.tenantId, templateId: input.templateId, templateVersion: templateDef.version,
+    contractId: input.contractId, modelId: input.modelId, modelVersion: String(input.modelVersion), workloadPrincipalId: input.workloadPrincipalId,
+    humanSponsorPrincipalId: input.humanSponsorPrincipalId, autonomy: templateDef.maximumAutonomy, allowedActions: actions,
+    languages: unique(input.languages ?? ["en-IN"]), productTypes: unique(input.productTypes ?? []), dataScopes: unique(input.dataScopes ?? []),
+    promptRef: input.promptRef, promptHash: input.promptHash.toLowerCase(), configurationRef: input.configurationRef,
+    knowledgeSources: normalizeKnowledge(input.knowledgeSources), memoryMode: "execution_scoped", dataRegion: IST_REGION,
+    requiredGuardrails: templateDef.requiredGuardrails, customerFacing: templateDef.customerFacing, status: "pending_approval",
+    proposedBy: input.proposedBy, approvedByRole: {}, governanceEvidence: {}, activationControl: null, createdAt: now.toISOString(), activatedAt: null
+  });
+  return result(platform, "installations", installation.installationId, installation, "ai_agent.installation_proposed", now);
+}
+
+export function activateTenantAiAgent(state, modelRegistry, input, now = new Date()) {
+  const platform = normalizeAiAgentPlatformState(state);
+  required(input, ["installationId", "tenantId", "governanceEvidence", "controlDecision"]);
+  const installation = tenantRecord(platform.installations[input.installationId], input.tenantId, "ai_agent_installation_missing");
+  if (installation.status !== "pending_approval") fail("ai_agent_installation_not_pending", "Only a pending installation can be activated.", 409);
+  const modelUse = evaluateModelUse(modelRegistry, { modelId: installation.modelId, customerDisclosureRef: input.governanceEvidence.customerDisclosureRef });
+  if (!modelUse.allowed) fail("ai_agent_model_not_usable", "The pinned model is not approved for use.", 409, { findings: modelUse.findings });
+  if (String(modelUse.model.version) !== installation.modelVersion) fail("ai_agent_model_version_mismatch", "The registered model version no longer matches the approved installation.", 409);
+  const approvals = validateApprovals(installation.approvedByRole, installation.proposedBy);
+  required(input.governanceEvidence, REQUIRED_EVIDENCE);
+  trustedDecision(input.controlDecision, "allow", "ai_agent_activation_control_denied");
+  const activated = seal({ ...installation, status: "active", approvedByRole: approvals, governanceEvidence: input.governanceEvidence, activationControl: decisionProjection(input.controlDecision), activatedAt: now.toISOString(), updatedAt: now.toISOString() });
+  return result(platform, "installations", activated.installationId, activated, "ai_agent.installation_activated", now);
+}
+
+export function recordTenantAiAgentApproval(state, input, now = new Date()) {
+  const platform = normalizeAiAgentPlatformState(state);
+  required(input, ["installationId", "tenantId", "role", "principalId", "principalType", "approvalRef"]);
+  if (input.principalType !== "human") fail("ai_agent_human_approval_required", "AI production approval must be performed by a human principal.", 403);
+  if (!APPROVAL_ROLES.includes(input.role)) fail("ai_agent_approval_role_invalid", "Approval role is not part of FST-034.");
+  const installation = tenantRecord(platform.installations[input.installationId], input.tenantId, "ai_agent_installation_missing");
+  if (installation.status !== "pending_approval") fail("ai_agent_installation_not_pending", "Only a pending installation may be approved.", 409);
+  if (installation.proposedBy === input.principalId) fail("ai_agent_proposer_cannot_approve", "The proposer cannot approve production activation.");
+  const existing = installation.approvedByRole ?? {};
+  if (existing[input.role]) fail("ai_agent_approval_role_already_recorded", "This approval role is already recorded.", 409);
+  if (Object.values(existing).some((approval) => approval.principalId === input.principalId)) fail("ai_agent_approval_independence_required", "Each approval role requires a distinct human principal.");
+  const approved = seal({ ...installation, approvedByRole: { ...existing, [input.role]: { principalId: input.principalId, approvalRef: input.approvalRef } }, updatedAt: now.toISOString() });
+  return result(platform, "installations", approved.installationId, approved, "ai_agent.installation_approval_recorded", now);
+}
+
+export function authorizeAiAgentExecution(state, modelRegistry, input, now = new Date()) {
+  const platform = normalizeAiAgentPlatformState(state);
+  required(input, ["executionId", "tenantId", "installationId", "action", "purpose", "inputRef", "inputHash", "modelConsumptionDecision", "actionGuardrailDecision"]);
+  if (platform.executions[input.executionId]) fail("ai_agent_execution_exists", "Execution ID already exists.", 409);
+  const installation = tenantRecord(platform.installations[input.installationId], input.tenantId, "ai_agent_installation_missing");
+  if (installation.status !== "active") fail("ai_agent_installation_inactive", "Agent installation is not active.", 409);
+  const contract = tenantRecord(platform.pricingContracts[installation.contractId], input.tenantId, "ai_agent_pricing_contract_invalid");
+  if (contract.status !== "active" || now.getTime() < Date.parse(contract.effectiveFrom) || now.getTime() > Date.parse(contract.validUntil)) fail("ai_agent_pricing_contract_inactive", "Agent execution requires a current active pricing contract.", 403);
+  if (!installation.allowedActions.includes(input.action)) fail("ai_agent_action_not_allowed", "Requested action is outside the approved customization.", 403);
+  if (!/^[a-f0-9]{64}$/i.test(input.inputHash)) fail("ai_agent_input_hash_invalid", "inputHash must be SHA-256 hex.");
+  const modelUse = evaluateModelUse(modelRegistry, { modelId: installation.modelId, humanReviewRef: input.humanReviewRef, customerDisclosureRef: input.customerDisclosureRef });
+  if (!modelUse.allowed) fail("ai_agent_model_not_usable", "Model use is blocked by governance or kill switch.", 409, { findings: modelUse.findings });
+  if (String(modelUse.model.version) !== installation.modelVersion) fail("ai_agent_model_version_mismatch", "The registered model version no longer matches the approved installation.", 409);
+  if (installation.customerFacing && !input.customerDisclosureRef) fail("ai_agent_disclosure_required", "Customer-facing execution requires an AI disclosure reference.");
+  trustedDecision(input.modelConsumptionDecision, "allow", "ai_agent_model_consumption_denied");
+  trustedDecision(input.actionGuardrailDecision, "allow", "ai_agent_action_guardrail_denied");
+  const execution = seal({ executionId: input.executionId, tenantId: input.tenantId, installationId: input.installationId, templateId: installation.templateId, action: input.action, purpose: input.purpose, inputRef: input.inputRef, inputHash: input.inputHash.toLowerCase(), modelId: installation.modelId, modelVersion: installation.modelVersion, promptHash: installation.promptHash, configurationRef: installation.configurationRef, workloadPrincipalId: installation.workloadPrincipalId, humanSponsorPrincipalId: installation.humanSponsorPrincipalId, modelConsumptionDecision: decisionProjection(input.modelConsumptionDecision), actionGuardrailDecision: decisionProjection(input.actionGuardrailDecision), humanReviewRef: input.humanReviewRef ?? null, customerDisclosureRef: input.customerDisclosureRef ?? null, status: "authorized", dataRegion: IST_REGION, authorizedAt: now.toISOString(), completedAt: null, outputRef: null, outputHash: null });
+  return result(platform, "executions", execution.executionId, execution, "ai_agent.execution_authorized", now);
+}
+
+export function completeAiAgentExecution(state, input, now = new Date()) {
+  const platform = normalizeAiAgentPlatformState(state);
+  required(input, ["executionId", "tenantId", "outputRef", "outputHash", "outcome"]);
+  const execution = tenantRecord(platform.executions[input.executionId], input.tenantId, "ai_agent_execution_missing");
+  if (execution.status !== "authorized") fail("ai_agent_execution_not_authorized", "Only an authorized execution can be completed.", 409);
+  if (!/^[a-f0-9]{64}$/i.test(input.outputHash)) fail("ai_agent_output_hash_invalid", "outputHash must be SHA-256 hex.");
+  if (!['proposal_created', 'human_handoff', 'no_action', 'failed'].includes(input.outcome)) fail("ai_agent_outcome_invalid", "Execution outcome is invalid.");
+  const completed = seal({ ...execution, status: input.outcome === "failed" ? "failed" : "completed", outcome: input.outcome, outputRef: input.outputRef, outputHash: input.outputHash.toLowerCase(), citations: unique(input.citations ?? []), completedAt: now.toISOString() });
+  return result(platform, "executions", completed.executionId, completed, "ai_agent.execution_completed", now);
+}
+
+export function recordAiAgentUsage(state, input, now = new Date()) {
+  const platform = normalizeAiAgentPlatformState(state);
+  required(input, ["usageId", "executionId", "tenantId"]);
+  if (platform.usageLedger[input.usageId]) fail("ai_agent_usage_exists", "Usage record already exists.", 409);
+  const execution = tenantRecord(platform.executions[input.executionId], input.tenantId, "ai_agent_execution_missing");
+  if (!["completed", "failed"].includes(execution.status)) fail("ai_agent_execution_usage_not_final", "Usage may be recorded only after execution reaches a final state.", 409);
+  if (Object.values(platform.usageLedger).some((item) => item.executionId === execution.executionId)) fail("ai_agent_execution_usage_exists", "Execution already has a usage record.", 409);
+  const installation = platform.installations[execution.installationId];
+  const contract = tenantRecord(platform.pricingContracts[installation.contractId], input.tenantId, "ai_agent_pricing_contract_invalid");
+  const metrics = { executions: "1", inputTokens: integerString(input.inputTokens ?? "0", "inputTokens"), outputTokens: integerString(input.outputTokens ?? "0", "outputTokens"), toolCalls: integerString(input.toolCalls ?? "0", "toolCalls") };
+  const p = contract.pricing;
+  const chargePaise = BigInt(p.per_execution_paise) + perThousand(metrics.inputTokens, p.per_1k_input_tokens_paise) + perThousand(metrics.outputTokens, p.per_1k_output_tokens_paise);
+  const usage = seal({ usageId: input.usageId, tenantId: input.tenantId, executionId: input.executionId, installationId: installation.installationId, contractId: contract.contractId, modelId: execution.modelId, modelVersion: execution.modelVersion, region: IST_REGION, metrics, currency: "INR", chargePaise: chargePaise.toString(), recordedAt: now.toISOString() });
+  return result(platform, "usageLedger", usage.usageId, usage, "ai_agent.usage_recorded", now);
+}
+
+export function suspendTenantAiAgent(state, input, now = new Date()) {
+  const platform = normalizeAiAgentPlatformState(state);
+  required(input, ["installationId", "tenantId", "reason", "actor", "incidentRef"]);
+  const installation = tenantRecord(platform.installations[input.installationId], input.tenantId, "ai_agent_installation_missing");
+  const suspended = seal({ ...installation, status: "suspended", suspensionReason: input.reason, suspensionIncidentRef: input.incidentRef, suspendedBy: input.actor, suspendedAt: now.toISOString(), updatedAt: now.toISOString() });
+  return result(platform, "installations", suspended.installationId, suspended, "ai_agent.installation_suspended", now);
+}
+
+export function buildAiAgentGovernanceReport(state, tenantId, { from, to } = {}) {
+  const platform = normalizeAiAgentPlatformState(state);
+  const start = from ? Date.parse(from) : Number.NEGATIVE_INFINITY;
+  const end = to ? Date.parse(to) : Number.POSITIVE_INFINITY;
+  if (Number.isNaN(start) || Number.isNaN(end) || start > end) fail("ai_agent_report_period_invalid", "Governance report period is invalid.");
+  const installations = Object.values(platform.installations).filter((x) => x.tenantId === tenantId);
+  const executions = Object.values(platform.executions).filter((x) => x.tenantId === tenantId && Date.parse(x.authorizedAt) >= start && Date.parse(x.authorizedAt) <= end);
+  const usage = Object.values(platform.usageLedger).filter((x) => x.tenantId === tenantId && Date.parse(x.recordedAt) >= start && Date.parse(x.recordedAt) <= end);
+  const report = { tenantId, period: { from: from ?? null, to: to ?? null }, installations: { total: installations.length, active: installations.filter((x) => x.status === "active").length, suspended: installations.filter((x) => x.status === "suspended").length }, executions: { total: executions.length, completed: executions.filter((x) => x.status === "completed").length, failed: executions.filter((x) => x.status === "failed").length, humanHandoffs: executions.filter((x) => x.outcome === "human_handoff").length }, usage: { inputTokens: sum(usage, "inputTokens"), outputTokens: sum(usage, "outputTokens"), toolCalls: sum(usage, "toolCalls"), chargePaise: usage.reduce((n, x) => n + BigInt(x.chargePaise), 0n).toString(), currency: "INR" }, lineage: { traceComplete: executions.every((x) => x.recordHash && x.inputHash && x.modelConsumptionDecision?.traceRef && x.actionGuardrailDecision?.traceRef), rawPromptsStored: false }, regulatoryControlFamilies: ["RBI-DLD-2025", "RBI-IT-23", "DPDP-ACT-2023", "FREE-AI-2025", "RBI-MRM-DRAFT-2026"] };
+  return seal(report);
+}
+
+function template(id, name, category, maximumAutonomy, allowedActions, requiredGuardrails, customerFacing) { return Object.freeze({ templateId: id, version: 1, name, category, maximumAutonomy, allowedActions: Object.freeze(allowedActions), requiredGuardrails: Object.freeze(requiredGuardrails), customerFacing, decisionAuthority: "none", outputType: "proposal_only", status: "available" }); }
+function normalizeKnowledge(values = []) { return values.map((x) => { required(x, ["ref", "version", "contentHash"]); if (!/^[a-f0-9]{64}$/i.test(x.contentHash)) fail("ai_agent_knowledge_hash_invalid", "Knowledge contentHash must be SHA-256 hex."); return { ref: x.ref, version: String(x.version), contentHash: x.contentHash.toLowerCase() }; }); }
+function validateApprovals(value, proposer) { if (!value || typeof value !== "object") fail("ai_agent_approvals_required", "Four-role approval is required."); const ids = APPROVAL_ROLES.map((role) => { const a = value[role]; required(a, ["principalId", "approvalRef"]); if (a.principalType && a.principalType !== "human") fail("ai_agent_human_approval_required", `${role} approval must be human.`); if (a.principalId === proposer) fail("ai_agent_proposer_cannot_approve", "The proposer cannot approve production activation."); return a.principalId; }); if (new Set(ids).size !== ids.length) fail("ai_agent_approval_independence_required", "All four production approval roles must use distinct human principals."); return Object.fromEntries(APPROVAL_ROLES.map((role) => [role, { principalId: value[role].principalId, approvalRef: value[role].approvalRef }])); }
+function trustedDecision(value, outcome, code) { if (!value || value.decision !== outcome || !value.traceRef || !["isolated_business_engine", "isolated_control_engine"].includes(value.source)) fail(code, "An affirmative traceable isolated-engine decision is required.", 403); }
+function decisionProjection(value) { return { decision: value.decision, traceRef: value.traceRef, source: value.source, decisionKey: value.decisionKey ?? null, rulesetHash: value.rulesetHash ?? null }; }
+function result(platform, collection, id, record, eventType, now) { return { state: { ...platform, [collection]: { ...platform[collection], [id]: record }, events: [...platform.events, { type: eventType, resourceId: id, recordHash: record.recordHash, at: now.toISOString() }] }, record }; }
+function tenantRecord(record, tenantId, code) { if (!record || record.tenantId !== tenantId) fail(code, "A same-tenant record is required.", 404); return record; }
+function required(value, keys) { for (const key of keys) if (value?.[key] === undefined || value?.[key] === null || value?.[key] === "") fail("ai_agent_field_required", `${key} is required.`); }
+function independent(a, b, code) { if (a === b) fail(code, "Proposer and approver must be different principals."); }
+function unique(values = []) { if (!Array.isArray(values)) fail("ai_agent_array_invalid", "Expected an array."); return [...new Set(values.map(String))]; }
+function integerString(value, path) { const text = String(value); if (!/^\d+$/.test(text)) fail("ai_agent_pricing_value_invalid", `${path} must be a non-negative integer string.`); return BigInt(text).toString(); }
+function iso(value) { const at = new Date(value); if (!Number.isFinite(at.getTime())) fail("ai_agent_date_invalid", "Date must be a valid ISO value."); return at.toISOString(); }
+function perThousand(units, rate) { const count = BigInt(units); return ((count + 999n) / 1000n) * BigInt(rate); }
+function sum(records, key) { return records.reduce((n, x) => n + BigInt(x.metrics[key]), 0n).toString(); }
+function seal(value) { const clean = JSON.parse(JSON.stringify(value)); delete clean.recordHash; return { ...clean, recordHash: hash(clean) }; }
+function hash(value) { return createHash("sha256").update(canonical(value)).digest("hex"); }
+function canonical(value) { if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`; if (value && typeof value === "object") return `{${Object.keys(value).sort().map((k) => `${JSON.stringify(k)}:${canonical(value[k])}`).join(",")}}`; return JSON.stringify(value); }
+function fail(code, message, status = 422, details = undefined) { throw Object.assign(new Error(message), { code, status, details }); }

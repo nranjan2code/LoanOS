@@ -1,6 +1,6 @@
 # Agentic AI Digital Workers on AWS
 
-Status: Architecture investigation and recommended target state; not production certification.
+Status: Architecture investigation plus implemented control-plane baseline; worker runtime and AWS production deployment are not yet implemented or certified.
 
 Research baseline: 2026-07-15.
 
@@ -24,6 +24,19 @@ The recommended implementation baseline is:
 - **The existing model-governance service** as the source of truth for model/agent inventory, validation, monitoring, incidents, and kill switches.
 
 This is a framework choice, not approval to add a dependency or deploy AWS services. A thin proof of concept should validate the TypeScript SDK, Mumbai service/model availability, data flows, latency, cost, and guardrail integration before an ADR and production dependency are accepted.
+
+### 1.1 Implemented baseline (2026-07-15)
+
+The repository now implements the provider-neutral governance and commercial boundary that must exist before an SDK or Bedrock model is connected:
+
+- four versioned marketplace templates: CAM preparation, underwriting review, loan fulfilment, and borrower support;
+- per-tenant pricing contracts in INR using exact non-negative integer paise/token/execution dimensions;
+- tenant-specific installation records with pinned model/prompt/configuration/knowledge versions, India region, workload identity, human sponsor, action allow-list, product/data scopes, and execution-scoped memory;
+- FST-034 activation requiring distinct human model owner, model validator, human reviewer, and model-risk manager approvals, governance evidence, and an isolated control-engine trace;
+- local model-registry and global/model kill-switch checks plus isolated business-engine decisions for `guardrail.model_consumption` and `guardrail.agent_action` before every execution;
+- hash-sealed input/output/configuration lineage, proposal-only outcomes, append-only audit events, usage/cost records, emergency suspension, and tenant governance reports.
+
+The implementation anchors are `packages/core/src/ai-agent-platform.js`, `apps/api/src/routes/ai-agent-platform.js`, and `rules/fixtures/guardrail-agent-action.json`. It intentionally does **not** call an LLM yet. The Bedrock/Strands provider adapter, durable worker, India-region AWS infrastructure, evaluation service, tenant UI, invoice integration, and live-provider conformance remain production gaps.
 
 ## 2. Why Digital Workers Fit LoanOS
 
@@ -250,6 +263,8 @@ LoanOS validates the schema, converts accepted model outputs into provenance-tag
 
 ### Phase DW-0 — governance and platform boundary
 
+Status: **partially implemented**. Marketplace/installations, pricing dimensions, approval evidence, proposal-only execution envelope, model/action guardrails, lineage, usage, suspension, and reporting are present. AWS/provider execution and several specialized domain guardrails remain open.
+
 - Approve an RE-owned digital-worker policy and risk taxonomy aligned to the final RBI MRM guidance when issued.
 - Add agent application/prompt/tool/knowledge/memory inventory fields to model governance.
 - Define `DigitalWorkerProvider`, work/proposal/evidence schemas, and the tool-risk catalogue.
@@ -290,7 +305,24 @@ A worker is not production-ready unless all answers are evidenced:
 - Are audit lineage, human interventions/overrides, incidents, near misses, monitoring, retention, and deletion demonstrable?
 - Do AWS/model/provider contracts provide due diligence material, audit/RBI access, incident support, sub-processor transparency, continuity, portability, and exit?
 
-## 11. Source Baseline
+## 11. Implemented API surface and pricing calculation
+
+Tenant-scoped authenticated endpoints are:
+
+- `GET /ai/marketplace`, `GET /ai/agents`, and `GET /ai/agents/governance-report?from=&to=`;
+- `POST /ai/pricing-contracts`, `/pricing-contracts/{id}/approve`, and `/ai/agents/installations`;
+- `POST /ai/agents/installations/{id}/approvals/{role}`, `/activate`, and `/suspend`;
+- `POST /ai/agents/executions/authorize`, `/executions/{id}/complete`, and `/usage`.
+
+All mutations classify under FST-034. Commercial contracts use separate authenticated proposal and approval calls. Each FST-034 role approval is also a separate call bound to the authenticated human and their effective canonical role; clients cannot submit a bundle of approver identities. Activation consumes those stored approvals and obtains a fresh isolated control-engine decision. The execution route additionally obtains fresh isolated business-engine traces; a missing or untrusted engine returns a denial.
+
+Commercial rates are contract data, not source-code list prices. The initial calculation is intentionally auditable:
+
+`charge_paise = per_execution_paise + ceil(input_tokens / 1000) × input_rate + ceil(output_tokens / 1000) × output_rate`
+
+Monthly fees and included quotas are represented in the contract schema but invoice-cycle aggregation and quota offsets are not yet implemented. Sales therefore must not claim automated invoicing or a fixed published price.
+
+## 12. Source Baseline
 
 Primary regulatory and policy sources:
 

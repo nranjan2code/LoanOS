@@ -131,6 +131,51 @@ export async function decideEligibilityWithEngine({
   return response.json();
 }
 
+// Production AI workers must pass the platform guardrail pack even when the
+// general lending engine is otherwise in off/shadow migration mode. There is
+// deliberately no permissive local fallback: an unreachable tenant engine is
+// a denial to consume model output (INV-5, DEC-4).
+export async function decideAiModelConsumption({ tenantId, requestId, modelId, modelVersion, now = new Date() }) {
+  const request = {
+    request_id: requestId,
+    tenant_id: tenantId,
+    decision_key: "guardrail.model_consumption",
+    effective_at: toIstIso(now),
+    facts: {},
+    fact_provenance: {
+      "/agent_output": { source: "model", model_id: modelId, model_version: String(modelVersion) }
+    },
+    context: { channel: "agent-runtime", caller: "workflow:ai-agent", audience: "internal" }
+  };
+  try {
+    const response = await fetch(`${engineBaseUrl(tenantId)}/v1/decide`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(request),
+      signal: AbortSignal.timeout(Number(process.env.LOANOS_RULES_ENGINE_TIMEOUT_MS ?? 3000))
+    });
+    if (!response.ok) throw new Error(`rules-engine: HTTP ${response.status}`);
+    const decision = await response.json();
+    if (!['allow', 'deny', 'require_human'].includes(decision?.decision) || !decision?.trace_ref) throw new Error("rules-engine: invalid guardrail response");
+    return { decision: decision.decision, traceRef: decision.trace_ref, source: "isolated_business_engine", decisionKey: request.decision_key, rulesetHash: decision?.ruleset?.platform_pack ?? null };
+  } catch (error) {
+    return { decision: "deny", traceRef: `fail_closed:${requestId}`, source: "isolated_business_engine", decisionKey: request.decision_key, rulesetHash: null, failClosed: true, error: "business_engine_unavailable_or_untrusted" };
+  }
+}
+
+export async function decideAiAgentAction({ tenantId, requestId, facts, now = new Date() }) {
+  const request = { request_id: requestId, tenant_id: tenantId, decision_key: "guardrail.agent_action", effective_at: toIstIso(now), facts, fact_provenance: {}, context: { channel: "agent-runtime", caller: "workflow:ai-agent", audience: "internal" } };
+  try {
+    const response = await fetch(`${engineBaseUrl(tenantId)}/v1/decide`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(request), signal: AbortSignal.timeout(Number(process.env.LOANOS_RULES_ENGINE_TIMEOUT_MS ?? 3000)) });
+    if (!response.ok) throw new Error(`rules-engine: HTTP ${response.status}`);
+    const decision = await response.json();
+    if (!['allow', 'deny', 'require_human'].includes(decision?.decision) || !decision?.trace_ref) throw new Error("rules-engine: invalid guardrail response");
+    return { decision: decision.decision, traceRef: decision.trace_ref, source: "isolated_business_engine", decisionKey: request.decision_key, rulesetHash: decision?.ruleset?.platform_pack ?? null };
+  } catch {
+    return { decision: "deny", traceRef: `fail_closed:${requestId}`, source: "isolated_business_engine", decisionKey: request.decision_key, rulesetHash: null, failClosed: true, error: "business_engine_unavailable_or_untrusted" };
+  }
+}
+
 // The gated eligibility assessment used by server.js call sites.
 //
 // Always runs the JS evaluator first in off/shadow mode. In active mode the

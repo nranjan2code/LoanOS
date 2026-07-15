@@ -17,13 +17,14 @@ The current implementation is intentionally small:
 - Multi-tenant: every data-plane request runs inside exactly one tenant, resolved from a tenant user session or `x-api-key`/bearer service token; cross-tenant access is impossible by construction because each request only ever receives its own tenant's partition (and, on the Postgres driver, is also blocked at the database layer by RLS).
 - Core domain logic in `packages/core/src`.
 - Decision engine (Rust) in `rules/`: API eligibility, KFS and decision call sites are wired through `LOANOS_RULES_ENGINE=off|shadow|active`. Identity/staffing authority uses the separate `LOANOS_CONTROL_RULES_ENGINE` gateway and per-tenant object map with unique HTTPS/`ctrl-*` identity, mTLS client/peer/trust references and KMS/HSM bundle-signing lineage. Production requires both engines and universal staffing active and rejects shared/untrusted/mismatched control routes. The local Rust fixture/test and hardened Node gateway exist; a separately deployed commercial control fleet does not. See the [decision engine design](decision-engine-design.md), ADR 0005 and the [role/staffing design](tenant-role-staffing-and-feature-gating.md).
+- AI-agent SaaS control plane: four proposal-only marketplace templates (CAM, underwriting review, loan fulfilment and borrower support), tenant contracts/customizations, four-human activation, model and action guardrails, hash-sealed executions, exact-paise usage, suspension and governance reporting are implemented. Production model invocation, Bedrock/Strands runtime, durable agent workers, AWS deployment, tenant UI, quota/invoice-cycle billing and live evaluation/monitoring integrations are not implemented. See [agentic AI digital workers](agentic-ai-digital-workers.md).
 - Pure backend API in `apps/api/src`.
 - Public platform website in `apps/web/`.
 - Tenant-branded landing template in `apps/tenant/`.
 - Internal staff workspace in `apps/dashboard/`.
 - Borrower customer portal in `apps/customer/`: a responsive, white-labelled journey home with prioritised next actions, visual application milestones, repayment schedules, a document centre, guided media, grievance tracking, and DPDP access/correction/erasure controls.
 - Shared design system tokens in `apps/shared/`.
-- Automated tests in `tests/`: 502 tracked file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
+- Automated tests in `tests/`: 580 tracked file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
 
 Run it:
 
@@ -37,6 +38,7 @@ npm run dev:api
 | Path | Role |
 | --- | --- |
 | `packages/core/src/compliance-controls.js` | Regulatory control catalog and finding helpers. |
+| `packages/core/src/ai-agent-platform.js`, `apps/api/src/routes/ai-agent-platform.js`, `rules/fixtures/guardrail-agent-action.json` | Governed AI-worker marketplace, per-RE commercial/install customization, four-role activation, fail-closed model/action authorization, proposal lineage, usage pricing, emergency suspension and tenant reporting. |
 | `rules/crates/rules-core/` | Decision engine contract types (`DecisionRequest`/`DecisionResponse`, decimal newtypes, reasons, outcomes, errors) — PH-0 of the [decision engine design](decision-engine-design.md). |
 | `packages/core/src/audit.js` | Tenant-scoped, append-only audit hash chain: tenant-bound genesis, canonical hashing, `sealAuditChain`, `verifyAuditChain`, and `buildAuditEvidencePack`. |
 | `packages/core/src/access-control.js` | Staff actor registry, role checks, queue assignment authority, and regulated-action actor validation. |

@@ -60,6 +60,13 @@ fn collections_guardrail() -> DecisionModel {
     .unwrap()
 }
 
+fn agent_action_guardrail() -> DecisionModel {
+    serde_json::from_str(include_str!(
+        "../../../fixtures/guardrail-agent-action.json"
+    ))
+    .unwrap()
+}
+
 /// A model that emits reasons at every audience level, for INV-10 tests.
 fn audience_model() -> DecisionModel {
     let row = |id: &str, audience: Audience| FindingRow {
@@ -107,7 +114,7 @@ fn instance() -> (Arc<Instance>, MemAudit) {
             author: "a".into(),
             approver: "b".into(),
         },
-        models: vec![collections_guardrail()],
+        models: vec![collections_guardrail(), agent_action_guardrail()],
     };
     let audit = MemAudit::default();
     let inst = Instance::new(
@@ -269,6 +276,52 @@ fn collections_contact_guardrail_enforces_rbi_window_and_caps() {
     assert_eq!(call(facts(11, 1, 8, false)).decision, Outcome::RequireHuman);
     // Hardship flag: human review required.
     assert_eq!(call(facts(11, 0, 1, true)).decision, Outcome::RequireHuman);
+}
+
+#[test]
+fn agent_action_guardrail_denies_decision_authority_and_allows_bounded_proposals() {
+    let (instance, _) = instance();
+    let facts = |proposal_only: bool, approved: bool| {
+        serde_json::json!({
+            "installation": { "active": true, "tenant_match": true },
+            "action": { "approved": approved, "proposal_only": proposal_only, "human_control_attempt": false },
+            "data": { "india_region": true },
+            "customer": { "customer_facing": false, "disclosure_present": false }
+        })
+    };
+    assert_eq!(
+        instance
+            .handle(request(
+                "guardrail.agent_action",
+                facts(true, true),
+                serde_json::json!({})
+            ))
+            .unwrap()
+            .decision,
+        Outcome::Allow
+    );
+    assert_eq!(
+        instance
+            .handle(request(
+                "guardrail.agent_action",
+                facts(false, true),
+                serde_json::json!({})
+            ))
+            .unwrap()
+            .decision,
+        Outcome::Deny
+    );
+    assert_eq!(
+        instance
+            .handle(request(
+                "guardrail.agent_action",
+                facts(true, false),
+                serde_json::json!({})
+            ))
+            .unwrap()
+            .decision,
+        Outcome::Deny
+    );
 }
 
 #[test]

@@ -14,6 +14,7 @@ import { routeAccessActivityCustody } from "./routes/access-activity-custody.js"
 import { routeIdentityOperations, routeIdentityOperationsWorker } from "./routes/identity-operations.js";
 import { routeTenantActivation } from "./routes/tenant-activation.js";
 import { routeConformanceAdministration } from "./routes/conformance-administration.js";
+import { routeAiAgentPlatform } from "./routes/ai-agent-platform.js";
 import { enforceUniversalMutationStaffing } from "./mutation-staffing-policy.js";
 import { validateControlEngineFleetConfiguration } from "./control-rules-engine.js";
 import { exchangeOidcAuthorizationCode, loadFederationAuthorizationEndpoint, validateFederatedLogin } from "./federation-runtime.js";
@@ -1269,6 +1270,7 @@ async function route(req, res, dataDir, platformAdminKey, observability, allowDi
   if (await routeInstitutionalOperations({ method, path, req, res, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
   if (await routeCustomerChannelControls({ method, path, req, res, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
   if (await routeCompletionControls({ method, path, req, res, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
+  if (await routeAiAgentPlatform({ method, path, req, res, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
 
   // Standing sub-processor disclosure: every authenticated tenant RE can read
   // the platform-wide register of LoanOS sub-processors that apply to it.

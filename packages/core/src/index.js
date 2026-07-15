@@ -66,6 +66,24 @@ export {
 } from "./model-governance.js";
 
 export {
+  AI_AGENT_MARKETPLACE_TEMPLATES,
+  AI_AGENT_PRICING_DIMENSIONS,
+  createAiAgentPlatformState,
+  normalizeAiAgentPlatformState,
+  projectAiAgentMarketplace,
+  proposeAiAgentPricingContract,
+  approveAiAgentPricingContract,
+  installTenantAiAgent,
+  recordTenantAiAgentApproval,
+  activateTenantAiAgent,
+  authorizeAiAgentExecution,
+  completeAiAgentExecution,
+  recordAiAgentUsage,
+  suspendTenantAiAgent,
+  buildAiAgentGovernanceReport
+} from "./ai-agent-platform.js";
+
+export {
   ALLOWED_RE_TYPES,
   acceptKfs,
   attachKfs,
