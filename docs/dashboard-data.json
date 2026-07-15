@@ -1,68 +1,68 @@
 {
-  "generated": "2026-07-14T22:29:56.691Z",
+  "generated": "2026-07-15T02:20:53.145Z",
   "git": {
     "branch": "main",
-    "count": 184,
+    "count": 185,
     "commits": [
+      {
+        "hash": "061c783",
+        "subject": "feat(identity): enforce tenant staffing and actor attribution",
+        "when": "4 hours ago"
+      },
       {
         "hash": "b411a51",
         "subject": "feat(identity): govern organisation admission and bootstrap access",
-        "when": "42 minutes ago"
+        "when": "5 hours ago"
       },
       {
         "hash": "f0e72f7",
         "subject": "docs(ai): define governed digital-worker architecture",
-        "when": "66 minutes ago"
+        "when": "5 hours ago"
       },
       {
         "hash": "876775d",
         "subject": "feat(platform): govern tenant product provisioning",
-        "when": "83 minutes ago"
+        "when": "5 hours ago"
       },
       {
         "hash": "adfb90c",
         "subject": "feat(platform): add production execution foundations",
-        "when": "2 hours ago"
+        "when": "6 hours ago"
       },
       {
         "hash": "5d36a8c",
         "subject": "feat(governance): complete capability evidence trace",
-        "when": "2 hours ago"
+        "when": "6 hours ago"
       },
       {
         "hash": "647c86c",
         "subject": "fix(dashboard): make capability metrics auditable",
-        "when": "2 hours ago"
+        "when": "6 hours ago"
       },
       {
         "hash": "ce1aacb",
         "subject": "fix(web): serve product journeys publicly",
-        "when": "2 hours ago"
+        "when": "6 hours ago"
       },
       {
         "hash": "0848776",
         "subject": "feat(integrations): complete deployment execution ports",
-        "when": "2 hours ago"
+        "when": "6 hours ago"
       },
       {
         "hash": "5f992d0",
         "subject": "feat(integrations): complete adapter execution baseline",
-        "when": "2 hours ago"
+        "when": "6 hours ago"
       },
       {
         "hash": "3037e82",
         "subject": "chore: sync and update workspace files",
-        "when": "3 hours ago"
+        "when": "6 hours ago"
       },
       {
         "hash": "81f7941",
         "subject": "docs(dashboard): refresh integration wave metadata",
-        "when": "3 hours ago"
-      },
-      {
-        "hash": "73efaa1",
-        "subject": "feat(integrations): persist delivery and file conformance",
-        "when": "3 hours ago"
+        "when": "6 hours ago"
       }
     ]
   },
@@ -11478,6 +11478,16 @@
               "note": "Automated evidence covering the AUD-004 control family."
             },
             {
+              "type": "code",
+              "ref": "packages/core/src/access-activity-custody.js",
+              "note": "Verified contiguous activity export and independent India WORM custody reconciliation."
+            },
+            {
+              "type": "test",
+              "ref": "tests/access-activity-custody.test.js",
+              "note": "Tamper, checksum, retention, four-eyes and complete-sequence custody evidence."
+            },
+            {
               "type": "doc",
               "ref": "docs/architecture/current-implementation.md",
               "note": "Documented architecture or regulatory boundary for AUD-004."
@@ -11797,7 +11807,7 @@
         },
         {
           "id": "SEC-002",
-          "name": "Enterprise OIDC/SAML federation, certified provider policy, MFA and session binding",
+          "name": "Enterprise OIDC/SAML federation, certified provider policy, code/PKCE/JWKS validation, MFA/device assurance and session binding",
           "applicability": "Core",
           "status": "Partial",
           "raw": "Partial",
@@ -11808,9 +11818,19 @@
               "note": "Certified Entra, Okta, AD FS, Keycloak, OpenLDAP-bridge and generic OIDC/SAML provider-policy contract."
             },
             {
+              "type": "code",
+              "ref": "packages/core/src/federated-access-runtime.js",
+              "note": "Cryptographic OIDC verification plus fail-closed SAML and MFA/WebAuthn/device assurance validation."
+            },
+            {
               "type": "test",
               "ref": "tests/enterprise-platform.test.js",
               "note": "Automated federation certification, MFA, metadata and provider-policy evidence."
+            },
+            {
+              "type": "test",
+              "ref": "tests/federated-access-runtime.test.js",
+              "note": "JWKS signature, claim, nonce, hardware/device and SAML validation-attestation evidence."
             },
             {
               "type": "doc",
@@ -11823,12 +11843,12 @@
           "dependencies": [
             "AUD-001"
           ],
-          "notes": "The policy and test contract is executable. No commercial IdP tenant, signed-token validation path, secrets/certificates, metadata rotation operation or witnessed provider conformance is live.",
+          "notes": "The protocol runtime is executable. No commercial IdP/MDM/SAML-gateway tenant, global logout/revocation operation, continuous metadata rotation or witnessed provider conformance is live.",
           "lastReviewed": "2026-07-15"
         },
         {
           "id": "SEC-003",
-          "name": "SCIM provisioning/deprovisioning, group mapping, immediate canonical suspension and governed role requests",
+          "name": "Scoped SCIM protocol provisioning/deprovisioning, group mapping, immediate canonical suspension and governed role requests",
           "applicability": "Core",
           "status": "Partial",
           "raw": "Partial",
@@ -11837,6 +11857,11 @@
               "type": "code",
               "ref": "packages/core/src/enterprise-identity.js",
               "note": "Idempotent SCIM events, group mappings and canonical-role request disposition."
+            },
+            {
+              "type": "code",
+              "ref": "apps/api/src/routes/enterprise-controls.js",
+              "note": "Scoped SCIM 2.0 discovery, exact user lookup, create/deactivate and group projection endpoints."
             },
             {
               "type": "test",
@@ -11854,7 +11879,7 @@
           "dependencies": [
             "AUD-001"
           ],
-          "notes": "Local API behavior exists. A live SCIM service credential, provider webhook/signature path, session/token revocation conformance and vendor SLA remain.",
+          "notes": "The scoped protocol surface exists. Commercial provider registration, cross-system reconciliation, session/token global revocation conformance and measured vendor leaver SLA remain.",
           "lastReviewed": "2026-07-15"
         },
         {
@@ -11890,7 +11915,7 @@
         },
         {
           "id": "SEC-005",
-          "name": "Fine-grained scoped RBAC/ABAC, separation of duty, per-feature minimum staffing and isolated control-policy enforcement",
+          "name": "Fine-grained scoped RBAC/ABAC, separation of duty, per-feature minimum staffing, deny-by-default mutation classification and isolated control-policy enforcement",
           "applicability": "Core",
           "status": "Partial",
           "raw": "Partial",
@@ -11906,6 +11931,16 @@
               "note": "Role authority, staffing, maker-checker, agent, suspension, lockout and escalation coverage."
             },
             {
+              "type": "code",
+              "ref": "apps/api/src/mutation-staffing-policy.js",
+              "note": "Deny-by-default protected staff mutation classification across FST-001..034."
+            },
+            {
+              "type": "test",
+              "ref": "tests/mutation-staffing-policy.test.js",
+              "note": "Exhaustive family coverage, active unknown-route denial and shadow-mode evidence."
+            },
+            {
               "type": "doc",
               "ref": "docs/architecture/tenant-role-staffing-and-feature-gating.md",
               "note": "Exhaustive role/staffing/edge-case and operations specification."
@@ -11916,7 +11951,7 @@
           "dependencies": [
             "AUD-001"
           ],
-          "notes": "The kernel, persistent administration APIs and isolated control gateway exist. Universal LOS/LMS/LWS/finance/compliance mutation-route enforcement, production control fleet and complete administration UI remain.",
+          "notes": "The kernel, persistent APIs, universal mutation gate and hardened control-fleet contract exist. Tenant shadow/cutover evidence, deployed control fleet and complete administration UI remain.",
           "lastReviewed": "2026-07-15"
         },
         {
@@ -14061,10 +14096,10 @@
     }
   ],
   "tests": {
-    "pass": 506,
+    "pass": 519,
     "fail": 0,
     "skipped": 5,
-    "total": 511,
+    "total": 524,
     "ran": true,
     "source": "provided-log"
   }

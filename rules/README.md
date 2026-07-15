@@ -99,16 +99,22 @@ Identity, feature staffing, SoD and agent-authority decisions use `apps/api/src/
 
 ```bash
 LOANOS_CONTROL_RULES_ENGINE=active
+LOANOS_UNIVERSAL_STAFFING=active
 LOANOS_CONTROL_RULES_ENGINE_URLS='{
   "ten_dev": {
     "url": "https://ctrl-ten-dev.internal",
     "instanceId": "ctrl-ten-dev-1",
-    "tenantBundleHash": "sha256:<approved-control-bundle>"
+    "tenantBundleHash": "sha256:<approved-control-bundle>",
+    "mtlsRequired": true,
+    "clientIdentityRef": "spiffe://loanos/api/ten-dev",
+    "serverIdentityRef": "spiffe://loanos/control/ten-dev",
+    "trustBundleRef": "kms://trust/control-fleet",
+    "bundleSigningKeyRef": "kms://keys/ten-dev-control-signing"
   }
 }'
 ```
 
-The control URL must differ from `LOANOS_RULES_ENGINE_URLS[tenant]`. Provision it as a separate process/pod or stronger isolation unit with a `ctrl-*` identity, separate service identity, bundle/key grants, audit partition and operator permissions. `off` and `shadow` exist for local development and cutover evidence only; production validation rejects them. Any unavailable endpoint, shared URL, wrong instance ID, wrong bundle hash or malformed response denies the action (INV-13/SEC-12).
+Every tenant control URL and `ctrl-*` identity must be unique and differ from `LOANOS_RULES_ENGINE_URLS[tenant]`. Provision it as a separate process/pod or stronger isolation unit with distinct service identity, mTLS trust, bundle/key grants, audit partition and operator permissions. The response must attest the exact client/peer identities and verified KMS/HSM signing-key reference. `off` and `shadow` exist for local development and cutover evidence only; production validation rejects them. Any unavailable endpoint, shared/non-HTTPS URL, wrong instance/transport/key/bundle identity or malformed response denies the action (INV-13/SEC-12). New protected staff mutations are also denied until classified into FST-001..034.
 
 ## Rules of engagement for changes
 

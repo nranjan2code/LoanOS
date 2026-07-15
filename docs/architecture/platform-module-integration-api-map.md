@@ -85,7 +85,7 @@ The deterministic rules engine never calls an external system during evaluation.
 | ID | Needed at | External operations | Direction / response | Current state | Also used by |
 | --- | --- | --- | --- | --- | --- |
 | INT-LWS-01 | Staff authority/routing | HRMS worker/position/manager/branch/leave/delegation and JML delta | BOTH/file; version and active reconciliation | Missing | Platform IAM |
-| INT-LWS-02 | Authentication/provisioning | OIDC/JWKS or SAML; SCIM user/group provision/deprovision | BOTH; signed identity/idempotent events | Governance only; local sessions | Platform |
+| INT-LWS-02 | Authentication/provisioning | OIDC discovery/auth-code/S256-PKCE/token/JWKS or certified SAML gateway; SCIM user/group provision/deprovision; MFA/WebAuthn/device posture | BOTH; signed identity/idempotent events | Protocol runtime, scoped SCIM and assurance sessions executable; no commercial IdP/MDM/gateway | Platform |
 | INT-LWS-03 | Task/escalation | Email/SMS/WhatsApp/voice/pager and delivery callbacks | BOTH; task ref/status | Communication mocks | All modules |
 | INT-LWS-04 | Evidence/committees | DMS upload/version/download, hold, signed minutes and manifest | BOTH; checksum/retention | Governance only | Audit/compliance |
 | INT-LWS-05 | External work orders | Valuer/advocate/agency/custodian/insurer order/status/report | BOTH; certification/SLA events | Certified adapter ports, request/event lifecycle and reconciliation API complete; vendor mappings missing | LOS, recovery |
@@ -179,7 +179,7 @@ Regulatory integration must be in the regulated entity’s name where required. 
 
 | ID | Needed at | External operations | Direction / response | Current state | Also used by |
 | --- | --- | --- | --- | --- | --- |
-| INT-PLT-01 | Workforce identity | Entra/Okta/AD FS/Keycloak/OpenLDAP-bridge or generic OIDC/SAML metadata/JWKS/signatures, MFA/conditional access, SCIM JML, group-to-role request, logout/token revoke and access-review export | BOTH | Provider-specific policy and SCIM lifecycle implemented locally; no live IdP, token validator or SCIM service credential; IdP groups never grant canonical roles directly | LWS, admin, isolated control engine |
+| INT-PLT-01 | Workforce identity | Entra/Okta/AD FS/Keycloak/OpenLDAP-bridge or generic OIDC/SAML metadata/JWKS/signatures, MFA/WebAuthn/device posture, SCIM JML, group-to-role request, logout/token revoke and access-review export | BOTH | OIDC cryptographic validation, certified SAML-attestation boundary, scoped SCIM protocol and immediate suspension executable; no commercial connection. IdP groups never grant canonical roles directly | LWS, admin, isolated control engine |
 | INT-PLT-02 | Secrets/crypto | Vault lease/revoke; KMS/HSM encrypt/sign/rotate/destroy | BOTH | Attestation; local/env keys | Every adapter |
 | INT-PLT-03 | Security monitoring | Attributed API/UI/domain/decision/integration events, correlation propagation, SIEM ingest, completeness reconciliation, alert/SOAR, DLP/scanner and threat intelligence | BOTH | Authenticated API and bounded screen activity are tenant-audited; external collectors, cross-system correlation and SIEM reconciliation missing | Compliance |
 | INT-PLT-04 | Evidence/time | WORM/object lock, hold/deletion, trusted NTP/TSA/anchor | BOTH | Attestations only | Audit |
@@ -209,7 +209,7 @@ These dependencies verify the prospective platform customer and safely create it
 | INT-ADM-07 | Contract and outsourcing due diligence | NDA/MSA/DPA/SLA/order form, eSign, questionnaire/evidence exchange, subprocessor/BCP/DR/exit approval and change callbacks | BOTH/file | Version/evidence references only; no DMS/eSign/GRC connector | Vendor risk, legal, compliance |
 | INT-ADM-08 | Subscription, invoicing and tax | Plan/entitlement, meter, invoice/GST, payment, credit/refund, dunning and accounting export | BOTH/file | Commercial controls only; no billing/tax/payment provider | Finance, entitlements |
 | INT-ADM-09 | Tenant infrastructure provisioning | Cloud/IAM, namespace/network, DNS/certificate, KMS, DB, queue, object/WORM, observability, backup/DR; status, compensation and rollback proof | BOTH | Dependency saga and injected execution ports exist; no cloud/DNS/certificate controllers | Deployment, security, data |
-| INT-ADM-10 | Workforce federation and re-verification | OIDC/SAML/SCIM onboarding; domain/group proof; JML; licence/legal/domain/representative delta rescreen; case/ticket escalation | BOTH/file | Federation and re-verification governance only; live IdP/registry/ticket feeds missing | LWS, platform operations |
+| INT-ADM-10 | Workforce federation and re-verification | OIDC/SAML/SCIM onboarding; domain/group proof; JML; licence/legal/domain/representative delta rescreen; case/ticket escalation | BOTH/file | Federation protocol runtime and SCIM surface implemented; live commercial IdP/MDM/registry/ticket feeds missing | LWS, platform operations |
 
 ## Cross-module dependency matrix
 

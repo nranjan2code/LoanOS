@@ -1,0 +1,31 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { createFederationPolicy, certifyFederationPolicy } from "../packages/core/src/enterprise-identity.js";
+import { createLoanOsServer } from "../apps/api/src/server.js";
+import { loadState, saveState } from "../apps/api/src/file-store.js";
+
+test("SCIM 2.0 service surface is tenant-scoped, idempotent and deactivates immediately", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-scim-")); const tenant = { tenantId: "tenant_scim", name: "SCIM Bank", apiKey: "scim-service-key" };
+  const server = createLoanOsServer({ dataDir, bootstrapTenants: [tenant] }); await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(async () => { await new Promise((resolve) => server.close(resolve)); await rm(dataDir, { recursive: true, force: true }); });
+  const base = `http://127.0.0.1:${server.address().port}`; await fetch(`${base}/health`);
+  let state = await loadState(dataDir); const now = new Date();
+  const draft = createFederationPolicy({}, { policyId: "idp-scim", providerType: "entra_id", protocol: "oidc", issuer: "https://idp.bank.in", metadataUrl: "https://idp.bank.in/.well-known/openid-configuration", audience: "loanos-scim", allowedDomains: ["bank.in"], groupMappings: { lending: { adminRoles: ["operator"], roles: ["loan_officer"], canonicalRoleIds: ["loan_officer"], queues: ["origination"] } }, pkceRequired: true, mfaRequired: true, owner: "iam-owner", proposedBy: "iam-maker" }, now);
+  const certified = certifyFederationPolicy(draft.registry, "idp-scim", { approvedBy: "iam-checker", approvalRef: "approval-1", metadataChecksumSha256: createHash("sha256").update("metadata").digest("hex"), metadataValidUntil: new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000).toISOString(), loginTestRef: "login-test", logoutTestRef: "logout-test", mfaTestRef: "mfa-test" }, now);
+  state.tenants[tenant.tenantId].federationPolicies = certified.registry; await saveState(state, dataDir);
+  const headers = { "content-type": "application/scim+json", "x-api-key": tenant.apiKey, "x-loanos-federation-policy": "idp-scim", "idempotency-key": "scim-create-1" };
+  let response = await fetch(`${base}/scim/v2/Users`, { method: "POST", headers, body: JSON.stringify({ schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"], externalId: "employee-1", userName: "user@bank.in", displayName: "Bank User", active: true, groups: [{ value: "lending" }] }) });
+  assert.equal(response.status, 201, await response.clone().text()); assert.match(response.headers.get("content-type"), /application\/scim\+json/); const created = await response.json(); assert.equal(created.active, true);
+  response = await fetch(`${base}/scim/v2/Users`, { method: "POST", headers, body: JSON.stringify({ schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"], externalId: "employee-1", userName: "user@bank.in", displayName: "Bank User", active: true, groups: [{ value: "lending" }] }) });
+  assert.equal(response.status, 200, await response.clone().text());
+  response = await fetch(`${base}/scim/v2/Users?filter=${encodeURIComponent('userName eq "user@bank.in"')}`, { headers: { "x-api-key": tenant.apiKey } });
+  assert.equal(response.status, 200); assert.equal((await response.json()).totalResults, 1);
+  response = await fetch(`${base}/scim/v2/Users/employee-1`, { method: "PATCH", headers: { "content-type": "application/scim+json", "x-api-key": tenant.apiKey, "idempotency-key": "scim-deactivate-1" }, body: JSON.stringify({ schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"], Operations: [{ op: "Replace", path: "active", value: false }] }) });
+  assert.equal(response.status, 200, await response.clone().text()); assert.equal((await response.json()).active, false);
+  state = await loadState(dataDir); const user = Object.values(state.tenants[tenant.tenantId].users).find((candidate) => candidate.federationExternalId === "employee-1");
+  assert.equal(user.status, "inactive"); assert.equal(state.tenants[tenant.tenantId].saasPrincipals[`${tenant.tenantId}:${user.userId}`].status, "suspended");
+});

@@ -16,11 +16,14 @@ import {
   registerPitrPolicy,
   registerSaasPrincipal,
   registerSecurityLogCustody,
+  scimUserProjection,
+  scimUserResourceToIdentityEvent,
   suspendSaasPrincipalFromIdentityProvider
 } from "../../../../packages/core/src/index.js";
 
 export async function routeEnterpriseTenantControls(context) {
   const { method, path, req, res, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor, upsertFederatedTenantUser } = context;
+  if (path === "/scim/v2" || path.startsWith("/scim/v2/")) return routeScimProtocol(context);
   if (!path.startsWith("/admin/federation") && !path.startsWith("/admin/scim")) return false;
   const allowedTenantRoles = method === "GET" ? ["tenant_admin", "security_admin", "user_admin", "auditor"] : ["tenant_admin", "security_admin", "user_admin"];
   if (!hasTenantAdminRole(authContext, allowedTenantRoles)) { sendJson(res, 403, { error: { code: "enterprise_identity_forbidden", message: "Tenant identity administration access is required." } }); return true; }
@@ -67,6 +70,98 @@ export async function routeEnterpriseTenantControls(context) {
   }
   return false;
 }
+
+async function routeScimProtocol(context) {
+  const { method, path, req, res, store, readJson, sendJson, appendEvent, authContext, authActor, upsertFederatedTenantUser } = context;
+  const scopes = authContext?.serviceCredential?.scopes ?? [];
+  const requiredScope = method === "GET" ? "scim:read" : "scim:write";
+  if (authContext?.principalType !== "tenant_service" || (!scopes.includes("*") && !scopes.includes(requiredScope))) {
+    scimError(res, sendJson, 401, "A tenant SCIM bearer credential with the required scope is required."); return true;
+  }
+  if (method === "GET" && path === "/scim/v2/ServiceProviderConfig") {
+    scimJson(res, sendJson, 200, { schemas: ["urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig"], patch: { supported: true }, bulk: { supported: false, maxOperations: 0, maxPayloadSize: 0 }, filter: { supported: true, maxResults: 200 }, changePassword: { supported: false }, sort: { supported: false }, etag: { supported: false }, authenticationSchemes: [{ type: "oauthbearertoken", name: "Tenant-scoped bearer token", description: "LoanOS service credential", primary: true }] }); return true;
+  }
+  if (method === "GET" && path === "/scim/v2/ResourceTypes") {
+    scimJson(res, sendJson, 200, listResponse([{ schemas: ["urn:ietf:params:scim:schemas:core:2.0:ResourceType"], id: "User", name: "User", endpoint: "/Users", schema: "urn:ietf:params:scim:schemas:core:2.0:User" }, { schemas: ["urn:ietf:params:scim:schemas:core:2.0:ResourceType"], id: "Group", name: "Group", endpoint: "/Groups", schema: "urn:ietf:params:scim:schemas:core:2.0:Group" }])); return true;
+  }
+  if (method === "GET" && path === "/scim/v2/Schemas") {
+    scimJson(res, sendJson, 200, listResponse([{ schemas: ["urn:ietf:params:scim:schemas:core:2.0:Schema"], id: "urn:ietf:params:scim:schemas:core:2.0:User", name: "User" }, { schemas: ["urn:ietf:params:scim:schemas:core:2.0:Schema"], id: "urn:ietf:params:scim:schemas:core:2.0:Group", name: "Group" }])); return true;
+  }
+  if (method === "GET" && path === "/scim/v2/Users") {
+    const state = await store.load(); const url = new URL(req.url, "http://localhost");
+    const filter = url.searchParams.get("filter");
+    let users = Object.values(state.users ?? {}).filter((user) => user.authenticationSource === "federated");
+    if (filter) {
+      const match = filter.match(/^userName eq "([^"]+)"$/i);
+      if (!match) { scimError(res, sendJson, 400, "Only exact userName eq filtering is supported.", "invalidFilter"); return true; }
+      users = users.filter((user) => user.email === match[1].trim().toLowerCase());
+    }
+    scimJson(res, sendJson, 200, listResponse(users.map((user) => scimUserProjection(user, "/scim/v2")))); return true;
+  }
+  if (method === "GET" && path === "/scim/v2/Groups") {
+    const state = await store.load();
+    const groups = Object.values(state.federationPolicies ?? {}).filter((policy) => policy.status === "active").flatMap((policy) => Object.keys(policy.groupMappings ?? {}).map((displayName) => ({ schemas: ["urn:ietf:params:scim:schemas:core:2.0:Group"], id: `${policy.policyId}:${displayName}`, displayName, members: [], meta: { resourceType: "Group", location: `/scim/v2/Groups/${encodeURIComponent(`${policy.policyId}:${displayName}`)}` } })));
+    scimJson(res, sendJson, 200, listResponse(groups)); return true;
+  }
+  if (method === "POST" && path === "/scim/v2/Users") {
+    const body = await readJson(req);
+    try {
+      const input = scimUserResourceToIdentityEvent(body, { policyId: header(req, "x-loanos-federation-policy"), eventId: `scim_${req._loanosRequestId}`, idempotencyKey: header(req, "idempotency-key"), appliedBy: authActor(authContext) });
+      const result = await applyScimProtocolEvent(context, input);
+      scimJson(res, sendJson, result.idempotent ? 200 : 201, scimUserProjection(result.user, "/scim/v2"), { location: `/scim/v2/Users/${encodeURIComponent(result.user.federationExternalId)}` });
+    } catch (error) { scimError(res, sendJson, 400, error.message, error.code); }
+    return true;
+  }
+  const userPatch = path.match(/^\/scim\/v2\/Users\/([^/]+)$/);
+  if (method === "PATCH" && userPatch) {
+    const body = await readJson(req); const state = await store.load(); const externalId = decodeURIComponent(userPatch[1]);
+    const existing = Object.values(state.users ?? {}).find((user) => user.federationExternalId === externalId);
+    if (!existing) { scimError(res, sendJson, 404, "SCIM user was not found."); return true; }
+    const operations = Array.isArray(body.Operations) ? body.Operations : [];
+    const deactivate = operations.some((operation) => String(operation.op).toLowerCase() === "replace" && String(operation.path).toLowerCase() === "active" && operation.value === false);
+    if (!deactivate) { scimError(res, sendJson, 400, "Only an active=false PATCH is accepted; group additions remain governed role requests.", "mutability"); return true; }
+    try {
+      const input = { eventId: `scim_${req._loanosRequestId}`, policyId: existing.federationPolicyId, externalId, email: existing.email, displayName: existing.displayName, groups: [], operation: "deactivate", idempotencyKey: header(req, "idempotency-key"), appliedBy: authActor(authContext) };
+      const result = await applyScimProtocolEvent(context, input);
+      scimJson(res, sendJson, 200, scimUserProjection(result.user, "/scim/v2"));
+    } catch (error) { scimError(res, sendJson, 400, error.message, error.code); }
+    return true;
+  }
+  scimError(res, sendJson, 404, "SCIM resource was not found."); return true;
+}
+
+async function applyScimProtocolEvent(context, input) {
+  const { store, appendEvent, authContext, authActor, upsertFederatedTenantUser } = context;
+  const state = await store.load();
+  const replay = Object.values(state.scimEvents ?? {}).find((event) => event.idempotencyKey === input.idempotencyKey);
+  if (replay) {
+    if (replay.policyId !== input.policyId || replay.externalId !== input.externalId || replay.operation !== input.operation || JSON.stringify(replay.groups) !== JSON.stringify(input.groups)) throw Object.assign(new Error("SCIM idempotency key was already used for different identity data."), { code: "scim_idempotency_conflict" });
+    const user = state.users?.[replay.userId];
+    if (!user) throw Object.assign(new Error("SCIM replay evidence points to a missing user."), { code: "scim_replay_inconsistent" });
+    return { event: replay, user, principal: state.saasPrincipals?.[`${authContext.tenantId}:${replay.userId}`] ?? null, idempotent: true };
+  }
+  const applied = applyScimIdentityEvent(state.users, state.scimEvents, state.federationPolicies, input);
+  const userResult = upsertFederatedTenantUser(state.users, applied.userInput);
+  if (userResult.findings.length) throw Object.assign(new Error("SCIM identity could not be applied."), { code: "scim_user_invalid" });
+  let next = { ...state, users: userResult.users, scimEvents: applied.events };
+  const principalKey = `${authContext.tenantId}:${applied.event.userId}`;
+  let principal = next.saasPrincipals?.[principalKey] ?? null;
+  if (applied.event.operation === "upsert" && !principal) {
+    const registered = registerSaasPrincipal(next, { tenantId: authContext.tenantId, principalId: applied.event.userId, principalType: "human", displayName: userResult.user.displayName, status: "active", emailVerified: true, mfaEnrolled: true, identityEvidenceRef: `scim:${applied.event.eventId}:${applied.event.evidenceChecksumSha256}` });
+    next = registered.state; principal = registered.principal;
+  }
+  if (applied.event.operation === "deactivate" && principal) {
+    const suspended = suspendSaasPrincipalFromIdentityProvider(next, { tenantId: authContext.tenantId, principalId: principal.principalId, policyId: applied.event.policyId, evidenceRef: `scim:${applied.event.eventId}:${applied.event.evidenceChecksumSha256}` });
+    next = suspended.state; principal = suspended.principal;
+  }
+  await store.save(appendEvent(next, { type: `identity.scim.${applied.event.operation}_applied`, eventId: applied.event.eventId, userId: applied.event.userId, policyId: applied.event.policyId, evidenceChecksumSha256: applied.event.evidenceChecksumSha256, requestedCanonicalRoleIds: applied.event.requestedCanonicalRoleIds, canonicalRoleDisposition: applied.event.canonicalRoleDisposition, actor: authActor(authContext) }));
+  return { event: applied.event, user: userResult.user, principal, idempotent: false };
+}
+
+function listResponse(resources) { return { schemas: ["urn:ietf:params:scim:api:messages:2.0:ListResponse"], totalResults: resources.length, startIndex: 1, itemsPerPage: resources.length, Resources: resources }; }
+function scimError(res, sendJson, status, detail, scimType) { scimJson(res, sendJson, status, { schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"], status: String(status), detail, ...(scimType ? { scimType } : {}) }); }
+function scimJson(res, sendJson, status, payload, headers = {}) { sendJson(res, status, payload, { "content-type": "application/scim+json; charset=utf-8", ...headers }); }
+function header(req, name) { const value = req.headers[name]; const scalar = Array.isArray(value) ? value[0] : value; if (!scalar || !String(scalar).trim()) throw Object.assign(new Error(`${name} header is required.`), { code: "scim_header_required" }); return String(scalar); }
 
 export async function routeEnterprisePlatformControls(context) {
   const { method, path, req, res, dataDir, authContext, readJson, sendJson, hasPlatformRole, authActor, loadWholeState, saveWholeState, appendPlatformEvent } = context;

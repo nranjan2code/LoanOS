@@ -293,6 +293,8 @@ Useful data-plane endpoints (tenant session or service key required):
 - [LoanOS architecture blueprint](/Users/nisheethranjan/Projects/AIBank/docs/architecture/loanos-india-blueprint.md)
 - [SaaS tenancy and operating model](/Users/nisheethranjan/Projects/AIBank/docs/architecture/saas-tenancy-and-operating-model.md)
 - [Current implementation map](/Users/nisheethranjan/Projects/AIBank/docs/architecture/current-implementation.md)
+- [Tenant role, staffing and identity model](/Users/nisheethranjan/Projects/AIBank/docs/architecture/tenant-role-staffing-and-feature-gating.md)
+- [Federated access and forensic-custody operations](/Users/nisheethranjan/Projects/AIBank/docs/architecture/federated-access-and-forensic-custody-operations.md)
 - [Product roadmap](/Users/nisheethranjan/Projects/AIBank/docs/product/roadmap.md)
 - [GTM asset library (Sales & Marketing, humans + AI agents)](/Users/nisheethranjan/Projects/AIBank/docs/gtm/README.md) — positioning, sales playbook/scripts, marketing, brand guide, AI-agent runbooks, and automation, kept in sync with the backlog via a claims-discipline matrix and check script.
 

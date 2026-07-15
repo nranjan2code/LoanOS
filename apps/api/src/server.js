@@ -10,6 +10,10 @@ import { routeCustomerChannelControls } from "./routes/customer-channel-controls
 import { routeCompletionControls } from "./routes/completion-controls.js";
 import { routeCersaiSearch } from "./routes/cersai-search.js";
 import { routeSaasIdentityGovernance } from "./routes/saas-identity-governance.js";
+import { routeAccessActivityCustody } from "./routes/access-activity-custody.js";
+import { enforceUniversalMutationStaffing } from "./mutation-staffing-policy.js";
+import { validateControlEngineFleetConfiguration } from "./control-rules-engine.js";
+import { exchangeOidcAuthorizationCode, loadFederationAuthorizationEndpoint, validateFederatedLogin } from "./federation-runtime.js";
 import { createObservabilityRegistry } from "./observability.js";
 import { readFile } from "node:fs/promises";
 import { join, dirname } from "node:path";
@@ -575,6 +579,10 @@ function validateProductionConfiguration(env = process.env) {
   }
   if (!env.LOANOS_CONTROL_RULES_ENGINE_URLS) {
     throw new Error("Production requires per-tenant LOANOS_CONTROL_RULES_ENGINE_URLS routing.");
+  }
+  validateControlEngineFleetConfiguration(env);
+  if (env.LOANOS_UNIVERSAL_STAFFING !== "active") {
+    throw new Error("Production requires LOANOS_UNIVERSAL_STAFFING=active so protected staff mutations cannot bypass canonical staffing policy.");
   }
   if (env.LOANOS_EMAIL_PROVIDER !== "real") {
     throw new Error("Production requires a real email provider for borrower authentication and KFS delivery.");
@@ -1161,6 +1169,32 @@ async function route(req, res, dataDir, platformAdminKey, observability, allowDi
   // never copied into the audit chain.
   await store.save(appendAccessActivityEvent(await store.load(), authenticatedRequestAuditEvent(req, authContext, method, path)));
 
+  const mutationAuthorization = await enforceUniversalMutationStaffing({
+    state: await store.load(), tenantId: tenant.tenantId, authContext, method, path,
+    requestId: req._loanosRequestId
+  });
+  if (mutationAuthorization.mode !== "off" && mutationAuthorization.reason !== "read_only") {
+    await store.save(appendAccessActivityEvent(await store.load(), {
+      type: "access.authorization.decision",
+      requestId: req._loanosRequestId,
+      principalId: authActor(authContext),
+      principalType: authContext?.principalType ?? "unknown",
+      method,
+      path,
+      featureId: mutationAuthorization.classification?.featureId ?? null,
+      classification: mutationAuthorization.classification?.disposition ?? null,
+      mode: mutationAuthorization.mode,
+      enforced: mutationAuthorization.enforced,
+      decision: mutationAuthorization.allowed ? "allow" : "deny",
+      reason: mutationAuthorization.reason,
+      controlSource: mutationAuthorization.controlDecision?.source ?? null
+    }));
+  }
+  if (!mutationAuthorization.allowed) {
+    sendJson(res, 403, { error: { code: mutationAuthorization.reason, message: "Protected mutation was denied by tenant staffing and authorization policy." }, authorization: { featureId: mutationAuthorization.classification?.featureId ?? null, mode: mutationAuthorization.mode, reason: mutationAuthorization.reason } });
+    return;
+  }
+
   if (method === "POST" && path === "/activity/screen-events") {
     if (!["tenant_user", "borrower"].includes(authContext?.principalType)) {
       sendJson(res, 403, { error: { code: "interactive_identity_required", message: "Screen activity requires an authenticated interactive session." } });
@@ -1193,6 +1227,8 @@ async function route(req, res, dataDir, platformAdminKey, observability, allowDi
     sendJson(res, 200, { tenantId: tenant.tenantId, count: state.accessActivityEvents?.length ?? 0, chainValid: verifyAccessActivityChain(state.accessActivityEvents ?? []), events: state.accessActivityEvents ?? [] });
     return;
   }
+
+  if (await routeAccessActivityCustody({ method, path, req, res, tenant, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
 
   if (method === "GET" && path === "/audit/events") {
     const state = await store.load();
@@ -8113,6 +8149,61 @@ function provisionTenantSetup(state, tenantId, body, authContext, now = new Date
 }
 
 async function routeAuth(req, res, { dataDir, method, path }) {
+  if (method === "POST" && path === "/auth/federated/start") {
+    const body = await readJson(req); const state = await loadWholeState(dataDir); const now = new Date();
+    const tenant = state.controlPlane.tenants?.[body.tenantId]; const policy = state.tenants?.[body.tenantId]?.federationPolicies?.[body.policyId];
+    if (!tenant || tenant.status !== "active" || !policy || policy.status !== "active" || Date.parse(policy.metadataValidUntil) <= now.getTime()) {
+      sendJson(res, 422, { error: { code: "federation_policy_inactive", message: "An active tenant federation policy is required." } }); return;
+    }
+    if (!policy.allowedRedirectUris?.includes(body.redirectUri)) { sendJson(res, 422, { error: { code: "federation_redirect_forbidden", message: "redirectUri is not certified for this federation policy." } }); return; }
+    if (policy.protocol === "oidc" && !/^[A-Za-z0-9_-]{43,128}$/.test(body.codeChallenge ?? "")) { sendJson(res, 422, { error: { code: "oidc_pkce_required", message: "A valid S256 PKCE challenge is required." } }); return; }
+    try {
+      const opaqueState = `fed_${randomBytes(24).toString("base64url")}`;
+      const nonce = `nonce_${randomBytes(24).toString("base64url")}`;
+      const requestId = policy.protocol === "saml" ? `samlreq_${randomBytes(18).toString("base64url")}` : null;
+      const challengeKey = hashSecret(opaqueState);
+      const challenge = { challengeKey, tenantId: tenant.tenantId, policyId: policy.policyId, protocol: policy.protocol, nonce, requestId, redirectUri: body.redirectUri, codeChallenge: policy.protocol === "oidc" ? body.codeChallenge : null, status: "pending", createdAt: now.toISOString(), expiresAt: new Date(now.getTime() + 5 * 60_000).toISOString() };
+      let authorizationUrl = null;
+      if (policy.protocol === "oidc") {
+        const endpoint = await loadFederationAuthorizationEndpoint(policy);
+        const target = new URL(endpoint);
+        for (const [name, value] of Object.entries({ client_id: policy.audience, response_type: "code", scope: "openid email profile groups", redirect_uri: body.redirectUri, state: opaqueState, nonce, code_challenge: body.codeChallenge, code_challenge_method: "S256" })) target.searchParams.set(name, value);
+        authorizationUrl = target.toString();
+      }
+      await saveWholeState({ ...state, controlPlane: { ...state.controlPlane, federationLoginChallenges: { ...(state.controlPlane.federationLoginChallenges ?? {}), [challengeKey]: challenge } } }, dataDir);
+      sendJson(res, 201, { state: opaqueState, protocol: policy.protocol, authorizationUrl, samlRequest: policy.protocol === "saml" ? { requestId, metadataUrl: policy.metadataUrl, relayState: opaqueState, validationBoundary: "certified_saml_gateway" } : null, expiresAt: challenge.expiresAt });
+    } catch (error) { sendJson(res, 502, { error: { code: error.code ?? "federation_start_failed", message: error.message } }); }
+    return;
+  }
+
+  if (method === "POST" && path === "/auth/federated/exchange") {
+    const body = await readJson(req); const state = await loadWholeState(dataDir); const now = new Date(); const challengeKey = hashSecret(String(body.state ?? ""));
+    const challenge = state.controlPlane.federationLoginChallenges?.[challengeKey];
+    if (!challenge || challenge.status !== "pending" || Date.parse(challenge.expiresAt) <= now.getTime()) { sendJson(res, 401, { error: { code: "federation_challenge_invalid", message: "Federation challenge is invalid, expired or already used." } }); return; }
+    const tenant = state.controlPlane.tenants?.[challenge.tenantId]; const tenantData = state.tenants?.[challenge.tenantId]; const policy = tenantData?.federationPolicies?.[challenge.policyId];
+    try {
+      let evidence = body;
+      if (challenge.protocol === "oidc") {
+        if (!/^[A-Za-z0-9._~-]{43,128}$/.test(body.codeVerifier ?? "")) throw Object.assign(new Error("PKCE verifier is malformed."), { code: "oidc_pkce_invalid" });
+        if (createHash("sha256").update(String(body.codeVerifier ?? "")).digest("base64url") !== challenge.codeChallenge) throw Object.assign(new Error("PKCE verifier does not match the initiated login."), { code: "oidc_pkce_invalid" });
+        evidence = await exchangeOidcAuthorizationCode(policy, { code: body.code, codeVerifier: body.codeVerifier, redirectUri: challenge.redirectUri });
+      }
+      const validated = await validateFederatedLogin(policy, evidence, { nonce: challenge.nonce, requestId: challenge.requestId, now });
+      const user = Object.values(tenantData.users ?? {}).find((candidate) => candidate.authenticationSource === "federated" && candidate.status === "active" && candidate.federationPolicyId === policy.policyId && (candidate.federationExternalId === validated.principal.externalId || candidate.email === validated.principal.email));
+      if (!user) throw Object.assign(new Error("Federated identity is not provisioned and active in this tenant."), { code: "federated_identity_not_provisioned" });
+      const { token, session } = createSessionRecord({ principalType: "tenant_user", tenantId: tenant.tenantId, userId: user.userId, email: user.email, displayName: user.displayName, roles: user.adminRoles, authenticationSource: "federated", assurance: validated.principal.assurance, federationPolicyId: policy.policyId, federationEvidenceChecksumSha256: validated.principal.evidenceChecksumSha256 }, now);
+      const nextUser = { ...user, lastLoginAt: now.toISOString(), updatedAt: now.toISOString() };
+      const nextTenantData = appendAccessActivityEvent({ ...tenantData, users: { ...tenantData.users, [user.userId]: nextUser } }, { type: "access.authentication.succeeded", requestId: req._loanosRequestId, principalId: user.userId, principalType: "tenant_user", sessionId: session.sessionId, authenticationSource: "federated", federationPolicyId: policy.policyId, assuranceLevel: validated.principal.assurance.assuranceLevel });
+      await saveWholeState({ ...state, controlPlane: { ...state.controlPlane, sessions: { ...state.controlPlane.sessions, [session.sessionId]: session }, federationLoginChallenges: { ...state.controlPlane.federationLoginChallenges, [challengeKey]: { ...challenge, status: "used", usedAt: now.toISOString(), sessionId: session.sessionId } } }, tenants: { ...state.tenants, [tenant.tenantId]: nextTenantData } }, dataDir);
+      sendJson(res, 200, { scope: "tenant", tenant: publicTenant(tenant), user: publicTenantUser(nextUser), session: publicSession(session) }, { "set-cookie": sessionCookie(token, session.expiresAt) });
+    } catch (error) {
+      const failedTenantData = appendAccessActivityEvent(tenantData ?? createEmptyTenantData(), { type: "access.authentication.failed", requestId: req._loanosRequestId, principalId: `federated:${sha256(String(body.state ?? ""))}`, principalType: "unresolved_human", authenticationSource: "federated", federationPolicyId: challenge.policyId, reason: error.code ?? "federation_exchange_failed" });
+      await saveWholeState({ ...state, controlPlane: { ...state.controlPlane, federationLoginChallenges: { ...state.controlPlane.federationLoginChallenges, [challengeKey]: { ...challenge, status: "failed", failedAt: now.toISOString(), failureCode: error.code ?? "federation_exchange_failed" } } }, tenants: { ...state.tenants, [challenge.tenantId]: failedTenantData } }, dataDir);
+      sendJson(res, 401, { error: { code: error.code ?? "federation_exchange_failed", message: error.message } });
+    }
+    return;
+  }
+
   if (method === "POST" && path === "/auth/login") {
     const body = await readJson(req);
     const scope = body.scope === "platform" ? "platform" : "tenant";

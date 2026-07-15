@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, createPublicKey } from "node:crypto";
 import { KNOWN_STAFF_ROLES } from "./access-control.js";
 import { CANONICAL_ROLE_CATALOGUE } from "./saas-identity-governance.js";
 
@@ -15,14 +15,29 @@ export function createFederationPolicy(registry = {}, input = {}, now = new Date
   for (const field of ["issuer", "metadataUrl", "audience", "owner", "proposedBy"]) requireText(input[field], field);
   requireHttps(input.metadataUrl, "metadataUrl");
   const allowedDomains = stringList(input.allowedDomains, "allowedDomains", true).map((item) => item.toLowerCase());
+  const allowedRedirectUris = stringList(input.allowedRedirectUris, "allowedRedirectUris").map((item) => httpsValue(item, "allowedRedirectUris"));
   const groupMappings = normalizeGroupMappings(input.groupMappings);
   if (input.protocol === "oidc" && input.pkceRequired !== true) throw identityError("federation_policy_invalid", "OIDC requires PKCE.");
   if (input.protocol === "saml" && input.signedAssertionsRequired !== true) throw identityError("federation_policy_invalid", "SAML requires signed assertions.");
+  let samlValidationGatewayJwk = null;
+  let samlValidationGatewayKeyId = null;
+  if (input.protocol === "saml") {
+    if (!input.samlValidationGatewayJwk || typeof input.samlValidationGatewayJwk !== "object" || Array.isArray(input.samlValidationGatewayJwk)) throw identityError("federation_policy_invalid", "SAML requires a certified validation-gateway public JWK.");
+    requireText(input.samlValidationGatewayKeyId, "samlValidationGatewayKeyId");
+    try { createPublicKey({ key: input.samlValidationGatewayJwk, format: "jwk" }); } catch { throw identityError("federation_policy_invalid", "SAML validation-gateway public JWK is invalid."); }
+    samlValidationGatewayJwk = structuredClone(input.samlValidationGatewayJwk); samlValidationGatewayKeyId = String(input.samlValidationGatewayKeyId);
+  }
   if (input.mfaRequired !== true) throw identityError("federation_policy_invalid", "Federated staff access requires MFA at the identity provider.");
   const policy = {
     policyId: String(input.policyId), providerType: input.providerType, protocol: input.protocol, issuer: String(input.issuer), metadataUrl: String(input.metadataUrl),
-    audience: String(input.audience), allowedDomains, groupMappings, mfaRequired: true,
+    audience: String(input.audience), allowedDomains, allowedRedirectUris, groupMappings, mfaRequired: true,
     pkceRequired: input.protocol === "oidc", signedAssertionsRequired: input.protocol === "saml",
+    maxAuthenticationAgeSeconds: boundedInteger(input.maxAuthenticationAgeSeconds ?? 3600, 60, 43_200, "maxAuthenticationAgeSeconds"),
+    hardwareBoundRequired: input.hardwareBoundRequired === true,
+    managedDeviceRequired: input.managedDeviceRequired === true,
+    maxDevicePostureAgeSeconds: boundedInteger(input.maxDevicePostureAgeSeconds ?? 300, 30, 3600, "maxDevicePostureAgeSeconds"),
+    acceptedAcrValues: stringList(input.acceptedAcrValues, "acceptedAcrValues"),
+    samlValidationGatewayJwk, samlValidationGatewayKeyId,
     secretRef: optionalText(input.secretRef), owner: String(input.owner), proposedBy: String(input.proposedBy),
     status: "draft", createdAt: now.toISOString(), certifiedAt: null
   };
@@ -92,6 +107,8 @@ function normalizeGroupMappings(value) {
 function stringList(value, field, required = false) { if (value == null && !required) return []; if (!Array.isArray(value)) throw identityError("enterprise_identity_invalid", `${field} must be an array.`); const result = [...new Set(value.map(String).map((item) => item.trim()).filter(Boolean))]; if (required && !result.length) throw identityError("enterprise_identity_invalid", `${field} requires at least one value.`); return result; }
 function requireText(value, field) { if (typeof value !== "string" || !value.trim()) throw identityError("enterprise_identity_invalid", `${field} is required.`); }
 function requireHttps(value, field) { try { if (new URL(value).protocol !== "https:") throw new Error(); } catch { throw identityError("enterprise_identity_invalid", `${field} must be an HTTPS URL.`); } }
+function httpsValue(value, field) { requireHttps(value, field); return new URL(value).toString(); }
+function boundedInteger(value, min, max, field) { if (!Number.isInteger(value) || value < min || value > max) throw identityError("enterprise_identity_invalid", `${field} must be an integer from ${min} to ${max}.`); return value; }
 function requireDigest(value, field) { if (!/^[a-fA-F0-9]{64}$/.test(value ?? "")) throw identityError("enterprise_identity_invalid", `${field} must be a SHA-256 digest.`); }
 function futureIso(value, now, field) { const time = Date.parse(value); if (!Number.isFinite(time) || time <= now.getTime()) throw identityError("enterprise_identity_invalid", `${field} must be in the future.`); return new Date(time).toISOString(); }
 function optionalText(value) { return value == null || String(value).trim() === "" ? null : String(value); }

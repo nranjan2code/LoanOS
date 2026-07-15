@@ -67,7 +67,7 @@ These are the load-bearing guarantees. Each must have automated verification (se
 - INV-10 Rule confidentiality. Rule content exists only in the control plane store and inside the owning tenant's instance memory. Logs, metrics, and error messages carry rule/node IDs and hashes only. Responses to agent-facing or borrower-facing callers carry audience-filtered reasons, never traces or rule internals.
 - INV-11 Data, not code. Bundles are declarative data. Instances load no dynamic code, no plugins, no tenant-supplied functions. Engine behavior changes only via signed platform releases.
 - INV-12 Time is an input. `effective_at` and `evaluated_at` arrive on the request (stamped by the gateway). The engine never reads the system clock during evaluation. All tenant-facing effective dates are interpreted in IST.
-- INV-13 Authority-plane isolation. A tenant's `guardrail.platform_control.*` decisions execute in a physically and administratively separate per-tenant runtime from lending/business decisions. The two runtime classes share no URL, process, mutable state, tenant bundle, service identity, key grant, audit partition or runtime administrator. A missing, untrusted, mismatched or shared control instance denies the action.
+- INV-13 Authority-plane isolation. A tenant's `guardrail.platform_control.*` decisions execute in a physically and administratively separate per-tenant runtime from lending/business decisions. The two runtime classes share no URL, process, mutable state, tenant bundle, service identity, key grant, audit partition or runtime administrator. Every control route has a unique `ctrl-*` identity, HTTPS address, mTLS workload/peer/trust references and KMS/HSM signing-key reference. A missing, untrusted, mismatched, unsigned or shared control instance denies the action.
 
 ## 5. System Topology
 
@@ -303,7 +303,7 @@ Controls:
 - SEC-9 RBAC. Roles: rule author, reviewer/approver, platform guardrail owner (separate from tenant authors), fleet operator (no rule read access), auditor (read-only traces + versions). No role combines author and approver over the same version (INV-9).
 - SEC-10 Memory hygiene. Key material zeroized on drop; instances run non-root, read-only filesystem, seccomp/AppArmor profile per isolation tier.
 - SEC-11 Anti-inference. Audience filtering of reasons (INV-10) plus rate limits and anomaly detection on guardrail probing patterns (an agent systematically sweeping fact values to map a threshold is a reportable security event).
-- SEC-12 Control-instance identity. The platform-control gateway pins the expected `ctrl-*` instance ID and optional tenant bundle hash, refuses a URL used by the business engine, and denies on transport, identity, bundle or response-validation failure. Control and business fleet access, signing keys and audit partitions require separate privileges.
+- SEC-12 Control-instance identity. The platform-control gateway pins the expected unique `ctrl-*` instance ID and tenant bundle hash, refuses business/shared/non-HTTPS addresses, requires mTLS workload/peer identity attestation and verified KMS/HSM signing-key lineage, and denies on transport, identity, key, bundle or response-validation failure. Control and business fleet access, signing keys and audit partitions require separate privileges.
 
 ## 13. Crate Architecture
 
@@ -351,6 +351,7 @@ Dependency rule: `rules-core`, `rules-expr`, `rules-model`, `rules-eval` must no
 - Golden decision corpus: every ruleset version carries a fixture set (inputs → expected outcome + key outputs); approval requires green goldens. Slice 1 seeds this corpus from the existing JS eligibility tests.
 - Differential shadow (PH-1): the ported eligibility graph runs against `packages/core/src/eligibility.js` outcomes over the seed-user corpus; cutover requires zero unexplained divergence.
 - Authority isolation (INV-13): tests deny a shared URL, wrong instance identity, missing facts, missing human role coverage, non-independent maker/checker, open staffing pauses, agent attempts to occupy human controls, and unavailable active control engines.
+- Universal route coverage: tests require all FST-001..034 families in the mutation classifier and deny a new/unclassified staff mutation in active mode.
 
 ## 15. Delivery Phases
 
@@ -395,6 +396,7 @@ Each phase has acceptance criteria; a phase is done when all its criteria have a
 ### PH-6 — Platform-control authority plane — complete 2026-07-15 (local staging)
 
 - [x] ADR 0005, INV-13, DEC-11 and SEC-12 establish a separate per-tenant runtime class for identity, feature staffing, SoD and agent authority.
+- [x] Production fleet validation requires unique HTTPS/`ctrl-*` routes, mTLS workload/peer/trust references and KMS/HSM signing-key references; active staff mutations are centrally classified and fail closed when unclassified.
 - [x] `guardrail.platform_control.staffing` has a declarative fixture and fail-closed Rust corpus covering complete staffing, missing checker/minimum people, agent human-control attempts and malformed facts.
 - [x] `apps/api/src/control-rules-engine.js` has independent off/shadow/active modes, per-tenant routing, expected `ctrl-*` identity and tenant-bundle checks, shared-business-URL rejection and active-mode fail-closed behavior.
 - [x] Production configuration requires both business and control engine mappings.

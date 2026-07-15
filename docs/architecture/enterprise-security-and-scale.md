@@ -26,9 +26,20 @@ deployment controller that must produce and operate that evidence.
   Tenant audit events retain policy, external identity, operation and hashed
   evidence lineage.
 
-Live OIDC/SAML token verification, IdP discovery refresh, signing-key rollover,
-SCIM bearer authentication and outbound IdP administration remain connector
-and deployment work.
+The API now exposes OIDC authorization-code/S256-PKCE start and exchange,
+fetches certified discovery/JWKS documents, verifies signature, issuer,
+audience, authorised party, validity, nonce, MFA and authentication age, and
+retains assurance in the session. SAML uses a deliberately explicit certified
+gateway boundary: LoanOS accepts only schema/signature/encryption/time/request-
+binding attestations, never an unparsed client assertion. WebAuthn/FIDO and
+signed managed-device evidence can be required per policy. SCIM discovery,
+exact filtering, User create/deactivate and Group projection require scoped
+tenant bearer credentials; directory groups still request rather than grant
+canonical roles.
+
+Commercial IdP registration, live SAML XML validation gateway, device/MDM
+signature adapter, global logout/revocation, continuous metadata/JWKS refresh
+and provider adverse-conformance evidence remain deployment work.
 
 ## Keys, security logs, and trusted time
 
@@ -45,6 +56,12 @@ and deployment work.
 The existing application envelope provider still performs local encryption.
 Production must connect it to the attested KMS/HSM, validate grants and key
 state directly, and operate actual SIEM/WORM/NTP infrastructure.
+
+The access ledger can now be exported as an exact verified contiguous payload.
+Independent custody approval requires a matching checksum, India storage,
+immutable WORM compliance mode, trusted time and at least 180 days' retention;
+reconciliation exposes every uncustodied sequence. A live collector and object-
+lock/SIEM acknowledgement adapter are still required.
 
 ## PostgreSQL HA, PITR, and capacity
 

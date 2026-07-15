@@ -133,7 +133,7 @@ Required federation controls are HTTPS metadata, exact issuer/audience, PKCE for
 
 Group mappings can populate legacy workspace roles/queues and request canonical roles. Requested canonical roles enter the LoanOS maker-checker queue. Deactivation is different: it is a containment signal and suspends access immediately. Re-activation never silently restores revoked canonical roles.
 
-No commercial IdP connection is live today. The current implementation is contract-complete local logic and mock/API test coverage. Production still needs vendor tenant registration, secrets/certificates, SCIM service credentials, signed webhook/event verification, metadata rotation, logout/session revocation tests and commercial SLAs.
+No commercial IdP connection is live today. The runtime now performs OIDC discovery, authorization-code exchange with S256 PKCE, JWKS signature/issuer/audience/time/nonce validation, certified SAML-gateway attestation validation, MFA/WebAuthn/device assurance evaluation and RFC-shaped SCIM discovery/User/Group operations. Production still needs vendor tenant registration, certificates/credentials, a certified SAML XML gateway, signed device-posture adapter, metadata/key-rotation operation, logout/token revocation tests and commercial SLAs.
 
 ## 9. Authentication, authorization and forensic activity chain
 
@@ -150,9 +150,13 @@ Every authenticated tenant API request appends `access.api.request` before dispa
 
 After dispatch, the same request ID is paired with `access.api.response`, the final HTTP status and completion time. Thus denied, failed and successful requests remain distinguishable even when no business mutation occurred.
 
+When `LOANOS_UNIVERSAL_STAFFING=active`, every authenticated staff `POST`, `PUT`, `PATCH` or `DELETE` is classified into one of FST-001..034 before handler dispatch. A new/unclassified mutation is denied. Classified mutations require current canonical role, configured feature readiness and an allow response from the isolated control engine. `access.authorization.decision` records feature, mode, decision and source. Identity-bootstrap/control endpoints remain self-governed by their stronger internal maker-checker state machine; borrower and workload routes retain their resource/scope controls rather than pretending to be a human role.
+
 Interactive apps may append `ui.activity.recorded` for a strict allow-list: screen view, task open/close, action intent and validation error. Only stable screen/action/entity type IDs and an optional hashed entity reference are accepted. Form values, keystrokes, page contents, borrower data and free-text descriptions are rejected by contract. Dashboard task views and borrower-portal panel views are wired to this endpoint.
 
 Domain events continue to record the business outcome, maker, checker, evidence and correlation. API request → UI event → workflow/domain event → integration request/callback → decision trace can therefore be joined by principal/session/request/entity correlation. External calls must propagate a correlation ID and workload identity; vendor acknowledgements return provider correlation without replacing the originating human/agent attribution.
+
+`POST /activity/exports` creates an exact contiguous payload over the verified activity chain, including previous/head hashes and a payload checksum. A different authenticated approver records India-resident immutable WORM compliance-mode custody, trusted timestamp and retention evidence. Reconciliation reports gaps, overlaps, pending batches and the highest externally custodied sequence.
 
 ## 10. Operational scenarios
 
@@ -181,15 +185,18 @@ Domain events continue to record the business outcome, maker, checker, evidence 
 - `POST /admin/identity-governance/principals/agents`
 - governed role grant/revocation, bootstrap, ownership, emergency access and staffing-escalation closure routes under the same prefix
 - federation policy and SCIM routes under `/admin/federation` and `/admin/scim`
+- `POST /auth/federated/start`, `POST /auth/federated/exchange`
+- SCIM 2.0 discovery plus `/scim/v2/Users` and `/scim/v2/Groups` using scoped tenant service credentials
 - `POST /activity/screen-events`
 - `GET /activity/events`
+- `GET|POST /activity/exports`, `POST /activity/exports/{id}/custody`
 
 ## 12. Remaining production work
 
-1. Wire every sensitive LOS/LMS/LWS/finance/compliance mutation to `authorizeStaffedFeatureAction`; the kernel and preflight API exist, but whole-route coverage is not yet complete.
-2. Deploy the separate control fleet, mTLS, KMS/key separation, audit sink, dashboards and shadow/cutover evidence.
-3. Complete IdP-specific conformance packs for Entra, Okta, AD FS, Keycloak and LDAP bridges; procure at least one production route.
-4. Add front-end staffing/readiness, escalation and role-request workspaces; current API behavior is ahead of administration UI.
-5. Propagate request/actor correlation through every provider adapter and callback, and add SIEM export/reconciliation for missing activity events.
-6. Add managed-device/posture, risk-adaptive authentication, WebAuthn/hardware-key policy, federation session logout and token revocation.
-7. Complete route-coverage evidence proving every protected mutation has authentication, canonical authorization, feature staffing and audit attribution gates.
+1. Run universal staffing in shadow for each tenant, close every `mutation_unclassified` or divergence, then activate; the active runtime is fail-closed but rollout evidence is still institution-specific.
+2. Deploy the separately addressed control fleet and supply the required unique `ctrl-*` identity, mTLS client/server/trust references, KMS/HSM signing reference, audit sink and witnessed cutover evidence.
+3. Complete IdP-specific conformance packs for Entra, Okta, AD FS, Keycloak and LDAP bridges; procure at least one production route and certify the SAML/device-posture adapters.
+4. Add front-end staffing/readiness, escalation, federation and role-request workspaces; current API behavior is ahead of administration UI.
+5. Connect prepared activity exports to a live India SIEM/object-lock provider and reconcile collector/provider acknowledgements on schedule.
+6. Add risk-adaptive step-up, federation global logout/back-channel logout, token revocation/introspection and user-visible authenticator recovery.
+7. Produce route-coverage, IdP key-rollover, leaver-latency, WORM restore and control-engine failover operating evidence before bank production.

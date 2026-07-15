@@ -357,6 +357,10 @@ export function createSessionRecord(input, now = new Date()) {
     // restricted session reach the specific /auth/* endpoints that resolve
     // that action — every other route is 403'd until it's cleared.
     restricted: input.restricted ?? null,
+    authenticationSource: input.authenticationSource ?? "local",
+    assurance: input.assurance ?? null,
+    federationPolicyId: input.federationPolicyId ?? null,
+    federationEvidenceChecksumSha256: input.federationEvidenceChecksumSha256 ?? null,
     createdAt: now.toISOString(),
     expiresAt,
     lastSeenAt: now.toISOString(),

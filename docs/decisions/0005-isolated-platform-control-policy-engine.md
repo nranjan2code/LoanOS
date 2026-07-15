@@ -20,7 +20,9 @@ Each tenant receives at least two physically and administratively distinct Rust 
 
 The instances must not share a URL, process, pod/microVM, tenant bundle, service identity, signing/encryption key grant, mutable cache, audit sink partition, deployment approval, or runtime administrator. The Node gateways are separate: `apps/api/src/rules-engine.js` and `apps/api/src/control-rules-engine.js`.
 
-Production requires `LOANOS_CONTROL_RULES_ENGINE=active` and a per-tenant object in `LOANOS_CONTROL_RULES_ENGINE_URLS` containing the control URL and expected `ctrl-*` instance ID. A response with the wrong instance identity or tenant bundle, an unreachable instance, malformed response, or a control URL equal to the business-engine URL is a denial.
+Production requires `LOANOS_CONTROL_RULES_ENGINE=active`, `LOANOS_UNIVERSAL_STAFFING=active` and a per-tenant object in `LOANOS_CONTROL_RULES_ENGINE_URLS`. Every object contains a unique HTTPS URL and `ctrl-*` instance ID plus mTLS client/server/trust references and a KMS/HSM bundle-signing key reference. A response must attest matching mTLS workload/peer identities and verified signing-key lineage. Wrong instance/bundle/transport/key identity, unreachable or malformed response, a duplicate control address, or a URL equal to the business-engine URL is a denial.
+
+All protected staff mutations are centrally classified into FST-001..034 before handler dispatch. In active mode an unknown mutation is denied, which turns endpoint addition into an explicit policy-maintenance obligation rather than a silent authorization bypass.
 
 Identity-provider groups may request canonical roles, but only the isolated control path and LoanOS maker-checker workflow may grant them. Agents never count as human staffing and cannot be makers, checkers, accountable officers, access reviewers, or auditors.
 

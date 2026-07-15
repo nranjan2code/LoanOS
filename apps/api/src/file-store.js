@@ -117,6 +117,7 @@ export function createEmptyTenantData() {
     dataQualityCertifications: {},
     federationPolicies: {},
     scimEvents: {},
+    activityExportBatches: {},
     screeningLists: {},
     cddReviews: {},
     transactionMonitoringRules: {},
@@ -336,6 +337,7 @@ function normalizeTenantData(data) {
     dataQualityCertifications: data?.dataQualityCertifications ?? {},
     federationPolicies: data?.federationPolicies ?? {},
     scimEvents: data?.scimEvents ?? {},
+    activityExportBatches: data?.activityExportBatches ?? {},
     screeningLists: data?.screeningLists ?? {},
     cddReviews: data?.cddReviews ?? {},
     transactionMonitoringRules: data?.transactionMonitoringRules ?? {},
@@ -565,6 +567,7 @@ export function normalizeState(state) {
       platformUsers: normalizePlatformUsers(state?.controlPlane?.platformUsers),
       sessions: normalizeSessions(state?.controlPlane?.sessions),
       loginAttempts: normalizeLoginAttempts(state?.controlPlane?.loginAttempts),
+      federationLoginChallenges: state?.controlPlane?.federationLoginChallenges ?? {},
       platformEvents: Array.isArray(state?.controlPlane?.platformEvents) ? state.controlPlane.platformEvents : [],
       ckycRegistry: state?.controlPlane?.ckycRegistry ?? { ...MOCK_CKYC_PRESEED }
     },
@@ -584,6 +587,7 @@ export function createEmptyState() {
       platformUsers: {},
       sessions: {},
       loginAttempts: {},
+      federationLoginChallenges: {},
       platformEvents: [],
       ckycRegistry: { ...MOCK_CKYC_PRESEED }
     },

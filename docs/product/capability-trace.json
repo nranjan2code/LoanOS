@@ -979,6 +979,16 @@
         "note": "Automated evidence covering the AUD-004 control family."
       },
       {
+        "type": "code",
+        "ref": "packages/core/src/access-activity-custody.js",
+        "note": "Verified contiguous activity export and independent India WORM custody reconciliation."
+      },
+      {
+        "type": "test",
+        "ref": "tests/access-activity-custody.test.js",
+        "note": "Tamper, checksum, retention, four-eyes and complete-sequence custody evidence."
+      },
+      {
         "type": "doc",
         "ref": "docs/architecture/current-implementation.md",
         "note": "Documented architecture or regulatory boundary for AUD-004."
@@ -10779,7 +10789,7 @@
     "lastReviewed": "2026-07-15"
   },
   "SEC-002": {
-    "capability": "Enterprise OIDC/SAML federation, certified provider policy, MFA and session binding",
+    "capability": "Enterprise OIDC/SAML federation, certified provider policy, code/PKCE/JWKS validation, MFA/device assurance and session binding",
     "category": "29. Identity, Security, and Cyber Controls",
     "plane": "Security & IAM",
     "applicability": "Core",
@@ -10792,9 +10802,19 @@
         "note": "Certified Entra, Okta, AD FS, Keycloak, OpenLDAP-bridge and generic OIDC/SAML provider-policy contract."
       },
       {
+        "type": "code",
+        "ref": "packages/core/src/federated-access-runtime.js",
+        "note": "Cryptographic OIDC verification plus fail-closed SAML and MFA/WebAuthn/device assurance validation."
+      },
+      {
         "type": "test",
         "ref": "tests/enterprise-platform.test.js",
         "note": "Automated federation certification, MFA, metadata and provider-policy evidence."
+      },
+      {
+        "type": "test",
+        "ref": "tests/federated-access-runtime.test.js",
+        "note": "JWKS signature, claim, nonce, hardware/device and SAML validation-attestation evidence."
       },
       {
         "type": "doc",
@@ -10806,11 +10826,11 @@
     "dependencies": [
       "AUD-001"
     ],
-    "notes": "The policy and test contract is executable. No commercial IdP tenant, signed-token validation path, secrets/certificates, metadata rotation operation or witnessed provider conformance is live.",
+    "notes": "The protocol runtime is executable. No commercial IdP/MDM/SAML-gateway tenant, global logout/revocation operation, continuous metadata rotation or witnessed provider conformance is live.",
     "lastReviewed": "2026-07-15"
   },
   "SEC-003": {
-    "capability": "SCIM provisioning/deprovisioning, group mapping, immediate canonical suspension and governed role requests",
+    "capability": "Scoped SCIM protocol provisioning/deprovisioning, group mapping, immediate canonical suspension and governed role requests",
     "category": "29. Identity, Security, and Cyber Controls",
     "plane": "Security & IAM",
     "applicability": "Core",
@@ -10821,6 +10841,11 @@
         "type": "code",
         "ref": "packages/core/src/enterprise-identity.js",
         "note": "Idempotent SCIM events, group mappings and canonical-role request disposition."
+      },
+      {
+        "type": "code",
+        "ref": "apps/api/src/routes/enterprise-controls.js",
+        "note": "Scoped SCIM 2.0 discovery, exact user lookup, create/deactivate and group projection endpoints."
       },
       {
         "type": "test",
@@ -10837,7 +10862,7 @@
     "dependencies": [
       "AUD-001"
     ],
-    "notes": "Local API behavior exists. A live SCIM service credential, provider webhook/signature path, session/token revocation conformance and vendor SLA remain.",
+    "notes": "The scoped protocol surface exists. Commercial provider registration, cross-system reconciliation, session/token global revocation conformance and measured vendor leaver SLA remain.",
     "lastReviewed": "2026-07-15"
   },
   "SEC-004": {
@@ -10872,7 +10897,7 @@
     "lastReviewed": "2026-07-15"
   },
   "SEC-005": {
-    "capability": "Fine-grained scoped RBAC/ABAC, separation of duty, per-feature minimum staffing and isolated control-policy enforcement",
+    "capability": "Fine-grained scoped RBAC/ABAC, separation of duty, per-feature minimum staffing, deny-by-default mutation classification and isolated control-policy enforcement",
     "category": "29. Identity, Security, and Cyber Controls",
     "plane": "Security & IAM",
     "applicability": "Core",
@@ -10890,6 +10915,16 @@
         "note": "Role authority, staffing, maker-checker, agent, suspension, lockout and escalation coverage."
       },
       {
+        "type": "code",
+        "ref": "apps/api/src/mutation-staffing-policy.js",
+        "note": "Deny-by-default protected staff mutation classification across FST-001..034."
+      },
+      {
+        "type": "test",
+        "ref": "tests/mutation-staffing-policy.test.js",
+        "note": "Exhaustive family coverage, active unknown-route denial and shadow-mode evidence."
+      },
+      {
         "type": "doc",
         "ref": "docs/architecture/tenant-role-staffing-and-feature-gating.md",
         "note": "Exhaustive role/staffing/edge-case and operations specification."
@@ -10899,7 +10934,7 @@
     "dependencies": [
       "AUD-001"
     ],
-    "notes": "The kernel, persistent administration APIs and isolated control gateway exist. Universal LOS/LMS/LWS/finance/compliance mutation-route enforcement, production control fleet and complete administration UI remain.",
+    "notes": "The kernel, persistent APIs, universal mutation gate and hardened control-fleet contract exist. Tenant shadow/cutover evidence, deployed control fleet and complete administration UI remain.",
     "lastReviewed": "2026-07-15"
   },
   "SEC-006": {
