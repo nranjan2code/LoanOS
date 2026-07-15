@@ -1,6 +1,4 @@
 const path = window.location.pathname.replace(/\/$/, '') || '/';
-const isPublicHomepage = path === '/';
-const platformGuidanceLink = isPublicHomepage ? '' : '<a href="/help/">Guide & Academy</a>';
 
 const pageNames = {
   '/platform': 'Platform',
@@ -9,8 +7,7 @@ const pageNames = {
   '/partners': 'Lending partners',
   '/loan-types': 'Loan and product library',
   '/trust': 'Trust centre',
-  '/resources': 'Resources',
-  '/help': 'Guide & Academy'
+  '/resources': 'Resources'
 };
 
 if (pageNames[path]) {
@@ -50,7 +47,6 @@ const header = `
         <a data-route="/loan-types" href="/loan-types/">Capabilities</a>
         <a data-route="/trust" href="/trust/">Trust centre</a>
         <a data-route="/resources" href="/resources/">Resources</a>
-        ${platformGuidanceLink}
         <a class="mobile-nav-cta" href="mailto:hello@aitailorworkshop.in?subject=LoanOS%20platform%20demo">Book a demo</a>
       </nav>
       <div class="nav-actions">
@@ -70,7 +66,7 @@ const footer = `
         </div>
         <div class="footer-col"><h3>Solutions</h3><a href="/financial-institutions/">Financial institutions</a><a href="/partners/">Partners & fintechs</a><a href="/for-msmes/">Borrower experience</a></div>
         <div class="footer-col"><h3>Explore</h3><a href="/platform/">Platform</a><a href="/loan-types/">Loan types</a><a href="/trust/">Trust centre</a></div>
-        <div class="footer-col"><h3>Learn</h3>${platformGuidanceLink}<a href="/resources/">Resource room</a><a href="/resources/#glossary">Plain-language glossary</a><a href="/resources/#faq">Common questions</a></div>
+        <div class="footer-col"><h3>Learn</h3><a href="/resources/">Resource room</a><a href="/resources/#glossary">Plain-language glossary</a><a href="/resources/#faq">Common questions</a></div>
         <div class="footer-col"><h3>Contact</h3><a href="mailto:hello@aitailorworkshop.in?subject=LoanOS%20platform%20demo">Book a demo</a><a href="mailto:hello@aitailorworkshop.in?subject=LoanOS%20trust%20review">Request a trust review</a><a href="mailto:hello@aitailorworkshop.in?subject=LoanOS%20partnership">Discuss a partnership</a></div>
       </div>
       <div class="footer-bottom"><span>© 2026 LoanOS India. All rights reserved.</span><span>India-only / INR-first / Human-governed AI</span></div>
