@@ -47,6 +47,7 @@ capability rows remain the source of truth for individual features.
 | AH | Organisation admission, bootstrap identity and canonical SaaS RBAC | Greenfield kernels and persistent first slice complete for non-active signup, multi-source organisation/representative evidence, session-bound two-person admission, quarantined tenant reservation, single-use MFA first owner, restricted provisioning sessions, verified second checker, 85 canonical roles, persistent maker-checker RBAC, hard SoD, 34 feature staffing policies, immediate suspension/revocation with pause/escalation, sponsored agents, IdP canonical-role requests, API/screen attribution, isolated control-engine fail-closed routing and a complete tenant-human IAM administration workspace. Direct production tenant minting and public/data-plane use are blocked. Production delivery, authoritative legal/RE/authority/domain/abuse verification, contracting/billing, cloud/DNS/certificate controllers, commercial IdPs and institution operating evidence remain. |
 | AI | Platform operations completion: admission/enterprise conformance, signed federated revocation, IAM automation and resilience drills | Complete at the product/simulator layer — 153 stable scenarios cover `INT-ADM-01..10`; 85 scenarios cover KMS/HSM/vault, broker/DLQ, CDC, MDM, deployment compensation/rollback and trusted time; provider logout evidence is signed, tenant/session exact and replay safe; IAM operational runs are checksum sealed and automate containment only; eight failure drills require independent measured witnessing. All evidence remains explicitly simulated/non-live. Production requires selected providers/direct-authority sources, contracts and credentials, deployed tenant-fenced schedulers/controllers, provider-native fixtures, live telemetry/custody and institution-witnessed UAT/drills. |
 | AJ | Persistent platform operations: unified tenant activation, expiring provider conformance, cryptographic revocation verification and durable identity workers | Complete at the product/control-plane layer — activation joins eight checksum/currentness gates and forbids simulator production; admission/enterprise campaigns persist immutable manifests/evidence with maker-checker, expiry and reassessment; logout envelopes now require exact-byte RS256/ES256 verification against governed public JWK profiles; tenant-service workers use leases, monotonic fences, bounded retry, DLQ, alerts/escalations and independent replay. Production still requires selected commercial providers, native signed fixtures, deployed scheduler/handler adapters, managed CAS/RLS evidence, telemetry/custody and witnessed institution assurance. |
+| AK | Executable identity-worker operations: atomic persistence, bounded scheduler, health and deployment | Repository execution slice complete — an HTTP service-plane runner claims, executes, checksums, records and finalizes tenant/workload-fenced jobs; PostgreSQL claims use the existing tenant advisory-lock transaction plus RLS, with a live-database race test; explicit simulation and injected-live handler boundaries, timeout/fail-closed recovery, health/readiness/Prometheus metrics, container profile, environment contract and operations runbook are implemented. Remaining production work is vendor selection/contracts, certified live ports/native schemas, secret-manager/workload federation, managed deployment/alerting, execution of the PostgreSQL test against the selected service, soak/chaos and institution-witnessed assurance. |
 
 ## Epic 1: Tenant and Regulated Entity Setup
 
@@ -261,7 +262,7 @@ Done when:
 
 ## Epic 8: AI Governance and Model Risk
 
-Status: first executable slice complete; drift monitoring first slice complete.
+Status: governed model-risk and digital-worker control-plane slices complete; no external model or agent runtime is connected.
 
 Goal: all model-assisted decisions are inventoried, validated, monitored, and kill-switchable.
 
@@ -279,10 +280,21 @@ Tasks:
 - AI incident workflow. First slice done: a kill-switch trigger opens an incident record tracking scope, reason, trigger actor, and status.
 - Kill-switch post-incident review. First slice done: the global switch cannot be cleared until a post-incident review (root cause, remediation) is recorded, and clearance closes the incident while retaining the evidence.
 - Tests for global/model/workflow kill switch.
+- Proposal-only marketplace templates for CAM preparation, underwriting review, document/compliance review, and service-support triage. Done: each template declares bounded inputs, outputs, action scopes, human sponsor, risk tier, pricing dimensions, and version lineage.
+- Tenant commercial contract and exact-paise usage model. First slice done: maker-checker pricing contracts, immutable rated usage, and tenant/platform reports exist; quotas, invoice aggregation, tax treatment, credits, and payment collection remain.
+- Tenant installation and customization. Done: a tenant pins a template version, approved model, prompt checksum, knowledge references/checksum, action scope, limits, retention, disclosure, and named owner without changing another tenant.
+- Material-agent staffing and approval. Done: FST-034 requires four distinct authenticated humans in business ownership, model-risk/compliance, information-security/data, and operations-control roles before activation.
+- Runtime authorization. Done at the control boundary: model-consumption and agent-action decisions are evaluated freshly, fail closed, and retain both decision traces before execution can begin.
+- Execution, completion, usage, and reporting lineage. Done at the control boundary: input/output checksums, human-review state, token/action units, exact-paise charge, correlation, policy, model, prompt, and knowledge versions are retained and audit sealed.
+- Agent suspension and incident response. Done: tenant and platform suspension controls block new runs; an unresolved output incident blocks completion/reporting claims.
+- Provider-neutral runtime adapter and AWS India deployment. Planned: connect an approved model/agent runtime without bypassing the existing governance boundary; retain provider request/response checksums and India processing evidence.
+- Specialized deterministic guardrails. Partial: generic `agent_action` and collections controls exist; retrieval/data minimization, outbound communication, eligibility/decision influence, and domain mutation need dedicated policy bundles and golden corpora.
+- Agent evaluation programme. Planned: versioned task suites, groundedness/completeness/safety thresholds, cohort monitoring, red-team evidence, regression gates, and automatic suspension tied to each installed version.
+- Marketplace and tenant administration UI. Planned: catalogue discovery, comparison, pricing approval, installation diff, staffing readiness, activation, usage budgets, reports, and uninstall/export journeys.
 
 Done when:
 
-- No model can be called unless inventory, validation, status, and kill-switch gates pass.
+- No model or agent can be called unless inventory, validation, staffing, installation, kill-switch, model-consumption, and agent-action gates pass, and the execution remains reproducible from retained lineage.
 
 ## Epic 9: Regulatory Reporting and Integrations
 

@@ -40,6 +40,8 @@ jobs:
           node-version: "20"
           cache: "npm"
       - run: npm ci
+      - name: Documentation integrity gate
+        run: npm run docs:check
       - name: Capability evidence integrity gate
         run: npm run trace:validate
       - name: Public-site content gate

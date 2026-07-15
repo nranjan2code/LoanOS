@@ -18,9 +18,10 @@ files: give the agent the runbook plus `shared-context.md` and the inputs it nam
 | [`agent-outreach-personalization.md`](agent-outreach-personalization.md) | Draft personalised outreach | `../sales/email-sequences.md`, `cold-call-scripts.md` |
 | [`agent-content-generation.md`](agent-content-generation.md) | Draft marketing content | `../marketing/` |
 | [`agent-qualification.md`](agent-qualification.md) | Score/qualify an opportunity | `../sales/qualification-framework.md` |
+| [`agent-website-content.md`](agent-website-content.md) | Draft governed public-site changes | [`../marketing/public-site-operations.md`](../marketing/public-site-operations.md) |
 
 Customer Success agent runbooks live with their department in
-[`../customer-success/ai-agents/`](../customer-success/ai-agents/): onboarding
+[`../customer-success/ai-agents/`](../customer-success/ai-agents/README.md): onboarding
 orchestration, health monitor, and QBR prep. They obey the same load order and
 golden rules below.
 

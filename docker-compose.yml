@@ -38,5 +38,33 @@ services:
     ports:
       - "3040:3040"
 
+  # Explicitly non-commercial worker used to exercise the complete durable
+  # scheduler protocol before a certified IdP/directory adapter is selected.
+  # It is opt-in so a default production-shaped stack cannot mistake simulator
+  # completion for live provider evidence.
+  identity-worker-simulator:
+    profiles: ["identity-simulator"]
+    build: .
+    command: ["node", "scripts/run-identity-operations-worker.mjs"]
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      LOANOS_API_URL: http://api:3040
+      LOANOS_IDENTITY_WORKER_API_KEY: ${LOANOS_IDENTITY_WORKER_API_KEY:?Set a tenant-bound worker API key}
+      LOANOS_IDENTITY_WORKER_ID: ${LOANOS_IDENTITY_WORKER_ID:-identity-worker-simulator-1}
+      LOANOS_IDENTITY_WORKER_EXECUTION_MODE: simulated
+      LOANOS_ALLOW_SIMULATED_IDENTITY_WORKER: "true"
+      LOANOS_IDENTITY_WORKER_MAX_JOBS: ${LOANOS_IDENTITY_WORKER_MAX_JOBS:-25}
+      LOANOS_IDENTITY_WORKER_LEASE_MS: ${LOANOS_IDENTITY_WORKER_LEASE_MS:-30000}
+      LOANOS_IDENTITY_WORKER_JOB_TIMEOUT_MS: ${LOANOS_IDENTITY_WORKER_JOB_TIMEOUT_MS:-10000}
+      LOANOS_IDENTITY_WORKER_INTERVAL_MS: ${LOANOS_IDENTITY_WORKER_INTERVAL_MS:-15000}
+      LOANOS_IDENTITY_WORKER_HEALTH_PORT: "3041"
+    ports:
+      - "3041:3041"
+    restart: unless-stopped
+
+
 volumes:
   loanos-pg:

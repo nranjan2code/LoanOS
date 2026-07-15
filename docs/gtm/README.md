@@ -20,14 +20,14 @@ and is checked by [`automation/gtm-backlog-sync.mjs`](automation/gtm-backlog-syn
 
 | Folder | What is in it | Primary owner |
 | --- | --- | --- |
-| `strategy/` | Positioning, ICP & personas, competitive landscape, pricing, claims↔backlog sync | Product marketing |
-| `sales/` | Playbook, discovery bank, call/email scripts, demo script, objections, battlecards, qualification | Sales |
-| `customer-success/` | Post-sale: onboarding, adoption/QBR, renewals/expansion, health/churn + CS agent runbooks | Customer Success |
-| `marketing/` | Marketing plan, messaging house, content calendar, campaign briefs, website copy | Marketing / demand gen |
-| `assets/` | Pitch-deck outline, one-pager, case-study template, FAQ | Product marketing |
-| `ai-agents/` | Canonical shared context + runbooks/prompts for AI agents that execute GTM tasks | RevOps / AI |
-| `automation/` | Runnable scripts: backlog-claim check, outreach list build, collateral generator | RevOps |
-| `brand/` | Brand guide (colours, type, logo, voice) — every asset must follow it | Product marketing / design |
+| [Strategy](strategy/README.md) | Positioning, ICP & personas, competitive landscape, pricing, claims↔backlog sync | Product marketing |
+| [Sales](sales/README.md) | Playbook, discovery bank, call/email scripts, demo script, objections, battlecards, qualification | Sales |
+| [Customer Success](customer-success/README.md) | Post-sale onboarding, adoption/QBR, renewals/expansion, health/churn and CS agent runbooks | Customer Success |
+| [Marketing](marketing/README.md) | Marketing plan, messaging house, content calendar, campaign briefs, website copy | Marketing / demand gen |
+| [Assets](assets/README.md) | Pitch-deck outline, one-pager, case-study template, FAQ | Product marketing |
+| [AI agents](ai-agents/README.md) | Canonical shared context and runbooks/prompts for GTM tasks | RevOps / AI |
+| [Automation](automation/README.md) | Runnable scripts: backlog-claim check, outreach list build, collateral generator | RevOps |
+| [Brand](brand/brand-guide.md) | Brand guide (colours, type, logo, voice) — every asset must follow it | Product marketing / design |
 
 For public-site work, use [Public Site Content Operations](marketing/public-site-operations.md).
 It is the shared human and AI workflow for drafting, reviewing and approving

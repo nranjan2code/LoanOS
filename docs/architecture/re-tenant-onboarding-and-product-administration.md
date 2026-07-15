@@ -14,8 +14,9 @@ LoanOS provides a versioned platform template library. The 21 public journeys ar
 8. **Configure finance and compliance** — chart of accounts, GST/TDS, bank/escrow/GL, EOD/BOD, reporting calendar, CIC/CKYCRR/FIU/CERSAI/CRILC/CIMS/PSL applicability and evidence owners.
 9. **Prepare data and operations** — migration mapping/reconciliation, users/training, SOPs, support/incident/DR, capacity, security assurance and control testing.
 10. **Sandbox and UAT** — happy/adverse product cases, roles, exceptions, accounting, reconciliation, regulatory outputs, accessibility and recovery evidence.
-11. **Approve and launch** — maker-checker product approval, tenant readiness, provider readiness for live mode, cutover/rollback and operations/compliance/finance sign-off.
-12. **Administer continuously** — add products, clone/customise templates, version policies/workflows, suspend/retire products, change channels/providers, recertify access and monitor readiness without affecting other active products.
+11. **Configure governed AI workers** — choose entitled proposal-only templates, approve pricing, pin model/prompt/knowledge/action versions, assign owner and FST-034 roles, set budgets/retention/disclosure, and run adverse/evaluation evidence; no external model call is implied by installation.
+12. **Approve and launch** — maker-checker product approval, tenant readiness, provider readiness for live mode, worker activation where applicable, cutover/rollback and operations/compliance/finance/signatory approval.
+13. **Administer continuously** — add products/workers, clone/customise templates, version policies/workflows, suspend/retire products or workers, change channels/providers, recertify access and monitor readiness without affecting other active products.
 
 ## Authority model
 
@@ -32,7 +33,7 @@ Customisation is data and policy: configuration schemas, decision models, workfl
 
 ## Readiness projection
 
-The getting-started workspace must show progress and blockers by workstream: tenant/RE, subscription, products, organisation/users, channels, partners, workflows, integrations, security, finance, compliance/reporting, migration, UAT/training and go-live. Each blocker links to its owner, required evidence and next action. Adding a later product creates a new scoped onboarding amendment; it does not reopen or mutate unrelated active products.
+The getting-started workspace must show progress and blockers by workstream: tenant/RE, subscription, products, organisation/users, channels, partners, workflows, integrations, AI/model governance, worker pricing/installations/staffing, security, finance, compliance/reporting, migration, UAT/training and go-live. Each blocker links to its owner, required evidence and next action. Adding a later product or worker creates a new scoped onboarding amendment; it does not reopen or mutate unrelated active products.
 
 ## Deployment models
 

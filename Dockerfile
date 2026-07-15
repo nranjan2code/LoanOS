@@ -13,6 +13,7 @@ RUN npm ci --omit=dev
 COPY packages ./packages
 COPY apps ./apps
 COPY db ./db
+COPY scripts ./scripts
 
 # Run as an unprivileged user.
 USER node

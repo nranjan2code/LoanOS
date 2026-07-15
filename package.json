@@ -8,6 +8,7 @@
     "test": "node --test tests/*.test.js",
     "trace:sync": "node scripts/sync-capability-trace.mjs",
     "trace:validate": "node scripts/validate-capability-evidence.mjs",
+    "docs:check": "node scripts/validate-documentation.mjs",
     "dashboard": "node scripts/sync-capability-trace.mjs && node scripts/validate-capability-evidence.mjs && node scripts/build-dashboard.mjs",
     "web:check": "node apps/web/scripts/validate-public-site.mjs",
     "web:content:check": "node docs/gtm/automation/gtm-backlog-sync.mjs && node apps/web/scripts/validate-public-site.mjs",

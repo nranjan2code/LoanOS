@@ -35,9 +35,13 @@ KFS-before-contract, data residency, tamper-evident audit.
 ### Core + AI Governance (`ai_governance`)
 Adds model inventory, governed lifecycle with independent-validation gate,
 model/global kill switch, drift auto-trip, generative adversarial/hallucination
-gate, customer-facing AI disclosure + human handoff. **Recommended default** for
-any RE using scorecards or GenAI in the credit path — and increasingly a board/
-RBI expectation.
+gate, customer-facing AI disclosure + human handoff, and the governed
+digital-worker control plane: proposal-only catalogue templates, tenant pricing
+contracts/installations, four-human activation, dual runtime authorization,
+execution/output lineage, exact-paise usage reports, and suspension. **Recommended
+default** for any RE using scorecards or GenAI in the credit path. Live foundation-
+model invocation, worker-quality evaluation, quotas, invoicing and the marketplace
+UI remain partial/roadmap and must not be sold as live.
 
 ### Core + Distribution (`dlg`, `co_lending`, `marketplace`)
 For REs with LSP/partner distribution: Default Loss Guarantee arrangements (5%
@@ -67,6 +71,14 @@ white-glove onboarding + exit guarantee.
 uplift (AI Governance, Distribution, Integrations) + volume-banded usage on
 active loan accounts. Dedicated data plane priced as an Enterprise uplift.
 
+For digital workers, price the governed service as a base AI Governance module
+plus an approved tenant contract per installed worker. Supported rating dimensions
+already represented in the product are input tokens, output tokens, successful
+run, human-review item, and permitted action unit, all rated in integer paise.
+Commercial rates, free allowances, caps, tax treatment and invoice rules require
+Finance/Founder approval; the repository contains no approved rate card and no
+production invoice engine.
+
 ## Pricing levers & guardrails
 
 - **Discount authority:** define floor by edition; require approval below floor.
@@ -76,6 +88,9 @@ active loan accounts. Dedicated data plane priced as an Enterprise uplift.
   dedicated-vs-pooled. Reflects the managed onboarding wizard + RE/product seeding.
 - **Sandbox** environments (synthetic-only) can be offered free during evaluation
   to de-risk the buy — the product already supports sandbox provisioning/reset.
+- **Usage budgets:** contract minimum/maximum dimensions and tenant alerts before
+  connecting a paid provider; hard quota enforcement and overage treatment remain
+  roadmap until finance, product and RE approve the policy.
 
 ## Commercial proof points that justify price
 

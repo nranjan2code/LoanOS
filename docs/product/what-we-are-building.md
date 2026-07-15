@@ -176,23 +176,24 @@ The current codebase contains Phase 0 executable controls:
 - Execution document packet renderer for KFS, sanction letter, agreement summary, privacy notice, checksums, delivery evidence, eSign evidence, and document-vault receipt.
 - AI model registry.
 - Model-level and global kill switch.
+- Governed digital-worker marketplace with proposal-only CAM, underwriting, document/compliance, and service-support templates.
+- Tenant pricing contracts, installations, four-role human approval, control-engine activation, dual runtime guardrails, execution/output lineage, exact-paise usage, reports, and suspension controls.
 - API endpoints backed by local JSON state.
 - Automated tests for the main compliance gates.
 
 ## What We Build Next
 
-Recently completed: SaaS tenancy groundwork, tenant onboarding, human login/admin, and the audit spine — per-tenant state partitioning, tenant-scoped service credentials, tenant/platform user sessions, tenant user administration, access reviews, service-key rotation, a platform onboarding wizard/control plane for tenant shell + owner + RE + product + module/flow readiness, a cross-tenant isolation suite, and a tamper-evident per-tenant audit hash chain with an integrity-attested evidence export pack (Epic 11, stages S1–S6 first slices).
+Recently completed: SaaS tenancy groundwork, tenant onboarding, human login/admin, the audit spine, and the first governed digital-worker control plane — including tenant-scoped commercial contracts and installations, FST-034 four-human activation, dual decision-engine authorization, checksum-sealed execution/output lineage, exact-paise usage, reporting, and suspension. These are control-plane capabilities; no external LLM invocation is represented as complete.
 
 Immediate next build:
 
-1. Production hardening for tenant lifecycle: the federation/SCIM policy and managed-key control planes are executable; next is live IdP token/signature/discovery integration, authenticated SCIM connectivity, direct KMS/HSM grants/key state, and expanded onboarding assurance (Epic 11, stage S5/S6).
-2. Product policy versioning with effective dates and explicit prepayment/foreclosure policy rules.
-3. CKYC adapter boundary and fuller V-CIP evidence vault.
-4. Data-retention, deletion-request, and third-party sharing consent workflows.
-5. Offer generation and borrower-facing execution upgrades such as PDF generation and external eSign envelope storage.
-6. Recovery contact logging, hardship/restructure workflow, settlement, and write-off approval.
-7. LSP/vendor incident workflows, exit controls, and deeper vendor periodic review packs.
-8. Drift monitoring, recurring fairness evidence, and model incident pack generation.
+1. Connect a provider-neutral model/agent adapter to an approved AWS India runtime while preserving model inventory, kill-switch, tenant isolation, dual guardrails, and complete request/response lineage.
+2. Add specialized deterministic guardrails for tenant-scoped retrieval, data minimization, outbound communications, eligibility/decision influence, and domain mutations, each with a golden corpus.
+3. Establish worker-specific evaluation and monitoring: versioned task suites, groundedness/completeness/safety thresholds, red-team and regression evidence, cohort reports, alerts, and automatic suspension.
+4. Build marketplace and tenant administration journeys for catalogue discovery, pricing approval, installation diff, staffing readiness, activation, usage budgets, reporting, and uninstall/export.
+5. Complete commercial operations with quotas, invoice aggregation, GST/tax treatment, credits, reconciliation, and contract-entitlement enforcement.
+6. Production harden tenancy and operations with live federation/SCIM, KMS/HSM custody, India-resident telemetry/SIEM, managed backup/PITR, DR, and independent assurance.
+7. Complete and certify live external lending integrations, institutional UAT, model-risk approval, security testing, and RE production admission.
 
 ## Non-Goals for Now
 
@@ -212,4 +213,5 @@ LoanOS India is successful when:
 - Every borrower-facing charge is disclosed and enforceable through KFS rules.
 - Every vendor and LSP action is scoped and auditable.
 - Every AI/model decision can be blocked instantly through a kill switch.
+- Every digital-worker action is proposal only, tenant scoped, independently authorized, attributable to humans and service identity, and reproducible from immutable lineage.
 - Compliance can produce evidence without reconstructing history manually.

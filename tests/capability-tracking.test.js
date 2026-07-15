@@ -17,8 +17,8 @@ test('capability parser covers the exhaustive catalogue including UX capabilitie
   const experience = categories.find((category) => category.n === 32);
 
   assert.equal(categories.length, 33);
-  assert.equal(capabilities.length, 453);
-  assert.equal(new Set(capabilities.map((capability) => capability.id)).size, 453);
+  assert.equal(capabilities.length, 462);
+  assert.equal(new Set(capabilities.map((capability) => capability.id)).size, 462);
   assert.equal(experience?.plane, 'Experience & Adoption');
   assert.equal(experience?.features.length, 17);
   assert.deepEqual(

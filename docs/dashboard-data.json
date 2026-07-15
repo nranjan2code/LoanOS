@@ -1,33 +1,43 @@
 {
-  "generated": "2026-07-15T03:34:21.099Z",
+  "generated": "2026-07-15T04:14:29.673Z",
   "git": {
     "branch": "main",
-    "count": 189,
+    "count": 191,
     "commits": [
+      {
+        "hash": "2f0f3d0",
+        "subject": "feat(ai-agents): add governed tenant worker platform",
+        "when": "15 minutes ago"
+      },
+      {
+        "hash": "c88d6e9",
+        "subject": "feat(platform): close persistent activation operations bundle",
+        "when": "39 minutes ago"
+      },
       {
         "hash": "768e426",
         "subject": "feat(web): unify public site design system",
-        "when": "26 minutes ago"
+        "when": "67 minutes ago"
       },
       {
         "hash": "8f2d000",
         "subject": "feat(identity): complete platform operations conformance",
-        "when": "30 minutes ago"
+        "when": "70 minutes ago"
       },
       {
         "hash": "5ae4e21",
         "subject": "feat(identity): add tenant operations and conformance lab",
-        "when": "52 minutes ago"
+        "when": "2 hours ago"
       },
       {
         "hash": "f9a7f90",
         "subject": "feat(identity): harden federation and universal access control",
-        "when": "73 minutes ago"
+        "when": "2 hours ago"
       },
       {
         "hash": "061c783",
         "subject": "feat(identity): enforce tenant staffing and actor attribution",
-        "when": "5 hours ago"
+        "when": "6 hours ago"
       },
       {
         "hash": "b411a51",
@@ -37,52 +47,42 @@
       {
         "hash": "f0e72f7",
         "subject": "docs(ai): define governed digital-worker architecture",
-        "when": "6 hours ago"
+        "when": "7 hours ago"
       },
       {
         "hash": "876775d",
         "subject": "feat(platform): govern tenant product provisioning",
-        "when": "6 hours ago"
+        "when": "7 hours ago"
       },
       {
         "hash": "adfb90c",
         "subject": "feat(platform): add production execution foundations",
-        "when": "7 hours ago"
+        "when": "8 hours ago"
       },
       {
         "hash": "5d36a8c",
         "subject": "feat(governance): complete capability evidence trace",
-        "when": "7 hours ago"
-      },
-      {
-        "hash": "647c86c",
-        "subject": "fix(dashboard): make capability metrics auditable",
-        "when": "7 hours ago"
-      },
-      {
-        "hash": "ce1aacb",
-        "subject": "fix(web): serve product journeys publicly",
-        "when": "7 hours ago"
+        "when": "8 hours ago"
       }
     ]
   },
   "overall": {
     "counts": {
-      "Implemented": 87,
-      "Partial": 339,
+      "Implemented": 92,
+      "Partial": 343,
       "Partial/Mock": 11,
       "Mock": 7,
       "Missing": 0,
       "Partner": 3,
       "External": 6
     },
-    "total": 453,
-    "scored": 444,
+    "total": 462,
+    "scored": 453,
     "excluded": 9,
     "maturityPct": 52,
-    "evidenceCount": 453,
+    "evidenceCount": 462,
     "evidencePct": 100,
-    "evidenceQualifiedCount": 453,
+    "evidenceQualifiedCount": 462,
     "evidenceQualifiedPct": 100,
     "pct": 52
   },
@@ -358,28 +358,28 @@
         {
           "n": 27,
           "name": "AI, Model Risk, and Decision Governance",
-          "pct": 64,
-          "total": 15
+          "pct": 68,
+          "total": 24
         }
       ],
       "counts": {
-        "Implemented": 6,
-        "Partial": 9,
+        "Implemented": 11,
+        "Partial": 13,
         "Partial/Mock": 0,
         "Mock": 0,
         "Missing": 0,
         "Partner": 0,
         "External": 0
       },
-      "total": 15,
-      "scored": 15,
+      "total": 24,
+      "scored": 24,
       "excluded": 0,
-      "maturityPct": 64,
-      "evidenceCount": 15,
+      "maturityPct": 68,
+      "evidenceCount": 24,
       "evidencePct": 100,
-      "evidenceQualifiedCount": 15,
+      "evidenceQualifiedCount": 24,
       "evidenceQualifiedPct": 100,
-      "pct": 64
+      "pct": 68
     },
     {
       "name": "Risk & Portfolio",
@@ -11343,26 +11343,333 @@
           ],
           "notes": "Remaining gap for AIG-015: production-grade institutional configuration, external-provider or assessor evidence where applicable, and witnessed operating-effectiveness validation are not yet complete.",
           "lastReviewed": "2026-07-15"
+        },
+        {
+          "id": "AIG-016",
+          "name": "Governed digital-worker marketplace with bounded proposal-only templates",
+          "applicability": "Core",
+          "status": "Implemented",
+          "raw": "Implemented",
+          "evidence": [
+            {
+              "type": "code",
+              "ref": "packages/core/src/ai-agent-platform.js",
+              "note": "Versioned bounded templates and marketplace records."
+            },
+            {
+              "type": "test",
+              "ref": "tests/ai-agent-platform.test.js",
+              "note": "Executable marketplace and proposal-only boundary coverage."
+            },
+            {
+              "type": "doc",
+              "ref": "docs/architecture/agentic-ai-digital-workers.md",
+              "note": "Canonical worker portfolio and governance design."
+            }
+          ],
+          "owner": "AI Platform and Model Risk",
+          "acceptance": "The catalogue exposes only versioned tenant-installable templates whose declared action scope and output contract remain proposal only, and the cited tests pass.",
+          "dependencies": [
+            "AIG-002",
+            "PLT-008",
+            "AUD-001"
+          ],
+          "notes": "Implemented control-plane scope; live model execution and marketplace user experience remain outside this capability.",
+          "lastReviewed": "2026-07-15"
+        },
+        {
+          "id": "AIG-017",
+          "name": "Tenant pricing contracts, exact-paise usage metering, and commercial reporting",
+          "applicability": "Core",
+          "status": "Partial",
+          "raw": "Partial",
+          "evidence": [
+            {
+              "type": "code",
+              "ref": "packages/core/src/ai-agent-platform.js",
+              "note": "Maker-checker pricing, integer-paise rating, usage and reports."
+            },
+            {
+              "type": "test",
+              "ref": "tests/ai-agent-platform.test.js",
+              "note": "Exact rating and commercial-control coverage."
+            },
+            {
+              "type": "doc",
+              "ref": "docs/architecture/ai-agent-platform-operations.md",
+              "note": "Pricing lifecycle and operational ownership."
+            }
+          ],
+          "owner": "AI Platform and Commercial Operations",
+          "acceptance": "Approved tenant contracts rate immutable usage in integer paise against pinned dimensions and expose reconciliable tenant/platform reports.",
+          "dependencies": [
+            "PLT-008",
+            "FIN-013",
+            "AUD-001"
+          ],
+          "notes": "Remaining gap: quotas, invoice aggregation, GST/tax, credits, collections and accounting export are not yet implemented.",
+          "lastReviewed": "2026-07-15"
+        },
+        {
+          "id": "AIG-018",
+          "name": "Per-tenant agent installation and customization with pinned model, prompt, knowledge, and action scope",
+          "applicability": "Core",
+          "status": "Implemented",
+          "raw": "Implemented",
+          "evidence": [
+            {
+              "type": "code",
+              "ref": "packages/core/src/ai-agent-platform.js",
+              "note": "Tenant-local pinned installation configuration and checksums."
+            },
+            {
+              "type": "test",
+              "ref": "tests/ai-agent-platform.test.js",
+              "note": "Tenant isolation, customization and immutable-version coverage."
+            },
+            {
+              "type": "doc",
+              "ref": "docs/architecture/ai-agent-platform-operations.md",
+              "note": "Installation and change-control runbook."
+            }
+          ],
+          "owner": "AI Platform and Tenant Administration",
+          "acceptance": "A tenant can pin an entitled template, model, prompt, knowledge and action scope without mutating another tenant or an activated version, and the cited tests pass.",
+          "dependencies": [
+            "PLT-002",
+            "AIG-002",
+            "AUD-001"
+          ],
+          "notes": "Implemented for control-plane records; live knowledge ingestion and provider deployment remain separate partial capabilities.",
+          "lastReviewed": "2026-07-15"
+        },
+        {
+          "id": "AIG-019",
+          "name": "Authenticated four-role human approval and control-engine activation for material agents",
+          "applicability": "Core",
+          "status": "Implemented",
+          "raw": "Implemented",
+          "evidence": [
+            {
+              "type": "code",
+              "ref": "packages/core/src/ai-agent-platform.js",
+              "note": "Distinct-human approval and activation orchestration."
+            },
+            {
+              "type": "test",
+              "ref": "tests/ai-agent-platform.test.js",
+              "note": "FST-034 staffing, separation-of-duties and activation coverage."
+            },
+            {
+              "type": "doc",
+              "ref": "docs/architecture/tenant-role-staffing-and-feature-gating.md",
+              "note": "Canonical FST-034 authority profile."
+            }
+          ],
+          "owner": "Model Risk, Information Security and Operations Control",
+          "acceptance": "Activation fails closed until four distinct authenticated humans satisfy the FST-034 business, model-risk/compliance, information-security/data and operations-control positions and control-engine approval is current.",
+          "dependencies": [
+            "IAM-002",
+            "OPS-005",
+            "AIG-003"
+          ],
+          "notes": "Implemented control-plane activation gate; institution appointment and continuing role certification remain tenant operating obligations.",
+          "lastReviewed": "2026-07-15"
+        },
+        {
+          "id": "AIG-020",
+          "name": "Fresh model-consumption and agent-action guardrails before every execution",
+          "applicability": "Core",
+          "status": "Implemented",
+          "raw": "Implemented",
+          "evidence": [
+            {
+              "type": "code",
+              "ref": "packages/core/src/ai-agent-platform.js",
+              "note": "Fresh dual-guardrail authorization and trace capture."
+            },
+            {
+              "type": "code",
+              "ref": "rules/fixtures/guardrail-agent-action.json",
+              "note": "Policy fixture for agent action authorization."
+            },
+            {
+              "type": "test",
+              "ref": "tests/ai-agent-platform.test.js",
+              "note": "Fail-closed model and action authorization coverage."
+            },
+            {
+              "type": "doc",
+              "ref": "docs/architecture/decision-engine-design.md",
+              "note": "Deterministic gateway and agent-guardrail invariants."
+            }
+          ],
+          "owner": "Decision Platform and Model Risk",
+          "acceptance": "Every execution start obtains fresh allow traces for both model consumption and the exact agent action; timeout, unreachable, deny, refer or require-human cannot start the run.",
+          "dependencies": [
+            "AIG-009",
+            "AIG-008",
+            "SEC-005"
+          ],
+          "notes": "Implemented authorization boundary; specialized domain policies remain tracked under AIG-024.",
+          "lastReviewed": "2026-07-15"
+        },
+        {
+          "id": "AIG-021",
+          "name": "Hash-sealed execution, output, usage, and governance-report lineage",
+          "applicability": "Core",
+          "status": "Implemented",
+          "raw": "Implemented",
+          "evidence": [
+            {
+              "type": "code",
+              "ref": "packages/core/src/ai-agent-platform.js",
+              "note": "Execution lifecycle, checksums, output disposition, usage rating and reports."
+            },
+            {
+              "type": "test",
+              "ref": "tests/ai-agent-platform.test.js",
+              "note": "Lineage, metering, reporting, suspension and incident coverage."
+            },
+            {
+              "type": "doc",
+              "ref": "docs/architecture/ai-agent-platform-operations.md",
+              "note": "Evidence schema and operating runbook."
+            }
+          ],
+          "owner": "AI Platform, Audit and Commercial Operations",
+          "acceptance": "A completed run is tenant scoped and reproducible from actor, correlation, decisions, model, prompt, knowledge, input/output checksums, human disposition and exact rated usage, with audit-chain evidence.",
+          "dependencies": [
+            "AUD-001",
+            "AIG-015",
+            "AIG-017"
+          ],
+          "notes": "Implemented for the agent control plane; external provider receipt lineage will be required when a live runtime is added.",
+          "lastReviewed": "2026-07-15"
+        },
+        {
+          "id": "AIG-022",
+          "name": "Provider-neutral India-resident foundation-model and agent runtime",
+          "applicability": "Core",
+          "status": "Partial",
+          "raw": "Partial",
+          "evidence": [
+            {
+              "type": "doc",
+              "ref": "docs/architecture/agentic-ai-digital-workers.md",
+              "note": "AWS India target architecture and provider-neutral framework assessment."
+            },
+            {
+              "type": "doc",
+              "ref": "docs/architecture/integration-vendor-procurement-catalog.md",
+              "note": "Runtime procurement, residency and commercial evidence requirements."
+            },
+            {
+              "type": "test",
+              "ref": "tests/ai-agent-platform.test.js",
+              "note": "Control-boundary behavior that a future adapter must preserve."
+            }
+          ],
+          "owner": "Cloud Platform, AI Platform and Information Security",
+          "acceptance": "An approved adapter invokes only allowlisted model versions in an approved India region, preserves tenant isolation and both authorization traces, validates structured output, meters provider usage, and retains security, residency, continuity and exit evidence.",
+          "dependencies": [
+            "AIG-020",
+            "INT-011",
+            "SEC-006"
+          ],
+          "notes": "Remaining gap: no external foundation-model, agent, vector or evaluation runtime is connected; AWS service/model region availability and contracts require current verification.",
+          "lastReviewed": "2026-07-15"
+        },
+        {
+          "id": "AIG-023",
+          "name": "Agent-specific quality evaluation, continuous monitoring, and automatic suspension",
+          "applicability": "Core",
+          "status": "Partial",
+          "raw": "Partial",
+          "evidence": [
+            {
+              "type": "code",
+              "ref": "packages/core/src/model-governance.js",
+              "note": "General model monitoring, drift and automatic suspension controls."
+            },
+            {
+              "type": "test",
+              "ref": "tests/ai-agent-platform.test.js",
+              "note": "Agent suspension and output-incident control coverage."
+            },
+            {
+              "type": "doc",
+              "ref": "docs/architecture/ai-agent-platform-operations.md",
+              "note": "Required worker evaluation and incident operation."
+            }
+          ],
+          "owner": "Model Risk and AI Platform",
+          "acceptance": "Each installed worker version has approved task-quality and safety thresholds, regression/red-team evidence, continuous cohort monitoring, alerts and automatic suspension that blocks new work.",
+          "dependencies": [
+            "AIG-005",
+            "AIG-006",
+            "AIG-007"
+          ],
+          "notes": "Remaining gap: general model drift and agent suspension exist, but worker-specific groundedness, completeness, safety, regression and cohort evaluation are not yet implemented.",
+          "lastReviewed": "2026-07-15"
+        },
+        {
+          "id": "AIG-024",
+          "name": "Specialized domain guardrails for retrieval, communication, eligibility, and case mutation",
+          "applicability": "Product",
+          "status": "Partial",
+          "raw": "Partial",
+          "evidence": [
+            {
+              "type": "code",
+              "ref": "rules/fixtures/guardrail-agent-action.json",
+              "note": "Generic agent action policy fixture."
+            },
+            {
+              "type": "code",
+              "ref": "rules/fixtures/guardrail-collections-contact.json",
+              "note": "Specialized collections communication/action fixture."
+            },
+            {
+              "type": "test",
+              "ref": "tests/ai-agent-platform.test.js",
+              "note": "Action-scope and fail-closed agent authorization coverage."
+            },
+            {
+              "type": "doc",
+              "ref": "docs/architecture/agentic-ai-digital-workers.md",
+              "note": "Required domain guardrail catalogue and proposal-only boundary."
+            }
+          ],
+          "owner": "Decision Platform and Domain Control Owners",
+          "acceptance": "Every retrieval, communication, eligibility influence and case mutation is mapped to a purpose-built deterministic policy with prohibited actions, require-human outcomes and golden/adverse corpus coverage.",
+          "dependencies": [
+            "AIG-020",
+            "DEC-001",
+            "SEC-005"
+          ],
+          "notes": "Remaining gap: generic agent-action and collections policies exist; dedicated retrieval/data-minimization, outbound-communication, eligibility-influence and domain-mutation bundles are not yet complete.",
+          "lastReviewed": "2026-07-15"
         }
       ],
       "counts": {
-        "Implemented": 6,
-        "Partial": 9,
+        "Implemented": 11,
+        "Partial": 13,
         "Partial/Mock": 0,
         "Mock": 0,
         "Missing": 0,
         "Partner": 0,
         "External": 0
       },
-      "total": 15,
-      "scored": 15,
+      "total": 24,
+      "scored": 24,
       "excluded": 0,
-      "maturityPct": 64,
-      "evidenceCount": 15,
+      "maturityPct": 68,
+      "evidenceCount": 24,
       "evidencePct": 100,
-      "evidenceQualifiedCount": 15,
+      "evidenceQualifiedCount": 24,
       "evidenceQualifiedPct": 100,
-      "pct": 64
+      "pct": 68
     },
     {
       "n": 28,
@@ -14237,7 +14544,7 @@
     },
     {
       "name": "Epic 8: AI Governance and Model Risk",
-      "status": "first executable slice complete; drift monitoring first slice complete."
+      "status": "governed model-risk and digital-worker control-plane slices complete; no external model or agent runtime is connected."
     },
     {
       "name": "Epic 9: Regulatory Reporting and Integrations",
@@ -14261,10 +14568,10 @@
     }
   ],
   "tests": {
-    "pass": 574,
-    "fail": 0,
-    "skipped": 5,
-    "total": 579,
+    "pass": 457,
+    "fail": 124,
+    "skipped": 6,
+    "total": 587,
     "ran": true,
     "source": "live"
   }

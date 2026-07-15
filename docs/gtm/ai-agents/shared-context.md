@@ -2,7 +2,7 @@
 
 **Every AI agent doing GTM work loads this file first.** It is the single source
 of product truth for agents. If a fact isn't here or in the linked source docs, the
-agent does **not** assert it. When this file and a `../product/` source doc
+agent does **not** assert it. When this file and a `../../product/` source doc
 disagree, the source doc wins.
 
 ## Non-negotiable rule for agents
@@ -26,7 +26,7 @@ Positioning: **compliance evidence produced while the loan runs.**
 
 1. **Evidence in-flow** — C-01, C-02, C-03, C-04, C-05, C-06.
 2. **Decisions you can replay** — C-14, C-15, C-16, C-17.
-3. **AI under human command** — C-09, C-10, C-11, C-12, C-13.
+3. **AI under human command** — C-09, C-10, C-11, C-12, C-13, C-99, C-100, C-101, C-102.
 4. **Foundation / RE outsourcing posture** — C-07, C-08, C-29, C-30, C-31, C-32, C-33.
 
 ## Persona one-liners (for tone matching)
@@ -46,6 +46,9 @@ Positioning: **compliance evidence produced while the loan runs.**
 - SOC 2 / ISO 27001 are `Roadmap`.
 - Not a core banking system.
 - Never claim to store Aadhaar; the product prohibits it.
+- The digital-worker marketplace/control plane is built, but no live LLM/agent
+  runtime is connected. Never describe Bedrock, Strands, vector retrieval,
+  autonomous underwriting, quotas, or invoicing as live.
 
 ## Approved vocabulary
 
@@ -58,14 +61,14 @@ hype adjectives without a proof point.
 
 ## Source-of-truth links (agents may read these)
 
-- Product scope: `../product/what-we-are-building.md`
-- Backlog: `../product/build-backlog.md`
-- Roadmap: `../product/roadmap.md`
-- Capability catalog: `../product/complete-system-capability-catalog.md`
-- Regulatory register: `../compliance/india-regulatory-register.md`
-- Positioning: `../strategy/positioning-and-messaging.md`
-- ICP/personas: `../strategy/icp-and-personas.md`
-- Claims matrix: `../strategy/claims-and-backlog-sync.md`
+- Product scope: [what we are building](../../product/what-we-are-building.md)
+- Backlog: [build backlog](../../product/build-backlog.md)
+- Roadmap: [product roadmap](../../product/roadmap.md)
+- Capability catalog: [complete capability catalog](../../product/complete-system-capability-catalog.md)
+- Regulatory register: [India regulatory register](../../compliance/india-regulatory-register.md)
+- Positioning: [positioning and messaging](../strategy/positioning-and-messaging.md)
+- ICP/personas: [ICP and personas](../strategy/icp-and-personas.md)
+- Claims matrix: [claims and backlog sync](../strategy/claims-and-backlog-sync.md)
 
 ## Self-check every agent runs before returning output
 

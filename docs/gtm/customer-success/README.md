@@ -25,7 +25,7 @@ Sales close ──▶ Onboard ──▶ Adopt ──▶ Prove value (QBR) ──
 | [`adoption-and-qbr.md`](adoption-and-qbr.md) | Adoption milestones and the QBR that proves compliance value |
 | [`renewals-and-expansion.md`](renewals-and-expansion.md) | Renewal motion + module expansion (AI Governance / Distribution / Integrations) |
 | [`health-and-churn.md`](health-and-churn.md) | Health-score model, risk signals, and save plays |
-| [`ai-agents/`](ai-agents/) | CS AI-agent runbooks: onboarding orchestration, health monitor, QBR prep |
+| [AI-agent runbooks](ai-agents/README.md) | Onboarding orchestration, health monitor and QBR preparation |
 
 ## Handoff in (from Sales)
 

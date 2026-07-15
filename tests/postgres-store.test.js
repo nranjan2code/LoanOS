@@ -222,6 +222,56 @@ test("withStateLock does not serialize callers using different lock keys", { ski
   assert(elapsedMs < 250, `expected concurrent locks to overlap, took ${elapsedMs}ms`);
 });
 
+test("Postgres tenant lock makes competing identity-worker claims atomic and RLS-scoped", { skip: describeSkip && skipReason }, async (t) => {
+  const pg = await import("pg");
+  const { Pool } = pg.default;
+  const adminPool = new Pool({ connectionString: DATABASE_URL_TEST });
+  t.after(() => adminPool.end());
+  await applySchema(adminPool);
+  await resetDatabase(adminPool);
+  await adminPool.query(
+    `INSERT INTO tenants (tenant_id, name, api_key_hash, onboarding) VALUES ($1, $2, $3, '{}'::jsonb)`,
+    ["tnt_worker_atomic", "Atomic Worker Tenant", "hash"]
+  );
+
+  const connectionString = rewriteRole(DATABASE_URL_TEST, "loanos_control_plane");
+  const postgresStore = await import("../apps/api/src/postgres-store.js");
+  const { claimIdentityOperationsJobs, scheduleIdentityOperationsJob } = await import("../packages/core/src/identity-operations-worker.js");
+  await postgresStore.resetPoolForTests(connectionString);
+  t.after(() => postgresStore.resetPoolForTests(connectionString));
+  const tenantId = "tnt_worker_atomic";
+  const workloadIdentityRef = "loanos-service://tnt_worker_atomic/svc-worker";
+
+  await postgresStore.withStateLock("ignored", tenantId, async () => {
+    const state = await postgresStore.loadTenantDataOnly("ignored", tenantId);
+    const scheduled = scheduleIdentityOperationsJob(state, {
+      tenantId,
+      jobId: "job-atomic-1",
+      type: "identity_readiness_assessment",
+      workloadIdentityRef,
+      purpose: "atomic claim proof",
+      idempotencyKey: "atomic/job-1",
+      payload: { policyRef: "identity-readiness/v1" }
+    });
+    await postgresStore.saveTenantDataOnly("ignored", tenantId, scheduled.state);
+  });
+
+  const claim = (runId) => postgresStore.withStateLock("ignored", tenantId, async () => {
+    const state = await postgresStore.loadTenantDataOnly("ignored", tenantId);
+    const result = claimIdentityOperationsJobs(state, { tenantId, runId, workerId: runId, workloadIdentityRef });
+    await postgresStore.saveTenantDataOnly("ignored", tenantId, result.state);
+    return result.claimed.length;
+  });
+  const counts = await Promise.all([claim("run-atomic-a"), claim("run-atomic-b")]);
+  assert.equal(counts.reduce((sum, value) => sum + value, 0), 1);
+
+  await postgresStore.withStateLock("ignored", tenantId, async () => {
+    const stored = await postgresStore.loadTenantDataOnly("ignored", tenantId);
+    assert.equal(stored.identityOperationsJobs[`${tenantId}:job-atomic-1`].status, "leased");
+    assert.equal(Object.values(stored.identityOperationsWorkerRuns).filter((run) => run.claimedJobIds.length === 1).length, 1);
+  });
+});
+
 test("storage.js with LOANOS_STORAGE_DRIVER=postgres serves a full multi-tenant API round-trip", { skip: describeSkip && skipReason }, async (t) => {
   const pg = await import("pg");
   const { Pool } = pg.default;

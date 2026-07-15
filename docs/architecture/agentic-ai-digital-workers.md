@@ -38,6 +38,8 @@ The repository now implements the provider-neutral governance and commercial bou
 
 The implementation anchors are `packages/core/src/ai-agent-platform.js`, `apps/api/src/routes/ai-agent-platform.js`, and `rules/fixtures/guardrail-agent-action.json`. It intentionally does **not** call an LLM yet. The Bedrock/Strands provider adapter, durable worker, India-region AWS infrastructure, evaluation service, tenant UI, invoice integration, and live-provider conformance remain production gaps.
 
+Operational lifecycle, API sequence, pricing semantics, incident procedure and production-admission evidence are maintained in [AI-Agent Platform Operations](ai-agent-platform-operations.md).
+
 ## 2. Why Digital Workers Fit LoanOS
 
 LoanOS already contains the controls that most agent projects attempt to add later:
@@ -198,7 +200,7 @@ Mumbai availability of AgentCore does not prove every AgentCore feature, Bedrock
 | --- | --- | --- |
 | RBI Digital Lending Directions, 2025 | Binding direction for covered REs | RE remains responsible for LSP acts; need-based explicit-consent collection with audit trail; customer rights; grievance route; India storage and controlled processing; AI worker cannot become an ungoverned LSP/DLA side channel |
 | RBI IT Outsourcing Directions, 2023 and financial-services outsourcing rules | Binding according to RE/applicability | RE accountability, due diligence, audit/RBI access, sub-outsourcing, incident, BCP/DR, concentration, continuity, and exit rights apply to LoanOS/AWS/model providers |
-| DPDP Act, 2023 and DPDP Rules, 2025 | Law/rules with commencement and tenant applicability to be tracked | Notice/legal basis, purpose limitation, data minimization, security safeguards, breach response, processor contracts, principal rights, retention/erasure, and verifiable consent where relied on |
+| DPDP Act, 2023 and DPDP Rules, 2025 | Law/rules under a phased commencement schedule; tenant and provision applicability must be tracked | Build now for notice/legal basis, purpose limitation, data minimization, security safeguards, breach response, processor contracts, principal rights, retention/erasure, and verifiable consent where relied on; do not misstate a future commencement date as already operative |
 | CERT-In Directions, 2022 | Binding for covered entities | Six-hour reporting for specified cyber incidents, 180-day India log retention, time synchronization, and evidence preservation include agent systems |
 | RBI FREE-AI Committee report, 2025 | Expert committee recommendations, not by itself a binding direction | Adopt the seven sutras and recommended board policy, risk classification, validation, consumer protection, security, monitoring, incident, and kill-switch controls as the platform baseline |
 | India AI Governance Guidelines, 2025 | Government guidance, not a standalone AI statute | People-first/human oversight, fairness, accountability, understandable-by-design, safety/resilience, risk-based controls, audit trails, incident reporting, and techno-legal enforcement |

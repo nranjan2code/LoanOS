@@ -77,8 +77,10 @@ Every `BOTH` integration requires idempotent commands, status/read, authenticate
 | INT-RSK-04 | Fraud intelligence | Device/identity/payment consortium lookup and confirmed-fraud feedback | BOTH; purpose and reason codes | Missing | LOS, collections |
 | INT-RSK-05 | Model operations | Registry/artifact/feature feed, drift/bias metrics and kill-switch event | BOTH; artifact/data lineage | Internal governance | Platform, compliance |
 | INT-RSK-06 | Reference data | Benchmarks, rates, calendars, geography, industry, collateral indices | IN/file; effective date/version/checksum | Institution-supplied data | LOS, LMS, ALM |
+| INT-RSK-07 | Foundation-model and agent runtime | Structured request/output, provider/model version, token/action usage, safety result, request/response checksum, cancellation and incident evidence | BOTH; no raw provider response becomes a lending fact without provenance and validation | Governed marketplace, installation, authorization, lineage and metering exist; no external runtime adapter | LOS, LWS, compliance, platform |
+| INT-RSK-08 | Agent knowledge and retrieval | Approved source ingestion, tenant filtering, embedding/index version, citation, freshness, deletion and access revocation | BOTH/file; source/version/checksum/citation | Installation retains approved knowledge references/checksum; no retrieval or vector runtime | LOS, LMS, LWS, compliance |
 
-The deterministic rules engine never calls an external system during evaluation. Provider results enter as provenance-tagged facts before evaluation; failure produces refer/deny.
+The deterministic rules engine never calls an external system during evaluation. Provider results enter as provenance-tagged facts before evaluation; failure produces refer/deny. A model/agent runtime is similarly outside the engine: LoanOS must authorize the run first, then validate and retain the provider result before any downstream use.
 
 ## 4. LWS — work management and control operations
 

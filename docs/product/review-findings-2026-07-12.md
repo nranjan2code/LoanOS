@@ -85,7 +85,7 @@ is unproven by any test, and the gateway is single-tenant. These items turn "plu
 "functioning, proven, and multi-tenant."
 
 ### REV-10 — Automated test coverage of the JS→engine gateway · P1 · DONE
-Added a robust test suite at [rules-engine-gateway.test.js](file:///Users/nisheethranjan/Projects/AIBank/tests/rules-engine-gateway.test.js) validating the gateway caller's behavior in `off`, `shadow` (including divergence logging and error resilience), and `active` (asserting INV-5 fail-closed to `refer` when the engine service is unreachable) modes. Also added a dynamic live integration test case that queries the actual running `rules-service` if it is active on localhost.
+Added a robust test suite at [rules-engine-gateway.test.js](../../tests/rules-engine-gateway.test.js) validating the gateway caller's behavior in `off`, `shadow` (including divergence logging and error resilience), and `active` (asserting INV-5 fail-closed to `refer` when the engine service is unreachable) modes. Also added a dynamic live integration test case that queries the actual running `rules-service` if it is active on localhost.
 
 ### REV-11 — CI lane that starts `rules-service` and runs the gateway integration test · P1 · DONE
 Enhanced `loanos.sh` build script to compile the Rust workspace, run formatting/clippy/tests, sign bundles, output `fleet.json`, and run Node integration tests. In CI, because the new test suite runs as part of the standard `npm test` pipeline, the gateway and verification checks are fully covered on every push.
