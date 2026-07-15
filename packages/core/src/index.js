@@ -540,6 +540,8 @@ export {
   evaluatePlatformCanary,
   projectPlatformDelivery,
   promotePlatformRelease,
+  proposePlatformRollback,
+  approvePlatformRollback,
   rollbackPlatformRelease
 } from "./platform-delivery.js";
 

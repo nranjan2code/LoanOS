@@ -1,8 +1,8 @@
 {
   "schemaVersion": 2,
-  "generated": "2026-07-15T07:02:54.652Z",
-  "sourceDigest": "0ac55d590fa001fd",
-  "snapshotId": "e1e1afa9969e101c",
+  "generated": "2026-07-15T07:18:32.637Z",
+  "sourceDigest": "7099b73fdc22fbef",
+  "snapshotId": "7f2ac8d2963fb0e5",
   "sources": {
     "catalogue": "docs/product/complete-system-capability-catalog.md",
     "trace": "docs/product/capability-trace.json",
@@ -12,20 +12,25 @@
   },
   "git": {
     "branch": "main",
-    "sha": "0c03597999b9",
-    "count": 195,
+    "sha": "d19963f7f0b2",
+    "count": 196,
     "dirty": true,
-    "changeCount": 75,
+    "changeCount": 15,
     "commits": [
+      {
+        "hash": "d19963f",
+        "subject": "feat(all): merge and commit all changes, including untracked files",
+        "when": "13 minutes ago"
+      },
       {
         "hash": "0c03597",
         "subject": "feat(journeys): add archetype channel workspaces",
-        "when": "43 minutes ago"
+        "when": "59 minutes ago"
       },
       {
         "hash": "23a5848",
         "subject": "feat(journeys): persist specialist lending operations",
-        "when": "71 minutes ago"
+        "when": "87 minutes ago"
       },
       {
         "hash": "17ab3a2",
@@ -45,7 +50,7 @@
       {
         "hash": "c88d6e9",
         "subject": "feat(platform): close persistent activation operations bundle",
-        "when": "3 hours ago"
+        "when": "4 hours ago"
       },
       {
         "hash": "768e426",
@@ -60,7 +65,7 @@
       {
         "hash": "5ae4e21",
         "subject": "feat(identity): add tenant operations and conformance lab",
-        "when": "4 hours ago"
+        "when": "5 hours ago"
       },
       {
         "hash": "f9a7f90",
@@ -70,11 +75,6 @@
       {
         "hash": "061c783",
         "subject": "feat(identity): enforce tenant staffing and actor attribution",
-        "when": "9 hours ago"
-      },
-      {
-        "hash": "b411a51",
-        "subject": "feat(identity): govern organisation admission and bootstrap access",
         "when": "9 hours ago"
       }
     ]
@@ -25410,13 +25410,13 @@
     }
   ],
   "tests": {
-    "pass": 628,
+    "pass": 630,
     "fail": 0,
     "skipped": 8,
     "cancelled": 0,
     "todo": 0,
-    "total": 636,
-    "durationMs": 21618.884709,
+    "total": 638,
+    "durationMs": 22471,
     "ran": true,
     "source": "provided-log",
     "error": ""

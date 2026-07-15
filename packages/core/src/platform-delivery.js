@@ -11,6 +11,7 @@ export function createPlatformRelease(input, existingReleases = [], now = new Da
   requireText(input.sourceRevision, "sourceRevision");
   requireText(input.changeTicket, "changeTicket");
   requireText(input.proposedBy, "proposedBy");
+  const proposer = normalizeReleasePrincipal(input.proposer, input.proposedBy, "proposer");
   requireText(input.rollbackVersion, "rollbackVersion");
   requireText(input.rollbackProcedureRef, "rollbackProcedureRef");
   if (!RELEASE_RISKS.has(input.riskLevel)) throw deliveryError("release_invalid", "riskLevel is invalid.");
@@ -31,6 +32,7 @@ export function createPlatformRelease(input, existingReleases = [], now = new Da
     riskLevel: input.riskLevel,
     changeTicket: String(input.changeTicket),
     proposedBy: String(input.proposedBy),
+    proposer,
     rollbackVersion: String(input.rollbackVersion),
     rollbackProcedureRef: String(input.rollbackProcedureRef),
     evidence,
@@ -43,8 +45,10 @@ export function approvePlatformRelease(release, input, now = new Date()) {
   requireStatus(release, "pending_approval");
   requireText(input.approvedBy, "approvedBy");
   requireText(input.approvalRef, "approvalRef");
+  const approver = normalizeReleasePrincipal(input.approver, input.approvedBy, "approver");
+  requireHumanReleasePrincipal(approver, "Release approval");
   if (input.approvedBy === release.proposedBy) throw deliveryError("release_four_eyes_required", "Release approver must be independent of proposer.");
-  return { ...release, status: "approved", approvedBy: String(input.approvedBy), approvalRef: String(input.approvalRef), approvedAt: now.toISOString() };
+  return { ...release, status: "approved", approvedBy: String(input.approvedBy), approver, approvalRef: String(input.approvalRef), approvedAt: now.toISOString() };
 }
 
 export function evaluatePlatformCanary(release, input, now = new Date()) {
@@ -56,6 +60,7 @@ export function evaluatePlatformCanary(release, input, now = new Date()) {
   const p95LatencyThresholdMs = positiveNumber(input.p95LatencyThresholdMs, "p95LatencyThresholdMs");
   requireText(input.observedBy, "observedBy");
   requireText(input.evidenceRef, "evidenceRef");
+  const observer = normalizeReleasePrincipal(input.observer, input.observedBy, "observer");
   const minimumRequests = positiveInteger(input.minimumRequests ?? 100, "minimumRequests");
   const passed = requestCount >= minimumRequests && errorRatePct <= errorRateThresholdPct && p95LatencyMs <= p95LatencyThresholdMs;
   return {
@@ -69,6 +74,7 @@ export function evaluatePlatformCanary(release, input, now = new Date()) {
       p95LatencyMs,
       p95LatencyThresholdMs,
       observedBy: String(input.observedBy),
+      observer,
       evidenceRef: String(input.evidenceRef),
       outcome: passed ? "passed" : "failed",
       evaluatedAt: now.toISOString()
@@ -80,32 +86,79 @@ export function promotePlatformRelease(release, input, now = new Date()) {
   requireStatus(release, "canary_passed");
   requireText(input.promotedBy, "promotedBy");
   requireText(input.promotionRef, "promotionRef");
+  const promoter = normalizeReleasePrincipal(input.promoter, input.promotedBy, "promoter");
+  requireHumanReleasePrincipal(promoter, "Production promotion");
   if (input.promotedBy === release.proposedBy) throw deliveryError("release_four_eyes_required", "Release promoter must be independent of proposer.");
-  return { ...release, status: "deployed", promotedBy: String(input.promotedBy), promotionRef: String(input.promotionRef), deployedAt: now.toISOString() };
+  return { ...release, status: "deployed", promotedBy: String(input.promotedBy), promoter, promotionRef: String(input.promotionRef), deployedAt: now.toISOString() };
 }
 
 export function rollbackPlatformRelease(release, input, now = new Date()) {
+  const proposed = proposePlatformRollback(release, input, now);
+  return approvePlatformRollback(proposed, input, now);
+}
+
+export function proposePlatformRollback(release, input, now = new Date()) {
   requireStatus(release, "deployed");
   requireText(input.proposedBy, "proposedBy");
-  requireText(input.approvedBy, "approvedBy");
-  requireText(input.approvalRef, "approvalRef");
   requireText(input.reason, "reason", 8);
   requireText(input.incidentRef ?? input.changeTicket, "incidentRef or changeTicket");
-  if (input.proposedBy === input.approvedBy) throw deliveryError("release_four_eyes_required", "Rollback requires independent proposer and approver.");
+  const proposer = normalizeReleasePrincipal(input.proposer, input.proposedBy, "rollback proposer");
+  return { ...release, status: "rollback_pending_approval", rollbackProposal: { targetVersion: release.rollbackVersion, proposedBy: String(input.proposedBy), proposer, reason: String(input.reason), incidentRef: input.incidentRef ? String(input.incidentRef) : null, changeTicket: input.changeTicket ? String(input.changeTicket) : null, proposedAt: now.toISOString() } };
+}
+
+export function approvePlatformRollback(release, input, now = new Date()) {
+  requireStatus(release, "rollback_pending_approval");
+  requireText(input.approvedBy, "approvedBy");
+  requireText(input.approvalRef, "approvalRef");
+  const rollbackApprover = normalizeReleasePrincipal(input.approver, input.approvedBy, "rollback approver");
+  requireHumanReleasePrincipal(rollbackApprover, "Rollback approval");
+  if (release.rollbackProposal.proposedBy === input.approvedBy) throw deliveryError("release_four_eyes_required", "Rollback requires independent proposer and approver.");
   return {
     ...release,
     status: "rolled_back",
     rollback: {
       targetVersion: release.rollbackVersion,
-      proposedBy: String(input.proposedBy),
+      proposedBy: release.rollbackProposal.proposedBy,
+      proposer: release.rollbackProposal.proposer,
       approvedBy: String(input.approvedBy),
+      approver: rollbackApprover,
       approvalRef: String(input.approvalRef),
-      reason: String(input.reason),
-      incidentRef: input.incidentRef ? String(input.incidentRef) : null,
-      changeTicket: input.changeTicket ? String(input.changeTicket) : null,
+      reason: release.rollbackProposal.reason,
+      incidentRef: release.rollbackProposal.incidentRef,
+      changeTicket: release.rollbackProposal.changeTicket,
       rolledBackAt: now.toISOString()
     }
   };
+}
+
+function normalizeReleasePrincipal(value, fallbackId, label) {
+  const principal = value ?? { principalId: fallbackId, principalType: "human", authenticationSource: "legacy_domain_call" };
+  requireText(principal.principalId, `${label}.principalId`);
+  if (!["human", "ai_agent", "service"].includes(principal.principalType)) throw deliveryError("release_principal_invalid", `${label}.principalType is invalid.`);
+  requireText(principal.authenticationSource, `${label}.authenticationSource`);
+  if (principal.principalId !== String(fallbackId)) throw deliveryError("release_principal_mismatch", `${label}.principalId must match the attributed actor.`);
+  if (principal.principalType === "ai_agent") {
+    requireText(principal.agentInstallationId, `${label}.agentInstallationId`);
+    requireText(principal.modelId, `${label}.modelId`);
+    requireText(principal.modelVersion, `${label}.modelVersion`);
+    requireDigest(principal.promptHash, `${label}.promptHash`);
+    requireText(principal.guardrailDecisionRef, `${label}.guardrailDecisionRef`);
+  }
+  return {
+    principalId: String(principal.principalId),
+    principalType: principal.principalType,
+    authenticationSource: String(principal.authenticationSource),
+    ...(principal.credentialId ? { credentialId: String(principal.credentialId) } : {}),
+    ...(principal.agentInstallationId ? { agentInstallationId: String(principal.agentInstallationId) } : {}),
+    ...(principal.modelId ? { modelId: String(principal.modelId) } : {}),
+    ...(principal.modelVersion ? { modelVersion: String(principal.modelVersion) } : {}),
+    ...(principal.promptHash ? { promptHash: String(principal.promptHash).toLowerCase() } : {}),
+    ...(principal.guardrailDecisionRef ? { guardrailDecisionRef: String(principal.guardrailDecisionRef) } : {})
+  };
+}
+
+function requireHumanReleasePrincipal(principal, action) {
+  if (principal.principalType !== "human") throw deliveryError("release_human_authority_required", `${action} requires an authenticated human principal.`);
 }
 
 export function createConfigurationBaseline(input, now = new Date()) {

@@ -202,6 +202,8 @@ import {
   projectSecurityOperations,
   projectServiceOperations,
   promotePlatformRelease,
+  proposePlatformRollback,
+  approvePlatformRollback,
   preserveInvestigationEvidence,
   recordCollectionsReminder,
   recordCollectionContact,
@@ -507,6 +509,7 @@ export function createLoanOsServer({
   dataDir,
   bootstrapTenants = [],
   platformAdminKey,
+  platformAgentCredentials = [],
   allowDirectTenantProvisioning = process.env.NODE_ENV !== "production"
 } = {}) {
   validateProductionConfiguration();
@@ -548,7 +551,7 @@ export function createLoanOsServer({
       // driver ignores it (see withStateLock in file-store.js).
       const lockKey = await resolveLockKey(req, dataDir);
       await withStateLock(dataDir, lockKey, async () => {
-        await route(req, res, dataDir, adminKey, observability, allowDirectTenantProvisioning);
+        await route(req, res, dataDir, adminKey, observability, allowDirectTenantProvisioning, platformAgentCredentials);
         if (req._loanosResponsePersistencePromise) await req._loanosResponsePersistencePromise;
       });
     } catch (error) {
@@ -680,7 +683,7 @@ function bufferRequestBody(req) {
   });
 }
 
-async function route(req, res, dataDir, platformAdminKey, observability, allowDirectTenantProvisioning) {
+async function route(req, res, dataDir, platformAdminKey, observability, allowDirectTenantProvisioning, platformAgentCredentials = []) {
   const method = req.method ?? "GET";
   const url = new URL(req.url ?? "/", "http://localhost");
   // API versioning: routes are served both unprefixed and under an explicit
@@ -942,6 +945,7 @@ async function route(req, res, dataDir, platformAdminKey, observability, allowDi
     await routePlatform(req, res, {
       dataDir,
       platformAdminKey,
+      platformAgentCredentials,
       method,
       path,
       url,
@@ -7454,7 +7458,17 @@ function timingSafeStringEqual(a, b) {
   return timingSafeEqual(digestA, digestB);
 }
 
-async function platformAuthFromRequest(req, dataDir, platformAdminKey) {
+async function platformAuthFromRequest(req, dataDir, platformAdminKey, platformAgentCredentials = []) {
+  const agentIdHeader = req.headers["x-platform-agent-id"];
+  const agentKeyHeader = req.headers["x-platform-agent-key"];
+  const agentId = Array.isArray(agentIdHeader) ? agentIdHeader[0] : agentIdHeader;
+  const agentKey = Array.isArray(agentKeyHeader) ? agentKeyHeader[0] : agentKeyHeader;
+  if (agentId && agentKey) {
+    const credential = platformAgentCredentials.find((item) => item.agentId === agentId);
+    if (credential?.status === "active" && timingSafeStringEqual(agentKey, credential.secret)) {
+      return { authContext: { principalType: "platform_agent", userId: credential.agentId, roles: ["release_proposer"], agentCredential: { ...credential, secret: undefined } } };
+    }
+  }
   const key = platformAdminKeyFromRequest(req);
   if (platformAdminKey && key && timingSafeStringEqual(key, platformAdminKey)) {
     return {
@@ -7969,6 +7983,28 @@ function authActor(authContext) {
     ?? authContext?.staffId
     ?? authContext?.actor
     ?? "system";
+}
+
+function releasePrincipalFromAuth(authContext) {
+  const principalId = authActor(authContext);
+  if (authContext?.principalType === "platform_user") {
+    return { principalId, principalType: "human", authenticationSource: "platform_session" };
+  }
+  if (authContext?.principalType === "platform_agent") {
+    const credential = authContext.agentCredential ?? {};
+    return {
+      principalId,
+      principalType: "ai_agent",
+      authenticationSource: "scoped_agent_credential",
+      credentialId: credential.credentialId,
+      agentInstallationId: credential.agentInstallationId,
+      modelId: credential.modelId,
+      modelVersion: credential.modelVersion,
+      promptHash: credential.promptHash,
+      guardrailDecisionRef: credential.guardrailDecisionRef
+    };
+  }
+  return { principalId, principalType: "service", authenticationSource: "platform_admin_key" };
 }
 
 const SCREEN_ACTIVITY_TYPES = new Set(["screen_view", "task_opened", "task_closed", "action_intent", "validation_error"]);
@@ -9279,12 +9315,13 @@ async function routeTenantAdmin(req, res, { dataDir, method, path, tenant, authC
 async function routePlatform(req, res, {
   dataDir,
   platformAdminKey,
+  platformAgentCredentials,
   method,
   path,
   observability,
   allowDirectTenantProvisioning
 }) {
-  const platformAuth = await platformAuthFromRequest(req, dataDir, platformAdminKey);
+  const platformAuth = await platformAuthFromRequest(req, dataDir, platformAdminKey, platformAgentCredentials);
   if (!platformAuth.authContext && !platformAdminKey) {
     sendJson(res, 403, {
       error: {
@@ -9895,7 +9932,7 @@ async function routePlatform(req, res, {
   }
 
   if (method === "POST" && path === "/platform/delivery/releases") {
-    if (!hasPlatformRole(authContext, ["platform_admin", "security_admin"])) {
+    if (!hasPlatformRole(authContext, ["platform_admin", "security_admin", "release_proposer"])) {
       sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } });
       return;
     }
@@ -9907,7 +9944,7 @@ async function routePlatform(req, res, {
     try {
       const state = await loadWholeState(dataDir);
       const projection = projectPlatformDelivery(state.controlPlane.platformEvents ?? []);
-      const release = createPlatformRelease(body, projection.releases);
+      const release = createPlatformRelease({ ...body, proposer: releasePrincipalFromAuth(authContext) }, projection.releases);
       const nextState = appendPlatformEvent(state, { type: "platform.delivery.release_created", release }, { actor: authActor(authContext) });
       await saveWholeState(nextState, dataDir);
       sendJson(res, 201, { release });
@@ -9915,16 +9952,18 @@ async function routePlatform(req, res, {
     return;
   }
 
-  const releaseActionMatch = path.match(/^\/platform\/delivery\/releases\/([^/]+)\/(approval|canary|promotion|rollback)$/);
+  const releaseActionMatch = path.match(/^\/platform\/delivery\/releases\/([^/]+)\/(approval|canary|promotion|rollback-proposal|rollback)$/);
   if (method === "POST" && releaseActionMatch) {
-    if (!hasPlatformRole(authContext, ["platform_admin", "security_admin"])) {
+    const requestedAction = releaseActionMatch[2];
+    const permittedRoles = requestedAction === "rollback-proposal" ? ["platform_admin", "security_admin", "release_proposer"] : ["platform_admin", "security_admin"];
+    if (!hasPlatformRole(authContext, permittedRoles)) {
       sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } });
       return;
     }
     const body = await readJson(req);
     const actor = authActor(authContext);
     const action = releaseActionMatch[2];
-    const actorField = action === "approval" || action === "rollback" ? "approvedBy" : action === "canary" ? "observedBy" : "promotedBy";
+    const actorField = action === "approval" || action === "rollback" ? "approvedBy" : action === "rollback-proposal" ? "proposedBy" : action === "canary" ? "observedBy" : "promotedBy";
     if (body[actorField] !== actor) {
       sendJson(res, 403, { error: { code: "delivery_actor_mismatch", message: `${actorField} must be the authenticated platform actor.` } });
       return;
@@ -9944,9 +9983,15 @@ async function routePlatform(req, res, {
         securityGate = evaluateReleaseSecurityGate(current, security);
         if (securityGate.status !== "passed") throw Object.assign(new Error(`Release security gate blocked: ${securityGate.blockers.join(", ")}.`), { code: "release_security_gate_blocked" });
       }
-      const transition = action === "approval" ? approvePlatformRelease : action === "canary" ? evaluatePlatformCanary : action === "promotion" ? promotePlatformRelease : rollbackPlatformRelease;
-      const release = { ...transition(current, body), ...(securityGate ? { securityGate } : {}) };
-      const suffix = action === "approval" ? "approved" : action === "canary" ? "canary_evaluated" : action === "promotion" ? "promoted" : "rolled_back";
+      const principal = releasePrincipalFromAuth(authContext);
+      const attributedBody = action === "approval" ? { ...body, approver: principal }
+        : action === "canary" ? { ...body, observer: principal }
+          : action === "promotion" ? { ...body, promoter: principal }
+            : action === "rollback-proposal" ? { ...body, proposer: principal }
+              : { ...body, approver: principal };
+      const transition = action === "approval" ? approvePlatformRelease : action === "canary" ? evaluatePlatformCanary : action === "promotion" ? promotePlatformRelease : action === "rollback-proposal" ? proposePlatformRollback : approvePlatformRollback;
+      const release = { ...transition(current, attributedBody), ...(securityGate ? { securityGate } : {}) };
+      const suffix = action === "approval" ? "approved" : action === "canary" ? "canary_evaluated" : action === "promotion" ? "promoted" : action === "rollback-proposal" ? "rollback_proposed" : "rolled_back";
       const nextState = appendPlatformEvent(state, { type: `platform.delivery.release_${suffix}`, release }, { actor });
       await saveWholeState(nextState, dataDir);
       sendJson(res, 200, { release });

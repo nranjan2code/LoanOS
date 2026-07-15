@@ -1,6 +1,6 @@
 {
   "name": "loanos-india",
-  "version": "0.1.0",
+  "version": "0.2.0-alpha.1",
   "private": true,
   "type": "module",
   "description": "India-only LoanOS foundation covering LOS, LMS, LWS, and compliance-first AI governance.",

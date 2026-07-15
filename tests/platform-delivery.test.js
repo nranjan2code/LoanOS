@@ -54,6 +54,47 @@ test("release lifecycle enforces four-eyes approval, measured canary, promotion,
   assert.equal(rolledBack.rollback.targetVersion, releaseInput().rollbackVersion);
 });
 
+test("AI agents may propose releases with immutable provenance but cannot approve or promote", () => {
+  const agent = {
+    principalId: "agent_release_1",
+    principalType: "ai_agent",
+    authenticationSource: "scoped_agent_credential",
+    credentialId: "cred_release_1",
+    agentInstallationId: "install_release_1",
+    modelId: "release-copilot",
+    modelVersion: "1.0.0",
+    promptHash: "b".repeat(64),
+    guardrailDecisionRef: "guardrail://release/proposal/1"
+  };
+  const created = createPlatformRelease({ ...releaseInput(), proposedBy: agent.principalId, proposer: agent });
+  assert.equal(created.proposer.principalType, "ai_agent");
+  assert.equal(created.proposer.promptHash, "b".repeat(64));
+  assert.throws(() => approvePlatformRelease(created, { approvedBy: agent.principalId, approver: agent, approvalRef: "CAB-AI-1" }), (error) => error.code === "release_human_authority_required");
+  const approved = approvePlatformRelease(created, { approvedBy: "human_checker", approvalRef: "CAB-HUMAN-1" });
+  const canary = evaluatePlatformCanary(approved, { requestCount: 500, minimumRequests: 100, errorRatePct: 0, errorRateThresholdPct: 1, p95LatencyMs: 50, p95LatencyThresholdMs: 500, observedBy: agent.principalId, observer: agent, evidenceRef: "metrics://agent/canary/1" });
+  assert.equal(canary.canary.observer.principalType, "ai_agent");
+  assert.throws(() => promotePlatformRelease(canary, { promotedBy: agent.principalId, promoter: agent, promotionRef: "deploy://agent/1" }), (error) => error.code === "release_human_authority_required");
+});
+
+test("platform agent credential is proposal-only and API records model lineage", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-release-agent-"));
+  const credential = { agentId: "agent_release_api", secret: "agent-secret-1", status: "active", credentialId: "cred_release_api", agentInstallationId: "install_release_api", modelId: "release-copilot", modelVersion: "1.0.0", promptHash: "c".repeat(64), guardrailDecisionRef: "guardrail://release/api/1" };
+  const server = createLoanOsServer({ dataDir, platformAgentCredentials: [credential] });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(async () => { await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve())); await rm(dataDir, { recursive: true, force: true }); });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const headers = { "content-type": "application/json", "x-platform-agent-id": credential.agentId, "x-platform-agent-key": credential.secret };
+  const proposal = { ...releaseInput(), releaseId: "rel_agent_api", version: "2026.07.15-agent", proposedBy: credential.agentId };
+  let response = await fetch(`${base}/platform/delivery/releases`, { method: "POST", headers, body: JSON.stringify(proposal) });
+  assert.equal(response.status, 201, await response.clone().text());
+  const created = (await response.json()).release;
+  assert.equal(created.proposer.principalType, "ai_agent");
+  assert.equal(created.proposer.modelId, credential.modelId);
+  assert.equal(created.proposer.credentialId, credential.credentialId);
+  response = await fetch(`${base}/platform/delivery/releases/${proposal.releaseId}/approval`, { method: "POST", headers, body: JSON.stringify({ approvedBy: credential.agentId, approvalRef: "CAB-AI-BLOCKED" }) });
+  assert.equal(response.status, 403);
+});
+
 test("configuration baseline rejects secrets and reports exact drift", () => {
   assert.throws(() => createConfigurationBaseline({ baselineId: "base_bad", environment: "production", changeTicket: "CHG-1", proposedBy: "maker", approvedBy: "checker", approvalRef: "CAB-1", configuration: { DATABASE_PASSWORD: "secret" } }), (error) => error.code === "configuration_secret_forbidden");
   const baseline = createConfigurationBaseline({
@@ -166,7 +207,10 @@ test("bounded probe executes concurrent HTTP requests and platform APIs retain d
   assert.equal(resilienceResponse.status, 201);
   assert.equal((await resilienceResponse.json()).assessment.status, "passed");
 
-  const rollbackResponse = await post(`/platform/delivery/releases/${releaseInput().releaseId}/rollback`, { proposedBy: "release_maker", approvedBy: "release_checker", approvalRef: "CAB-EMERGENCY-1", reason: "Canary regression surfaced after full traffic promotion", incidentRef: "INC-2001" }, checkerCookie);
+  const rollbackProposalResponse = await post(`/platform/delivery/releases/${releaseInput().releaseId}/rollback-proposal`, { proposedBy: "release_maker", reason: "Canary regression surfaced after full traffic promotion", incidentRef: "INC-2001" }, makerCookie);
+  assert.equal(rollbackProposalResponse.status, 200);
+  assert.equal((await rollbackProposalResponse.json()).release.status, "rollback_pending_approval");
+  const rollbackResponse = await post(`/platform/delivery/releases/${releaseInput().releaseId}/rollback`, { approvedBy: "release_checker", approvalRef: "CAB-EMERGENCY-1" }, checkerCookie);
   assert.equal(rollbackResponse.status, 200);
   assert.equal((await rollbackResponse.json()).release.status, "rolled_back");
 

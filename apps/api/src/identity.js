@@ -571,7 +571,7 @@ export function hasPlatformRole(authContext, roles = ["platform_admin"]) {
   if (authContext?.principalType === "platform_key") {
     return true;
   }
-  if (authContext?.principalType !== "platform_user") {
+  if (!["platform_user", "platform_agent"].includes(authContext?.principalType)) {
     return false;
   }
   return roles.some((role) => authContext.roles?.includes(role));

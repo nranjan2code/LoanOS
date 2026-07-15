@@ -42,6 +42,7 @@ They meet at two deliberately isolated gateways: `apps/api/src/rules-engine.js` 
 - **Policy is data.** New lending/guardrail policy becomes a decision model (JSON) with a golden corpus — not engine code, not scattered `if`s in `server.js`.
 - **Determinism and lineage.** Engine evaluation reads no clock, no RNG, no I/O; every decision is replayable byte-identically from its audit record (INV-1/8/12).
 - **AI is gated.** Model outputs enter decisions only as provenance-tagged facts (DEC-4); the kill switch (`packages/core/src/model-governance.js` is the state source; the engine enforces) degrades model-dependent decisions to manual review. Agent actions go through `guardrail.*` decisions (`allow/deny/require_human`).
+- **AI cannot approve releases.** A scoped platform agent may propose releases or rollback and submit attributed canary evidence only with installation/model/prompt/guardrail lineage. Release approval, production promotion and rollback approval require independent authenticated humans; see `docs/architecture/delivery-operations.md`.
 - **Docs are part of done.** Architecture change → update `docs/architecture/`; irreversible choice → new ADR; engine change → check the design doc's INV/DEC tables; user-visible workflow change → update the canonical Guide & Academy content and verification date.
 
 ## Commands
