@@ -324,6 +324,7 @@ tr:last-child td { border-bottom: 0; }
 details { border-top: 1px solid var(--line); }
 details:last-child { border-bottom: 1px solid var(--line); }
 summary { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 20px 0; color: var(--forest); font-weight: 700; cursor: pointer; list-style: none; }
+summary::marker { content: ""; }
 summary::-webkit-details-marker { display: none; }
 summary::after { content: ""; width: 14px; height: 14px; flex: 0 0 14px; background: linear-gradient(var(--forest),var(--forest)) center / 14px 1.5px no-repeat, linear-gradient(var(--forest),var(--forest)) center / 1.5px 14px no-repeat; }
 details[open] summary::after { background-size: 14px 1.5px, 0 0; }
@@ -615,9 +616,7 @@ details p { max-width: 780px; margin: -5px 0 22px; color: var(--muted); font-siz
 }
 
 /* Homepage conversion narrative. All rules are scoped so internal pages remain unchanged. */
-.home-page .announcement,
-.home-page .nav-main > a[href="/help/"],
-.home-page .footer-col a[href="/help/"] { display: none; }
+.home-page .announcement { display: none; }
 .home-page .home-hero { padding: 68px 0 78px; }
 .home-page .home-hero .hero-grid { grid-template-columns: minmax(0,.86fr) minmax(540px,1.14fr); gap: 76px; }
 .home-page .home-hero h1 { max-width: 660px; font-size: var(--type-display-lg); }
@@ -718,8 +717,8 @@ details p { max-width: 780px; margin: -5px 0 22px; color: var(--muted); font-siz
 .home-page .home-faq-list details { border-bottom: 1px solid var(--line); }
 .home-page .home-faq-list summary { position: relative; padding: 24px 52px 24px 0; color: var(--forest); font-size: var(--type-title-md); font-weight: 700; cursor: pointer; list-style: none; }
 .home-page .home-faq-list summary::-webkit-details-marker { display: none; }
-.home-page .home-faq-list summary::after { content: "+"; position: absolute; right: 8px; top: 19px; color: var(--leaf); font-family: var(--display); font-size: var(--type-display-sm); font-weight: 400; }
-.home-page .home-faq-list details[open] summary::after { content: "−"; }
+.home-page .home-faq-list summary::after { content: ""; position: absolute; right: 8px; top: 28px; width: 16px; height: 16px; background: linear-gradient(var(--leaf),var(--leaf)) center / 16px 1.5px no-repeat, linear-gradient(var(--leaf),var(--leaf)) center / 1.5px 16px no-repeat; }
+.home-page .home-faq-list details[open] summary::after { background-size: 16px 1.5px, 0 0; }
 .home-page .home-faq-list details p { max-width: 720px; margin: -4px 0 26px; color: var(--muted); }
 .home-page .home-final-cta .cta-panel { border-top-color: var(--forest); }
 .home-page .home-final-cta .home-cta-note { text-align: right; }
