@@ -6,6 +6,7 @@ const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const webRoot = path.resolve(scriptDir, '..');
 const siteRoot = 'https://loanos.in';
 const contactEmail = 'hello@aitailorworkshop.in';
+const stylesheetVersion = 13;
 const errors = [];
 const warnings = [];
 
@@ -28,8 +29,54 @@ function requireMatch(source, pattern, message) {
 
 const pages = walk(webRoot).filter(file => file.endsWith('.html'));
 const sitemap = read(path.join(webRoot, 'sitemap.xml'));
+const stylesheet = read(path.join(webRoot, 'assets', 'site.css'));
 const canonicalUrls = [];
 const heroImages = new Map();
+
+const requiredDesignTokens = [
+  '--display',
+  '--sans',
+  '--type-display-xl',
+  '--type-display-lg',
+  '--type-display-md',
+  '--type-title-lg',
+  '--type-title-md',
+  '--type-body-lg',
+  '--type-body',
+  '--type-body-sm',
+  '--type-label',
+  '--type-meta',
+  '--leading-display',
+  '--leading-title',
+  '--leading-body',
+  '--tracking-display',
+  '--tracking-title',
+  '--tracking-label',
+  '--radius-sm',
+  '--radius-md',
+  '--radius-pill'
+];
+
+for (const token of requiredDesignTokens) {
+  if (!stylesheet.includes(`${token}:`)) errors.push(`site.css: missing design token ${token}`);
+}
+
+for (const declaration of stylesheet.matchAll(/font-size\s*:\s*([^;}]*)/g)) {
+  if (!declaration[1].trim().startsWith('var(--type-')) {
+    errors.push(`site.css: font-size must use a semantic type token (${declaration[1].trim()})`);
+  }
+}
+
+for (const declaration of stylesheet.matchAll(/border-radius\s*:\s*([^;}]*)/g)) {
+  const value = declaration[1].trim();
+  if (!['0', '50%'].includes(value) && !value.startsWith('var(--radius-')) {
+    errors.push(`site.css: border-radius must use the shared radius scale (${value})`);
+  }
+}
+
+if (!stylesheet.includes('--type-meta: .75rem;')) errors.push('site.css: metadata text must remain at least 12px');
+if ((stylesheet.match(/:root\s*{/g) || []).length !== 1) errors.push('site.css: design tokens must have one :root source of truth');
+if (/var\(--[^)]+\)[A-Za-z0-9.]+/.test(stylesheet)) errors.push('site.css: malformed custom property value');
 
 for (const page of pages) {
   const source = read(page);
@@ -37,8 +84,10 @@ for (const page of pages) {
   const canonical = requireMatch(source, /<link rel="canonical" href="([^"]+)">/, `${relative}: missing canonical URL`);
   requireMatch(source, /<meta name="description" content="[^"]+">/, `${relative}: missing description`);
   requireMatch(source, /loanos-logo-mark\.png/, `${relative}: missing approved logo image`);
-  requireMatch(source, /site\.css\?v=\d+/, `${relative}: missing versioned stylesheet`);
+  requireMatch(source, new RegExp(`site\\.css\\?v=${stylesheetVersion}`), `${relative}: stylesheet must use version ${stylesheetVersion}`);
   requireMatch(source, /site\.js\?v=\d+/, `${relative}: missing versioned script`);
+  requireMatch(source, /family=DM\+Sans:wght@400;500;600;700&family=DM\+Serif\+Display/, `${relative}: missing approved font pair`);
+  if (/style="[^"]*(?:font-|color:)/.test(source)) errors.push(`${relative}: typography and colour must come from the shared design system`);
 
   if (canonical) {
     canonicalUrls.push(canonical[1]);

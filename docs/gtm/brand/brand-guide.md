@@ -50,11 +50,12 @@ Use the CSS variable names verbatim when producing web/HTML assets.
 | `--sand` | `#f1ecdf` | Alternating section background |
 | `--white` | `#fff` | Cards, surfaces |
 | `--muted` | `#5b6863` | Secondary/body text |
-| `--line` | `rgba(0,0,0,.10)` | Borders/dividers |
+| `--line` | `rgba(8,43,35,.16)` | Borders/dividers |
 
 **Theme colour (meta):** `#123e32`.
-**Section accents:** `.accent-lime`, `.accent-saffron`, `.accent-sky`, and dark
-(`forest-deep`) — used sparingly to differentiate cards.
+**Section accents:** paper, sand, and `forest-deep` establish the page rhythm;
+lime, saffron, rose, and sky are supporting signals rather than competing card
+treatments.
 
 Pairing rules: forest/forest-deep backgrounds carry white text and lime accents;
 light (paper/sand/white) backgrounds carry ink/forest text with leaf accents.
@@ -66,16 +67,26 @@ Lime is a **highlight**, not a body colour — never large blocks of lime text.
   letter-spacing −0.035em, tight line-height (~0.98). Used for `h1`/`h2` "display"
   and large numerics.
 - **Body / UI:** `DM Sans` (`--sans`), weights 400–700, line-height 1.55.
-- **Eyebrow / kicker:** DM Sans 700, uppercase, letter-spacing ~0.14em, in `--leaf`
+- **Eyebrow / kicker:** DM Sans 700, uppercase, letter-spacing 0.1em, in `--leaf`
   (or `--lime` on dark, class `.eyebrow.light`).
 - Fallbacks: display → Georgia, serif; sans → system-ui, sans-serif.
 - Emphasis inside a display heading uses `<em>` styled non-italic in `--leaf`.
 
+All website typography must use the semantic `--type-*` scale. The canonical
+roles are display XL/LG/MD, display small/card, title LG/MD, body LG/body/body
+small, label, and metadata. Body-small text is 14px and metadata/labels never
+drop below 12px. Component-specific font-size literals are not permitted.
+
 ## Layout & shape
 
-- Max content width `--max: 1240px`; gutter via `.wrap`.
-- Corner radius `--radius: 18px` for cards/menus; pills use `999px`.
-- Soft shadow `--shadow: 0 24px 80px rgba(8,43,35,.12)`.
+- Max content width `--max: 1180px`; gutter via `.wrap`.
+- Editorial surfaces use `--radius-sm: 3px`; compact controls use
+  `--radius-md: 6px`; pills use `--radius-pill: 999px`.
+- Soft shadow `--shadow: 0 18px 52px rgba(8,43,35,.10)` is reserved for overlays
+  and floating evidence, not ordinary content rows.
+- Content is arranged as editorial rows with dividers. Avoid mixing a rounded
+  card wall with flat editorial rows on the same page.
+- Use the shared `--space-*` scale for structural gaps and section rhythm.
 - Generous whitespace; one idea per section; alternating paper / sand / forest
   section backgrounds for rhythm.
 - Focus ring: 3px `--saffron`, offset 4px (accessibility — keep it).
@@ -111,6 +122,7 @@ in-flow, governed boundary, India-first/India-hosted, accountable by constructio
 ## Accessibility (non-negotiable, part of the brand)
 
 - Maintain WCAG-AA contrast (ink/forest on light; white on forest-deep).
+- Visible text must be at least 12px; body copy should normally be 14–17px.
 - Keep the visible focus ring; captions-first video (no audio dependency); the
   site ships a skip link. New assets inherit these.
 

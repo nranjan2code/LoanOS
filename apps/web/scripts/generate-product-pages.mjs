@@ -78,7 +78,7 @@ function productPage(product) {
   <meta name="description" content="${escape(product.description)} Explore the people, controls, evidence and servicing pattern LoanOS can help institutions configure.">
   <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1"><link rel="canonical" href="https://loanos.in/loan-types/${product.slug}/">
   <meta property="og:type" content="website"><meta property="og:title" content="${escape(product.name)} journey | LoanOS India"><meta property="og:description" content="${escape(product.description)}"><meta property="og:url" content="https://loanos.in/loan-types/${product.slug}/"><meta property="og:site_name" content="LoanOS India"><meta property="og:image" content="https://loanos.in/assets/images/products/${product.slug}.jpg"><meta name="twitter:card" content="summary_large_image">
-  <meta name="theme-color" content="#123e32"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet"><link rel="stylesheet" href="/assets/site.css?v=12">
+  <meta name="theme-color" content="#123e32"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet"><link rel="stylesheet" href="/assets/site.css?v=13">
   <script type="application/ld+json">${schema}</script>
 </head><body><div data-site-header></div><main id="main">
   <section class="product-hero"><div class="wrap product-hero-grid"><div><p class="eyebrow">${escape(product.category)} journey</p><p class="product-breadcrumb"><a href="/loan-types/">Loan and product library</a> / ${escape(product.name)}</p><h1 class="display">${escape(product.name)} built around the <em>real case.</em></h1><p>${escape(product.description)}</p><div class="actions"><a class="button primary" href="mailto:hello@aitailorworkshop.in?subject=LoanOS%20${encodeURIComponent(product.name)}%20journey">Map this journey</a><a class="button ghost" href="#journey">See the journey</a></div><p class="product-scope">LoanOS provides configurable operating patterns. Each lender defines product availability, policy, pricing, eligibility and approvals.</p></div><figure class="product-hero-image"><img src="/assets/images/products/${product.slug}.jpg" alt="${escape(product.alt)}"><figcaption>${escape(product.category)} / LoanOS journey library</figcaption></figure></div></section>
@@ -102,7 +102,7 @@ catalogue = catalogue.replace(/<article class="loan-card"([\s\S]*?)<h3>([^<]+)<\
   const product = products.find(item => item.name === name);
   return product ? `<a class="loan-card" href="/loan-types/${product.slug}/"${before}<h3>${name}</h3>${after}</a>` : card;
 });
-catalogue = catalogue.replace('site.css?v=6', 'site.css?v=12').replace('site.js?v=6', 'site.js?v=12');
+catalogue = catalogue.replace('site.css?v=6', 'site.css?v=13').replace('site.js?v=6', 'site.js?v=12');
 fs.writeFileSync(cataloguePath, catalogue);
 
 const sitemap = ['/', '/platform/', '/financial-institutions/', '/for-msmes/', '/partners/', '/loan-types/', '/trust/', '/resources/', ...products.map(product => `/loan-types/${product.slug}/`)];
