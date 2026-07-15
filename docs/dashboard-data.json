@@ -1,26 +1,31 @@
 {
   "schemaVersion": 2,
-  "generated": "2026-07-15T16:58:50.343Z",
+  "generated": "2026-07-15T17:07:51.135Z",
   "sourceDigest": "e1b2c35e4dff7e68",
-  "snapshotId": "dfbca7c4d8991f8e",
+  "snapshotId": "19c391372b1f8302",
   "sources": {
     "catalogue": "docs/product/complete-system-capability-catalog.md",
     "trace": "docs/product/capability-trace.json",
     "planes": "scripts/planes.mjs",
     "backlog": "docs/product/build-backlog.md",
-    "tests": "reused build test log"
+    "tests": "live Node test run"
   },
   "git": {
     "branch": "main",
-    "sha": "e25c3646b77e",
-    "count": 204,
+    "sha": "e7d6066715fc",
+    "count": 205,
     "dirty": true,
-    "changeCount": 78,
+    "changeCount": 4,
     "commits": [
+      {
+        "hash": "e7d6066",
+        "subject": "feat(mobile): align domains under aitailorworkshop.in and implement android apps functional features",
+        "when": "3 minutes ago"
+      },
       {
         "hash": "e25c364",
         "subject": "feat(demo): update dashboards, portals, and showcase persona documentation",
-        "when": "32 minutes ago"
+        "when": "41 minutes ago"
       },
       {
         "hash": "28f7385",
@@ -70,11 +75,6 @@
       {
         "hash": "23a5848",
         "subject": "feat(journeys): persist specialist lending operations",
-        "when": "11 hours ago"
-      },
-      {
-        "hash": "17ab3a2",
-        "subject": "feat(product): add 21-journey conformance control plane",
         "when": "11 hours ago"
       }
     ]
@@ -25410,15 +25410,15 @@
     }
   ],
   "tests": {
-    "pass": 630,
+    "pass": 638,
     "fail": 0,
     "skipped": 8,
     "cancelled": 0,
     "todo": 0,
-    "total": 638,
-    "durationMs": 21531.153292,
+    "total": 646,
+    "durationMs": 22390.176084,
     "ran": true,
-    "source": "provided-log",
+    "source": "live",
     "error": ""
   }
 }

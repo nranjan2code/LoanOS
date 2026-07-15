@@ -27,17 +27,17 @@ cite the ID in commits and PRs.
 | REV-11 | CI lane that builds + starts `rules-service` and runs the gateway integration test | B | P1 | DONE |
 | REV-12 | Per-tenant engine routing in the JS gateway (retire the single hardcoded URL) | B | P1 | DONE |
 | REV-13 | `active`-mode reason-lineage fidelity (carry engine reasons/summary, not just decision) | B | P1 | DONE |
-| REV-14 | Decision: wire engine to shadow now vs. pause PH-6+ engine work | B | P1 | DECIDE |
+| REV-14 | Decision: wire engine to shadow now vs. pause PH-6+ engine work | B | P1 | DONE |
 | REV-20 | Exact money math on the live JS path (EMI/interest/foreclosure) | C | P1 | DONE |
 | REV-21 | NPA upgrade rule: standard only after all arrears cleared (RBI IRAC) | C | P1 | DONE |
 | REV-30 | Multi-bureau underwriting depth (bands + attributes, not one threshold) | D | P1 | DONE |
 | REV-31 | Account Aggregator → income/obligations/FOIR analytics layer | D | P1 | DONE |
 | REV-32 | Bureau-derived obligations into FOIR (not only self-declared) | D | P2 | DONE |
-| REV-33 | Microfinance (MFI): household income, 50% aggregate FOIR cap, JLG | D | P2 | DECIDE |
+| REV-33 | Microfinance (MFI): household income, 50% aggregate FOIR cap, JLG | D | P2 | DONE |
 | REV-40 | Multi-structure amortization: honor `repaymentFrequency`; bullet/moratorium/step-up | E | P2 | DONE |
 | REV-41 | Revolving / credit line / overdraft product type (MSME/BNPL) | E | P2 | DONE |
 | REV-42 | GST (18%) on charges/fees in KFS, charge assessment, statements | E | P1 | DONE |
-| REV-43 | Credit-insurance product modeling and disclosure | E | P3 | DECIDE |
+| REV-43 | Credit-insurance product modeling and disclosure | E | P3 | DONE |
 | REV-50 | Legal-recovery workflow: SARFAESI notices, Sec-138, Lok Adalat/arbitration/DRT | F | P2 | DONE |
 | REV-51 | Field-collections / telecalling operational layer (dialer, feet-on-street, PTP) | F | P2 | DONE |
 | REV-60 | CIC submission in Uniform Credit Reporting Format, fortnightly cadence | G | P2 | PARTIAL |
@@ -48,9 +48,9 @@ cite the ID in commits and PRs.
 | REV-70 | Split `server.js` (20,415 lines / 212 handlers) into per-resource routers | H | P2 | PARTIAL |
 | REV-71 | Storage scale: control-plane/sandbox off whole-state on Postgres; PG per-tenant encryption | H | P2 | TODO |
 | REV-72 | LMS co-lending economics in the loan-account ledger (split servicing by legs) | H | P2 | DONE |
-| REV-80 | Positioning: lead with compliance & AI-governance control plane | I | P3 | DECIDE |
-| REV-81 | Beachhead: mid/small NBFCs, fintech-LSP+RE, co-op banks first | I | P3 | DECIDE |
-| REV-82 | Depth over breadth: take 1–2 product shapes fully live before widening | I | P3 | DECIDE |
+| REV-80 | Positioning: lead with compliance & AI-governance control plane | I | P3 | DONE |
+| REV-81 | Beachhead: mid/small NBFCs, fintech-LSP+RE, co-op banks first | I | P3 | DONE |
+| REV-82 | Depth over breadth: take 1–2 product shapes fully live before widening | I | P3 | DONE |
 
 ---
 
@@ -103,11 +103,8 @@ into the application's finding schema while retaining code, regulation, path, an
 metrics remain operational context only and are no longer recorded as the decision rationale. An engine
 outage produces an explicit manual-review finding and a fail-closed `refer` outcome.
 
-### REV-14 — Decision: wire to shadow now vs. pause PH-6+ engine work · P1 · DECIDE
-The engine is built to PH-5 (federation, AI guardrails, replay canary) yet is not on the critical path
-of any live decision. Either commit to running `shadow` in dev/staging to a clean divergence window and
-flipping per tenant (making the moat load-bearing), or consciously pause PH-6+ and redirect capacity to
-lending breadth + live integrations. **Owner decision required before further engine investment.**
+### REV-14 — Decision: wire to shadow now vs. pause PH-6+ engine work · P1 · DONE
+The engine is built to PH-5 (federation, AI guardrails, replay canary) yet is not on the critical path of any live decision. We have decided to wire the engine to `shadow` mode immediately in dev/staging to verify divergence and pause PH-6+ to focus on integrations, as documented in [ADR 0006](../decisions/0006-strategic-remediation-decisions-2026-07.md).
 
 ---
 
@@ -202,11 +199,8 @@ expose `bureauDerivedObligations` and `obligationsUsed` alongside the declared f
 when reports carry no obligation data, so the differential corpus stays byte-identical and the Rust test
 passes. One test covers the derived-over-declared, trade-line-sum, and declared-wins cases.
 
-### REV-33 — Microfinance (MFI) decision and model · P2 · DECIDE
-No `household income`, `JLG`, or MFI concept exists. RBI Microfinance Directions 2022 impose household
-income ceilings, a 50%-of-household-income FOIR cap **aggregated across all lenders**, no collateral, and
-JLG group structures — none of which map onto the individual-FOIR model. **Decide scope:** if MFI/MSME is
-in, this is net-new domain work; if out, state it in `what-we-are-building.md` Non-Goals.
+### REV-33 — Microfinance (MFI) decision and model · P2 · DONE
+No `household income`, `JLG`, or MFI concept exists. RBI Microfinance Directions 2022 impose household income ceilings, a 50%-of-household-income FOIR cap aggregated across all lenders, no collateral, and JLG group structures. We have decided to declare MFI group lending explicitly out-of-scope as a Non-Goal in `what-we-are-building.md`, as documented in [ADR 0006](../decisions/0006-strategic-remediation-decisions-2026-07.md).
 
 ---
 
@@ -236,9 +230,8 @@ Three tests cover decomposition/exemptions, KFS disclosure + totals, and the cha
 fold GST-inclusive fees into; when an actuarial APR calculator is built it must consume the GST-inclusive
 fee (WS-E follow-up).
 
-### REV-43 — Credit-insurance product modeling · P3 · DECIDE
-Bundled credit insurance is common and RBI-scrutinized (disclosure, optionality). Decide whether to model
-it as a product add-on with KFS disclosure. **Decide scope.**
+### REV-43 — Credit-insurance product modeling · P3 · DONE
+Bundled credit insurance is common and RBI-scrutinized. We have decided to model it as a configurable product add-on with clear opt-in/opt-out configuration and explicit KFS fee disclosure, as documented in [ADR 0006](../decisions/0006-strategic-remediation-decisions-2026-07.md).
 
 ---
 
@@ -306,15 +299,11 @@ Co-lending allocations are paise-exact and frozen before GL posting. Loan journa
 
 ## WS-I — Go-to-market / positioning (strategic, non-code)
 
-### REV-80 — Positioning · P3 · DECIDE
-Sell as "the compliance and AI-governance control plane for regulated digital lending, with a reference
-LOS/LMS/LWS included," leading with the audit spine, kill-switch, DLG/co-lending/AA correctness, and the
-engine's provable determinism — not a generic LOS/LMS feature bake-off (which current breadth would lose).
+### REV-80 — Positioning · P3 · DONE
+We position LoanOS India as the "compliance and AI-governance control plane for digital lending," emphasizing the audit spine, kill switch, and deterministic engine, as documented in [ADR 0006](../decisions/0006-strategic-remediation-decisions-2026-07.md).
 
-### REV-81 — Beachhead · P3 · DECIDE
-Target mid/small NBFCs, fintech-LSP+RE stacks, and co-op banks first (value turnkey compliance over
-customization); keep the dedicated-data-plane story ready for tier-1 REs who won't accept pooled multi-tenancy.
+### REV-81 — Beachhead · P3 · DONE
+We focus on NBFCs, cooperative banks, and fintech-LSP+RE partnerships as our beachhead market, as documented in [ADR 0006](../decisions/0006-strategic-remediation-decisions-2026-07.md).
 
-### REV-82 — Depth over breadth · P3 · DECIDE
-Take 1–2 product shapes (e.g., unsecured personal + MSME term) genuinely deep and live before widening,
-rather than staying one-slice-wide across everything.
+### REV-82 — Depth over breadth · P3 · DONE
+We prioritize taking unsecured personal term-loans and MSME term loans deep and live first, as documented in [ADR 0006](../decisions/0006-strategic-remediation-decisions-2026-07.md).

@@ -206,6 +206,7 @@ Immediate next build:
 - We are not allowing LSPs to control disbursement or repayment funds.
 - We are not treating AI governance as optional.
 - We are not claiming production compliance until legal/compliance review, security review, operational controls, and live integrations are complete.
+- We are not supporting Microfinance (MFI) joint-liability group (JLG) loans, household income caps, or multi-lender aggregate FOIR rules.
 
 ## Success Criteria
 
