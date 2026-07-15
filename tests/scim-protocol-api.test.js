@@ -24,8 +24,14 @@ test("SCIM 2.0 service surface is tenant-scoped, idempotent and deactivates imme
   assert.equal(response.status, 200, await response.clone().text());
   response = await fetch(`${base}/scim/v2/Users?filter=${encodeURIComponent('userName eq "user@bank.in"')}`, { headers: { "x-api-key": tenant.apiKey } });
   assert.equal(response.status, 200); assert.equal((await response.json()).totalResults, 1);
+  state = await loadState(dataDir);
+  const activeUser = Object.values(state.tenants[tenant.tenantId].users).find((candidate) => candidate.federationExternalId === "employee-1");
+  state.controlPlane.sessions["federated-session-1"] = { sessionId: "federated-session-1", tokenHash: "test-token", principalType: "tenant_user", tenantId: tenant.tenantId, userId: activeUser.userId, email: activeUser.email, roles: [], status: "active", authenticationSource: "federated", federationPolicyId: "idp-scim", createdAt: now.toISOString(), expiresAt: new Date(now.getTime() + 60_000).toISOString(), lastSeenAt: now.toISOString(), revokedAt: null };
+  await saveState(state, dataDir);
   response = await fetch(`${base}/scim/v2/Users/employee-1`, { method: "PATCH", headers: { "content-type": "application/scim+json", "x-api-key": tenant.apiKey, "idempotency-key": "scim-deactivate-1" }, body: JSON.stringify({ schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"], Operations: [{ op: "Replace", path: "active", value: false }] }) });
   assert.equal(response.status, 200, await response.clone().text()); assert.equal((await response.json()).active, false);
   state = await loadState(dataDir); const user = Object.values(state.tenants[tenant.tenantId].users).find((candidate) => candidate.federationExternalId === "employee-1");
   assert.equal(user.status, "inactive"); assert.equal(state.tenants[tenant.tenantId].saasPrincipals[`${tenant.tenantId}:${user.userId}`].status, "suspended");
+  assert.equal(state.controlPlane.sessions["federated-session-1"].status, "revoked");
+  assert.match(state.controlPlane.sessions["federated-session-1"].revocationReason, /SCIM deactivation/);
 });

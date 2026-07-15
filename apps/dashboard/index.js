@@ -1962,10 +1962,11 @@ function setAdminTab(tabName) {
     loadPlatformUsers();
     loadBreakGlassGrants(document.getElementById('break-glass-tenant-id').value.trim());
   }
+  if (tabName === 'identity-ops') loadIdentityOperations();
 }
 
 const PLATFORM_ONLY_ADMIN_TABS = new Set(['platform', 'platform-access']);
-const TENANT_ONLY_ADMIN_TABS = new Set(['users', 'reviews', 'service']);
+const TENANT_ONLY_ADMIN_TABS = new Set(['users', 'reviews', 'service', 'identity-ops']);
 
 async function openAdminConsole() {
   if (!canOpenTenantAdmin()) {
@@ -2014,6 +2015,33 @@ async function renderTenantAdmin() {
     dom.adminRotatedKeyOutput.textContent = '';
   } catch (err) {
     showToast(`Admin load failed: ${err.message}`, 'error');
+  }
+}
+
+async function loadIdentityOperations() {
+  try {
+    const [summaryResponse, campaignsResponse] = await Promise.all([
+      apiFetch('/admin/identity-operations/summary'),
+      apiFetch('/admin/identity-operations/conformance/campaigns')
+    ]);
+    const summary = summaryResponse.summary;
+    document.getElementById('identity-ops-summary').innerHTML = renderSummaryCards([
+      ['Readiness', summary.status],
+      ['Active users', summary.users.active],
+      ['Active sessions', summary.sessions.active],
+      ['Federation policies', `${summary.federation.active} active / ${summary.federation.suspended} suspended`],
+      ['Simulator-certified', `${summary.conformance.simulatorCertifiedFamilies.length}/${summary.conformance.requiredFamilies.length}`],
+      ['Open escalations', summary.pending.escalations]
+    ]);
+    const campaigns = campaignsResponse.campaigns || [];
+    document.getElementById('identity-campaigns-list').innerHTML = campaigns.length ? campaigns.map(campaign => `
+      <div class="admin-row">
+        <div class="admin-row-title">${escapeHtml(campaign.family)} · ${escapeHtml(campaign.campaignId)}</div>
+        <p>${escapeHtml(campaign.status)} · ${Object.keys(campaign.results || {}).length}/${campaign.scenarioIds.length} scenarios · ${campaign.commerciallyLive ? 'live' : 'simulated only'}</p>
+        ${campaign.manifestChecksumSha256 ? `<code>${escapeHtml(campaign.manifestChecksumSha256)}</code>` : ''}
+      </div>`).join('') : emptyAdminRow('No identity conformance campaigns yet.');
+  } catch (err) {
+    showToast(`Identity control room load failed: ${err.message}`, 'error');
   }
 }
 
@@ -2380,6 +2408,114 @@ dom.adminInviteForm.addEventListener('submit', async (event) => {
 
 dom.adminTabs.forEach(tab => {
   tab.addEventListener('click', () => setAdminTab(tab.dataset.adminTab));
+});
+
+document.getElementById('btn-identity-ops-refresh').addEventListener('click', loadIdentityOperations);
+
+document.getElementById('btn-identity-revoke').addEventListener('click', async () => {
+  try {
+    const userId = document.getElementById('identity-revoke-user').value.trim();
+    const reason = document.getElementById('identity-revoke-reason').value.trim();
+    if (!userId || !reason) throw new Error('User ID and containment reason are required.');
+    const result = await apiFetch('/admin/identity-operations/sessions/revoke', { method: 'POST', body: JSON.stringify({ userId, reason }) });
+    showToast(`${result.revokedSessionIds.length} active session(s) revoked.`, 'success');
+    await loadIdentityOperations();
+  } catch (err) { showToast(`Session containment failed: ${err.message}`, 'error'); }
+});
+
+document.getElementById('btn-identity-recovery-propose').addEventListener('click', async () => {
+  try {
+    await apiFetch('/admin/identity-operations/recovery/proposals', { method: 'POST', body: JSON.stringify({
+      requestId: document.getElementById('identity-recovery-id').value.trim(),
+      principalId: document.getElementById('identity-recovery-user').value.trim(),
+      identityEvidenceRef: document.getElementById('identity-recovery-evidence').value.trim(),
+      reason: document.getElementById('identity-recovery-reason').value.trim()
+    }) });
+    showToast('Authenticator recovery proposed. A different administrator must approve it.', 'success');
+  } catch (err) { showToast(`Recovery proposal failed: ${err.message}`, 'error'); }
+});
+
+document.getElementById('btn-identity-recovery-approve').addEventListener('click', async () => {
+  try {
+    const requestId = document.getElementById('identity-recovery-id').value.trim();
+    const result = await apiFetch(`/admin/identity-operations/recovery/${encodeURIComponent(requestId)}/approval`, { method: 'POST', body: JSON.stringify({ approvalRef: document.getElementById('identity-recovery-approval-ref').value.trim() }) });
+    showToast(`Recovery approved; ${result.revokedSessionIds.length} session(s) revoked.`, 'success');
+    await loadIdentityOperations();
+  } catch (err) { showToast(`Recovery approval failed: ${err.message}`, 'error'); }
+});
+
+document.getElementById('btn-identity-rotation-propose').addEventListener('click', async () => {
+  try {
+    await apiFetch('/admin/identity-operations/federation/rotations/proposals', { method: 'POST', body: JSON.stringify({
+      requestId: document.getElementById('identity-rotation-id').value.trim(),
+      policyId: document.getElementById('identity-federation-policy').value.trim(),
+      proposedMetadata: document.getElementById('identity-rotation-metadata').value,
+      proposedMetadataValidUntil: document.getElementById('identity-rotation-valid-until').value.trim(),
+      proposedSigningKeyIds: parseCommaList(document.getElementById('identity-rotation-keys').value),
+      overlapStartsAt: document.getElementById('identity-rotation-overlap-start').value.trim(),
+      overlapEndsAt: document.getElementById('identity-rotation-overlap-end').value.trim(),
+      reason: document.getElementById('identity-rotation-reason').value.trim()
+    }) });
+    showToast('Federation rotation proposed. A different administrator must approve it.', 'success');
+  } catch (err) { showToast(`Rotation proposal failed: ${err.message}`, 'error'); }
+});
+
+document.getElementById('btn-identity-rotation-approve').addEventListener('click', async () => {
+  try {
+    const requestId = document.getElementById('identity-rotation-id').value.trim();
+    await apiFetch(`/admin/identity-operations/federation/rotations/${encodeURIComponent(requestId)}/approval`, { method: 'POST', body: JSON.stringify({ approvalRef: document.getElementById('identity-rotation-approval').value.trim(), conformanceEvidenceRef: document.getElementById('identity-rotation-conformance').value.trim() }) });
+    showToast('Federation rotation approved with rollback lineage retained.', 'success'); await loadIdentityOperations();
+  } catch (err) { showToast(`Rotation approval failed: ${err.message}`, 'error'); }
+});
+
+document.getElementById('btn-identity-suspend').addEventListener('click', async () => {
+  try {
+    const policyId = document.getElementById('identity-federation-policy').value.trim();
+    if (!confirm('Suspend this federation policy and revoke every affected active session now?')) return;
+    const result = await apiFetch(`/admin/identity-operations/federation/policies/${encodeURIComponent(policyId)}/suspension`, { method: 'POST', body: JSON.stringify({ reason: document.getElementById('identity-suspension-reason').value.trim(), evidenceRef: document.getElementById('identity-suspension-evidence').value.trim() }) });
+    showToast(`Federation suspended; ${result.revokedSessionIds.length} session(s) revoked.`, 'success'); await loadIdentityOperations();
+  } catch (err) { showToast(`Federation suspension failed: ${err.message}`, 'error'); }
+});
+
+document.getElementById('btn-identity-campaign-propose').addEventListener('click', async () => {
+  try {
+    await apiFetch('/admin/identity-operations/conformance/campaigns', { method: 'POST', body: JSON.stringify({
+      campaignId: document.getElementById('identity-campaign-id').value.trim(),
+      family: document.getElementById('identity-campaign-family').value,
+      providerProfileRef: document.getElementById('identity-provider-ref').value.trim(),
+      executionMode: 'simulated'
+    }) });
+    showToast('Simulator campaign proposed. Independent approval is required.', 'success');
+    await loadIdentityOperations();
+  } catch (err) { showToast(`Campaign proposal failed: ${err.message}`, 'error'); }
+});
+
+document.getElementById('btn-identity-campaign-approve').addEventListener('click', async () => {
+  try {
+    const campaignId = document.getElementById('identity-campaign-id').value.trim();
+    await apiFetch(`/admin/identity-operations/conformance/campaigns/${encodeURIComponent(campaignId)}/approval`, { method: 'POST', body: JSON.stringify({ approvalRef: document.getElementById('identity-campaign-approval-ref').value.trim() }) });
+    showToast('Simulator campaign approved.', 'success'); await loadIdentityOperations();
+  } catch (err) { showToast(`Campaign approval failed: ${err.message}`, 'error'); }
+});
+
+document.getElementById('btn-identity-campaign-run').addEventListener('click', async () => {
+  try {
+    const campaignId = document.getElementById('identity-campaign-id').value.trim();
+    const result = await apiFetch(`/admin/identity-operations/conformance/campaigns/${encodeURIComponent(campaignId)}/run`, { method: 'POST', body: JSON.stringify({}) });
+    showToast(`Campaign result: ${result.campaign.status}. This remains simulator-only evidence.`, 'success'); await loadIdentityOperations();
+  } catch (err) { showToast(`Campaign execution failed: ${err.message}`, 'error'); }
+});
+
+document.getElementById('btn-identity-reconcile').addEventListener('click', async () => {
+  try {
+    const sourceUsers = JSON.parse(document.getElementById('identity-recon-users').value || '[]');
+    const result = await apiFetch('/admin/identity-operations/directory-reconciliations', { method: 'POST', body: JSON.stringify({
+      reconciliationId: document.getElementById('identity-recon-id').value.trim(),
+      policyId: document.getElementById('identity-recon-policy').value.trim(),
+      sourceEvidenceRef: document.getElementById('identity-recon-evidence').value.trim(), sourceUsers
+    }) });
+    showToast(`Directory reconciliation: ${result.reconciliation.status}.`, result.reconciliation.status === 'reconciled' ? 'success' : 'warning');
+  } catch (err) { showToast(`Directory reconciliation failed: ${err.message}`, 'error'); }
 });
 
 dom.btnOnboardingPrev.addEventListener('click', () => setOnboardingStep(apiState.onboardingStep - 1));

@@ -193,6 +193,11 @@ body {
   background: var(--bg-elevated);
 }
 
+.identity-live-warning {
+  border-left: 4px solid #b7791f;
+  background: #fffaf0;
+}
+
 .login-form {
   display: flex;
   flex-direction: column;

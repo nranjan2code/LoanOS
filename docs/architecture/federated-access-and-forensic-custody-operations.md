@@ -24,7 +24,13 @@ The tenant is selected only from an active LoanOS service credential. `scim:read
 - `PATCH /scim/v2/Users/{externalId}` for `active=false` immediate containment;
 - `GET /scim/v2/Groups` for approved policy mappings.
 
-Create/update is idempotent and domain/policy/group bound. Group membership produces `pending_loanos_maker_checker` canonical-role requests. Deactivation immediately makes the login inactive, suspends the canonical principal, invalidates session resolution, assesses staffing loss, pauses affected features and opens escalations. Re-enabling a directory user does not restore historical LoanOS grants automatically.
+Create/update is idempotent and domain/policy/group bound. Group membership produces `pending_loanos_maker_checker` canonical-role requests. Deactivation immediately makes the login inactive, suspends the canonical principal, explicitly marks every persisted matching session revoked with actor/reason, records the revoked session IDs, assesses staffing loss, pauses affected features and opens escalations. Re-enabling a directory user does not restore historical LoanOS grants automatically.
+
+## Identity operations and deterministic conformance
+
+The tenant IAM control room and `/admin/identity-operations/*` API govern planned metadata/signing-key rotation, emergency federation suspension, direct all-session containment, maker-checker authenticator recovery and provider-directory reconciliation. Rotation retains former key/metadata lineage and enforces a bounded overlap. Recovery excludes both the subject and proposer from approval and forces clean MFA re-enrolment after revoking all sessions.
+
+The vendor-neutral conformance lab contains mandatory OIDC, SAML-gateway, SCIM, device-posture, isolated-control-engine and SIEM/WORM packs. Every pack includes cross-tenant, invalid-signature, replay, stale-evidence and provider-outage cases plus family-specific rollover/deactivation/custody cases. Campaigns require distinct proposal and approval and can produce only `simulator_certified`, never a live certification. See [tenant identity operations and conformance lab](identity-operations-and-conformance-lab.md).
 
 ## Universal mutation rollout
 
@@ -71,7 +77,7 @@ Recommended schedule is continuous collector delivery plus at least daily sealed
 
 ## Production acceptance evidence
 
-- vendor-specific OIDC and SAML positive/adverse conformance, PKCE interception, nonce/replay, audience mix-up, expired/not-yet-valid token and key-rollover tests;
+- LoanOS simulator-certified OIDC/SAML/SCIM/device/control-engine/SIEM-WORM packs, followed by vendor-specific positive/adverse conformance, PKCE interception, nonce/replay, audience mix-up, expired/not-yet-valid token and key-rollover tests;
 - SCIM create, exact filter, duplicate, local-account collision, cross-tenant token, unknown group, deactivation and rehire tests with p95/p99 leaver latency;
 - password/MFA/federated/WebAuthn/device/session/logout/recovery threat scenarios;
 - complete mutation-route inventory with zero unclassified paths and shadow/active decision reconciliation;

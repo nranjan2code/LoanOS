@@ -11,6 +11,7 @@ import { routeCompletionControls } from "./routes/completion-controls.js";
 import { routeCersaiSearch } from "./routes/cersai-search.js";
 import { routeSaasIdentityGovernance } from "./routes/saas-identity-governance.js";
 import { routeAccessActivityCustody } from "./routes/access-activity-custody.js";
+import { routeIdentityOperations } from "./routes/identity-operations.js";
 import { enforceUniversalMutationStaffing } from "./mutation-staffing-policy.js";
 import { validateControlEngineFleetConfiguration } from "./control-rules-engine.js";
 import { exchangeOidcAuthorizationCode, loadFederationAuthorizationEndpoint, validateFederatedLogin } from "./federation-runtime.js";
@@ -1255,7 +1256,8 @@ async function route(req, res, dataDir, platformAdminKey, observability, allowDi
   }
 
   if (await routeDataGovernanceControls({ method, path, req, res, tenant, store, readJson, sendJson, appendEvent })) return;
-  if (await routeEnterpriseTenantControls({ method, path, req, res, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor, upsertFederatedTenantUser })) return;
+  if (await routeEnterpriseTenantControls({ method, path, req, res, store, stateRef, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor, upsertFederatedTenantUser })) return;
+  if (await routeIdentityOperations({ method, path, req, res, tenant, store, stateRef, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
   if (await routeRiskAmlControls({ method, path, req, res, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
   if (await routeImplementationControls({ method, path, req, res, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
   if (await routeInstitutionalOperations({ method, path, req, res, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;

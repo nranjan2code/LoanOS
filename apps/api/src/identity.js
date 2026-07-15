@@ -238,10 +238,16 @@ export function normalizeSessions(sessions = {}) {
       status: session.status ?? "active",
       restricted: session.restricted ?? null,
       challengePurpose: session.challengePurpose ?? null,
+      authenticationSource: session.authenticationSource ?? "local",
+      assurance: session.assurance ?? null,
+      federationPolicyId: session.federationPolicyId ?? null,
+      federationEvidenceChecksumSha256: session.federationEvidenceChecksumSha256 ?? null,
       createdAt: session.createdAt ?? null,
       expiresAt: session.expiresAt ?? null,
       lastSeenAt: session.lastSeenAt ?? null,
-      revokedAt: session.revokedAt ?? null
+      revokedAt: session.revokedAt ?? null,
+      revokedBy: session.revokedBy ?? null,
+      revocationReason: session.revocationReason ?? null
     };
   }
   return normalized;

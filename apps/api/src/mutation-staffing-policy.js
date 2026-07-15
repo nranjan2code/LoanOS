@@ -8,7 +8,7 @@ const SELF_GOVERNED_PREFIXES = ["/activity/screen-events", "/admin/identity-gove
 // active mode an unclassified staff mutation is denied, so new endpoints must
 // deliberately select a control family instead of silently bypassing staffing.
 export const MUTATION_STAFFING_ROUTE_RULES = Object.freeze([
-  rule("FST-001", /^\/admin\/(users|invites|access-reviews|federation|scim|sessions|service-credentials|service-credential-compromises|api-key)/),
+  rule("FST-001", /^\/admin\/(users|invites|access-reviews|federation|scim|identity-operations|sessions|service-credentials|service-credential-compromises|api-key)/),
   rule("FST-002", /^\/(products|product-configurations|journeys|pricing-policies|loans\/marketplace-offers)/),
   rule("FST-003", /^\/(loans\/(applications|decisions|sanctions|eligibility)|channels\/leads)/),
   rule("FST-004", /^\/(borrowers(?:\/|$)|kyc|ckyc|aml\/customer|reporting\/ckycrr)/),

@@ -1,9 +1,14 @@
 {
-  "generated": "2026-07-15T02:20:53.145Z",
+  "generated": "2026-07-15T02:41:32.969Z",
   "git": {
     "branch": "main",
-    "count": 185,
+    "count": 186,
     "commits": [
+      {
+        "hash": "f9a7f90",
+        "subject": "feat(identity): harden federation and universal access control",
+        "when": "20 minutes ago"
+      },
       {
         "hash": "061c783",
         "subject": "feat(identity): enforce tenant staffing and actor attribution",
@@ -22,7 +27,7 @@
       {
         "hash": "876775d",
         "subject": "feat(platform): govern tenant product provisioning",
-        "when": "5 hours ago"
+        "when": "6 hours ago"
       },
       {
         "hash": "adfb90c",
@@ -47,22 +52,17 @@
       {
         "hash": "0848776",
         "subject": "feat(integrations): complete deployment execution ports",
-        "when": "6 hours ago"
+        "when": "7 hours ago"
       },
       {
         "hash": "5f992d0",
         "subject": "feat(integrations): complete adapter execution baseline",
-        "when": "6 hours ago"
+        "when": "7 hours ago"
       },
       {
         "hash": "3037e82",
         "subject": "chore: sync and update workspace files",
-        "when": "6 hours ago"
-      },
-      {
-        "hash": "81f7941",
-        "subject": "docs(dashboard): refresh integration wave metadata",
-        "when": "6 hours ago"
+        "when": "7 hours ago"
       }
     ]
   },
@@ -11833,6 +11833,16 @@
               "note": "JWKS signature, claim, nonce, hardware/device and SAML validation-attestation evidence."
             },
             {
+              "type": "code",
+              "ref": "packages/core/src/identity-integration-conformance.js",
+              "note": "Exhaustive simulator-only OIDC and SAML-gateway positive, rollover, replay, cross-tenant, stale-evidence and outage packs."
+            },
+            {
+              "type": "test",
+              "ref": "tests/identity-integration-conformance.test.js",
+              "note": "Proves exhaustive family coverage, four-eyes campaigns and the prohibition on live-certification claims."
+            },
+            {
               "type": "doc",
               "ref": "docs/architecture/tenant-role-staffing-and-feature-gating.md",
               "note": "Provider trust, authentication-versus-authorization and commercial-integration boundary."
@@ -11843,12 +11853,12 @@
           "dependencies": [
             "AUD-001"
           ],
-          "notes": "The protocol runtime is executable. No commercial IdP/MDM/SAML-gateway tenant, global logout/revocation operation, continuous metadata rotation or witnessed provider conformance is live.",
+          "notes": "The protocol runtime, governed metadata/key rotation and exhaustive simulator campaigns are executable. Remaining gap: no commercial IdP/MDM/SAML-gateway tenant, provider-native global logout/revocation or witnessed provider conformance is live.",
           "lastReviewed": "2026-07-15"
         },
         {
           "id": "SEC-003",
-          "name": "Scoped SCIM protocol provisioning/deprovisioning, group mapping, immediate canonical suspension and governed role requests",
+          "name": "Scoped SCIM protocol provisioning/deprovisioning, group mapping, explicit all-session/canonical suspension, directory reconciliation and governed role requests",
           "applicability": "Core",
           "status": "Partial",
           "raw": "Partial",
@@ -11869,6 +11879,16 @@
               "note": "Provisioning/deactivation, domain restriction and role-request evidence."
             },
             {
+              "type": "code",
+              "ref": "packages/core/src/identity-operations.js",
+              "note": "Provider-directory reconciliation and explicit tenant-principal session revocation without accepting provider-pushed roles."
+            },
+            {
+              "type": "test",
+              "ref": "tests/scim-protocol-api.test.js",
+              "note": "Proves SCIM deactivation persists explicit session revocation, canonical suspension and reason lineage."
+            },
+            {
               "type": "doc",
               "ref": "docs/architecture/tenant-role-staffing-and-feature-gating.md",
               "note": "Immediate deactivation, no direct role grant and reactivation edge cases."
@@ -11879,12 +11899,12 @@
           "dependencies": [
             "AUD-001"
           ],
-          "notes": "The scoped protocol surface exists. Commercial provider registration, cross-system reconciliation, session/token global revocation conformance and measured vendor leaver SLA remain.",
+          "notes": "The scoped protocol, explicit persisted-session revocation and provider-snapshot reconciliation exist. Commercial provider registration, provider-native token revocation conformance and measured vendor leaver SLA remain.",
           "lastReviewed": "2026-07-15"
         },
         {
           "id": "SEC-004",
-          "name": "Enforced MFA, step-up authentication, and recovery",
+          "name": "Enforced MFA, step-up authentication, maker-checker recovery and forced clean re-enrolment",
           "applicability": "Core",
           "status": "Partial",
           "raw": "Partial",
@@ -11898,6 +11918,16 @@
               "type": "test",
               "ref": "tests/security-operations.test.js",
               "note": "Automated evidence covering the SEC-004 control family."
+            },
+            {
+              "type": "code",
+              "ref": "packages/core/src/identity-operations.js",
+              "note": "Independent authenticator recovery clears the old factor, forces clean enrolment and supports immediate global session revocation."
+            },
+            {
+              "type": "test",
+              "ref": "tests/identity-operations-api.test.js",
+              "note": "Session-bound maker-checker recovery and immediate invalidation of the subject's active session."
             },
             {
               "type": "doc",
@@ -11944,6 +11974,16 @@
               "type": "doc",
               "ref": "docs/architecture/tenant-role-staffing-and-feature-gating.md",
               "note": "Exhaustive role/staffing/edge-case and operations specification."
+            },
+            {
+              "type": "code",
+              "ref": "apps/dashboard/index.html",
+              "note": "Tenant IAM control room for readiness, session containment, recovery, conformance and directory reconciliation."
+            },
+            {
+              "type": "test",
+              "ref": "tests/identity-operations-api.test.js",
+              "note": "Same-tenant human administration, actor binding, maker-checker and readiness API evidence."
             }
           ],
           "owner": "Information Security",
@@ -11951,7 +11991,7 @@
           "dependencies": [
             "AUD-001"
           ],
-          "notes": "The kernel, persistent APIs, universal mutation gate and hardened control-fleet contract exist. Tenant shadow/cutover evidence, deployed control fleet and complete administration UI remain.",
+          "notes": "The kernel, persistent APIs, universal mutation gate, IAM operations UI and hardened control-fleet contract exist. Tenant shadow/cutover evidence and a separately deployed control fleet remain.",
           "lastReviewed": "2026-07-15"
         },
         {
@@ -14096,11 +14136,11 @@
     }
   ],
   "tests": {
-    "pass": 519,
+    "pass": 528,
     "fail": 0,
     "skipped": 5,
-    "total": 524,
+    "total": 533,
     "ran": true,
-    "source": "provided-log"
+    "source": "live"
   }
 }

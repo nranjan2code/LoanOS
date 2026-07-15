@@ -478,6 +478,7 @@
         <button class="admin-tab active" type="button" data-admin-tab="users">Tenant Users</button>
         <button class="admin-tab" type="button" data-admin-tab="reviews">Access Reviews</button>
         <button class="admin-tab" type="button" data-admin-tab="service">Service Access</button>
+        <button class="admin-tab" type="button" data-admin-tab="identity-ops">Identity Operations</button>
         <button class="admin-tab" type="button" data-admin-tab="audit">Audit</button>
         <button class="admin-tab" type="button" data-admin-tab="platform">Organisations</button>
         <button class="admin-tab" type="button" data-admin-tab="platform-access">Platform Team</button>
@@ -568,6 +569,84 @@
           </div>
           <pre class="admin-secret-output" id="admin-rotated-key-output"></pre>
         </div>
+      </section>
+
+      <section class="admin-panel" id="admin-panel-identity-ops">
+        <div class="admin-summary-grid" id="identity-ops-summary"></div>
+        <div class="admin-form identity-live-warning">
+          <h4>Identity control room</h4>
+          <p><strong>Integration state: simulated only.</strong> Conformance here certifies the LoanOS contract and deterministic simulator; it does not claim that an IdP, SIEM, WORM store, device provider, or control-engine connection is commercially live.</p>
+          <button id="btn-identity-ops-refresh" class="btn btn-secondary" type="button">Refresh control room</button>
+        </div>
+        <div class="admin-form">
+          <h4>Immediate session containment</h4>
+          <p>Revoke every active session for one tenant user. In-flight work is stopped and the action is retained in the audit chain.</p>
+          <div class="admin-form-grid">
+            <input id="identity-revoke-user" placeholder="User / principal ID" required>
+            <input id="identity-revoke-reason" placeholder="Incident or containment reason" required>
+            <button id="btn-identity-revoke" class="btn btn-warning" type="button">Revoke all sessions</button>
+          </div>
+        </div>
+        <div class="admin-form">
+          <h4>Authenticator recovery · maker-checker</h4>
+          <div class="admin-form-grid">
+            <input id="identity-recovery-id" placeholder="Recovery request ID">
+            <input id="identity-recovery-user" placeholder="User / principal ID">
+            <input id="identity-recovery-evidence" placeholder="Identity verification evidence ref">
+            <input id="identity-recovery-reason" placeholder="Recovery reason">
+            <button id="btn-identity-recovery-propose" class="btn btn-secondary" type="button">Propose recovery</button>
+            <input id="identity-recovery-approval-ref" placeholder="Independent approval ref">
+            <button id="btn-identity-recovery-approve" class="btn btn-primary" type="button">Approve and revoke sessions</button>
+          </div>
+        </div>
+        <div class="admin-form">
+          <h4>Federation rotation and emergency suspension</h4>
+          <p>Planned metadata/key rotation is maker-checker. Emergency suspension is immediate and revokes affected sessions.</p>
+          <div class="admin-form-grid">
+            <input id="identity-federation-policy" placeholder="Federation policy ID">
+            <input id="identity-rotation-id" placeholder="Rotation request ID">
+            <textarea id="identity-rotation-metadata" rows="3" placeholder="Proposed metadata or canonical metadata document"></textarea>
+            <input id="identity-rotation-valid-until" placeholder="Metadata valid until (ISO date-time)">
+            <input id="identity-rotation-keys" placeholder="Signing key IDs, comma separated">
+            <input id="identity-rotation-overlap-start" placeholder="Key overlap starts (ISO date-time)">
+            <input id="identity-rotation-overlap-end" placeholder="Key overlap ends (ISO date-time)">
+            <input id="identity-rotation-reason" placeholder="Rotation reason">
+            <button id="btn-identity-rotation-propose" class="btn btn-secondary" type="button">Propose rotation</button>
+            <input id="identity-rotation-approval" placeholder="Independent approval ref">
+            <input id="identity-rotation-conformance" placeholder="Conformance evidence ref">
+            <button id="btn-identity-rotation-approve" class="btn btn-primary" type="button">Approve rotation</button>
+            <input id="identity-suspension-reason" placeholder="Emergency suspension reason">
+            <input id="identity-suspension-evidence" placeholder="Incident / evidence ref">
+            <button id="btn-identity-suspend" class="btn btn-warning" type="button">Suspend federation now</button>
+          </div>
+        </div>
+        <div class="admin-form">
+          <h4>Vendor-neutral conformance lab</h4>
+          <p>Every mandatory positive, negative, replay, stale-evidence, cross-tenant, rollover, and outage scenario is run by the deterministic simulator.</p>
+          <div class="admin-form-grid">
+            <input id="identity-campaign-id" placeholder="Campaign ID">
+            <select id="identity-campaign-family">
+              <option value="oidc">OIDC</option><option value="saml_gateway">SAML gateway</option><option value="scim">SCIM</option><option value="device_posture">Device posture</option><option value="control_engine">Control engine</option><option value="siem_worm">SIEM / WORM custody</option>
+            </select>
+            <input id="identity-provider-ref" placeholder="Vendor/profile reference">
+            <button id="btn-identity-campaign-propose" class="btn btn-secondary" type="button">Propose campaign</button>
+            <input id="identity-campaign-approval-ref" placeholder="Independent approval ref">
+            <button id="btn-identity-campaign-approve" class="btn btn-primary" type="button">Approve campaign</button>
+            <button id="btn-identity-campaign-run" class="btn btn-warning" type="button">Run complete simulator pack</button>
+          </div>
+        </div>
+        <div class="admin-form">
+          <h4>Federated directory reconciliation</h4>
+          <p>Paste the provider snapshot. Provider-supplied roles are detected and never applied as LoanOS access grants.</p>
+          <div class="admin-form-grid">
+            <input id="identity-recon-id" placeholder="Reconciliation ID">
+            <input id="identity-recon-policy" placeholder="Federation policy ID">
+            <input id="identity-recon-evidence" placeholder="Provider export evidence ref">
+            <textarea id="identity-recon-users" rows="5" placeholder='[{"externalId":"idp-123","active":true,"roles":[]}]'></textarea>
+            <button id="btn-identity-reconcile" class="btn btn-secondary" type="button">Run reconciliation</button>
+          </div>
+        </div>
+        <div class="admin-list" id="identity-campaigns-list"></div>
       </section>
 
       <section class="admin-panel" id="admin-panel-platform">

@@ -16,13 +16,14 @@ import {
   registerPitrPolicy,
   registerSaasPrincipal,
   registerSecurityLogCustody,
+  revokePrincipalSessions,
   scimUserProjection,
   scimUserResourceToIdentityEvent,
   suspendSaasPrincipalFromIdentityProvider
 } from "../../../../packages/core/src/index.js";
 
 export async function routeEnterpriseTenantControls(context) {
-  const { method, path, req, res, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor, upsertFederatedTenantUser } = context;
+  const { method, path, req, res, store, stateRef, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor, upsertFederatedTenantUser } = context;
   if (path === "/scim/v2" || path.startsWith("/scim/v2/")) return routeScimProtocol(context);
   if (!path.startsWith("/admin/federation") && !path.startsWith("/admin/scim")) return false;
   const allowedTenantRoles = method === "GET" ? ["tenant_admin", "security_admin", "user_admin", "auditor"] : ["tenant_admin", "security_admin", "user_admin"];
@@ -64,8 +65,14 @@ export async function routeEnterpriseTenantControls(context) {
         staffingImpact = suspended.staffingImpact;
         escalations = suspended.escalations;
       }
-      await store.save(appendEvent(next, { type: `identity.scim.${applied.event.operation}_applied`, eventId: applied.event.eventId, userId: applied.event.userId, policyId: applied.event.policyId, evidenceChecksumSha256: applied.event.evidenceChecksumSha256, requestedCanonicalRoleIds: applied.event.requestedCanonicalRoleIds, canonicalRoleDisposition: applied.event.canonicalRoleDisposition, staffingImpact, actor: authActor(authContext) }));
-      sendJson(res, 201, { event: applied.event, user: userResult.user, principal, staffingImpact, escalations });
+      let revokedSessionIds = [];
+      if (applied.event.operation === "deactivate") {
+        const revoked = revokePrincipalSessions(stateRef.get().controlPlane.sessions, { tenantId: authContext.tenantId, userId: applied.event.userId, revokedBy: authActor(authContext), reason: `SCIM deactivation ${applied.event.eventId}` });
+        revokedSessionIds = revoked.revokedSessionIds;
+        await stateRef.set({ ...stateRef.get(), controlPlane: { ...stateRef.get().controlPlane, sessions: revoked.sessions } });
+      }
+      await store.save(appendEvent(next, { type: `identity.scim.${applied.event.operation}_applied`, eventId: applied.event.eventId, userId: applied.event.userId, policyId: applied.event.policyId, evidenceChecksumSha256: applied.event.evidenceChecksumSha256, requestedCanonicalRoleIds: applied.event.requestedCanonicalRoleIds, canonicalRoleDisposition: applied.event.canonicalRoleDisposition, staffingImpact, revokedSessionIds, actor: authActor(authContext) }));
+      sendJson(res, 201, { event: applied.event, user: userResult.user, principal, staffingImpact, escalations, revokedSessionIds });
     } catch (error) { sendEnterpriseError(res, sendJson, error); } return true;
   }
   return false;
@@ -131,7 +138,7 @@ async function routeScimProtocol(context) {
 }
 
 async function applyScimProtocolEvent(context, input) {
-  const { store, appendEvent, authContext, authActor, upsertFederatedTenantUser } = context;
+  const { store, stateRef, appendEvent, authContext, authActor, upsertFederatedTenantUser } = context;
   const state = await store.load();
   const replay = Object.values(state.scimEvents ?? {}).find((event) => event.idempotencyKey === input.idempotencyKey);
   if (replay) {
@@ -154,8 +161,14 @@ async function applyScimProtocolEvent(context, input) {
     const suspended = suspendSaasPrincipalFromIdentityProvider(next, { tenantId: authContext.tenantId, principalId: principal.principalId, policyId: applied.event.policyId, evidenceRef: `scim:${applied.event.eventId}:${applied.event.evidenceChecksumSha256}` });
     next = suspended.state; principal = suspended.principal;
   }
-  await store.save(appendEvent(next, { type: `identity.scim.${applied.event.operation}_applied`, eventId: applied.event.eventId, userId: applied.event.userId, policyId: applied.event.policyId, evidenceChecksumSha256: applied.event.evidenceChecksumSha256, requestedCanonicalRoleIds: applied.event.requestedCanonicalRoleIds, canonicalRoleDisposition: applied.event.canonicalRoleDisposition, actor: authActor(authContext) }));
-  return { event: applied.event, user: userResult.user, principal, idempotent: false };
+  let revokedSessionIds = [];
+  if (applied.event.operation === "deactivate") {
+    const revoked = revokePrincipalSessions(stateRef.get().controlPlane.sessions, { tenantId: authContext.tenantId, userId: applied.event.userId, revokedBy: authActor(authContext), reason: `SCIM deactivation ${applied.event.eventId}` });
+    revokedSessionIds = revoked.revokedSessionIds;
+    await stateRef.set({ ...stateRef.get(), controlPlane: { ...stateRef.get().controlPlane, sessions: revoked.sessions } });
+  }
+  await store.save(appendEvent(next, { type: `identity.scim.${applied.event.operation}_applied`, eventId: applied.event.eventId, userId: applied.event.userId, policyId: applied.event.policyId, evidenceChecksumSha256: applied.event.evidenceChecksumSha256, requestedCanonicalRoleIds: applied.event.requestedCanonicalRoleIds, canonicalRoleDisposition: applied.event.canonicalRoleDisposition, revokedSessionIds, actor: authActor(authContext) }));
+  return { event: applied.event, user: userResult.user, principal, revokedSessionIds, idempotent: false };
 }
 
 function listResponse(resources) { return { schemas: ["urn:ietf:params:scim:api:messages:2.0:ListResponse"], totalResults: resources.length, startIndex: 1, itemsPerPage: resources.length, Resources: resources }; }
