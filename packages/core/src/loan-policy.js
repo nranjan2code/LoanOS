@@ -3,6 +3,7 @@ import { evaluateModelUse } from "./model-governance.js";
 import { GST_RATE_BPS, summarizeGst, withGstDisclosure } from "./tax.js";
 import { randomUUID } from "node:crypto";
 import { generateContractualSchedule, periodsForTenor, periodsPerYearForFrequency } from "./repayment-schedule.js";
+import { isBusinessProductJourneyType } from "./product-journey-administration.js";
 
 export const ALLOWED_RE_TYPES = new Set([
   "commercial_bank",
@@ -301,7 +302,7 @@ export function validateKfs(kfs) {
   // Prepayment & Foreclosure validations in KFS
   const rateType = kfs.interestRateType ?? "fixed";
   const bType = kfs.borrowerType ?? "individual";
-  const isBusiness = kfs.productType === "business_loan" || kfs.productType === "msme_loan";
+  const isBusiness = isBusinessProductJourneyType(kfs.productType);
 
   if (rateType === "floating" && bType === "individual" && !isBusiness) {
     if (kfs.prepaymentPolicy?.chargeBps > 0) {

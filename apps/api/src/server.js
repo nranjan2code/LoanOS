@@ -13,6 +13,7 @@ import { routeSaasIdentityGovernance } from "./routes/saas-identity-governance.j
 import { routeAccessActivityCustody } from "./routes/access-activity-custody.js";
 import { routeIdentityOperations, routeIdentityOperationsWorker } from "./routes/identity-operations.js";
 import { routeTenantActivation } from "./routes/tenant-activation.js";
+import { routeProductJourneyConformance } from "./routes/product-journey-conformance.js";
 import { routeConformanceAdministration } from "./routes/conformance-administration.js";
 import { routeAiAgentPlatform } from "./routes/ai-agent-platform.js";
 import { enforceUniversalMutationStaffing } from "./mutation-staffing-policy.js";
@@ -1264,6 +1265,7 @@ async function route(req, res, dataDir, platformAdminKey, observability, allowDi
   if (await routeIdentityOperationsWorker({ method, path, req, res, tenant, store, readJson, sendJson, appendEvent, authContext, authActor })) return;
   if (await routeIdentityOperations({ method, path, req, res, tenant, store, stateRef, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
   if (await routeTenantActivation({ method, path, req, res, tenant, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
+  if (await routeProductJourneyConformance({ method, path, req, res, tenant, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
   if (await routeConformanceAdministration({ method, path, req, res, tenant, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
   if (await routeRiskAmlControls({ method, path, req, res, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
   if (await routeImplementationControls({ method, path, req, res, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;

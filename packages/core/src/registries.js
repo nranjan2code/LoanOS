@@ -1,21 +1,10 @@
 import { createFinding, summarizeFindings } from "./compliance-controls.js";
 import { ALLOWED_RE_TYPES, ALLOWED_CHARGE_TYPES } from "./loan-policy.js";
 import { periodsForTenor } from "./repayment-schedule.js";
+import { PRODUCT_JOURNEY_TYPES, isBusinessProductJourneyType } from "./product-journey-administration.js";
 
 const ACTIVE_STATUS = "active";
-const ALLOWED_PRODUCT_TYPES = new Set([
-  "personal_loan",
-  "business_loan",
-  "msme_loan",
-  "consumer_durable_loan",
-  "vehicle_loan",
-  "housing_loan",
-  "education_loan",
-  "gold_loan",
-  "loan_against_property",
-  "working_capital_line",
-  "overdraft"
-]);
+const ALLOWED_PRODUCT_TYPES = new Set(PRODUCT_JOURNEY_TYPES);
 const ALLOWED_LSP_STATUSES = new Set(["draft", "active", "suspended", "terminated"]);
 const ALLOWED_LSP_SERVICES = new Set([
   "customer_acquisition",
@@ -642,7 +631,7 @@ export function validateProductPolicy(product, regulatedEntities = {}) {
     if (!Number.isFinite(product.creditLimit) || product.creditLimit <= 0 || !Number.isFinite(product.drawingPower) || product.drawingPower < 0 || product.drawingPower > product.creditLimit) findings.push(createFinding("error", "RBI-DL-2025", "Revolving facility requires valid creditLimit and drawingPower.", "creditLimit"));
     if (!Number.isFinite(product.minimumPaymentPercent) || product.minimumPaymentPercent <= 0 || product.minimumPaymentPercent > 100) findings.push(createFinding("error", "RBI-KFS-2024", "Revolving minimumPaymentPercent must be above 0 and at most 100.", "minimumPaymentPercent"));
     if (!Number.isInteger(product.reviewFrequencyMonths) || product.reviewFrequencyMonths <= 0 || !product.facilityExpiryDate || Number.isNaN(new Date(`${product.facilityExpiryDate}T23:59:59.999Z`).getTime())) findings.push(createFinding("error", "RBI-DL-2025", "Revolving facility requires review cadence and a valid expiry date.", "reviewFrequencyMonths"));
-    if (facilityType === "overdraft" && product.productType !== "overdraft") findings.push(createFinding("error", "RBI-DL-2025", "Overdraft facility requires overdraft productType.", "productType"));
+    if (facilityType === "overdraft" && product.productType !== "msme_working_capital") findings.push(createFinding("error", "RBI-DL-2025", "Overdraft facility requires the msme_working_capital journey type.", "productType"));
   }
 
   // Interest calculation method: must be declared and valid.
@@ -742,8 +731,8 @@ export function validateProductPolicy(product, regulatedEntities = {}) {
   }
 
   // RBI Rule: No prepayment penalty/foreclosure charge on floating rate term loans to individual borrowers for non-business purposes.
-  // We check if rate type is floating and productType is a retail loan (not business/msme).
-  const isRetail = product?.productType !== "business_loan" && product?.productType !== "msme_loan";
+  // Product type is canonical; facility mechanics remain a separate field.
+  const isRetail = !isBusinessProductJourneyType(product?.productType);
   if (rateType === "floating" && isRetail) {
     if (prepay?.chargeBps > 0) {
       findings.push(createFinding("error", "RBI-FPC-PENAL", "Prepayment penalty is prohibited on floating-rate individual retail loans.", "prepaymentPolicy.chargeBps"));

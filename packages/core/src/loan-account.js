@@ -3,6 +3,7 @@ import { createFinding, summarizeFindings } from "./compliance-controls.js";
 import { createLoanId } from "./loan-policy.js";
 import { decomposeGstInclusive } from "./tax.js";
 import { generateContractualSchedule } from "./repayment-schedule.js";
+import { isBusinessProductJourneyType } from "./product-journey-administration.js";
 
 const ACTIVE_STATUS = "active";
 const CLOSED_STATUS = "closed";
@@ -839,7 +840,7 @@ export function quoteForeclosure(account, input = {}, now = new Date()) {
 
   const rateType = account.interestRateType ?? "fixed";
   const bType = account.borrowerType ?? "individual";
-  const isBusiness = account.productType === "business_loan" || account.productType === "msme_loan";
+  const isBusiness = isBusinessProductJourneyType(account.productType);
   if (rateType === "floating" && bType === "individual" && !isBusiness) {
     if (foreclosureCharge > 0 || (input.foreclosureChargeAmount ?? 0) > 0) {
       findings.push(createFinding("error", "RBI-FPC-PENAL", "Foreclosure charges are prohibited on floating-rate individual retail loans.", "foreclosureCharge"));
@@ -1125,7 +1126,7 @@ export function prepayLoanAccount(account, input = {}, now = new Date()) {
 
     const rateType = account.interestRateType ?? "fixed";
     const bType = account.borrowerType ?? "individual";
-    const isBusiness = account.productType === "business_loan" || account.productType === "msme_loan";
+    const isBusiness = isBusinessProductJourneyType(account.productType);
     if (rateType === "floating" && bType === "individual" && !isBusiness) {
       if (prepaymentCharge > 0 || (input.prepaymentChargeAmount ?? 0) > 0) {
         findings.push(createFinding("error", "RBI-FPC-PENAL", "Prepayment charges are prohibited on floating-rate individual retail loans.", "prepaymentCharge"));

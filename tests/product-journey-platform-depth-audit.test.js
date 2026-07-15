@@ -1,0 +1,29 @@
+import assert from "node:assert/strict";
+import { access, readFile } from "node:fs/promises";
+import test from "node:test";
+
+import { PRODUCT_JOURNEY_TYPES } from "../packages/core/src/product-journey-administration.js";
+
+const auditUrl = new URL("../docs/product/product-journey-platform-depth.json", import.meta.url);
+
+test("platform-depth audit covers the canonical 21 and never infers production readiness", async () => {
+  const audit = JSON.parse(await readFile(auditUrl, "utf8"));
+  assert.deepEqual(audit.journeys.map((item) => item.journeyType).sort(), [...PRODUCT_JOURNEY_TYPES].sort());
+  assert.equal(new Set(audit.journeys.map((item) => item.journeyType)).size, 21);
+  assert.equal(audit.journeys.filter((item) => item.maturity === "controlled_first_slice").length, 3);
+  assert.equal(audit.journeys.filter((item) => item.maturity === "configurable_pattern").length, 18);
+  assert.equal(audit.journeys.some((item) => item.maturity === "production_ready"), false);
+  assert.ok(audit.dimensions.length >= 12);
+});
+
+test("every depth claim has repository evidence and maps only to governed shared batches", async () => {
+  const audit = JSON.parse(await readFile(auditUrl, "utf8"));
+  for (const journey of audit.journeys) {
+    assert.ok(journey.kernelEvidence.length > 0, `${journey.journeyType} needs kernel evidence`);
+    for (const ref of journey.kernelEvidence) await access(new URL(`../${ref}`, import.meta.url));
+    assert.ok(journey.gaps.length > 0, `${journey.journeyType} must retain truthful gaps`);
+    for (const batchId of journey.gaps) assert.ok(audit.batches[batchId], `${journey.journeyType} references ${batchId}`);
+  }
+  assert.equal(audit.journeys.filter((item) => item.apiDepth === "kernel_not_persisted").length, 17);
+  assert.equal(audit.journeys.filter((item) => item.experienceDepth === "missing_specialised").length, 19);
+});

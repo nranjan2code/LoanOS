@@ -2,7 +2,11 @@ import { createHash } from "node:crypto";
 
 export const PRODUCT_JOURNEY_TYPES = Object.freeze(["agriculture_allied_finance", "co_lending_programme", "commercial_vehicle_finance", "consumer_durable_finance", "education_loan", "equipment_machinery_finance", "gold_loan", "green_equipment_finance", "home_loan", "invoice_discounting", "loan_against_property", "microfinance_group_lending", "msme_term_loan", "msme_working_capital", "personal_loan", "personal_vehicle_loan", "professional_practice_loan", "purchase_order_finance", "secured_business_loan", "supply_chain_finance", "trade_finance_workflow"]);
 export const BUILT_IN_PRODUCT_JOURNEY_TYPES = PRODUCT_JOURNEY_TYPES;
+export const BUSINESS_PRODUCT_JOURNEY_TYPES = Object.freeze(["agriculture_allied_finance", "co_lending_programme", "commercial_vehicle_finance", "equipment_machinery_finance", "green_equipment_finance", "invoice_discounting", "microfinance_group_lending", "msme_term_loan", "msme_working_capital", "professional_practice_loan", "purchase_order_finance", "secured_business_loan", "supply_chain_finance", "trade_finance_workflow"]);
 const TYPES = new Set(PRODUCT_JOURNEY_TYPES);
+const BUSINESS_TYPES = new Set(BUSINESS_PRODUCT_JOURNEY_TYPES);
+export function isCanonicalProductJourneyType(value) { return TYPES.has(value); }
+export function isBusinessProductJourneyType(value) { return BUSINESS_TYPES.has(value); }
 const REQUIRED_CHECKS = Object.freeze(["regulated_entity_bound", "product_policy_approved", "channels_authorized", "roles_assigned", "controls_mapped", "accounting_profile_approved", "compliance_profile_approved", "provider_readiness_assessed", "customer_content_approved", "tenant_uat_passed", "operations_readiness_approved"]);
 const STATUSES = new Set(["draft", "configured", "approved", "active", "suspended", "retired"]);
 

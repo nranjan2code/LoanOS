@@ -24,7 +24,7 @@ The current implementation is intentionally small:
 - Internal staff workspace in `apps/dashboard/`.
 - Borrower customer portal in `apps/customer/`: a responsive, white-labelled journey home with prioritised next actions, visual application milestones, repayment schedules, a document centre, guided media, grievance tracking, and DPDP access/correction/erasure controls.
 - Shared design system tokens in `apps/shared/`.
-- Automated tests in `tests/`: 580 tracked file-driver/domain tests that always run, plus 5 Postgres integration tests that self-skip unless `DATABASE_URL_TEST` is set.
+- Automated tests in `tests/`: 600+ tracked file-driver/domain tests, with environment-dependent Postgres/integration cases self-skipping unless their test services are configured.
 
 Run it:
 
@@ -50,6 +50,7 @@ npm run dev:api
 | `packages/core/src/federated-revocation-verification.js`, `packages/core/src/identity-operational-automation.js`, `apps/api/src/routes/enterprise-controls.js` | Maker-checker tenant/policy/protocol/issuer/audience-bound RS256/ES256 public-JWK verifier profiles, exact-byte signature validation, key validity/rotation lineage and replay-safe provider logout containment. Commercial provider activation remains non-live. |
 | `packages/core/src/conformance-campaign-administration.js`, `apps/api/src/routes/conformance-administration.js` | Persistent simulator-only candidate profiles and immutable organisation-admission/enterprise-platform campaign manifests, append-only evidence, four-eyes approval, certification expiry/reassessment and tenant administration projection. |
 | `packages/core/src/tenant-activation-gate.js`, `apps/api/src/routes/tenant-activation.js` | Unified checksum/currentness activation assessment across admission, IAM staffing, products, integrations, deployment, security, UAT and drills; simulator evidence is structurally prevented from producing production readiness. |
+| `packages/core/src/product-journey-administration.js`, `packages/core/src/product-journey-conformance.js`, `apps/api/src/routes/product-journey-conformance.js` | Greenfield canonical 21-product vocabulary plus tenant-persistent conformance campaigns. Each current template/version receives 16 common and one archetype scenario, checksum-bound proposal/result evidence, independent approval and assessment, audit events, coverage projection and an explicit simulator/live boundary. Passing conformance can produce a controlled slice or activation candidate, never a direct production-ready claim. |
 | `packages/core/src/organisation-admission-conformance.js` | Versioned 153-scenario conformance catalogue for `INT-ADM-01` through `INT-ADM-10`: stable IDs, mandatory common and family-specific adverse classes, tenant/purpose isolation, checksum-bound source lineage, replay-safe deterministic execution, suite assessment and provider-simulator compilation. Evidence is permanently simulator-only and non-live. |
 | `packages/core/src/grievance.js` | Complaint registry, grievance lifecycle, 30-day RBI Ombudsman clock, and RBI CMS escalation evidence. |
 | `packages/core/src/document-packet.js` | KFS, sanction letter, loan agreement summary, and privacy notice rendering, rendered borrower loan-statement document, plus delivery evidence controls. |
@@ -172,9 +173,10 @@ npm run dev:api
 | `apps/api/src/resilience-probe.js` | Dependency-free bounded concurrent HTTP probe with per-request timeout, status/error counts, p50/p95/p99 latency, throughput, duration, and concurrency evidence. |
 | `scripts/run-resilience-probe.mjs` | CLI wrapper for the bounded probe, configured by `LOANOS_PROBE_*`; emits JSON evidence and exits non-zero on request errors or invalid invocation. |
 | `scripts/planes.mjs` | Shared exhaustive capability-catalogue parser, conservative status normalizer, and category-to-product-plane mapping used by trace and dashboard generation; accepts both two-letter (`UX-*`) and three-letter capability families. |
-| `scripts/sync-capability-trace.mjs` | Non-destructively synchronizes all 453 catalogue capabilities into the machine-readable trace register while preserving curated ownership, evidence, acceptance, dependency, note, and review fields. |
+| `scripts/sync-capability-trace.mjs` | Non-destructively synchronizes all 463 catalogue capabilities into the machine-readable trace register while preserving curated ownership, evidence, acceptance, dependency, note, and review fields. |
 | `scripts/build-dashboard.mjs` | Generates the self-contained capability/build dashboard and JSON projection from the shared parser, trace register, backlog, Git history, and test evidence. |
 | `tests/compliance.test.js` | Regression tests for compliance, API, tenancy, audit, LOS/LMS/LWS, and integration-ledger gates. |
+| `tests/product-journey-conformance.test.js`, `tests/product-journey-conformance-api.test.js`, `tests/product-journey-platform-depth-audit.test.js` | Canonical vocabulary rejection, all-21 manifest completeness, fail-closed/tamper/idempotency/independence controls, persistent API/audit coverage and evidence-backed platform-depth audit enforcement. |
 | `tests/external-services.test.js` | Provider-boundary tests for `ExternalServiceManager` mock/real dispatch and residency guards. |
 | `tests/provider-simulator.test.js` | Deterministic clock/IDs, tenant isolation, journal/idempotency, signed scheduled callbacks and adverse-provider simulation. |
 | `tests/origination-provider-conformance.test.js` | Complete adverse-class coverage, stable scenario identifiers, deterministic simulator compilation and real-provider simulator prohibition. |
@@ -249,6 +251,8 @@ npm run dev:api
 | `POST /identity-operations-worker/v1/claims`, `/jobs/:id/outcome`, `/runs/:id/finalize` | Tenant-service worker plane with credential-derived workload identity, expiring leases, monotonic fences, evidence-required results and fail-closed run finalization. |
 | `GET /admin/conformance/summary`, `POST /candidates`, `/campaigns/proposals`, `/campaigns/:id/approval|evidence|assessment|reassessment`, `/campaigns/expire` | Persistent tenant-human administration of expiring simulator-only admission and enterprise conformance evidence. |
 | `GET/POST /admin/tenant-activation/assessments` | Stores and projects the unified eight-dimension activation result; platform activation independently recomputes and approves only current production-ready evidence. |
+| `GET /admin/product-journey-conformance` | Returns the exact canonical 21-product catalogue, same-tenant campaign records and current assessed coverage without inferring production readiness. |
+| `POST /admin/product-journey-conformance/campaigns`, `/campaigns/:id/approval`, `/results`, `/assessment` | Persists authenticated proposal, independent approval, checksum-bound scenario results and independent assessment for the current product/template/environment manifest. |
 | `GET /admin/federation/revocation-verifiers`, `POST /revocation-verifiers/proposals`, `/revocation-verifiers/:id/approval` | Governs public-key verification profiles and explicit rotation under authenticated maker-checker authority. |
 | `POST /federation/v1/logout-events` | Cryptographically verifies exact signed provider revocation bytes through an active same-tenant profile before persisting exact matching session containment. |
 | `POST /admin/identity-governance/ownership-transfers/*`, `/emergency-access/*` | Governs accountable ownership transfer and time-bounded, independently approved emergency access. |

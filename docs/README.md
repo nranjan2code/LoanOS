@@ -21,6 +21,7 @@ Section indexes: [Architecture](architecture/README.md) · [Product](product/REA
 | [What we are building](product/what-we-are-building.md) | Product definition, users, modules, scope, non-goals, and success criteria. |
 | [Complete-system capability catalogue](product/complete-system-capability-catalog.md) | Canonical exhaustive target capability register across lending, operations, accounting, risk, compliance, technology, and product-specific journeys, with current maturity classifications. |
 | [Product journey support matrix](product/product-journey-support-matrix.md) | Evidence-tier status for the 21 public journeys, their implemented platform boundary, tenant-specific activation requirements, and remaining production gaps. |
+| [Product journey platform-depth audit](product/product-journey-platform-depth-audit.md) | Machine-checked deep readiness across tenant administration, domain kernels, APIs, experiences, lifecycle composition, tests, integrations and operations for all 21 journeys, grouped into shared remediation batches. |
 | [Capability & build dashboard](dashboard.md) | How `docs/dashboard.html` is generated: plane/category/feature status view, completion scoring, product-plane mapping, and how it auto-updates on `./loanos.sh build`. |
 | [Roadmap](product/roadmap.md) | Phased delivery plan from compliance foundation to AI governance hardening. |
 | [Build backlog](product/build-backlog.md) | Actionable engineering backlog grouped by epic. |
