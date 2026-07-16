@@ -67,3 +67,6 @@ temp/
 
 # Runtime PIDs
 *.pid
+
+# Local full-source backup snapshots (manual, machine-local — never versioned)
+loanos-demo-source-*.tar.gz
