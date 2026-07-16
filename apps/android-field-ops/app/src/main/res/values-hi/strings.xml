@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">LoanOS फील्ड ऑपरेशंस</string>
+
+    <string name="login_title">LoanOS सुरक्षित पोर्टल</string>
+    <string name="login_subtitle">अनुपालन-सुरक्षित फील्ड एक्सेस</string>
+    <string name="login_tenant_id">टेनेंट आईडी</string>
+    <string name="login_email">कार्य ईमेल</string>
+    <string name="login_password">पासवर्ड</string>
+    <string name="login_mfa_code">MFA कोड (यदि सक्षम हो)</string>
+    <string name="login_sign_in">साइन इन करें</string>
+
+    <string name="nav_field_kyc">फील्ड केवाईसी</string>
+    <string name="nav_collections">वसूली</string>
+    <string name="nav_collateral">संपार्श्विक</string>
+    <string name="nav_sync_queue">सिंक कतार</string>
+    <string name="action_sign_out">साइन आउट करें</string>
+
+    <string name="device_cert_pending_title">डिवाइस प्रमाणन आवश्यक</string>
+    <string name="device_cert_pending_body">यह डिवाइस अभी तक फील्ड संचालन के लिए प्रमाणित नहीं है। नीचे दी गई डिवाइस आईडी अपने सुरक्षा प्रशासक के साथ साझा करें ताकि वे टेनेंट बैक ऑफिस से स्वतंत्र प्रमाणन पूरा कर सकें।</string>
+
+    <string name="collections_title">सौंपे गए वसूली कार्य</string>
+    <string name="collections_status_label">स्थिति: %1$s</string>
+    <string name="collections_post_for">इसके लिए फील्ड वसूली दर्ज करें: %1$s</string>
+    <string name="collections_amount_label">एकत्रित राशि (₹)</string>
+    <string name="collections_amount_invalid">कृपया एक मान्य राशि दर्ज करें (अधिकतम 2 दशमलव स्थान)।</string>
+    <string name="collections_submit">वसूली रसीद दर्ज करें</string>
+    <string name="collections_posted">नकद भुगतान सुरक्षित रूप से दर्ज और सिंक के लिए कतारबद्ध किया गया!</string>
+
+    <string name="kyc_title">उधारकर्ता केवाईसी ऑनबोर्डिंग</string>
+    <string name="kyc_borrower_name">उधारकर्ता का पूरा नाम</string>
+    <string name="kyc_mobile_number">मोबाइल नंबर (भारत)</string>
+    <string name="kyc_permission_denied">अनुपालन योग्य केवाईसी कैप्चर के लिए कैमरा और सटीक स्थान अनुमतियाँ आवश्यक हैं।</string>
+    <string name="kyc_photo_captured">📷 लाइव फ़ोटो कैप्चर हो गई</string>
+    <string name="kyc_grant_access">कैप्चर शुरू करने के लिए कैमरा और स्थान की अनुमति दें।</string>
+    <string name="kyc_capture_retake">✓ लाइव फ़ोटो फिर से लें</string>
+    <string name="kyc_capture_action">📷 लाइव फ़ोटो + जीपीएस लॉक कैप्चर करें</string>
+    <string name="kyc_gps_failed">जीपीएस लॉक विफल: %1$s</string>
+    <string name="kyc_photo_failed">फ़ोटो कैप्चर विफल: %1$s</string>
+    <string name="kyc_missing_fields">नाम, मोबाइल, लाइव फ़ोटो और जीपीएस लॉक सभी अनिवार्य हैं।</string>
+    <string name="kyc_queue_action">ऑनबोर्डिंग लीड सुरक्षित रूप से कतारबद्ध करें</string>
+    <string name="kyc_queued">केवाईसी सुरक्षित रूप से ऑफ़लाइन सिंक कतार में सहेजा गया!</string>
+
+    <string name="collateral_title">संपार्श्विक / सुरक्षा निरीक्षण</string>
+    <string name="collateral_description_label">परिसंपत्ति विवरण</string>
+    <string name="collateral_valuation_label">अनुमानित मूल्यांकन (₹)</string>
+    <string name="collateral_valuation_invalid">कृपया एक मान्य मूल्यांकन राशि दर्ज करें (अधिकतम 2 दशमलव स्थान)।</string>
+    <string name="collateral_missing_fields">विवरण, मूल्यांकन, हार्डवेयर-स्टैम्प्ड फ़ोटो और जीपीएस लॉक सभी अनिवार्य हैं।</string>
+    <string name="collateral_queue_action">मूल्यांकन रिपोर्ट सुरक्षित रूप से कतारबद्ध करें</string>
+    <string name="collateral_queued">संपार्श्विक मूल्यांकन सुरक्षित रूप से ऑफ़लाइन सिंक कतार में सहेजा गया!</string>
+
+    <string name="sync_queue_title">सिंक आउटबॉक्स कतार</string>
+    <string name="sync_queue_pending_total">%1$d लंबित · %2$d कुल</string>
+    <string name="sync_queue_envelope_id">एनवलप आईडी: %1$s…</string>
+    <string name="sync_queue_type">प्रकार: %1$s</string>
+    <string name="sync_queue_status">स्थिति: %1$s</string>
+    <string name="sync_queue_digest">सिफरटेक्स्ट डाइजेस्ट: %1$s…</string>
+    <string name="sync_queue_action">बैकएंड के साथ सिंक करें</string>
+    <string name="sync_queue_success">सिंक सफलतापूर्वक पूर्ण हुआ!</string>
+    <string name="sync_queue_failure">सिंक विफल: %1$s</string>
+
+    <string name="key_lease_failed">इस रिकॉर्ड के लिए एन्क्रिप्शन कुंजी सुरक्षित नहीं की जा सकी (%1$s)। कृपया बेहतर सिग्नल मिलने पर पुनः प्रयास करें।</string>
+</resources>

@@ -19,6 +19,14 @@ lerna-debug.log*
 # Rust (rules engine workspace)
 rules/target/
 
+# Android (machine-local SDK path, build outputs, generated wrapper jar)
+apps/android-*/local.properties
+apps/android-*/**/build/
+apps/android-*/.gradle/
+apps/android-*/*.iml
+apps/android-*/.cxx/
+apps/android-*/captures/
+
 # Runtime data & DBs
 .loanos-data/
 *.db

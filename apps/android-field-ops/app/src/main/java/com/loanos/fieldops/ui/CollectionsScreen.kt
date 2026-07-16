@@ -9,16 +9,21 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.loanos.fieldops.R
 import com.loanos.fieldops.data.AssignmentEntity
 import com.loanos.fieldops.data.FieldOpsDatabase
 import com.loanos.fieldops.data.OfflineEnvelopeEntity
+import com.loanos.fieldops.security.DeviceIdentity
+import com.loanos.fieldops.security.KeyLeaseClient
 import com.loanos.fieldops.sync.OfflineQueueManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.util.UUID
+import org.json.JSONObject
+import java.math.BigDecimal
 
 @Composable
 fun CollectionsScreen() {
@@ -29,6 +34,7 @@ fun CollectionsScreen() {
     var assignments by remember { mutableStateOf<List<AssignmentEntity>>(emptyList()) }
     var selectedAssignment by remember { mutableStateOf<AssignmentEntity?>(null) }
     var collectionAmount by remember { mutableStateOf("") }
+    var isSubmitting by remember { mutableStateOf(false) }
     var snackbarMessage by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -84,7 +90,7 @@ fun CollectionsScreen() {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text("Assigned Collections Tasks", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.collections_title), style = MaterialTheme.typography.titleMedium)
 
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -102,7 +108,11 @@ fun CollectionsScreen() {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text(item.title, style = MaterialTheme.typography.bodyLarge)
                             Text(item.subtitle, style = MaterialTheme.typography.bodyMedium)
-                            Text("Status: ${item.status.uppercase()}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                            Text(
+                                stringResource(R.string.collections_status_label, item.status.uppercase()),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
                         }
                     }
                 }
@@ -110,41 +120,65 @@ fun CollectionsScreen() {
 
             selectedAssignment?.let { item ->
                 if (item.status == "pending") {
-                    HorizontalDivider()
-                    Text("Post Field Collection for: ${item.title.removePrefix("Borrower: ")}", style = MaterialTheme.typography.bodyMedium)
-                    
+                    Divider()
+                    Text(
+                        stringResource(R.string.collections_post_for, item.title.removePrefix("Borrower: ")),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+
                     OutlinedTextField(
                         value = collectionAmount,
                         onValueChange = { collectionAmount = it },
-                        label = { Text("Amount Collected (₹)") },
+                        label = { Text(stringResource(R.string.collections_amount_label)) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.fillMaxWidth()
                     )
 
                     Button(
+                        enabled = !isSubmitting,
                         onClick = {
-                            val amount = collectionAmount.toDoubleOrNull()
-                            if (amount == null || amount <= 0) {
-                                snackbarMessage = "Please enter a valid cash amount."
+                            // Exact paise math: money never passes through floating point (INV-6).
+                            val amountPaise = parseRupeesToPaise(collectionAmount)
+                            if (amountPaise == null || amountPaise <= 0L) {
+                                snackbarMessage = context.getString(R.string.collections_amount_invalid)
                                 return@Button
                             }
 
+                            isSubmitting = true
                             scope.launch {
+                                val deviceId = DeviceIdentity.get(context)
+                                val leaseResult = KeyLeaseClient.lease(deviceId)
+                                if (leaseResult.isFailure) {
+                                    isSubmitting = false
+                                    snackbarMessage = context.getString(
+                                        R.string.key_lease_failed,
+                                        leaseResult.exceptionOrNull()?.message ?: ""
+                                    )
+                                    return@launch
+                                }
+                                val leasedKey = leaseResult.getOrThrow()
+
                                 withContext(Dispatchers.IO) {
-                                    val amountPaise = (amount * 100).toLong().toString()
-                                    val plaintextJson = """{"loanId":"${item.id}","collectedAmountPaise":"$amountPaise"}"""
-                                    val mockKeyBytes = ByteArray(32) { 0x02.toByte() }
-                                    
+                                    val loanId = try {
+                                        JSONObject(item.payloadJson).optString("loanId", item.id)
+                                    } catch (e: Exception) {
+                                        item.id
+                                    }
+                                    val plaintextJson = JSONObject()
+                                        .put("loanId", loanId)
+                                        .put("collectedAmountPaise", amountPaise.toString())
+                                        .toString()
+
                                     val envelope = OfflineQueueManager.createEnvelope(
                                         tenantId = item.tenantId,
+                                        deviceId = deviceId,
                                         aggregateType = "collection",
                                         aggregateId = item.id,
                                         baseVersion = item.baseVersion,
                                         plaintextPayload = plaintextJson,
-                                        keyId = "kms://tenant-a/leased-key-1",
-                                        aesKeyBytes = mockKeyBytes,
-                                        createdBy = "officer-a",
-                                        expiresAt = "2026-07-20T10:00:00.000Z"
+                                        keyId = leasedKey.keyId,
+                                        aesKeyBytes = leasedKey.keyBytes,
+                                        createdBy = "officer-a"
                                     )
 
                                     db.offlineEnvelopeDao().insert(
@@ -152,7 +186,7 @@ fun CollectionsScreen() {
                                             envelopeId = envelope.envelopeId,
                                             tenantId = envelope.tenantId,
                                             idempotencyKey = envelope.idempotencyKey,
-                                            deviceId = "certified-device-1",
+                                            deviceId = envelope.deviceId,
                                             aggregateType = envelope.aggregateType,
                                             aggregateId = envelope.aggregateId,
                                             baseVersion = envelope.baseVersion,
@@ -172,17 +206,36 @@ fun CollectionsScreen() {
                                     db.assignmentDao().updateStatus(item.id, "completed")
                                     assignments = db.assignmentDao().getAssignmentsByType("collection")
                                 }
-                                snackbarMessage = "Cash payment posted securely and queued for sync!"
+                                isSubmitting = false
+                                snackbarMessage = context.getString(R.string.collections_posted)
                                 collectionAmount = ""
                                 selectedAssignment = null
                             }
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Post Collection EMI Receipt")
+                        if (isSubmitting) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), color = MaterialTheme.colorScheme.onPrimary)
+                        } else {
+                            Text(stringResource(R.string.collections_submit))
+                        }
                     }
                 }
             }
         }
+    }
+}
+
+/**
+ * Parses a rupee amount into exact paise. Rejects more than two decimal places
+ * and values that are not exactly representable as a whole number of paise.
+ */
+private fun parseRupeesToPaise(input: String): Long? {
+    return try {
+        val rupees = BigDecimal(input.trim())
+        if (rupees.scale() > 2) return null
+        rupees.movePointRight(2).longValueExact()
+    } catch (e: Exception) {
+        null
     }
 }

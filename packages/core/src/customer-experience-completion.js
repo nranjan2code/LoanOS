@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 
 const INDIAN_LANGUAGES = new Set(["as", "bn", "gu", "hi", "kn", "ml", "mr", "or", "pa", "ta", "te", "ur"]);
 const TEMPLATE_TYPES = new Set(["kfs", "notice", "communication", "servicing"]);
@@ -42,6 +42,32 @@ export function certifyFieldDevice(input = {}, existing = [], now = new Date()) 
   if (input.encryptedStorage !== true || input.screenLockEnforced !== true || input.remoteWipeEnabled !== true) fail("device_certification_blocked", "Encrypted storage, screen lock, and remote wipe are mandatory.");
   if (existing.some((item) => item.tenantId === input.tenantId && item.deviceId === input.deviceId && item.status === "certified")) fail("device_certification_duplicate", "Device already has an active tenant certification.");
   return { tenantId: input.tenantId, deviceId: input.deviceId, platform: input.platform, osVersion: input.osVersion, browserVersion: input.browserVersion, attestationRef: input.attestationRef, encryptionEvidenceRef: input.encryptionEvidenceRef, assistiveTechnologyEvidenceRef: input.assistiveTechnologyEvidenceRef, encryptedStorage: true, screenLockEnforced: true, remoteWipeEnabled: true, testedBy: input.testedBy, approvedBy: input.approvedBy, approvalRef: input.approvalRef, status: "certified", expiresAt: future(input.expiresAt, now, "expiresAt"), certifiedAt: now.toISOString() };
+}
+
+const KEY_LEASE_TTL_MS = 15 * 60_000; // short-lived data key — matches a single field session, not a device lifetime
+
+/**
+ * Issues a one-time-use AES-256 data key to a certified field device for local
+ * envelope encryption. The raw key material is returned to the caller exactly
+ * once and is never persisted server-side — only keyId/deviceId/expiresAt are
+ * retained (for audit and to reject a stale/expired keyId at enqueue time),
+ * matching the doc's "leased key" language without pretending this scaffold
+ * wraps a real external KMS/HSM.
+ */
+export function leaseEncryptionKey(device, input = {}, now = new Date()) {
+  sameTenant(device, input);
+  if (device.status !== "certified" || Date.parse(device.expiresAt) <= now.getTime()) fail("device_not_certified", "A current certified device is required.");
+  const keyId = `kms://${input.tenantId}/leased-key-${randomUUID()}`;
+  const keyMaterial = randomBytes(32);
+  return {
+    tenantId: input.tenantId,
+    deviceId: device.deviceId,
+    keyId,
+    keyMaterialBase64: keyMaterial.toString("base64"),
+    algorithm: "AES-256-GCM",
+    issuedAt: now.toISOString(),
+    expiresAt: new Date(now.getTime() + KEY_LEASE_TTL_MS).toISOString()
+  };
 }
 
 export function enqueueEncryptedOfflineWork(device, input = {}, existing = [], now = new Date()) {

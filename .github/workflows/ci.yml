@@ -50,6 +50,27 @@ jobs:
         run: npm run web:content:check
       - run: npm test
 
+  android:
+    name: Android apps (field-ops, dsa-ops)
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        app: [android-field-ops, android-dsa-ops]
+    defaults:
+      run:
+        working-directory: apps/${{ matrix.app }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager "platforms;android-34" "build-tools;34.0.0"
+      - run: chmod +x gradlew
+      - run: ./gradlew assembleDebug --console=plain
+      - run: ./gradlew lintDebug --console=plain
+
   test-postgres:
     name: Test (Postgres/RLS driver)
     runs-on: ubuntu-latest

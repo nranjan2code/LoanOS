@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Covers navigation, screen chrome, form labels and status/error copy for
+  docs/architecture/android-field-operations-app.md §5's 12-language
+  requirement ("as","bn","gu","hi","kn","ml","mr","or","pa","ta","te","ur").
+  Key Fact Statements, consent text and other borrower-facing disclosures are
+  NOT static resources here: they are resolved server-side per tenant/language
+  via resolveLocalizedTemplate() and must never be hardcoded in this file.
+-->
+<resources>
+    <string name="app_name">LoanOS Field Operations</string>
+
+    <string name="login_title">LoanOS Secure Portal</string>
+    <string name="login_subtitle">Compliance Gated Field Access</string>
+    <string name="login_tenant_id">Tenant ID</string>
+    <string name="login_email">Work Email</string>
+    <string name="login_password">Password</string>
+    <string name="login_mfa_code">MFA Code (if enabled)</string>
+    <string name="login_sign_in">Sign In</string>
+
+    <string name="nav_field_kyc">Field KYC</string>
+    <string name="nav_collections">Collections</string>
+    <string name="nav_collateral">Collateral</string>
+    <string name="nav_sync_queue">Sync Queue</string>
+    <string name="action_sign_out">Sign out</string>
+
+    <string name="device_cert_pending_title">Device Certification Required</string>
+    <string name="device_cert_pending_body">This device is not yet certified for field operations. Share the device ID below with your security administrator so they can complete independent certification from the tenant back office.</string>
+
+    <string name="collections_title">Assigned Collections Tasks</string>
+    <string name="collections_status_label">Status: %1$s</string>
+    <string name="collections_post_for">Post Field Collection for: %1$s</string>
+    <string name="collections_amount_label">Amount Collected (₹)</string>
+    <string name="collections_amount_invalid">Enter a valid rupee amount (up to 2 decimal places).</string>
+    <string name="collections_submit">Post Collection EMI Receipt</string>
+    <string name="collections_posted">Cash payment posted securely and queued for sync!</string>
+
+    <string name="kyc_title">Borrower KYC Onboarding</string>
+    <string name="kyc_borrower_name">Borrower Full Name</string>
+    <string name="kyc_mobile_number">Mobile Number (India)</string>
+    <string name="kyc_permission_denied">Camera and precise location permissions are required for compliant KYC capture.</string>
+    <string name="kyc_photo_captured">📷 Live Photo Captured</string>
+    <string name="kyc_grant_access">Grant camera and location access to begin capture.</string>
+    <string name="kyc_capture_retake">✓ Retake Live Photo</string>
+    <string name="kyc_capture_action">📷 Capture Live Photo + GPS Lock</string>
+    <string name="kyc_gps_failed">GPS lock failed: %1$s</string>
+    <string name="kyc_photo_failed">Photo capture failed: %1$s</string>
+    <string name="kyc_missing_fields">Name, mobile, live photo and GPS lock are all mandatory.</string>
+    <string name="kyc_queue_action">Securely Queue Onboarding Lead</string>
+    <string name="kyc_queued">KYC Saved securely to offline sync queue!</string>
+
+    <string name="collateral_title">Collateral / Security Inspection</string>
+    <string name="collateral_description_label">Asset Description</string>
+    <string name="collateral_valuation_label">Assessed Valuation (₹)</string>
+    <string name="collateral_valuation_invalid">Enter a valid valuation amount (up to 2 decimal places).</string>
+    <string name="collateral_missing_fields">Description, valuation, a hardware-stamped photo and GPS lock are all mandatory.</string>
+    <string name="collateral_queue_action">Securely Queue Valuation Report</string>
+    <string name="collateral_queued">Collateral valuation saved securely to offline sync queue!</string>
+
+    <string name="sync_queue_title">Sync Outbox Queue</string>
+    <string name="sync_queue_pending_total">%1$d pending · %2$d total</string>
+    <string name="sync_queue_envelope_id">Envelope ID: %1$s…</string>
+    <string name="sync_queue_type">Type: %1$s</string>
+    <string name="sync_queue_status">Status: %1$s</string>
+    <string name="sync_queue_digest">Ciphertext Digest: %1$s…</string>
+    <string name="sync_queue_action">Sync Envelopes with Backend</string>
+    <string name="sync_queue_success">Sync completed successfully!</string>
+    <string name="sync_queue_failure">Sync failed: %1$s</string>
+
+    <string name="key_lease_failed">Could not secure an encryption key for this record (%1$s). Please retry when signal improves.</string>
+</resources>

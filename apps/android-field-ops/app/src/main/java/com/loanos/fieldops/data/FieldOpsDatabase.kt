@@ -5,7 +5,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import com.loanos.fieldops.security.KeyManager
-import net.sqlcipher.database.SupportFactory
+import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 
 @Database(
     entities = [OfflineEnvelopeEntity::class, AssignmentEntity::class],
@@ -26,7 +26,7 @@ abstract class FieldOpsDatabase : RoomDatabase() {
         fun getDatabase(context: Context): FieldOpsDatabase {
             return INSTANCE ?: synchronized(this) {
                 val passphrase = KeyManager.getDatabasePassphrase(context)
-                val supportFactory = SupportFactory(passphrase.toByteArray())
+                val supportFactory = SupportOpenHelperFactory(passphrase.toByteArray())
 
                 val instance = Room.databaseBuilder(
                     context.applicationContext,

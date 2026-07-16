@@ -55,6 +55,39 @@ test("customer experience completion API handles device certification, offline w
   const deviceRecord = await response.json();
   assert.equal(deviceRecord.status, "certified");
 
+  // 2b. Status lookup — a field device cannot self-certify (testedBy !== approvedBy
+  // is enforced), so this read-only endpoint is how it learns its own status.
+  response = await fetch(`${base}/experience/devices/device-xyz/status`, { headers });
+  assert.equal(response.status, 200);
+  const statusRecord = await response.json();
+  assert.equal(statusRecord.status, "certified");
+  assert.equal(statusRecord.expiresAt, devicePayload.expiresAt);
+
+  response = await fetch(`${base}/experience/devices/never-seen/status`, { headers });
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).status, "not_certified");
+
+  // 2c. Key lease — a certified device gets a one-time AES-256 data key; the
+  // server never retains the raw material after this response.
+  response = await fetch(`${base}/experience/keys/lease`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ deviceId: "device-xyz" })
+  });
+  assert.equal(response.status, 201, await response.clone().text());
+  const leaseRecord = await response.json();
+  assert.equal(leaseRecord.deviceId, "device-xyz");
+  assert.equal(leaseRecord.algorithm, "AES-256-GCM");
+  assert.equal(Buffer.from(leaseRecord.keyMaterialBase64, "base64").length, 32);
+  assert.ok(new Date(leaseRecord.expiresAt).getTime() > Date.now());
+
+  response = await fetch(`${base}/experience/keys/lease`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ deviceId: "never-certified" })
+  });
+  assert.equal(response.status, 422);
+
   // 3. Enqueue offline work
   const ciphertext = "base64:ciphertext-data-value";
   const envelopePayload = {

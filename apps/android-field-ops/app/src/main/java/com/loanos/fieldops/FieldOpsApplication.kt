@@ -1,12 +1,13 @@
 package com.loanos.fieldops
 
 import android.app.Application
-import net.sqlcipher.database.SQLiteDatabase
+import com.loanos.fieldops.network.NetworkModule
 
 class FieldOpsApplication : Application() {
     override fun onCreate() {
         super.onCreate()
-        // Initialize SQLCipher library
-        SQLiteDatabase.loadLibs(this)
+        // Initialize SQLCipher native library (net.zetetic:sqlcipher-android)
+        System.loadLibrary("sqlcipher")
+        NetworkModule.init(this)
     }
 }

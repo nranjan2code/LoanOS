@@ -1,6 +1,7 @@
 import {
   certifyFieldDevice,
   enqueueEncryptedOfflineWork,
+  leaseEncryptionKey,
   reconcileEncryptedOfflineWork
 } from "../../../../packages/core/src/customer-experience-completion.js";
 
@@ -18,6 +19,23 @@ export async function routeCustomerExperienceCompletion(context) {
 
   const state = await store.load();
   const tenantId = authContext.tenantId;
+
+  // Read-only certification lookup: a field device cannot legitimately certify
+  // itself (certifyFieldDevice enforces testedBy !== approvedBy — four-eyes),
+  // so the app has no way to learn its own status without this. It only ever
+  // reads the record a security_admin created via the back office.
+  const statusMatch = path.match(/^\/experience\/devices\/([^/]+)\/status$/);
+  if (method === "GET" && statusMatch) {
+    const deviceId = decodeURIComponent(statusMatch[1]);
+    const record = state.certifiedFieldDevices?.[deviceId];
+    if (!record || record.tenantId !== tenantId) {
+      sendJson(res, 200, { deviceId, status: "not_certified", expiresAt: null });
+      return true;
+    }
+    const expired = Date.parse(record.expiresAt) <= Date.now();
+    sendJson(res, 200, { deviceId, status: expired ? "expired" : record.status, expiresAt: record.expiresAt });
+    return true;
+  }
 
   if (method === "GET" && path === "/experience/assignments") {
     // Return mock assignment projection for field agents
@@ -70,6 +88,25 @@ export async function routeCustomerExperienceCompletion(context) {
       };
       event = "experience.device.certified";
     } 
+    else if (path === "/experience/keys/lease") {
+      const device = state.certifiedFieldDevices?.[body.deviceId];
+      if (!device) {
+        sendJson(res, 422, { error: { code: "device_not_certified", message: "Certified device not found." } });
+        return true;
+      }
+      record = leaseEncryptionKey(device, { ...body, tenantId }, new Date());
+      // Never persist keyMaterialBase64 — it is returned to the device exactly
+      // once in this response. Only audit-safe metadata is retained.
+      const { keyMaterialBase64, ...auditableLease } = record;
+      nextState = {
+        ...state,
+        leasedEncryptionKeys: {
+          ...(state.leasedEncryptionKeys ?? {}),
+          [record.keyId]: auditableLease
+        }
+      };
+      event = "experience.key.leased";
+    }
     else if (path === "/experience/offline-work/enqueue") {
       const device = state.certifiedFieldDevices?.[body.deviceId];
       if (!device) {
