@@ -76,7 +76,7 @@ test("composed journey API binds human actors, enforces four eyes and persists r
     createdBy: "body-supplied-attacker",
     lineage: {
       productTemplateRef: PRODUCT_TEMPLATE_CATALOGUE.personal_loan.templateId, productTemplateVersion: PRODUCT_TEMPLATE_CATALOGUE.personal_loan.version, productTemplateChecksumSha256: PRODUCT_TEMPLATE_CATALOGUE.personal_loan.templateChecksumSha256,
-      workspaceSchemaId: "journey-workspace/term_lending", workspaceSchemaVersion: 1, workspaceSchemaChecksumSha256: JOURNEY_WORKSPACE_SCHEMAS.term_lending.schemaChecksumSha256,
+      workspaceSchemaId: JOURNEY_WORKSPACE_SCHEMAS.personal_loan.schemaId, workspaceSchemaVersion: 1, workspaceSchemaChecksumSha256: JOURNEY_WORKSPACE_SCHEMAS.personal_loan.schemaChecksumSha256,
       policyBundleRef: "policy/personal/v1", policyBundleVersion: 1, policyBundleChecksumSha256: H,
       workflowRef: "workflow/personal/v1", workflowVersion: 1, workflowChecksumSha256: H,
       accountingPolicyRef: "accounting/personal/v1", accountingPolicyVersion: 1, accountingPolicyChecksumSha256: H,
@@ -142,7 +142,7 @@ test("composed journey API binds human actors, enforces four eyes and persists r
     recordedBy: "body-supplied-attacker",
     evidenceRef: "provider-attempt/synthetic-1",
     evidenceChecksumSha256: H,
-    compensation: { mode: "manual_intervention", actionRef: "runbook/kyc-reconcile", ownerRole: "operator", dueAt: "2026-07-16T12:00:00.000Z" }
+    compensation: { mode: "manual_intervention", actionRef: "runbook/kyc-reconcile", ownerRole: "operator", dueAt: "2027-07-16T12:00:00.000Z" }
   });
   await expectStatus(response, 201);
   const failed = await response.json();

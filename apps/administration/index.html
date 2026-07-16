@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Governed tenant product administration for all lending journeys.">
+  <title>Product administration</title>
+  <link rel="stylesheet" href="/shared/design-tokens.css">
+  <link rel="stylesheet" href="/administration/administration.css?v=1">
+  <script src="/administration/administration.js?v=1" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+  <header class="topbar"><a id="home" class="brand" href="/"><span id="brand-mark" aria-hidden="true"></span><span id="brand-name">Product administration</span></a><nav><a id="banker-link" href="/">Banker workspace</a><button id="refresh" type="button">Refresh</button></nav></header>
+  <main id="main">
+    <section class="hero"><p class="eyebrow">Tenant governance</p><h1>Product administration</h1><p>Configure, staff, evidence, activate, suspend and retire every lending journey with independent approval.</p><div id="summary" class="summary" aria-live="polite"></div></section>
+    <p id="status" class="status" role="status" aria-live="polite">Loading governed product state…</p>
+    <section class="layout">
+      <aside class="panel products" aria-labelledby="products-title"><div class="section-head"><div><p class="eyebrow">Canonical catalogue</p><h2 id="products-title">All 21 journeys</h2></div></div><div id="product-list" class="product-list"></div></aside>
+      <section id="detail" class="panel detail" aria-labelledby="detail-title"><p class="eyebrow">Selected journey</p><h2 id="detail-title">Choose a journey</h2><div id="detail-content" class="empty">Select a product to inspect its contract and tenant readiness.</div></section>
+    </section>
+    <section class="panel" aria-labelledby="approvals-title"><div class="section-head"><div><p class="eyebrow">Four eyes</p><h2 id="approvals-title">Pending approvals</h2></div></div><div id="approval-list" class="approval-list"></div></section>
+    <section class="panel" aria-labelledby="brand-title"><div class="section-head"><div><p class="eyebrow">White-label control plane</p><h2 id="brand-title">Published brand releases</h2></div><a href="#brand-list">Legal identity remains separate from product presentation</a></div><div id="brand-list" class="brand-list"></div></section>
+  </main>
+  <template id="configuration-template">
+    <form id="configuration-form" class="governed-form">
+      <fieldset><legend>Authority and availability</legend><label>Regulated entity references<input name="regulatedEntityRefs" required placeholder="re_primary"></label><fieldset class="checks"><legend>Channels</legend><label><input type="checkbox" name="channels" value="borrower">Customer</label><label><input type="checkbox" name="channels" value="partner">Partner</label><label><input type="checkbox" name="channels" value="branch">Branch</label><label><input type="checkbox" name="channels" value="field">Field</label><label><input type="checkbox" name="channels" value="credit">Credit</label><label><input type="checkbox" name="channels" value="operations">Operations</label><label><input type="checkbox" name="channels" value="control">Control</label></fieldset><label>Effective from<input name="effectiveFrom" type="datetime-local" required></label><label>Effective to<input name="effectiveTo" type="datetime-local"></label></fieldset>
+      <fieldset><legend>Governed product bindings</legend><label>Product policy<input name="productPolicyRef" required></label><label>Decision bundle<input name="decisionBundleRef" required></label><label>Accounting profile<input name="accountingProfileRef" required></label><label>Compliance profile<input name="complianceProfileRef" required></label><label>Provider profiles<input name="providerProfileRefs" required placeholder="provider/kyc, provider/payments"></label><label>Document pack<input name="documentPackRef" required></label><label>Programme references<input name="programmeRefs"></label></fieldset>
+      <fieldset><legend>Staffing grant</legend><label>Grant ID<input name="grantId" required></label><label>Principal ID<input name="principalId" required></label><label>Roles<input name="roles" required placeholder="credit_maker, credit_checker"></label><label>Scope references<input name="scopeRefs" required placeholder="branch/all"></label><label>Staffing evidence<input name="staffingEvidenceRef" required></label></fieldset>
+      <fieldset><legend>White-label binding</legend><label>Brand release<input name="brandVersionRef" required></label><label>Legal-entity disclosure<input name="legalEntityDisclosureRef" required></label><label>Locales<input name="localeRefs" required placeholder="en, hi"></label><label>Communication templates<input name="communicationTemplateSetRef" required></label><label>Document templates<input name="documentTemplateSetRef" required></label></fieldset>
+      <fieldset><legend>Release evidence</legend><div id="readiness-fields" class="evidence-grid"></div></fieldset>
+      <div class="form-actions"><button type="submit">Propose configuration</button><button type="button" class="secondary" data-close>Cancel</button></div>
+    </form>
+  </template>
+</body>
+</html>

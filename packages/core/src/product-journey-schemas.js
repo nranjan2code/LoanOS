@@ -1,0 +1,57 @@
+import { createHash } from "node:crypto";
+
+import { PRODUCT_JOURNEY_CONTRACTS } from "./product-journey-contracts.js";
+
+const CHANNELS = Object.freeze(["borrower", "branch", "partner", "field", "credit", "operations", "control"]);
+const CAPTURE = Object.freeze(["borrower", "branch", "partner", "field"]);
+const REVIEW = Object.freeze(["branch", "credit", "operations", "control"]);
+
+const PRODUCT_NAMES = Object.freeze({
+  personal_loan: ["Personal loan", "व्यक्तिगत ऋण"], msme_term_loan: ["MSME term loan", "सूक्ष्म, लघु और मध्यम उद्यम सावधि ऋण"], professional_practice_loan: ["Professional practice loan", "पेशेवर व्यवसाय ऋण"],
+  secured_business_loan: ["Secured business loan", "सुरक्षित व्यवसाय ऋण"], loan_against_property: ["Loan against property", "संपत्ति के बदले ऋण"], home_loan: ["Home loan", "गृह ऋण"],
+  equipment_machinery_finance: ["Equipment and machinery finance", "उपकरण और मशीनरी वित्त"], green_equipment_finance: ["Green equipment finance", "हरित उपकरण वित्त"], personal_vehicle_loan: ["Personal vehicle loan", "व्यक्तिगत वाहन ऋण"],
+  commercial_vehicle_finance: ["Commercial vehicle finance", "वाणिज्यिक वाहन वित्त"], gold_loan: ["Gold loan", "स्वर्ण ऋण"], education_loan: ["Education loan", "शिक्षा ऋण"],
+  agriculture_allied_finance: ["Agriculture and allied finance", "कृषि और संबद्ध वित्त"], microfinance_group_lending: ["Microfinance group lending", "सूक्ष्मवित्त समूह ऋण"], consumer_durable_finance: ["Consumer durable finance", "उपभोक्ता टिकाऊ वस्तु वित्त"],
+  invoice_discounting: ["Invoice discounting", "चालान बट्टाकरण"], purchase_order_finance: ["Purchase order finance", "क्रय आदेश वित्त"], supply_chain_finance: ["Supply-chain finance", "आपूर्ति शृंखला वित्त"],
+  trade_finance_workflow: ["Trade finance", "व्यापार वित्त"], co_lending_programme: ["Co-lending programme", "सह-ऋण कार्यक्रम"], msme_working_capital: ["MSME working capital", "सूक्ष्म, लघु और मध्यम उद्यम कार्यशील पूंजी"]
+});
+
+const HI = Object.freeze({
+  applicant:"आवेदक", beneficiary:"लाभार्थी", seller:"विक्रेता", buyer:"खरीदार", student:"विद्यार्थी", farmer:"किसान", merchant:"व्यापारी", participant:"प्रतिभागी", partner:"साझेदार", lender:"ऋणदाता", originator:"प्रवर्तक", promoter:"प्रवर्तक", owner:"स्वामी", member:"सदस्य", group:"समूह", centre:"केंद्र", anchor:"प्रमुख खरीदार", programme:"कार्यक्रम", arrangement:"व्यवस्था", institution:"संस्थान", developer:"विकासकर्ता", manufacturer:"निर्माता", supplier:"आपूर्तिकर्ता", dealer:"विक्रेता", vehicle:"वाहन", property:"संपत्ति", asset:"परिसंपत्ति", professional:"पेशेवर", profession:"पेशा", registration:"पंजीकरण", practice:"व्यवसाय", employment:"रोज़गार", salary:"वेतन", bureau:"ऋण सूचना ब्यूरो", consent:"सहमति", legal:"कानूनी", entity:"इकाई", business:"व्यवसाय", udyam:"उद्यम", gst:"जीएसटी", income:"आय", household:"परिवार", indebtedness:"ऋणग्रस्तता", repayment:"पुनर्भुगतान", capacity:"क्षमता", conduct:"आचरण", coercion:"दबाव-रहित", attestation:"घोषणा", cashflow:"नकदी प्रवाह", assessment:"आकलन", end:"अंतिम", use:"उपयोग", title:"स्वामित्व", search:"खोज", valuation:"मूल्यांकन", market:"बाजार", value:"मूल्य", proposed:"प्रस्तावित", ltv:"ऋण-मूल्य अनुपात", security:"प्रतिभूति", perfection:"पूर्णता", mortgage:"बंधक", occupancy:"अधिभोग", encumbrance:"भार", status:"स्थिति", transaction:"लेनदेन", rera:"रेरा", project:"परियोजना", agreement:"समझौता", customer:"ग्राहक", contribution:"अंशदान", construction:"निर्माण", stage:"चरण", category:"श्रेणी", quotation:"मूल्य-प्रस्ताव", invoice:"चालान", cost:"लागत", serial:"क्रमांक", number:"संख्या", installation:"स्थापना", required:"आवश्यक", certificate:"प्रमाणपत्र", green:"हरित", taxonomy:"वर्गीकरण", estimated:"अनुमानित", impact:"प्रभाव", metric:"माप", subsidy:"अनुदान", incentive:"प्रोत्साहन", class:"वर्ग", road:"सड़क", price:"मूल्य", insurance:"बीमा", identification:"पहचान", permit:"परमिट", route:"मार्ग", fleet:"बेड़ा", size:"आकार", packet:"पैकेट", gross:"सकल", stone:"पत्थर", net:"शुद्ध", eligible:"पात्र", weight:"वजन", grams:"ग्राम", gram:"ग्राम", purity:"शुद्धता", karat:"कैरेट", assessed:"आकलित", rate:"दर", per:"प्रति", collateral:"संपार्श्विक", vault:"तिजोरी", location:"स्थान", auction:"नीलामी", policy:"नीति", co:"सह", borrower:"उधारकर्ता", course:"पाठ्यक्रम", admission:"प्रवेश", verified:"सत्यापित", fee:"शुल्क", schedule:"अनुसूची", moratorium:"स्थगन", months:"माह", land:"भूमि", activity:"गतिविधि", tenure:"काश्त-अधिकार", crop:"फसल", season:"मौसम", seasonal:"मौसमी", acreage:"रकबा", decimal:"दशमलव", geo:"भौगोलिक", evidence:"प्रमाण", harvest:"कटाई", date:"तिथि", weather:"मौसम", risk:"जोखिम", ref:"संदर्भ", refs:"संदर्भ", reference:"संदर्भ", code:"कोड", type:"प्रकार", active:"सक्रिय", vintage:"अवधि", receipts:"प्राप्तियां", annual:"वार्षिक", monthly:"मासिक", turnover:"कारोबार", paise:"पैसे", sku:"वस्तु पहचान", financed:"वित्तपोषित", amount:"राशि", down:"अग्रिम", payment:"भुगतान", delivery:"सुपुर्दगी", otp:"एकबारगी संकेत", face:"अंकित", assignment:"हस्तांतरण", acknowledgement:"स्वीकृति", advance:"अग्रिम", concentration:"एकाग्रता", limit:"सीमा", bps:"आधार अंक", dispute:"विवाद", purchase:"क्रय", order:"आदेश", expected:"अपेक्षित", estimate:"अनुमान", margin:"मार्जिन", shipment:"माल-प्रेषण", incoterm:"व्यापार शर्त", destination:"गंतव्य", fulfilment:"पूर्ति", milestones:"मील-पत्थर", trade:"व्यापार", erp:"उद्यम प्रणाली", due:"देय", instrument:"प्रपत्र", currency:"मुद्रा", minor:"लघु", units:"इकाइयां", customs:"सीमा-शुल्क", sanctions:"प्रतिबंध", screening:"जांच", discrepancy:"विसंगति", escrow:"एस्क्रो", waterfall:"वितरण क्रम", allocation:"आवंटन", facility:"सुविधा", stock:"भंडार", drawing:"आहरण", power:"शक्ति", renewal:"नवीनीकरण", primary:"प्राथमिक", statement:"विवरण", statements:"विवरण", receivables:"प्राप्य", ageing:"आयु-वर्गीकरण", existing:"मौजूदा", obligations:"दायित्व", account:"खाता", share:"हिस्सा", no:"बिना", first:"प्रथम", loss:"हानि", support:"सहायता", or:"या", ownership:"स्वामित्व", plan:"योजना", letter:"पत्र", report:"रिपोर्ट", records:"अभिलेख", record:"दर्ज", bank:"बैंक", tax:"कर", returns:"रिटर्न", assay:"परख", notice:"सूचना", seal:"मुहर", movement:"आवागमन", custody:"अभिरक्षा", receipt:"रसीद", acceptance:"स्वीकृति", verification:"सत्यापन", commercial:"वाणिज्यिक", diligence:"सावधानी जांच", field:"क्षेत्र", inspection:"निरीक्षण", financial:"वित्तीय", goods:"वस्तु", service:"सेवा", resolution:"संकल्प", training:"प्रशिक्षण", baseline:"आधार-रेखा", identity:"पहचान", onboarding:"सम्मिलन", reconciliation:"मिलान", sale:"बिक्री", settlement:"निपटान", documents:"दस्तावेज़", definition:"परिभाषा", warranty:"वारंटी", visa:"वीज़ा", if:"यदि", applicable:"लागू", originals:"मूल दस्तावेज़", conditions:"शर्तें", regulatory:"नियामकीय", information:"जानकारी", product:"उत्पाद", application:"आवेदन", draft:"मसौदा", assisted:"सहायता-प्राप्त", save:"सहेजें", submit:"जमा करें", provide:"प्रदान करें", accept:"स्वीकार करें", kfs:"मुख्य तथ्य विवरण", sign:"हस्ताक्षर करें", contract:"अनुबंध", view:"देखें", attributed:"श्रेयांकित", capture:"दर्ज करें", offline:"ऑफ़लाइन", synchronise:"समकालित करें", visit:"दौरा", create:"बनाएं", request:"मांगें", verify:"सत्यापित करें", propose:"प्रस्ताव दें", refer:"संदर्भित करें", approve:"अनुमोदित करें", decline:"अस्वीकृत करें", exception:"अपवाद", prepare:"तैयार करें", authorise:"अधिकृत करें", disbursement:"संवितरण", close:"बंद करें", review:"समीक्षा करें", audit:"लेखा-परीक्षा", suspend:"निलंबित करें", export:"निर्यात करें"
+});
+
+const BOOL = /(?:_active|_verified|_required)$/;
+const INTEGER = /(?:_months|_size)$/;
+const MONEY = /(?:_paise|_minor_units)$/;
+const DECIMAL = /(?:_grams|_karat|_decimal|_metric)$/;
+const DATE = /(?:_date)$/;
+const CODE = /(?:_code|_type|_class|_status|_incoterm)$/;
+const INTERNAL = /(?:assessment|screening|valuation|title_search|security_perfection|auction_policy|vault_location|waterfall|allocation|concentration|drawing_power|erp_confirmation)/;
+
+export const PRODUCT_JOURNEY_WORKSPACE_SCHEMAS = Object.freeze(Object.fromEntries(Object.entries(PRODUCT_JOURNEY_CONTRACTS).map(([journeyType, contract]) => {
+  const [en, hi] = PRODUCT_NAMES[journeyType];
+  const fields = contract.requiredFacts.map((factId) => fact(factId));
+  const documents = contract.requiredEvidence.map((evidenceId) => evidence(evidenceId));
+  const actions = Object.entries(contract.channelActions).flatMap(([channel, ids]) => ids.map((id) => action(id, channel)));
+  const core = { schemaId: `journey-workspace/${journeyType}`, schemaVersion: contract.contractVersion, contractId: contract.contractId, contractChecksumSha256: contract.checksumSha256, archetype: contract.archetype, journeyTypes: [journeyType], title: { en, hi }, supportedLanguages: ["en", "hi"], channels: CHANNELS,
+    sections: [{ sectionId: "product_facts", title: { en: `${en} facts`, hi: `${hi} के तथ्य` }, fields }], documents, actions,
+    privacy: { browserPersistence: "prohibited", businessDataCaching: "prohibited", offlineMode: "shell_and_schema_only", auditPayloadValues: "prohibited" } };
+  return [journeyType, Object.freeze({ ...core, schemaChecksumSha256: hash(core) })];
+})));
+
+function fact(fieldId) {
+  const channels = /(?:vault_location)/.test(fieldId) ? ["operations", "control"] : INTERNAL.test(fieldId) ? REVIEW : CHANNELS;
+  const type = BOOL.test(fieldId) ? "boolean" : INTEGER.test(fieldId) ? "integer" : MONEY.test(fieldId) ? "money_string" : DECIMAL.test(fieldId) ? "decimal_string" : DATE.test(fieldId) ? "date" : CODE.test(fieldId) ? "code" : fieldId.endsWith("_ref") || fieldId.endsWith("_refs") ? "reference" : "text";
+  const dataClass = MONEY.test(fieldId) || DECIMAL.test(fieldId) || /(?:income|turnover|receipts|cost|margin|value|limit|power)/.test(fieldId) ? "financial" : /(?:identity|mobile|member|student|farmer|owner|promoter)/.test(fieldId) ? "restricted" : "confidential";
+  return Object.freeze({ fieldId, label: labels(fieldId), type, channels: Object.freeze([...channels]), dataClass, required: true, exposure: dataClass === "restricted" || dataClass === "financial" ? "mask" : "full" });
+}
+function evidence(documentType) { return Object.freeze({ documentType, title: labels(documentType), channels: CHANNELS, dataClass: /(?:bank|income|financial|invoice|fee|cost|settlement|valuation|cashflow|stock)/.test(documentType) ? "financial" : "restricted", required: true, exposure: "metadata_only" }); }
+function action(actionId, channel) {
+  const makerChecker = /(?:approve|decline|authorise|close|suspend|exception)/.test(actionId);
+  const role = channel === "credit" ? (makerChecker ? "credit_checker" : "credit_maker") : channel === "operations" ? (makerChecker ? "operations_checker" : "operations_maker") : channel === "field" ? "field_officer" : channel === "partner" ? "partner_user" : channel === "control" ? "compliance_officer" : channel === "branch" ? "branch_operator" : null;
+  return Object.freeze({ actionId, title: labels(actionId), channels: [channel], requiredRoles: role ? [role] : [], makerChecker, actorAttributionRequired: true });
+}
+function labels(id) { const words = id.split("_"); return { en: words.map((word, index) => index ? word : `${word[0].toUpperCase()}${word.slice(1)}`).join(" "), hi: words.map((word) => HI[word] ?? transliterate(word)).join(" ") }; }
+function transliterate() { return "अन्य विवरण"; }
+function stable(value) { if (Array.isArray(value)) return `[${value.map(stable).join(",")}]`; if (value && typeof value === "object") return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stable(value[key])}`).join(",")}}`; return JSON.stringify(value); }
+function hash(value) { return createHash("sha256").update(stable(value)).digest("hex"); }

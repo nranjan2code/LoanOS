@@ -3,23 +3,25 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#123e32">
-  <meta name="description" content="Tenant-entitled, schema-driven lending journey workspace.">
-  <title>Lending journeys</title>
+  <meta name="theme-color" content="#173f35">
+  <meta name="description" content="Role-aware, tenant-branded lending journey workspace.">
+  <title>Lending workspace</title>
   <link rel="stylesheet" href="/shared/design-tokens.css">
-  <link rel="stylesheet" href="/journey-workspace/workspace.css?v=1">
-  <script src="/journey-workspace/workspace.js?v=1" defer></script>
+  <link rel="stylesheet" href="/journey-workspace/workspace.css?v=2">
+  <script src="/journey-workspace/workspace.js?v=2" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to main content</a>
-  <p id="offline" class="offline" role="status" hidden>Offline: customer and lending data are not cached. Reconnect to continue securely.</p>
+  <p id="offline" class="offline" role="status" hidden>Offline: lending data is not cached. Reconnect to continue securely.</p>
   <header class="topbar">
-    <a id="back" class="brand" href="/">▲ <span>LoanOS</span></a>
+    <a id="back" class="brand" href="/" aria-label="Return to workspace home"><span id="brand-mark" aria-hidden="true"></span><span id="brand-name">Lending workspace</span></a>
     <div class="controls">
       <label for="language">Language</label>
       <select id="language"><option value="en">English</option><option value="hi">हिन्दी</option></select>
       <label id="staff-channel-label" for="staff-channel">Workspace</label>
-      <select id="staff-channel"><option value="branch">Branch</option><option value="credit">Credit</option><option value="operations">Operations</option><option value="control">Control</option></select>
+      <select id="staff-channel">
+        <option value="branch">Branch</option><option value="credit">Credit</option><option value="operations">Operations</option><option value="control">Control</option><option value="administration">Administration</option>
+      </select>
     </div>
   </header>
   <main id="main">
@@ -29,16 +31,40 @@
       <p id="page-description">Only products activated for this tenant and authorised for your role appear here.</p>
       <div class="trust"><span>Tenant isolated</span><span>No browser PII storage</span><span>Version bound</span><span>Fully attributable</span></div>
     </section>
+
     <div id="status" class="status" role="status" aria-live="polite">Loading authorised journeys…</div>
+
+    <section id="administration" class="panel" aria-labelledby="administration-title" hidden>
+      <h2 id="administration-title">Administration</h2>
+      <p>Product activation, role assignment, policy and branding are governed in the tenant administration application.</p>
+      <a id="administration-link" class="button-link" href="/">Open tenant administration</a>
+    </section>
+
+    <section id="draft-region" class="panel" aria-labelledby="draft-title" hidden>
+      <div class="region-head"><div><p class="eyebrow">Your work</p><h2 id="draft-title">Saved drafts</h2></div><button id="refresh-drafts" class="secondary" type="button">Refresh</button></div>
+      <div id="draft-list" class="draft-list"></div>
+    </section>
+
     <section id="catalogue" class="catalogue" aria-label="Available lending journeys"></section>
+
     <section id="workspace" class="workspace" aria-labelledby="workspace-title" hidden>
-      <div class="workspace-head"><div><p class="eyebrow" id="schema-meta"></p><h2 id="workspace-title"></h2></div><button id="close-workspace" class="secondary" type="button">Back to journeys</button></div>
+      <div class="workspace-head"><div><p class="eyebrow" id="schema-meta"></p><h2 id="workspace-title" tabindex="-1"></h2></div><button id="close-workspace" class="secondary" type="button">Back to journeys</button></div>
       <form id="journey-form" novalidate>
         <div id="form-sections"></div>
-        <section class="documents" aria-labelledby="documents-title"><h3 id="documents-title">Required evidence</h3><div id="document-list"></div></section>
-        <section class="actions" aria-labelledby="actions-title"><h3 id="actions-title">Authorised next actions</h3><div id="action-list"></div></section>
-        <label class="confirm"><input id="declaration" type="checkbox" required><span>I confirm these details and evidence references are accurate and authorised for this journey.</span></label>
-        <div class="form-actions"><button class="secondary" id="save-draft" type="button">Save secure draft</button><button class="primary" type="submit">Submit application</button></div>
+        <section class="documents" aria-labelledby="documents-title">
+          <h3 id="documents-title">Evidence checklist</h3>
+          <p class="section-copy">Record evidence references only when the document service is connected. Files are never retained in this browser.</p>
+          <div id="document-list" class="document-list"></div>
+        </section>
+        <section class="timeline" aria-labelledby="timeline-title">
+          <h3 id="timeline-title">Case and lifecycle</h3>
+          <div id="timeline-content" class="empty-state">No governed case lifecycle is linked to this draft.</div>
+        </section>
+        <section class="actions" aria-labelledby="actions-title">
+          <h3 id="actions-title">Authorised actions</h3>
+          <p id="action-guidance" class="section-copy"></p>
+          <div id="action-list" class="form-actions"></div>
+        </section>
         <p id="form-status" class="status" role="status" aria-live="polite"></p>
       </form>
     </section>

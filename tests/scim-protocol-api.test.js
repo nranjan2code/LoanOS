@@ -29,7 +29,7 @@ test("SCIM 2.0 service surface is tenant-scoped, idempotent and deactivates imme
   assert.equal(response.status, 200); assert.equal((await response.json()).totalResults, 1);
   state = await loadState(dataDir);
   const activeUser = Object.values(state.tenants[tenant.tenantId].users).find((candidate) => candidate.federationExternalId === "employee-1");
-  const tenantState = state.tenants[tenant.tenantId], H = "a".repeat(64), template = PRODUCT_TEMPLATE_CATALOGUE.personal_loan, schema = JOURNEY_WORKSPACE_SCHEMAS.term_lending;
+  const tenantState = state.tenants[tenant.tenantId], H = "a".repeat(64), template = PRODUCT_TEMPLATE_CATALOGUE.personal_loan, schema = JOURNEY_WORKSPACE_SCHEMAS.personal_loan;
   tenantState.tenantProductSubscriptions = { "subscription-scim": { subscriptionId: "subscription-scim", tenantId: tenant.tenantId, productTypes: ["personal_loan"], effectiveFrom: "2026-01-01T00:00:00.000Z", validUntil: "2030-01-01T00:00:00.000Z", status: "active" } };
   const lifecycle = createComposedJourneyInstance(tenantState, {
     tenantId: tenant.tenantId, lifecycleId: "lifecycle-scim-1", journeyType: "personal_loan", subjectRef: "subject/synthetic-1", applicationRef: "application/synthetic-1", requestedAmountPaise: "10000", assignedPrincipalIds: [activeUser.userId, "checker-1"], idempotencyKey: "composed/scim/1", createdBy: activeUser.userId,

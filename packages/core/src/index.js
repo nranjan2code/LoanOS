@@ -53,6 +53,51 @@ export {
 } from "./ai-interaction.js";
 
 export {
+  PRODUCT_CONTRACT_VERSION,
+  PRODUCT_CONTRACT_CHANNELS,
+  PRODUCT_JOURNEY_CONTRACTS,
+  PRODUCT_JOURNEY_CONTRACT_TYPES,
+  PRODUCT_CONTRACT_ADMINISTRATION_SECTIONS,
+  PRODUCT_CONTRACT_WHITE_LABEL_CONTENT_KEYS,
+  getProductJourneyContract,
+  validateProductJourneyContracts
+} from "./product-journey-contracts.js";
+
+export {
+  PRODUCT_READINESS_GATES,
+  TEMPLATE_STATUSES as PRODUCT_PLATFORM_TEMPLATE_STATUSES,
+  PRODUCT_STATUSES as TENANT_PRODUCT_STATUSES,
+  createProductPlatformAdministrationState,
+  proposePlatformTemplateVersion,
+  publishPlatformTemplateVersion,
+  subscribeTenantProduct,
+  proposeTenantProductConfiguration,
+  approveTenantProductConfiguration,
+  activateTenantProduct,
+  suspendTenantProduct,
+  retireTenantProduct,
+  administerTenantProgramme,
+  assessTenantProductReadiness,
+  diffTenantProductConfigurations
+} from "./product-platform-administration.js";
+
+export {
+  BRAND_SCOPE_LEVELS,
+  BRAND_CHANNELS,
+  proposeBrandRelease,
+  approveBrandRelease,
+  publishBrandRelease,
+  rollbackBrandRelease,
+  resolveBrandExperience,
+  projectBrandAdministration
+} from "./brand-governance.js";
+
+export {
+  promoteSubmittedJourneyDraft,
+  projectJourneyApplication
+} from "./journey-application-service.js";
+
+export {
   MODEL_STATUSES,
   createModelRegistryState,
   normalizeModelRegistryState,

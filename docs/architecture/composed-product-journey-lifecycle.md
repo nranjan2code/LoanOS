@@ -21,7 +21,7 @@ JD-04 adds an authenticated administration/API composition boundary, not a new i
 
 ```mermaid
 flowchart LR
-  W["11 schema-driven channel workspaces"] --> J["Composed lifecycle instance"]
+  W["21 contract-bound product workspaces"] --> J["Composed lifecycle instance"]
   S["17-journey specialist service"] --> J
   C["Common KYC, credit, KFS and contracting services"] --> J
   J --> D["Disbursement and beneficiary controls"]

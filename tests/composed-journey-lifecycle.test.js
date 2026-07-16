@@ -30,7 +30,6 @@ const initialState = () => ({
 const evidence = (kind) => ({ kind, ref: `evidence/${kind}`, checksumSha256: H });
 
 function creation(journeyType = "personal_loan", suffix = journeyType) {
-  const archetype = PRODUCT_TO_WORKSPACE_ARCHETYPE[journeyType];
   const template = PRODUCT_TEMPLATE_CATALOGUE[journeyType];
   return {
     tenantId: "tenant-a", lifecycleId: `lc-${suffix}`, journeyType,
@@ -39,7 +38,7 @@ function creation(journeyType = "personal_loan", suffix = journeyType) {
     idempotencyKey: `create/${suffix}`, createdBy: "maker-1",
     lineage: {
       productTemplateRef: template.templateId, productTemplateVersion: template.version, productTemplateChecksumSha256: template.templateChecksumSha256,
-      workspaceSchemaId: JOURNEY_WORKSPACE_SCHEMAS[archetype].schemaId, workspaceSchemaVersion: 1, workspaceSchemaChecksumSha256: JOURNEY_WORKSPACE_SCHEMAS[archetype].schemaChecksumSha256,
+      workspaceSchemaId: JOURNEY_WORKSPACE_SCHEMAS[journeyType].schemaId, workspaceSchemaVersion: 1, workspaceSchemaChecksumSha256: JOURNEY_WORKSPACE_SCHEMAS[journeyType].schemaChecksumSha256,
       policyBundleRef: `policy/${journeyType}`, policyBundleVersion: 1, policyBundleChecksumSha256: H,
       workflowRef: `workflow/${journeyType}`, workflowVersion: 1, workflowChecksumSha256: H,
       accountingPolicyRef: `accounting/${journeyType}`, accountingPolicyVersion: 1, accountingPolicyChecksumSha256: H,
@@ -64,7 +63,7 @@ function proposal(lifecycle, suffix = "1") {
   };
 }
 
-test("the 13-step composed lifecycle covers all 21 products through 11 governed workspace archetypes", () => {
+test("the 13-step composed lifecycle covers all 21 product-specific workspace schemas", () => {
   assert.deepEqual(validateComposedJourneyLifecycleCatalogue(), { valid: true, errors: [], journeyCount: 21, stageCount: 13 });
   assert.equal(COMPOSED_JOURNEY_STAGES.at(-1), "completed");
   assert.equal(new Set(PRODUCT_JOURNEY_TYPES.map((type) => PRODUCT_TO_WORKSPACE_ARCHETYPE[type])).size, 11);

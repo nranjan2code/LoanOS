@@ -8,6 +8,7 @@ This index is the navigation root for LoanOS architecture. The current implement
 - [Current implementation map](current-implementation.md)
 - [Persistent specialist journey service](persistent-specialist-journey-service.md)
 - [Archetype journey workspaces](archetype-journey-workspaces.md)
+- [Greenfield product applications](greenfield-product-applications.md)
 - [Composed product-journey lifecycle](composed-product-journey-lifecycle.md)
 - [LoanOS Guide and Academy](help-centre-and-academy.md)
 - [SaaS tenancy and operating model](saas-tenancy-and-operating-model.md)

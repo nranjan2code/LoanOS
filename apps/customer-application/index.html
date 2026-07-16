@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Secure customer lending application workspace.">
+  <title>Customer applications</title>
+  <link rel="stylesheet" href="/shared/design-tokens.css">
+  <link rel="stylesheet" href="/customer-application/application.css">
+  <script src="/customer-application/application.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+  <header class="topbar"><a id="brand-home" class="brand" href="/"><span id="brand-mark" aria-hidden="true"></span><span id="brand-name">Customer applications</span></a><button id="refresh" type="button">Refresh</button></header>
+  <main id="main">
+    <section class="hero"><p class="eyebrow">Secure lending</p><h1>Your applications</h1><p>Start an authorised application, continue a server-held draft, or review its recorded status.</p></section>
+    <p id="network-warning" class="warning" role="alert" hidden>You are offline. Application changes require a secure connection.</p>
+    <p id="status" role="status" aria-live="polite">Loading your authorised journeys…</p>
+    <nav class="tabs" aria-label="Application sections"><a href="#available">New application</a><a href="#drafts">Drafts and status</a><a href="#guidance">Consent and evidence</a></nav>
+    <section id="available" class="panel" aria-labelledby="available-title"><h2 id="available-title">Available applications</h2><div id="catalogue" class="cards"></div></section>
+    <section id="drafts" class="panel" aria-labelledby="drafts-title"><h2 id="drafts-title">Drafts and submitted applications</h2><div id="draft-list" class="rows"></div></section>
+    <section id="guidance" class="panel guidance" aria-labelledby="guidance-title"><h2 id="guidance-title">Before you provide information</h2><div><h3>Consent</h3><p>Review each server-provided consent request before agreeing. Consent is specific, recorded and revocable where applicable.</p></div><div><h3>Evidence</h3><p>The application will identify the evidence authorised for your selected product and stage. Use only its secure evidence controls.</p></div><div><h3>Your data</h3><p>This page does not retain application data in browser storage. Drafts and status are read from the secure service.</p></div></section>
+    <noscript>This application requires JavaScript to load your authorised journeys securely.</noscript>
+  </main>
+</body>
+</html>

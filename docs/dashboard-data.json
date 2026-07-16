@@ -1,8 +1,8 @@
 {
   "schemaVersion": 2,
-  "generated": "2026-07-16T06:16:46.791Z",
-  "sourceDigest": "e1b2c35e4dff7e68",
-  "snapshotId": "d02fb841038b03b8",
+  "generated": "2026-07-16T12:18:36.475Z",
+  "sourceDigest": "1b3f5b02b3b70095",
+  "snapshotId": "82b2096cea92551c",
   "sources": {
     "catalogue": "docs/product/complete-system-capability-catalog.md",
     "trace": "docs/product/capability-trace.json",
@@ -11,71 +11,71 @@
     "tests": "reused build test log"
   },
   "git": {
-    "branch": "main",
-    "sha": "34cbbc69e4c5",
-    "count": 207,
+    "branch": "android-apps-review",
+    "sha": "daf513582aed",
+    "count": 208,
     "dirty": true,
-    "changeCount": 1,
+    "changeCount": 121,
     "commits": [
+      {
+        "hash": "daf5135",
+        "subject": "chore(docs): update dashboard data and HTML snapshot",
+        "when": "6 hours ago"
+      },
       {
         "hash": "34cbbc6",
         "subject": "feat(storage): REV-71 — storage scale, scoped sandbox routes, full Postgres state parity",
-        "when": "13 hours ago"
+        "when": "19 hours ago"
       },
       {
         "hash": "7c0c17a",
         "subject": "feat(docs): resolve all strategic product decisions citing ADR 0006 (REV-14, REV-33, REV-43, REV-80, REV-81, REV-82)",
-        "when": "13 hours ago"
+        "when": "19 hours ago"
       },
       {
         "hash": "e7d6066",
         "subject": "feat(mobile): align domains under aitailorworkshop.in and implement android apps functional features",
-        "when": "13 hours ago"
+        "when": "19 hours ago"
       },
       {
         "hash": "e25c364",
         "subject": "feat(demo): update dashboards, portals, and showcase persona documentation",
-        "when": "14 hours ago"
+        "when": "20 hours ago"
       },
       {
         "hash": "28f7385",
         "subject": "fix(demo): align platform admin bootstrap credential",
-        "when": "17 hours ago"
+        "when": "23 hours ago"
       },
       {
         "hash": "4a5f6d6",
         "subject": "fix(demo): simplify one-command AWS release",
-        "when": "18 hours ago"
+        "when": "24 hours ago"
       },
       {
         "hash": "3e03637",
         "subject": "feat(demo): govern and automate platform showcases",
-        "when": "21 hours ago"
+        "when": "27 hours ago"
       },
       {
         "hash": "935a8ed",
         "subject": "fix(web): remove academy from public site",
-        "when": "22 hours ago"
+        "when": "28 hours ago"
       },
       {
         "hash": "6b04df0",
         "subject": "fix(web): clean up homepage disclosure links",
-        "when": "22 hours ago"
+        "when": "28 hours ago"
       },
       {
         "hash": "ca1816b",
         "subject": "feat(web): rebuild public homepage experience",
-        "when": "22 hours ago"
+        "when": "28 hours ago"
       },
       {
         "hash": "0293d31",
         "subject": "feat(delivery): govern human and AI releases",
-        "when": "23 hours ago"
-      },
-      {
-        "hash": "d19963f",
-        "subject": "feat(all): merge and commit all changes, including untracked files",
-        "when": "23 hours ago"
+        "when": "29 hours ago"
       }
     ]
   },
@@ -25410,13 +25410,13 @@
     }
   ],
   "tests": {
-    "pass": 638,
+    "pass": 676,
     "fail": 0,
     "skipped": 10,
     "cancelled": 0,
     "todo": 0,
-    "total": 648,
-    "durationMs": 27649.776708,
+    "total": 686,
+    "durationMs": 27872.623083,
     "ran": true,
     "source": "provided-log",
     "error": ""
