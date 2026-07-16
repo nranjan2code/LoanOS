@@ -11,7 +11,7 @@ packages/core     domain kernel: compliance controls, KYC, KFS, loan policy,
                   audit hash chain, model governance (kill-switch source of truth)
 db/               Postgres schema (optional driver; RLS per tenant)
 rules/            THE DECISION ENGINE (Rust cargo workspace) — see below
-deploy/aws/       disposable synthetic-demo infrastructure and release tooling
+deploy/aws/       generation-2 synthetic-showcase infrastructure and immutable release tooling (server/browser only; never Android)
 docs/             product, architecture, compliance, decision records (ADRs)
 tests/            Node test suite (node:test): npm test
 ```
@@ -30,6 +30,7 @@ They meet at two deliberately isolated gateways: `apps/api/src/rules-engine.js` 
 | `docs/architecture/decision-engine-design.md` | Source of truth for the engine. Requirements carry stable IDs — INV-n (invariants = test obligations), DEC-n (design decisions), SEC-n (security controls), PH-n (phases). If code and doc disagree, the doc wins until amended. Cite IDs in commits. |
 | `docs/decisions/000*.md` | ADRs: compliance-first foundation, multi-tenant SaaS delivery, per-tenant pure-Rust engine. |
 | `docs/architecture/current-implementation.md` | What exists today and where each control lives. |
+| `docs/architecture/aws-showcase-deployment.md` | Canonical generation-2 AWS showcase contract: selective artifact boundary, immutable release/update lifecycle, domains, ownership, recovery, and production gaps. Read before changing `deploy/aws/`. |
 | `docs/architecture/help-centre-and-academy.md` | Canonical human guidance contract, verification metadata and future tenant/RE overlay boundary. |
 | `docs/architecture/tenant-role-staffing-and-feature-gating.md` | Canonical roles, feature staffing, IdP/SCIM, agents, revocation/pause and activity-attribution source. |
 | `docs/compliance/india-regulatory-register.md` | Regulatory control families (RBI Digital Lending Directions 2025 etc.). |
@@ -45,7 +46,9 @@ They meet at two deliberately isolated gateways: `apps/api/src/rules-engine.js` 
 - **Determinism and lineage.** Engine evaluation reads no clock, no RNG, no I/O; every decision is replayable byte-identically from its audit record (INV-1/8/12).
 - **AI is gated.** Model outputs enter decisions only as provenance-tagged facts (DEC-4); the kill switch (`packages/core/src/model-governance.js` is the state source; the engine enforces) degrades model-dependent decisions to manual review. Agent actions go through `guardrail.*` decisions (`allow/deny/require_human`).
 - **AI cannot approve releases.** A scoped platform agent may propose releases or rollback and submit attributed canary evidence only with installation/model/prompt/guardrail lineage. Release approval, production promotion and rollback approval require independent authenticated humans; see `docs/architecture/delivery-operations.md`.
+- **The AWS showcase release boundary is explicit.** `deploy/aws/demo-package-manifest.txt` is the allowlist; never archive the repository root, add `apps/android-*`, package local dependencies/build outputs, or bypass the committed-`HEAD` default. Releases use immutable S3 keys plus SHA-256 verification; bootstrap is first-boot only and ordinary updates go through SSM with an atomic release switch and health rollback. A database-schema difference must fail closed until a reviewed migration or replacement-stack path exists. Do not manually mutate CloudFormation-owned CloudFront, IAM, network, instance, or alias resources. Read `docs/architecture/aws-showcase-deployment.md` and `deploy/aws/README.md`.
 - **Docs are part of done.** Architecture change → update `docs/architecture/`; irreversible choice → new ADR; engine change → check the design doc's INV/DEC tables; user-visible workflow change → update the canonical Guide & Academy content and verification date.
+- **AWS demo changes have a documentation set.** A change to packaging, bootstrap, updates, CloudFormation, domains, smoke tests, credentials, recovery, or teardown must review the AWS showcase architecture, AWS runbook, demo handbook, current implementation map, and this file. Update the sales demo narrative/claim register when the visible capability changes.
 
 ## Commands
 
@@ -54,8 +57,11 @@ npm test                                   # Node suite (148+ tests)
 npm run dev:api                            # local API (file store)
 ./loanos.sh build|start|stop|clean         # orchestration
 npm run demo:audit                         # validate canonical synthetic showcase profile
+./deploy/aws/package-demo.sh --help        # inspect selective server/browser packaging options
+./deploy/aws/release-demo.sh deploy --email you@example.com  # create/update the generation-2 showcase
 ./deploy/aws/release-demo.sh status        # inspect AWS demo and bootstrap state
 ./deploy/aws/release-demo.sh smoke         # GET-based public demo acceptance checks
+./deploy/aws/release-demo.sh dns           # print the external-DNS plan for configured aliases
 cd rules && cargo test --workspace         # engine suite (73+ tests)
 cd rules && cargo clippy --workspace --all-targets -- -D warnings
 node rules/tools/gen-eligibility-corpus.mjs  # regen differential corpus after JS policy changes

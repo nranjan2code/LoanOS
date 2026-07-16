@@ -1,0 +1,32 @@
+# LoanOS AWS showcase runtime allow-list.
+#
+# One repository path per line. Blank lines and comments are ignored.
+# Keep this list deliberately explicit: the AWS demo is a server/browser
+# release, not a source-code backup. Android applications, tests, local
+# artefacts, documentation, and Git metadata must not enter the archive.
+
+package.json
+package-lock.json
+
+apps/administration
+apps/api
+apps/banker-application
+apps/customer
+apps/customer-application
+apps/dashboard
+apps/help
+apps/journey-workspace
+apps/partner
+apps/partner-application
+apps/platform-administration
+apps/shared
+apps/tenant
+apps/web
+
+packages/core
+db
+rules
+
+deploy/aws/bootstrap-demo.sh
+deploy/aws/update-demo.sh
+deploy/aws/demo-package-manifest.txt

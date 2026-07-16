@@ -46,6 +46,7 @@ This index is the navigation root for LoanOS architecture. The current implement
 
 ## Security, assurance and operations
 
+- [AWS synthetic showcase deployment](aws-showcase-deployment.md)
 - [Enterprise security and scale](enterprise-security-and-scale.md)
 - [Data governance](data-governance.md)
 - [Control assurance](control-assurance.md)

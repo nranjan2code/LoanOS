@@ -1,8 +1,8 @@
 {
   "schemaVersion": 2,
-  "generated": "2026-07-16T12:18:36.475Z",
+  "generated": "2026-07-16T13:43:34.072Z",
   "sourceDigest": "1b3f5b02b3b70095",
-  "snapshotId": "82b2096cea92551c",
+  "snapshotId": "a01a0617f3295ee5",
   "sources": {
     "catalogue": "docs/product/complete-system-capability-catalog.md",
     "trace": "docs/product/capability-trace.json",
@@ -11,71 +11,71 @@
     "tests": "reused build test log"
   },
   "git": {
-    "branch": "android-apps-review",
-    "sha": "daf513582aed",
-    "count": 208,
+    "branch": "main",
+    "sha": "d4354453523a",
+    "count": 213,
     "dirty": true,
-    "changeCount": 121,
+    "changeCount": 11,
     "commits": [
+      {
+        "hash": "d435445",
+        "subject": "chore: ignore local full-source backup tarballs",
+        "when": "67 minutes ago"
+      },
+      {
+        "hash": "2730683",
+        "subject": "Merge branch 'android-apps-review'",
+        "when": "68 minutes ago"
+      },
+      {
+        "hash": "f4a8b75",
+        "subject": "feat(applications): establish greenfield product web platform",
+        "when": "74 minutes ago"
+      },
+      {
+        "hash": "67494ec",
+        "subject": "feat(applications): establish greenfield product web platform",
+        "when": "75 minutes ago"
+      },
+      {
+        "hash": "dbe3031",
+        "subject": "feat(android): wire real backend integration for field-ops and DSA apps",
+        "when": "79 minutes ago"
+      },
       {
         "hash": "daf5135",
         "subject": "chore(docs): update dashboard data and HTML snapshot",
-        "when": "6 hours ago"
+        "when": "7 hours ago"
       },
       {
         "hash": "34cbbc6",
         "subject": "feat(storage): REV-71 — storage scale, scoped sandbox routes, full Postgres state parity",
-        "when": "19 hours ago"
+        "when": "20 hours ago"
       },
       {
         "hash": "7c0c17a",
         "subject": "feat(docs): resolve all strategic product decisions citing ADR 0006 (REV-14, REV-33, REV-43, REV-80, REV-81, REV-82)",
-        "when": "19 hours ago"
+        "when": "21 hours ago"
       },
       {
         "hash": "e7d6066",
         "subject": "feat(mobile): align domains under aitailorworkshop.in and implement android apps functional features",
-        "when": "19 hours ago"
+        "when": "21 hours ago"
       },
       {
         "hash": "e25c364",
         "subject": "feat(demo): update dashboards, portals, and showcase persona documentation",
-        "when": "20 hours ago"
+        "when": "21 hours ago"
       },
       {
         "hash": "28f7385",
         "subject": "fix(demo): align platform admin bootstrap credential",
-        "when": "23 hours ago"
+        "when": "25 hours ago"
       },
       {
         "hash": "4a5f6d6",
         "subject": "fix(demo): simplify one-command AWS release",
-        "when": "24 hours ago"
-      },
-      {
-        "hash": "3e03637",
-        "subject": "feat(demo): govern and automate platform showcases",
-        "when": "27 hours ago"
-      },
-      {
-        "hash": "935a8ed",
-        "subject": "fix(web): remove academy from public site",
-        "when": "28 hours ago"
-      },
-      {
-        "hash": "6b04df0",
-        "subject": "fix(web): clean up homepage disclosure links",
-        "when": "28 hours ago"
-      },
-      {
-        "hash": "ca1816b",
-        "subject": "feat(web): rebuild public homepage experience",
-        "when": "28 hours ago"
-      },
-      {
-        "hash": "0293d31",
-        "subject": "feat(delivery): govern human and AI releases",
-        "when": "29 hours ago"
+        "when": "26 hours ago"
       }
     ]
   },
@@ -25416,7 +25416,7 @@
     "cancelled": 0,
     "todo": 0,
     "total": 686,
-    "durationMs": 27872.623083,
+    "durationMs": 23155.285875,
     "ran": true,
     "source": "provided-log",
     "error": ""

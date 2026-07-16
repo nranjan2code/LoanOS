@@ -1,10 +1,33 @@
 # Release, Configuration, and Resilience Operations
 
-Status date: 2026-07-15
+Status date: 2026-07-16
 
 ## Purpose
 
 This control plane makes production changes and resilience evidence reviewable and fail-closed. It does not deploy software itself. A production deployment controller must call these gates and refuse promotion when the projected release is not `canary_passed` or when institutional policy has unresolved drift/resilience failures.
+
+## Synthetic showcase controller boundary
+
+`deploy/aws/` contains a separate generation-2 controller for the disposable
+synthetic showcase. It provides selective server/browser packaging, immutable
+checksummed S3 releases, first-boot CloudFormation provisioning, Systems
+Manager updates, atomic host release switching, health-gated restoration, and
+template-owned demo subdomains. It excludes Android applications and refuses
+automatic database-schema changes.
+
+That controller is production-like operational rehearsal, not the production
+delivery controller described in this document. It does not satisfy the
+human approval, scan/SBOM, canary, migration, India-residency, availability,
+backup, secret-custody, or independently isolated tenant-engine requirements.
+Its inputs must remain synthetic and its releases must not be recorded as
+production admission evidence.
+
+The detailed showcase contract is
+[AWS synthetic showcase deployment](aws-showcase-deployment.md); exact operator
+commands live in the [AWS runbook](../../deploy/aws/README.md), and presentation
+and recovery procedure lives in the
+[demo handbook](../operations/demo-handbook.md). Those documents cannot grant
+production approval or weaken the human authority model below.
 
 ## Release lifecycle
 

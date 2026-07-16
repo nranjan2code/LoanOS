@@ -11,6 +11,11 @@ each beat to a `Built` claim (IDs from `../strategy/claims-and-backlog-sync.md`)
   checks. Use the preconfigured `dev` showcase tenant for a dependable broad
   demonstration. Use a `workshop-*` tenant only when live tenant configuration
   is part of the agreed narrative.
+- Infrastructure operators must also follow the
+  [AWS showcase deployment architecture](../../architecture/aws-showcase-deployment.md)
+  and [AWS deployment runbook](../../../deploy/aws/README.md). Do not use
+  console-only infrastructure changes, a dirty/unattributable artifact, or a
+  release that has not passed the public smoke suite.
 - Confirm the persona-owned pain from discovery — open on it.
 - Load a sandbox tenant (synthetic borrowers only). Never demo on a real tenant.
 - Have the claims-sync matrix open; if asked "is this live?", answer honestly.

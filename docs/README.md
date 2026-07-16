@@ -12,6 +12,7 @@ This folder is the working documentation set for the LoanOS India build. It expl
 6. [Platform module integration and API map](architecture/platform-module-integration-api-map.md)
 7. [Build backlog](product/build-backlog.md)
 8. [Documentation governance and audit](documentation-governance.md)
+9. [AWS synthetic showcase deployment architecture](architecture/aws-showcase-deployment.md)
 
 Section indexes: [Architecture](architecture/README.md) · [Product](product/README.md) · [Compliance](compliance/README.md) · [Decision records](decisions/README.md) · [Operations](operations/README.md) · [GTM](gtm/README.md)
 
@@ -47,6 +48,7 @@ Section indexes: [Architecture](architecture/README.md) · [Product](product/REA
 | [Agentic AI digital workers on AWS](architecture/agentic-ai-digital-workers.md) | Investigated target architecture, worker catalogue, autonomy boundaries, AWS/Strands framework decision, India-residency controls, regulatory status map, governance lifecycle, and phased delivery plan for bounded digital workers. |
 | [AI-agent platform operations](architecture/ai-agent-platform-operations.md) | Executable marketplace/pricing/install/approval/execution/usage/reporting lifecycle, incident procedure, API sequence and remaining AWS/provider production-admission evidence. |
 | [Decision engine operations](../rules/README.md) | Developer/operator guide: crate map, build and test, local fleet (sign/up/health/kill-switch), replay canary, API integration modes. |
+| [AWS synthetic showcase deployment architecture](architecture/aws-showcase-deployment.md) | Canonical generation-2 deployment contract: selective artifact boundary, infrastructure ownership, immutable updates, custom-domain topology, failure recovery, and the production promotion boundary. |
 | [AWS synthetic demo deployment](../deploy/aws/README.md) | End-to-end disposable, credit-conscious CloudFormation demo: packaging, bootstrap, applications, updates, external-DNS custom domains, troubleshooting, and teardown; synthetic data only. |
 | [Synthetic demo operator handbook](operations/demo-handbook.md) | Canonical showcase/workshop field guide: automation boundary, 21 journeys, 14 personas, mocked integrations, release and DNS operation, smoke tests, troubleshooting, evidence, cost and teardown. |
 | [Agent guide](../AGENTS.md) | Orientation for AI coding agents and new engineers: architecture map, load-bearing documents, non-negotiable engineering rules, commands. (`CLAUDE.md` imports it.) |
@@ -89,3 +91,4 @@ A feature is not considered complete unless it updates the relevant docs:
 - Externally-visible capability that changes what Sales/Marketing may claim: update the claim's Status/Evidence in `docs/gtm/strategy/claims-and-backlog-sync.md` and re-run `node docs/gtm/automation/gtm-backlog-sync.mjs`.
 - User-visible workflow: update its Guide & Academy article, maturity/environment/control labels and `last verified` date; if no article is needed, record that decision in the implementation document.
 - AI-agent operating rule or repository map: update `AGENTS.md` and any load-bearing document it points to.
+- AWS showcase packaging, infrastructure, release, domain, recovery or teardown: update `architecture/aws-showcase-deployment.md`, `../deploy/aws/README.md`, `operations/demo-handbook.md`, `architecture/current-implementation.md`, and `AGENTS.md`; update the sales narrative/claim register if externally visible behavior changes.

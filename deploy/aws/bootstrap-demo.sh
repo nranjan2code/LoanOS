@@ -8,10 +8,15 @@ set -Eeuo pipefail
 : "${LOANOS_STACK_NAME:?LOANOS_STACK_NAME is required}"
 : "${LOANOS_AWS_REGION:?LOANOS_AWS_REGION is required}"
 : "${LOANOS_ORIGIN_TOKEN:?LOANOS_ORIGIN_TOKEN is required}"
+: "${LOANOS_RELEASE_ID:?LOANOS_RELEASE_ID is required}"
+: "${LOANOS_SOURCE_KEY:?LOANOS_SOURCE_KEY is required}"
+: "${LOANOS_SOURCE_SHA256:?LOANOS_SOURCE_SHA256 is required}"
 
 STATUS_PARAMETER="/loanos-demo/${LOANOS_STACK_NAME}/status"
 CREDENTIALS_PARAMETER="/loanos-demo/${LOANOS_STACK_NAME}/credentials"
-APP_DIR=${LOANOS_APP_DIR:-/opt/loanos/app}
+RELEASE_STATUS_PARAMETER="/loanos-demo/${LOANOS_STACK_NAME}/release-status"
+RELEASE_PARAMETER="/loanos-demo/${LOANOS_STACK_NAME}/release"
+APP_DIR=${LOANOS_APP_DIR:-/opt/loanos/current}
 STATE_DIR=/var/lib/loanos
 RULES_PORT=47311
 
@@ -278,5 +283,25 @@ aws ssm put-parameter \
   --type SecureString \
   --overwrite \
   --value "$CREDENTIALS_JSON" >/dev/null
+
+RELEASE_JSON=$(jq -n \
+  --arg releaseId "$LOANOS_RELEASE_ID" \
+  --arg sourceKey "$LOANOS_SOURCE_KEY" \
+  --arg sha256 "$LOANOS_SOURCE_SHA256" \
+  --arg installedAt "$(date --iso-8601=seconds)" \
+  '{releaseId:$releaseId,sourceKey:$sourceKey,sha256:$sha256,installedAt:$installedAt,previousRelease:null}')
+aws ssm put-parameter \
+  --region "$LOANOS_AWS_REGION" \
+  --name "$RELEASE_PARAMETER" \
+  --description "Currently installed LoanOS synthetic showcase release" \
+  --type String \
+  --overwrite \
+  --value "$RELEASE_JSON" >/dev/null
+aws ssm put-parameter \
+  --region "$LOANOS_AWS_REGION" \
+  --name "$RELEASE_STATUS_PARAMETER" \
+  --type String \
+  --overwrite \
+  --value "COMPLETE ${LOANOS_RELEASE_ID}" >/dev/null
 put_status COMPLETE
 trap - ERR

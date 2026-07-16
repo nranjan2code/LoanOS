@@ -5,6 +5,13 @@ platform demonstration. It covers the two supported demo modes, all 21 product
 journeys, operator personas, mocked provider boundaries, AWS release handling,
 custom domains, recovery, evidence, cost control, and teardown.
 
+Read it with the
+[AWS showcase deployment architecture](../architecture/aws-showcase-deployment.md)
+for the technical contract and the
+[AWS deployment runbook](../../deploy/aws/README.md) for exact commands. The
+[sales demo narrative](../gtm/sales/demo-script.md) governs the presentation
+sequence and approved claim language.
+
 The demo proves platform behavior with **synthetic data only**. It is not a
 production deployment, a regulatory certification, or evidence that a live
 provider is connected. Never enter real borrower data, PAN or Aadhaar values,
@@ -39,9 +46,10 @@ architecture documents.
 | Seed/repair the showcase records during API bootstrap | Automated | API bootstrap applies `showcase-v1` without removing unrelated operational records |
 | Generate a workshop manifest | Automated | `node scripts/demo-system.mjs workshop --session <id>` |
 | Create a synthetic workshop tenant shell | Automated with explicit confirmation | `npm run demo:create-workshop -- ... --confirm-synthetic-only` |
-| Package committed source, upload it, deploy CloudFormation, wait, and smoke-test | Automated | `./deploy/aws/release-demo.sh deploy` |
-| Read deployment/bootstrap status and run public smoke tests | Automated | `release-demo.sh status` and `release-demo.sh smoke` |
-| Bind a custom hostname and existing ACM certificate | Template-owned | `AlternateDomainName` and `AcmCertificateArn` parameters |
+| Build the selective server/browser release, upload it, create/update the environment, wait, and smoke-test | Automated | `./deploy/aws/release-demo.sh deploy`; Android apps are excluded by the package manifest |
+| Read infrastructure/bootstrap/release status and run public smoke tests | Automated | `release-demo.sh status` and `release-demo.sh smoke` |
+| Install a committed code release without recreating the database or credentials | Automated with fail-closed health gates | Re-run `release-demo.sh deploy` against a generation-2 stack |
+| Bind the six canonical subdomains and existing ACM certificate | Template-owned | `release-demo.sh domains --domain-root ... --certificate-arn ...` |
 | AWS sign-in, MFA, account/region choice, billing review | Human guarded | Operator verifies identity, account, credits, and budget |
 | ACM DNS validation and external DNS cutover | Human guarded | DNS-provider change; independently verify record and target |
 | Retrieve generated demo credentials | Human guarded | SSM `SecureString`; never print, paste, or screenshot |
@@ -62,13 +70,18 @@ npm test
 (cd rules && cargo test --workspace)
 (cd rules && cargo clippy --workspace --all-targets -- -D warnings)
 npm run demo:audit
-bash -n deploy/aws/bootstrap-demo.sh deploy/aws/package-demo.sh deploy/aws/release-demo.sh
-cfn-lint deploy/aws/cloudformation-demo.yaml
+bash -n deploy/aws/bootstrap-demo.sh deploy/aws/update-demo.sh \
+  deploy/aws/package-demo.sh deploy/aws/release-demo.sh
+aws cloudformation validate-template --region ap-south-1 \
+  --template-body file://deploy/aws/cloudformation-demo.yaml
 ```
 
-The release archive contains committed `HEAD` only. Commit the exact revision
-to be shown and record its SHA. Do not package a dirty tree and describe it as
-the deployed revision.
+The generation-2 release contains only the paths allowlisted in
+`deploy/aws/demo-package-manifest.txt`; Android applications, repository
+history, local dependencies and build outputs are forbidden. Normal releases
+contain committed `HEAD` only. Commit the exact revision to be shown and
+record its SHA. `--include-worktree` is for disposable development checks and
+must not be described as an approved release.
 
 The audit must report:
 
@@ -79,46 +92,58 @@ The audit must report:
 
 ## 4. AWS release procedure
 
-### 4.1 Preferred: replacement stack
+### 4.1 Create the generation-2 showcase
 
-A replacement stack provides a clean rollback and avoids mixing newly
-generated encryption material with an older database. Set a new stack name,
-deploy, test, then move DNS only after acceptance.
+Use a stable stack name. The first invocation creates the private versioned
+release bucket, selective artifact, CloudFormation environment and immutable
+release layout, then waits for first-boot bootstrap and public smoke checks.
 
 ```bash
-./deploy/aws/release-demo.sh deploy --email demo-ops@example.com
-./deploy/aws/release-demo.sh status
-./deploy/aws/release-demo.sh smoke
+./deploy/aws/release-demo.sh deploy \
+  --stack loanos-showcase \
+  --email demo-ops@example.com
+./deploy/aws/release-demo.sh status --stack loanos-showcase
+./deploy/aws/release-demo.sh smoke --stack loanos-showcase
 ```
 
-The wrapper generates the private source-bucket name and creates it with
-public access blocked. Optional `--region`, `--stack`, and `--bucket` flags can
-override defaults. For a custom domain, also provide the validated ACM
-certificate values as environment variables before running `deploy`.
+The wrapper generates the account/region-specific source-bucket name and
+creates it with public access blocked, AES-256 encryption and versioning.
+Optional `--region`, `--stack`, and `--bucket` flags override defaults.
 
-The certificate must be in `us-east-1`, even when the stack is in Mumbai. The
-script packages committed source, uploads it under
-`releases/<commit>/loanos-demo-source.tar.gz`, deploys the stack, waits up to 30
-minutes for bootstrap `COMPLETE`, and tests the website and `/health`.
+The script packages committed source under
+`releases/<commit>/loanos-server-web.tar.gz`, verifies its SHA-256 on the host,
+waits up to 40 minutes for bootstrap `COMPLETE`, and tests health and every
+browser entry point. Accept the CloudFront hostname before public DNS cutover.
 
-Keep the old stack and DNS target until the replacement passes the acceptance
-checklist. Then change the `demo` CNAME to the new CloudFront hostname. Delete
-the old stack only after DNS and application verification.
+### 4.2 Ordinary same-environment code release
 
-### 4.2 Same-stack update
+Re-run the same command against `loanos-showcase`. The wrapper detects
+generation 2, reuses its bucket, and installs the immutable release through
+Systems Manager. It does not update EC2 user data, rerun bootstrap, recreate
+PostgreSQL, or rotate credentials/encryption keys.
 
-Using the same `STACK_NAME` is suitable only for a disposable demo. A user-data
-or infrastructure change may replace the EC2 instance and regenerate demo
-credentials. Never treat bootstrap as an in-place database migration and never
-rerun `bootstrap-demo.sh` manually against an existing database.
+The installer builds in a staging release directory, atomically changes
+`/opt/loanos/current`, restarts rules first, refreshes the kill switch, restarts
+the API and checks both health endpoints. A failed post-switch gate restores
+the previous release. A `db/schema.sql` difference fails with
+`REQUIRES_FRESH_STACK`; it is never applied as an unreviewed migration.
 
-### 4.3 Deployment outputs
+### 4.3 Replacement stack for infrastructure/schema change
+
+Create a second stack name, accept it on the CloudFront hostname, then cut DNS
+over. Keep the old target until acceptance. An alternate domain can belong to
+only one CloudFront distribution, so remove it from the old distribution and
+wait for deployment before attaching it to the replacement. Never rerun
+`bootstrap-demo.sh` as an upgrade.
+
+### 4.4 Deployment outputs
 
 Record the non-secret values from CloudFormation:
 
-- `DemoUrl` and, when configured, `CustomDemoUrl`;
+- `DemoUrl` and, when configured, all six custom entry-point URLs;
 - `InstanceId`;
 - `BootstrapStatusParameter`;
+- `ReleaseStatusParameter` and `ReleaseParameter`;
 - `CredentialsParameter`; and
 - `BootstrapLogCommand`.
 
@@ -135,8 +160,15 @@ recording.
 | Tenant landing | `/t/dev/` |
 | Staff workspace | `/t/dev/staff/` |
 | Borrower portal | `/t/dev/portal/` |
+| Partner workspace | `/t/dev/partners/` |
+| Platform administration | `/t/dev/staff/?scope=platform` |
 | Guide and Academy | `/help/` |
 | API health | `/health` |
+
+With a configured domain root, the canonical entry points are `demo`, `staff`,
+`portal`, `partners`, `admin`, and `help` under that root. Root requests on the
+five specialised hosts redirect to the corresponding path above; the public
+showcase remains on `demo`.
 
 Run a GET-based check; `curl -I` exercises `HEAD` and can produce a different
 authentication result from the browser route.
@@ -212,15 +244,6 @@ showcase. The platform administrator uses the separate
 | Grievance officer | `grievance-officer-1@dev.local` | Handle borrower grievance workflow and evidence |
 | Grievance lead | `grievance-lead-1@dev.local` | Oversee grievance operations and queues |
 | KYC officer | `kyc-officer-1@dev.local` | Complete KYC evidence and exception handling |
-| Loan officer | Origination work queue and customer evidence |
-| Disbursement maker | Conditions precedent and controlled disbursement preparation |
-| Compliance analyst | Regulatory controls, audit lineage, and evidence export |
-| Collections manager | Contact policy, treatment strategy, and allocation |
-| Collections lead | Escalation, approvals, and portfolio posture |
-| Portfolio risk manager | Limits, concentration, stress, and model monitoring |
-| Grievance officer | Complaint handling and time-bound resolution |
-| Grievance lead | Escalation and independent closure oversight |
-| KYC officer | Consent, identity evidence, screening, and deficiency handling |
 
 These are scenario identities, not a claim that a customer should copy the
 same staffing model. The five product-admin roles (`journey_admin`,
@@ -349,12 +372,22 @@ to its support matrix and current evidence.
 
 ## 10. Custom domain and DNS
 
-Prefer `demo.example.com`. Create/validate an ACM certificate in `us-east-1`,
-then pass its ARN and the hostname into the stack. At GoDaddy retain two
-different CNAMEs:
+Use the six canonical one-level subdomains of one DNS root. Create/validate a
+wildcard ACM certificate in `us-east-1`, then attach the root and ARN using:
+
+```bash
+./deploy/aws/release-demo.sh domains \
+  --stack loanos-showcase \
+  --domain-root example.com \
+  --certificate-arn 'arn:aws:acm:us-east-1:ACCOUNT:certificate/ID'
+./deploy/aws/release-demo.sh dns --stack loanos-showcase
+```
+
+At GoDaddy retain two classes of records:
 
 1. ACM validation: `_token` to `_value.acm-validations.aws` (keep for renewal).
-2. Traffic: `demo` to the current `d...cloudfront.net` hostname.
+2. Traffic: six CNAMEs named `demo`, `staff`, `portal`, `partners`, `admin`,
+   and `help`, all targeting the current `d...cloudfront.net` hostname.
 
 Never use `https://` or a path in either DNS target. A wildcard certificate
 such as `*.example.com` covers `demo.example.com`, not the apex. Verify with:
@@ -365,8 +398,11 @@ curl -fsS -o /dev/null -w '%{http_code}\n' https://demo.example.com/
 curl -fsS https://demo.example.com/health
 ```
 
-The alias and certificate are now CloudFormation-owned parameters; do not add
-or change them only in the CloudFront console because that creates drift.
+The aliases, certificate and host-router function are CloudFormation-owned; do
+not add or change them only in the CloudFront console because that creates
+drift. A hostname can belong to only one distribution. During blue/green
+cutover, detach it from the old distribution before attaching it to the new
+one.
 
 ## 11. Troubleshooting decision tree
 
@@ -399,24 +435,28 @@ startup; rotate any exposed credential.
 
 ### Rollback
 
-For blue/green, point DNS back to the last accepted CloudFront distribution.
-Do not copy databases or key files between independently bootstrapped stacks.
-For a code rollback, check out the known commit, validate it, and release it as
-a new replacement stack so the deployed commit and archive digest remain
-attributable.
+For a failed generation-2 in-place release, `update-demo.sh` automatically
+restores the previously active symlink and services before reporting failure.
+Verify the old public health immediately. For infrastructure/schema blue/green,
+keep the previous stack and CloudFront hostname until acceptance; restore its
+aliases and DNS if cutover must be reversed. Do not copy databases or key files
+between independently bootstrapped stacks.
 
 ### Teardown
 
-1. Move/delete the traffic CNAME if it points to the stack being removed.
+1. Move/delete all six traffic CNAMEs if they point to the stack being removed.
 2. Delete the CloudFormation stack and wait for `DELETE_COMPLETE`.
-3. Delete its two instance-created SSM parameters:
-   `/loanos-demo/<stack>/credentials` and `/loanos-demo/<stack>/status`.
+3. Delete its four instance-created SSM parameters: `credentials`, `status`,
+   `release`, and `release-status` under `/loanos-demo/<stack>/`.
 4. Delete the release object from the private S3 bucket when no rollback needs
    it.
 5. Delete workshop credential files and any exported synthetic evidence that
    is no longer required.
 6. Check EC2 Global View, EBS, public IPv4, CloudFront, S3, SSM, and Billing for
    leftovers.
+
+Do not manually delete a CloudFormation-owned distribution before its stack;
+that creates drift and commonly causes `DELETE_FAILED` cleanup.
 
 The stack avoids NAT Gateway, load balancer, RDS, Elastic IP, and Route 53, but
 EC2, EBS, public IPv4, S3, CloudFront, and data transfer may still consume

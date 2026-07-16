@@ -286,6 +286,9 @@ Useful data-plane endpoints (tenant session or service key required):
 ## Design Docs
 
 - [Documentation index](/Users/nisheethranjan/Projects/AIBank/docs/README.md)
+- [AWS synthetic showcase deployment architecture](/Users/nisheethranjan/Projects/AIBank/docs/architecture/aws-showcase-deployment.md)
+- [AWS synthetic showcase runbook](/Users/nisheethranjan/Projects/AIBank/deploy/aws/README.md)
+- [Synthetic demo operator handbook](/Users/nisheethranjan/Projects/AIBank/docs/operations/demo-handbook.md)
 - [What we are building](/Users/nisheethranjan/Projects/AIBank/docs/product/what-we-are-building.md)
 - [Build backlog](/Users/nisheethranjan/Projects/AIBank/docs/product/build-backlog.md)
 - [India regulatory register](/Users/nisheethranjan/Projects/AIBank/docs/compliance/india-regulatory-register.md)
