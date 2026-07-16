@@ -21,3 +21,16 @@ test("workspace prohibits browser persistence and business-data caching", async 
   assert.match(js, /cache:"no-store"/);
   assert.doesNotMatch(js, /localStorage|sessionStorage|indexedDB|serviceWorker/);
 });
+
+test("workspace derives brand identity, resumes server drafts and never invents authorised actions", async () => {
+  const [html, js] = await Promise.all([readFile(new URL("index.html", root), "utf8"), readFile(new URL("workspace.js", root), "utf8")]);
+  assert.doesNotMatch(html, /LoanOS/);
+  assert.match(js, /\/brand-experience/);
+  assert.match(js, /applyTheme/);
+  assert.match(js, /\/drafts/);
+  assert.match(js, /draft\?\.draftId/);
+  assert.match(js, /actions\.filter/);
+  assert.doesNotMatch(html, /id="save-draft"|Submit application<\/button>/);
+  assert.match(html, /Case and lifecycle/);
+  assert.match(js, /Check connection/);
+});

@@ -96,7 +96,7 @@ test("canonical SaaS identity API binds verified users and enforces session-boun
 
   let persisted = await loadState(dataDir);
   let tenantState = persisted.tenants[TENANT.tenantId];
-  const H = "a".repeat(64), template = PRODUCT_TEMPLATE_CATALOGUE.personal_loan, schema = JOURNEY_WORKSPACE_SCHEMAS.term_lending;
+  const H = "a".repeat(64), template = PRODUCT_TEMPLATE_CATALOGUE.personal_loan, schema = JOURNEY_WORKSPACE_SCHEMAS.personal_loan;
   tenantState.tenantProductSubscriptions = { "subscription-rbac": { subscriptionId: "subscription-rbac", tenantId: TENANT.tenantId, productTypes: ["personal_loan"], effectiveFrom: "2026-01-01T00:00:00.000Z", validUntil: "2030-01-01T00:00:00.000Z", status: "active" } };
   const lifecycle = createComposedJourneyInstance(tenantState, {
     tenantId: TENANT.tenantId, lifecycleId: "lifecycle-rbac-1", journeyType: "personal_loan", subjectRef: "subject/synthetic-1", applicationRef: "application/synthetic-1", requestedAmountPaise: "10000", assignedPrincipalIds: ["credit-maker", "credit-checker"], idempotencyKey: "composed/rbac/1", createdBy: "credit-maker",

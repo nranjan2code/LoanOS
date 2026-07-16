@@ -18,6 +18,9 @@ import { routeProductJourneyConformance } from "./routes/product-journey-conform
 import { routeSpecialistJourneys } from "./routes/specialist-journeys.js";
 import { routeJourneyWorkspaces } from "./routes/journey-workspaces.js";
 import { routeComposedJourneys } from "./routes/composed-journeys.js";
+import { routeProductPlatformAdministration } from "./routes/product-platform-administration.js";
+import { routeBrandGovernance } from "./routes/brand-governance.js";
+import { routeJourneyApplications } from "./routes/journey-applications.js";
 import { routeConformanceAdministration } from "./routes/conformance-administration.js";
 import { routeAiAgentPlatform } from "./routes/ai-agent-platform.js";
 import { enforceUniversalMutationStaffing } from "./mutation-staffing-policy.js";
@@ -32,6 +35,8 @@ import { claimDueProviderCallbacks, enqueueProviderCallback, projectProviderCall
 import { buildSignedFileManifest, createSignedFileCorrection, recordSignedFileAcknowledgement, registerSignedFileSchemaProfile } from "../../../packages/core/src/signed-file-conformance.js";
 import { createTransportRecord, createTransportResubmission, markTransportDispatched, recordTransportPoll } from "../../../packages/core/src/signed-file-transport.js";
 import { createBusinessAdapterRequest, projectBusinessAdapterReconciliation, recordBusinessAdapterEvent, registerBusinessAdapter } from "../../../packages/core/src/business-adapter-conformance.js";
+import { PRODUCT_JOURNEY_CONTRACTS } from "../../../packages/core/src/product-journey-contracts.js";
+import { createProductPlatformAdministrationState, proposePlatformTemplateVersion, publishPlatformTemplateVersion } from "../../../packages/core/src/product-platform-administration.js";
 import {
   acceptSignupLegalDocuments,
   activateFirstOwner,
@@ -783,6 +788,15 @@ async function route(req, res, dataDir, platformAdminKey, observability, allowDi
   if (method === "GET" && path.startsWith("/journey-workspace/")) {
     return serveStaticFile(res, appsRoot, "journey-workspace", path, "/journey-workspace/");
   }
+  if (method === "GET" && path.startsWith("/administration/")) {
+    return serveStaticFile(res, appsRoot, "administration", path, "/administration/");
+  }
+  if (method === "GET" && path.startsWith("/platform-administration/")) {
+    return serveStaticFile(res, appsRoot, "platform-administration", path, "/platform-administration/");
+  }
+  for (const application of ["customer-application", "partner-application", "banker-application"]) {
+    if (method === "GET" && path.startsWith(`/${application}/`)) return serveStaticFile(res, appsRoot, application, path, `/${application}/`);
+  }
 
   // --- Canonical LoanOS Guide & Academy. Tenant/RE overlays will be added
   // only through an explicitly authorised, tenant-isolated content boundary. ---
@@ -893,6 +907,12 @@ async function route(req, res, dataDir, platformAdminKey, observability, allowDi
     }
 
     // GET /t/{tenantId}/staff/ → Staff workspace (dashboard)
+    if (subPath === "/staff/application" || subPath === "/staff/application/") {
+      return serveStaticFile(res, appsRoot, "banker-application", "/index.html", "/");
+    }
+    if (subPath === "/staff/administration" || subPath === "/staff/administration/") {
+      return serveStaticFile(res, appsRoot, "administration", "/index.html", "/");
+    }
     if (subPath === "/staff/journeys" || subPath === "/staff/journeys/") {
       return serveStaticFile(res, appsRoot, "journey-workspace", "/index.html", "/");
     }
@@ -905,6 +925,9 @@ async function route(req, res, dataDir, platformAdminKey, observability, allowDi
     }
 
     // GET /t/{tenantId}/portal/ → Customer/borrower portal
+    if (subPath === "/portal/application" || subPath === "/portal/application/") {
+      return serveStaticFile(res, appsRoot, "customer-application", "/index.html", "/");
+    }
     if (subPath === "/portal/journeys" || subPath === "/portal/journeys/") {
       return serveStaticFile(res, appsRoot, "journey-workspace", "/index.html", "/");
     }
@@ -917,6 +940,9 @@ async function route(req, res, dataDir, platformAdminKey, observability, allowDi
     }
 
     // GET /t/{tenantId}/partners/ → Branch and authorised-channel workspace
+    if (subPath === "/partners/application" || subPath === "/partners/application/") {
+      return serveStaticFile(res, appsRoot, "partner-application", "/index.html", "/");
+    }
     if (subPath === "/partners/journeys" || subPath === "/partners/journeys/") {
       return serveStaticFile(res, appsRoot, "journey-workspace", "/index.html", "/");
     }
@@ -1303,6 +1329,9 @@ async function route(req, res, dataDir, platformAdminKey, observability, allowDi
   if (await routeSpecialistJourneys({ method, path, req, res, tenant, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
   if (await routeJourneyWorkspaces({ method, path, req, res, tenant, store, readJson, sendJson, appendEvent, authContext, authActor })) return;
   if (await routeComposedJourneys({ method, path, req, res, tenant, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
+  if (await routeProductPlatformAdministration({ method, path, req, res, tenant, store, stateRef, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
+  if (await routeBrandGovernance({ method, path, req, res, tenant, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
+  if (await routeJourneyApplications({ method, path, req, res, tenant, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
   if (await routeConformanceAdministration({ method, path, req, res, tenant, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
   if (await routeRiskAmlControls({ method, path, req, res, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
   if (await routeImplementationControls({ method, path, req, res, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
@@ -9374,6 +9403,52 @@ async function routePlatform(req, res, {
   if (await routePlatformOrganisationSignup(req, res, { dataDir, method, path, authContext })) return;
 
   if (await routeEnterprisePlatformControls({ method, path, req, res, dataDir, authContext, readJson, sendJson, hasPlatformRole, authActor, loadWholeState, saveWholeState, appendPlatformEvent })) return;
+
+  if (method === "GET" && (path === "/platform/product-administration" || path === "/platform/product-administration/")) {
+    if (!hasPlatformRole(authContext, ["platform_admin", "tenant_provisioner", "auditor"])) { sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform product-catalogue role." } }); return; }
+    return serveStaticFile(res, join(__dirname, "..", ".."), "platform-administration", "/index.html", "/");
+  }
+
+  if (method === "GET" && path === "/platform/product-templates") {
+    if (!hasPlatformRole(authContext, ["platform_admin", "tenant_provisioner", "auditor"])) { sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform product-catalogue role." } }); return; }
+    const state = await loadWholeState(dataDir);
+    const administration = state.controlPlane.productPlatformAdministration ?? createProductPlatformAdministrationState();
+    sendJson(res, 200, { contracts: Object.values(PRODUCT_JOURNEY_CONTRACTS), templates: Object.values(administration.templates), canonicalJourneyCount: Object.keys(PRODUCT_JOURNEY_CONTRACTS).length });
+    return;
+  }
+
+  if (method === "POST" && path === "/platform/product-templates/proposals") {
+    if (!hasPlatformRole(authContext, ["platform_admin", "tenant_provisioner"])) { sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform product-catalogue role." } }); return; }
+    const body = await readJson(req); const actor = authActor(authContext);
+    try {
+      const contract = PRODUCT_JOURNEY_CONTRACTS[body.productType];
+      if (!contract) throw Object.assign(new Error("A canonical product contract is required."), { code: "product_contract_not_found" });
+      const state = await loadWholeState(dataDir);
+      const administration = state.controlPlane.productPlatformAdministration ?? createProductPlatformAdministrationState();
+      const result = proposePlatformTemplateVersion(administration, { commandId: body.commandId, productType: contract.journeyType, templateId: contract.contractId, version: body.version, specification: contract, proposedBy: actor });
+      let next = { ...state, controlPlane: { ...state.controlPlane, productPlatformAdministration: result.state } };
+      next = appendPlatformEvent(next, { type: "platform.product_template.proposed", template: result.template }, { actor });
+      await saveWholeState(next, dataDir);
+      sendJson(res, result.idempotentReplay ? 200 : 201, { template: result.template, idempotent: result.idempotentReplay });
+    } catch (error) { sendJson(res, error.code?.includes("conflict") || error.code?.includes("exists") ? 409 : 422, { error: { code: error.code ?? "platform_product_template_invalid", message: error.message } }); }
+    return;
+  }
+
+  const productTemplatePublicationMatch = path.match(/^\/platform\/product-templates\/([^/]+)\/versions\/(\d+)\/publication$/);
+  if (method === "POST" && productTemplatePublicationMatch) {
+    if (!hasPlatformRole(authContext, ["platform_admin"])) { sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Platform admin approval is required." } }); return; }
+    const body = await readJson(req); const actor = authActor(authContext);
+    try {
+      const state = await loadWholeState(dataDir);
+      const administration = state.controlPlane.productPlatformAdministration ?? createProductPlatformAdministrationState();
+      const result = publishPlatformTemplateVersion(administration, { commandId: body.commandId, productType: decodeURIComponent(productTemplatePublicationMatch[1]), version: Number(productTemplatePublicationMatch[2]), approvedBy: actor, approvalRef: body.approvalRef });
+      let next = { ...state, controlPlane: { ...state.controlPlane, productPlatformAdministration: result.state } };
+      next = appendPlatformEvent(next, { type: "platform.product_template.published", template: result.template }, { actor });
+      await saveWholeState(next, dataDir);
+      sendJson(res, result.idempotentReplay ? 200 : 201, { template: result.template, idempotent: result.idempotentReplay });
+    } catch (error) { sendJson(res, error.code?.includes("four_eyes") ? 403 : error.code?.includes("conflict") ? 409 : 422, { error: { code: error.code ?? "platform_product_template_invalid", message: error.message } }); }
+    return;
+  }
 
   if (method === "GET" && path === "/platform/control-assurance") {
     if (!hasPlatformRole(authContext, ["platform_admin", "security_admin", "auditor"])) { sendJson(res, 403, { error: { code: "platform_role_forbidden", message: "Insufficient platform role." } }); return; }

@@ -2,7 +2,7 @@
 
 ## Decision and status
 
-LoanOS renders the 21 canonical lending journeys through **11 governed workspace schemas**, not 21 copied applications. The decision engine retains 12 risk archetypes; `business_term` and `unsecured_term` share the `term_lending` presentation schema while keeping separate templates, policies, workflows and specialist controls.
+LoanOS now renders the 21 canonical lending journeys through **21 governed product schemas generated from one reusable schema system**. The earlier 11 shared schemas were removed because they concealed mandatory product facts. Archetypes remain layout and component-reuse metadata only; they are not product definitions.
 
 This document is the architecture, design and operations record for JD-03. The implemented slice covers schema definition, tenant entitlement, channel/role projection, multilingual accessible rendering, server-persistent drafts, exact schema lineage, privacy-safe audit, and the common UI shell. It does **not** claim composed application-to-closure completion or production readiness. JD-04, JD-05 and JD-06 remain.
 
@@ -22,7 +22,7 @@ This document is the architecture, design and operations record for JD-03. The i
 | `merchant_pos` | consumer durable finance | merchant, SKU, invoice, down payment, delivery confirmation |
 | `priority_term` | education loan | institution, course, admission, fee schedule, cost and moratorium |
 
-The machine-enforced mapping is `PRODUCT_TO_WORKSPACE_ARCHETYPE`. Catalogue validation requires exactly 21 product mappings and 11 schemas. Adding a product without a schema, or duplicating a field identifier within a schema, fails validation.
+The machine-enforced product authority is `PRODUCT_JOURNEY_CONTRACTS`; `PRODUCT_TO_WORKSPACE_ARCHETYPE` selects reusable layout components. Catalogue validation requires exactly 21 contract-bound product schemas. Adding a product without a schema, omitting a contract fact/evidence item, copying untranslated labels, or duplicating a field identifier fails validation.
 
 ## Channel model
 
@@ -127,7 +127,7 @@ Operators investigate with authenticated activity evidence and the tenant audit 
 
 ## Test and acceptance evidence
 
-- `tests/journey-workspace.test.js`: 21-to-11 coverage, checksums, entitlement, channel/role denial, redaction, ownership, idempotency, required fields and exact money.
+- `tests/journey-workspace.test.js`: 21 product-schema coverage, contract checksums, typed bilingual facts/evidence, same-archetype distinction, entitlement, channel/role denial, redaction, ownership, idempotency, required fields and exact money.
 - `tests/journey-workspace-api.test.js`: authenticated API, role/channel boundary, service-key denial, persistence, static mount and audit-value exclusion.
 - `tests/journey-workspace-ui.test.js`: accessibility hooks, multilingual rendering, safe DOM construction and browser/offline privacy constraints.
 

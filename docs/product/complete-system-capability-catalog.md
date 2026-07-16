@@ -742,7 +742,7 @@ The detailed register contains **463 individually identified capabilities**. At 
 
 The complete-system catalogue must be filtered into a product pack before a product is advertised or committed. Each pack inherits all applicable `Core` capabilities and adds its specific requirements.
 
-JD-02 provides a governed tenant-persistent backend service for the 13 specialised and four trade packs. JD-03 maps all 21 products into 11 governed schema/workspace archetypes across seven channels. JD-04 now composes their exact evidence into a tenant-persistent common lifecycle from capture through closure, with version binding, maker-checker transitions, fail-closed pause, escalation and compensation. This is a controlled platform boundary: each pack still retains its capability-level `Partial`/`Missing`/`External` status, while JD-01 administration completeness, JD-05 generated full-stack execution and JD-06 live-provider/deployment evidence remain.
+JD-02 provides a governed tenant-persistent backend service for the 13 specialised and four trade packs. The greenfield JD-03 replacement binds all 21 product contracts to distinct product schemas across seven channels while retaining archetype component reuse. JD-04 composes their exact evidence into a tenant-persistent common lifecycle from capture through closure, with version binding, maker-checker transitions, fail-closed pause, escalation and compensation. This is a controlled platform boundary: each pack still retains its capability-level `Partial`/`Missing`/`External` status, while generated full-stack execution and live-provider/deployment evidence remain.
 
 ### Unsecured personal term loan
 

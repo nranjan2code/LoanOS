@@ -43,13 +43,13 @@ test("journey workspace API binds tenant, actor and role while persisting redact
   response = await fetch(`${base}/journey-workspaces/credit/schemas/home_loan`, { headers: { cookie } });
   await expectStatus(response, 200);
   const schema = (await response.json()).schema;
-  assert.equal(schema.schemaId, "journey-workspace/property_secured");
+  assert.equal(schema.schemaId, "journey-workspace/home_loan");
   assert.match(schema.schemaChecksumSha256, /^[a-f0-9]{64}$/);
 
-  response = await fetch(`${base}/journey-workspaces/credit/drafts/home_loan`, { method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify({ draftId: "draft-api-1", idempotencyKey: "idem-api-1", values: { requested_amount_paise: "5000000" } }) });
+  response = await fetch(`${base}/journey-workspaces/credit/drafts/home_loan`, { method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify({ draftId: "draft-api-1", idempotencyKey: "idem-api-1", values: { agreement_value_paise: "5000000" } }) });
   await expectStatus(response, 201);
   const draft = (await response.json()).draft;
-  assert.notEqual(draft.values.requested_amount_paise, "5000000");
+  assert.notEqual(draft.values.agreement_value_paise, "5000000");
 
   response = await fetch(`${base}/journey-workspaces/credit/drafts`, { headers: { cookie } });
   await expectStatus(response, 200);

@@ -83,7 +83,7 @@ export function createComposedJourneyInstance(state, input, now = new Date().toI
   const requestedAmountPaise = money(input.requestedAmountPaise, "requestedAmountPaise");
   const lineage = validateLineage(input.lineage, journeyType);
   const expectedArchetype = PRODUCT_TO_WORKSPACE_ARCHETYPE[journeyType];
-  const governedSchema = JOURNEY_WORKSPACE_SCHEMAS[expectedArchetype];
+  const governedSchema = JOURNEY_WORKSPACE_SCHEMAS[journeyType];
   if (lineage.workspaceSchemaId !== governedSchema?.schemaId || String(lineage.workspaceSchemaVersion) !== String(governedSchema?.schemaVersion) || lineage.workspaceSchemaChecksumSha256 !== governedSchema?.schemaChecksumSha256) fail("composed_journey_schema_mismatch", `The workspace schema lineage must match the governed ${expectedArchetype} schema exactly.`);
   const governedTemplate = PRODUCT_TEMPLATE_CATALOGUE[journeyType];
   if (lineage.productTemplateRef !== governedTemplate?.templateId || String(lineage.productTemplateVersion) !== String(governedTemplate?.version) || lineage.productTemplateChecksumSha256 !== governedTemplate?.templateChecksumSha256) fail("composed_journey_template_mismatch", `The product-template lineage must match the governed ${journeyType} template exactly.`);
