@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Starting point for the 12-language coverage docs/architecture/
+  android-dsa-origination-app.md §5 requires. Covers navigation and
+  top-level screen chrome only. Key Fact Statements and consent text shown
+  to the borrower are resolved server-side per tenant/language via
+  resolveLocalizedTemplate() and must never be hardcoded here.
+-->
+<resources>
+    <string name="app_name">LoanOS DSA Origination</string>
+
+    <string name="login_title">LoanOS DSA Origination</string>
+    <string name="login_subtitle">Sign in with your corporate identity provider. MFA is enforced by the IdP.</string>
+    <string name="login_tenant_id">Tenant ID</string>
+    <string name="login_policy_id">Federation Policy ID</string>
+    <string name="login_sign_in">Sign in with Corporate IdP</string>
+
+    <string name="nav_lead_intake">Lead Intake</string>
+    <string name="nav_consent_qr">Consent QR</string>
+    <string name="nav_my_referrals">My Referrals</string>
+    <string name="action_sign_out">Sign out</string>
+</resources>

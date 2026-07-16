@@ -43,6 +43,9 @@ graph TD
 | **FST-013** | Cash/Field Collection Posting | `collections_maker` | `collections_checker` / `reconciliation_checker` | Geo-tagged entry, unique receipt ID, printer attestation, exact paise math. |
 | **FST-016** | Collateral/Security Inspection | `collateral_maker` | `collateral_checker` | Hardware-stamped asset images, geo-tagged valuation report. |
 
+### 2.1 App Launch Sequence
+Every launch progresses through four gates before any borrower data is reachable: **Login** (`POST /auth/login`, tenant/email/password/MFA — the resulting session is a cookie, not a bearer token, since the backend's `sessionTokenFromRequest` only reads the `Cookie` header) → **Biometric Gate** (`BiometricPrompt`, re-proves presence on every launch, independent of the server session) → **Device Certification Check** (§3.1 — blocks until a security_admin has certified this device) → **Dashboard** (Field KYC / Collections / Collateral / Sync Queue tabs).
+
 ---
 
 ## 3. Compliance and Security Architecture
@@ -53,7 +56,7 @@ The app runs on field-certified devices. By default, it operates under a strict 
 A device cannot connect to the backend or download field allocations unless it has been certified. The certification process verifies:
 * **Hardware-backed Attestation:** The app uses Google Play Integrity API to generate hardware attestation tokens verifying that the OS has not been compromised (no root, bootloader locked, valid signature).
 * **System Settings Enforcement:** The app checks that screen lock (PIN/Biometrics) is active, file system encryption is enabled, and USB debugging/developer options are disabled.
-* **Independent Approval:** A device's certification signature must be verified by `certifyFieldDevice()` on the backend, requiring independent review by a security administrator (four-eyes principle).
+* **Independent Approval:** A device's certification signature must be verified by `certifyFieldDevice()` on the backend, requiring independent review by a security administrator (four-eyes principle) — `certifyFieldDevice()` rejects any submission where `testedBy === approvedBy`. **The app itself never calls this endpoint.** A field device cannot legitimately certify itself, so `DeviceCertificationScreen` only polls the read-only `GET /experience/devices/{deviceId}/status` endpoint after login, displaying the device's stable ID (`Settings.Secure.ANDROID_ID`) for the security administrator to certify from the tenant back office, and re-checks every 15 seconds until certified.
 
 ```javascript
 // Verification anchor in packages/core/src/customer-experience-completion.js
@@ -65,8 +68,14 @@ if (input.encryptedStorage !== true || input.screenLockEnforced !== true || inpu
 ### 3.2 On-Device Data Storage
 Under RBI guidelines, storing unencrypted Customer PII (Personally Identifiable Information) on local storage is strictly prohibited.
 * **Encrypted Database:** The app uses **SQLCipher** to encrypt the SQLite/Room database.
-* **Cryptographic Key Management:** Database keys are generated inside the **Android Keystore System** (hardware-backed). The key never leaves the secure enclave (TEE or StrongBox).
-* **Data Sanitization:** When an agent logs out or when a session expires, the local database key is wiped from memory, rendering all local data unreadable.
+* **Cryptographic Key Management:** The SQLCipher passphrase is a random 256-bit value generated once per install and stored only in `EncryptedSharedPreferences`, whose master key lives in the Android Keystore System (hardware-backed TEE/StrongBox where available). It is never derived from anything guessable and never leaves the device.
+* **Data Sanitization:** When an agent logs out or a session expires, `KeyManager.wipeLocalData()` deletes both the passphrase and the encrypted database file, rendering all local data permanently unrecoverable.
+
+### 3.3 Per-Envelope Key Leasing (`leaseEncryptionKey`)
+Rather than a hardcoded key baked into the APK, each offline envelope is encrypted with a fresh, short-lived AES-256 data key fetched from `POST /experience/keys/lease` immediately before use.
+* **Certified-device gated:** The lease endpoint enforces the same certification check as `enqueueEncryptedOfflineWork` — an uncertified or expired device is rejected.
+* **Issued once, retained never:** The server generates the key, returns the raw material to the device exactly once, and persists only `keyId`/`deviceId`/`expiresAt` for audit — never the key bytes. A compromised device therefore only ever exposes recently-leased keys, not a long-lived shared secret.
+* **Scope:** This is a demo-scale in-process issuer, not a production KMS/HSM integration; production deployment should back this endpoint with a real key-management service.
 
 ---
 
@@ -98,18 +107,19 @@ Field agents often operate in areas with poor internet connectivity. The app use
                   v
 +-----------------+-----------------+
 |         LoanOS Core API           |
-|  (reconcileEncryptedOfflineWork)  |
+|  (enqueueEncryptedOfflineWork)    |
 +-----------------------------------+
 ```
 
 ### 4.1 Plaintext-Free Enveloping (`enqueueEncryptedOfflineWork`)
 When the app is offline, any transaction (e.g., collection posting, lead onboarding) is encrypted locally before being written to the outbox queue.
-* **AES-256-GCM Envelope:** The payload is encrypted with a unique one-time key. Only the ciphertext, salt, initialization vector (nonce), authentication tag, and cryptographic hash are queued.
+* **AES-256-GCM Envelope:** The payload is encrypted with a per-envelope leased key (§3.3). Only the ciphertext, salt, initialization vector (nonce), authentication tag, and cryptographic hash are queued.
 * **No Plaintext Leaks:** Plaintext fields containing customer data (e.g., name, mobile, financial info) are never written to standard outbound queues or logs.
+* **App-side responsibility ends at enqueue:** `SyncManager` calls `POST /experience/offline-work/enqueue` only. `POST /experience/offline-work/reconcile` is a back-office `reconciliation_checker` action (§4.2) — the field device never calls it.
 
 ### 4.2 Conflict Detection and Reconciliation
-When connectivity is restored, the queued envelopes are pushed to the backend for reconciliation:
-* **Idempotency Verification:** Every envelope contains an `idempotencyKey` that prevents replay attacks.
+When connectivity is restored, the queued envelopes are pushed to the backend queue via enqueue; a `reconciliation_checker` later reconciles them:
+* **Idempotency Verification:** Every envelope contains an `idempotencyKey` that prevents replay attacks. If the app retries an enqueue the server already holds (e.g. a partially-acknowledged sync), it responds `409` and the app marks the envelope `uploaded` rather than resubmitting.
 * **Version Validation:** The backend checks the `baseVersion` of the record (e.g., the loan account version when the agent left the office) against the server's `currentVersion`.
 * **Conflict Resolution:** If the version has changed (e.g., the customer paid online while the agent was in the field), the envelope is flagged as `conflict` (`aggregate_version_changed`) and routed to the `reconciliation_checker` for manual resolution.
 

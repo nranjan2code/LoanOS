@@ -14,12 +14,13 @@ import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
 
 @Composable
-fun QrShareScreen() {
-    val mockOnboardingUrl = "https://demo.aitailorworkshop.in/t/tenant-a/onboard?ref=dsa-partner-1"
+fun QrShareScreen(session: DsaSession) {
+    val partnerRef = session.partnerId ?: "unassigned"
+    val onboardingUrl = "https://demo.aitailorworkshop.in/t/${session.tenantId}/onboard?ref=$partnerRef"
     var qrBitmap by remember { mutableStateOf<Bitmap?>(null) }
 
-    LaunchedEffect(mockOnboardingUrl) {
-        qrBitmap = generateQrCode(mockOnboardingUrl)
+    LaunchedEffect(onboardingUrl) {
+        qrBitmap = generateQrCode(onboardingUrl)
     }
 
     Column(
@@ -48,7 +49,7 @@ fun QrShareScreen() {
         } ?: CircularProgressIndicator()
 
         Spacer(modifier = Modifier.height(24.dp))
-        Text("Partner Referral Code: DSA-PARTNER-1", style = MaterialTheme.typography.labelMedium)
+        Text("Partner Referral Code: $partnerRef", style = MaterialTheme.typography.labelMedium)
     }
 }
 

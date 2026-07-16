@@ -7,7 +7,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.loanos.fieldops.R
 import com.loanos.fieldops.data.FieldOpsDatabase
 import com.loanos.fieldops.data.OfflineEnvelopeEntity
 import kotlinx.coroutines.Dispatchers
@@ -54,12 +56,16 @@ fun SyncQueueScreen() {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            val pendingCount = envelopes.count { it.status == "queued" }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text("Sync Outbox Queue", style = MaterialTheme.typography.titleMedium)
-                Text("${envelopes.size} Pending Envelopes", style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.sync_queue_title), style = MaterialTheme.typography.titleMedium)
+                Text(
+                    stringResource(R.string.sync_queue_pending_total, pendingCount, envelopes.size),
+                    style = MaterialTheme.typography.bodyMedium
+                )
             }
 
             LazyColumn(
@@ -73,16 +79,17 @@ fun SyncQueueScreen() {
                             containerColor = when (item.status) {
                                 "conflict" -> MaterialTheme.colorScheme.errorContainer
                                 "applied" -> MaterialTheme.colorScheme.tertiaryContainer
+                                "uploaded" -> MaterialTheme.colorScheme.secondaryContainer
                                 else -> MaterialTheme.colorScheme.surfaceVariant
                             }
                         )
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
-                            Text("Envelope ID: ${item.envelopeId.take(8)}...", style = MaterialTheme.typography.bodyMedium)
-                            Text("Type: ${item.aggregateType.uppercase()}", style = MaterialTheme.typography.labelSmall)
-                            Text("Status: ${item.status.uppercase()}", style = MaterialTheme.typography.labelMedium)
+                            Text(stringResource(R.string.sync_queue_envelope_id, item.envelopeId.take(8)), style = MaterialTheme.typography.bodyMedium)
+                            Text(stringResource(R.string.sync_queue_type, item.aggregateType.uppercase()), style = MaterialTheme.typography.labelSmall)
+                            Text(stringResource(R.string.sync_queue_status, item.status.uppercase()), style = MaterialTheme.typography.labelMedium)
                             Spacer(modifier = Modifier.height(4.dp))
-                            Text("Ciphertext Digest: ${item.ciphertextSha256.take(16)}...", style = MaterialTheme.typography.bodySmall)
+                            Text(stringResource(R.string.sync_queue_digest, item.ciphertextSha256.take(16)), style = MaterialTheme.typography.bodySmall)
                         }
                     }
                 }
@@ -90,11 +97,6 @@ fun SyncQueueScreen() {
 
             Button(
                 onClick = {
-                    if (envelopes.isEmpty()) {
-                        snackbarMessage = "No envelopes to sync."
-                        return@Button
-                    }
-                    
                     syncInProgress = true
                     scope.launch {
                         val result = com.loanos.fieldops.network.SyncManager.sync(context)
@@ -103,19 +105,19 @@ fun SyncQueueScreen() {
                         }
                         syncInProgress = false
                         snackbarMessage = if (result.isSuccess) {
-                            "Sync completed successfully!"
+                            context.getString(R.string.sync_queue_success)
                         } else {
-                            "Sync failed: " + result.exceptionOrNull()?.message
+                            context.getString(R.string.sync_queue_failure, result.exceptionOrNull()?.message ?: "")
                         }
                     }
                 },
-                enabled = !syncInProgress && envelopes.isNotEmpty(),
+                enabled = !syncInProgress,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 if (syncInProgress) {
                     CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(24.dp))
                 } else {
-                    Text("Sync Envelopes with Backend")
+                    Text(stringResource(R.string.sync_queue_action))
                 }
             }
         }

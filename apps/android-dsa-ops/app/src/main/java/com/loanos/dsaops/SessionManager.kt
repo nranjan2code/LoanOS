@@ -3,58 +3,68 @@ package com.loanos.dsaops
 import android.content.Context
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKeys
+import com.loanos.dsaops.network.PersistentCookieJar
+
+data class DsaSession(
+    val tenantId: String,
+    val userId: String,
+    val displayName: String,
+    val partnerId: String?,
+    val expiresAt: String
+)
 
 /**
- * Manages short-lived, encrypted session credentials for the DSA Lead app.
- * Adheres to the Zero-Local-Data compliance pattern by restricting local storage to transient session tokens.
+ * Tracks the signed-in DSA's non-secret session metadata. The actual credential
+ * is the session cookie set by /auth/federated/exchange, held only in
+ * [PersistentCookieJar] — this class never sees it, matching the Zero-Local-Data
+ * posture (session key lives in EncryptedSharedPreferences, capped at ~1 hour by
+ * the server-issued expiresAt, never a long-lived refresh token).
  */
-class SessionManager(context: Context) {
-    private val masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC)
-
-    private val sharedPreferences = EncryptedSharedPreferences.create(
+class SessionManager(private val context: Context) {
+    private val prefs = EncryptedSharedPreferences.create(
         "loanos_dsa_session_prefs",
-        masterKeyAlias,
-        context,
+        MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC),
+        context.applicationContext,
         EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
     )
 
-    companion object {
-        private const val TOKEN_KEY = "oidc_access_token"
-        private const val TOKEN_EXPIRY_KEY = "token_expiry_timestamp"
-        private const val MOCK_EXPIRY_DURATION_MS = 3600000L // 1 hour token validity limit
-    }
-
-    /**
-     * Stores a new short-lived session token.
-     */
-    fun saveSessionToken(token: String) {
-        val expiryTime = System.currentTimeMillis() + MOCK_EXPIRY_DURATION_MS
-        sharedPreferences.edit()
-            .putString(TOKEN_KEY, token)
-            .putLong(TOKEN_EXPIRY_KEY, expiryTime)
+    fun saveSession(session: DsaSession) {
+        prefs.edit()
+            .putString(KEY_TENANT, session.tenantId)
+            .putString(KEY_USER, session.userId)
+            .putString(KEY_NAME, session.displayName)
+            .putString(KEY_PARTNER, session.partnerId)
+            .putString(KEY_EXPIRES, session.expiresAt)
             .apply()
     }
 
-    /**
-     * Retrieves the session token, ensuring it hasn't expired.
-     */
-    fun getSessionToken(): String? {
-        val expiryTime = sharedPreferences.getLong(TOKEN_EXPIRY_KEY, 0L)
-        if (System.currentTimeMillis() > expiryTime) {
-            clearSession() // Auto-wipe expired session
+    fun getSession(): DsaSession? {
+        val userId = prefs.getString(KEY_USER, null) ?: return null
+        val expiresAt = prefs.getString(KEY_EXPIRES, null) ?: return null
+        if (java.time.Instant.parse(expiresAt).isBefore(java.time.Instant.now())) {
+            clearSession()
             return null
         }
-        return sharedPreferences.getString(TOKEN_KEY, null)
+        return DsaSession(
+            tenantId = prefs.getString(KEY_TENANT, "") ?: "",
+            userId = userId,
+            displayName = prefs.getString(KEY_NAME, "") ?: "",
+            partnerId = prefs.getString(KEY_PARTNER, null),
+            expiresAt = expiresAt
+        )
     }
 
-    /**
-     * Wipes active session credentials immediately.
-     */
     fun clearSession() {
-        sharedPreferences.edit()
-            .remove(TOKEN_KEY)
-            .remove(TOKEN_EXPIRY_KEY)
-            .apply()
+        prefs.edit().clear().apply()
+        PersistentCookieJar(context).clear()
+    }
+
+    companion object {
+        private const val KEY_TENANT = "tenantId"
+        private const val KEY_USER = "userId"
+        private const val KEY_NAME = "displayName"
+        private const val KEY_PARTNER = "partnerId"
+        private const val KEY_EXPIRES = "expiresAt"
     }
 }

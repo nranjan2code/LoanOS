@@ -1,86 +1,53 @@
 package com.loanos.fieldops.security
 
-import android.security.keystore.KeyGenParameterSpec
-import android.security.keystore.KeyProperties
-import java.security.KeyStore
-import javax.crypto.KeyGenerator
-import javax.crypto.SecretKey
 import android.content.Context
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKeys
-import java.util.UUID
+import java.security.SecureRandom
 
 /**
- * Handles hardware-backed cryptographic key lifecycle for local database (SQLCipher) encryption.
- * Integrates with Android Keystore System to ensure keys never leave the secure hardware (TEE/StrongBox).
+ * Handles the local database (SQLCipher) passphrase lifecycle.
+ *
+ * The passphrase is random, generated once per install, and stored only inside
+ * EncryptedSharedPreferences whose master key lives in the Android Keystore
+ * (hardware-backed TEE/StrongBox where available). Wiping the passphrase renders
+ * the SQLCipher database permanently unreadable — this is the data-sanitization
+ * lever required on agent logout, certification revocation or remote wipe.
  */
 object KeyManager {
-    private const val KEY_PROVIDER = "AndroidKeyStore"
-    private const val DB_KEY_ALIAS = "loanos_db_encryption_key"
+    private const val PREFS_NAME = "loanos_secure_db_prefs"
+    private const val PASSPHRASE_KEY = "db_passphrase"
+    private const val PASSPHRASE_BYTES = 32
 
-    init {
-        // Ensure the db key is created on initialization
-        getOrCreateDatabaseKey()
-    }
-
-    /**
-     * Retrieves the existing database encryption key from Keystore, or generates a new one.
-     */
-    fun getOrCreateDatabaseKey(): SecretKey {
-        val keyStore = KeyStore.getInstance(KEY_PROVIDER).apply { load(null) }
-        
-        if (keyStore.containsAlias(DB_KEY_ALIAS)) {
-            val entry = keyStore.getEntry(DB_KEY_ALIAS, null) as? KeyStore.SecretKeyEntry
-            if (entry != null) {
-                return entry.secretKey
-            }
-        }
-
-        // Generate a new hardware-backed AES-256 key
-        val keyGenerator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, KEY_PROVIDER)
-        val spec = KeyGenParameterSpec.Builder(
-            DB_KEY_ALIAS,
-            KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
-        ).run {
-            setKeySize(256)
-            setBlockModes(KeyProperties.BLOCK_MODE_GCM)
-            setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
-            setUserAuthenticationRequired(true) // Requires device screen lock
-            setUserAuthenticationValidityDurationSeconds(300) // Valid for 5 mins after authentication
-            build()
-        }
-
-        keyGenerator.init(spec)
-        return keyGenerator.generateKey()
-    }
+    private fun securePrefs(context: Context) = EncryptedSharedPreferences.create(
+        PREFS_NAME,
+        MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC),
+        context,
+        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+    )
 
     /**
-     * Securely wipes the database key entry from Keystore memory (e.g. on emergency containment or agent logout).
-     */
-    fun revokeKeys() {
-        val keyStore = KeyStore.getInstance(KEY_PROVIDER).apply { load(null) }
-        if (keyStore.containsAlias(DB_KEY_ALIAS)) {
-            keyStore.deleteEntry(DB_KEY_ALIAS)
-        }
-    }
-
-    /**
-     * Gets or generates a secure database passphrase stored in EncryptedSharedPreferences.
+     * Gets or generates the SQLCipher passphrase (hex-encoded 256-bit random value).
      */
     fun getDatabasePassphrase(context: Context): String {
-        val masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC)
-        val sharedPreferences = EncryptedSharedPreferences.create(
-            "loanos_secure_db_prefs",
-            masterKeyAlias,
-            context,
-            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-        )
-        var passphrase = sharedPreferences.getString("db_passphrase", null)
+        val prefs = securePrefs(context)
+        var passphrase = prefs.getString(PASSPHRASE_KEY, null)
         if (passphrase == null) {
-            passphrase = UUID.randomUUID().toString() + UUID.randomUUID().toString()
-            sharedPreferences.edit().putString("db_passphrase", passphrase).apply()
+            val bytes = ByteArray(PASSPHRASE_BYTES).apply { SecureRandom().nextBytes(this) }
+            passphrase = bytes.joinToString("") { "%02x".format(it) }
+            prefs.edit().putString(PASSPHRASE_KEY, passphrase).apply()
         }
         return passphrase
+    }
+
+    /**
+     * Data sanitization: wipes the database passphrase and deletes the encrypted
+     * database files. After this call all locally cached field data is unrecoverable.
+     * Invoke on agent logout, session expiry or emergency containment.
+     */
+    fun wipeLocalData(context: Context, databaseName: String = "loanos_field_ops.db") {
+        securePrefs(context).edit().remove(PASSPHRASE_KEY).apply()
+        context.deleteDatabase(databaseName)
     }
 }

@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">LoanOS கள செயல்பாடுகள்</string>
+
+    <string name="login_title">LoanOS பாதுகாப்பான போர்டல்</string>
+    <string name="login_subtitle">இணக்கம் கட்டுப்படுத்தப்பட்ட கள அணுகல்</string>
+    <string name="login_tenant_id">டெனன்ட் ஐடி</string>
+    <string name="login_email">பணி மின்னஞ்சல்</string>
+    <string name="login_password">கடவுச்சொல்</string>
+    <string name="login_mfa_code">MFA குறியீடு (இயக்கப்பட்டிருந்தால்)</string>
+    <string name="login_sign_in">உள்நுழைக</string>
+
+    <string name="nav_field_kyc">கள KYC</string>
+    <string name="nav_collections">வசூல்கள்</string>
+    <string name="nav_collateral">அடமானம்</string>
+    <string name="nav_sync_queue">ஒத்திசைவு வரிசை</string>
+    <string name="action_sign_out">வெளியேறு</string>
+
+    <string name="device_cert_pending_title">சாதன சான்றிதழ் தேவை</string>
+    <string name="device_cert_pending_body">இந்த சாதனம் இன்னும் கள செயல்பாடுகளுக்கு சான்றளிக்கப்படவில்லை. உங்கள் பாதுகாப்பு நிர்வாகி டெனன்ட் பின் அலுவலகத்திலிருந்து சுயாதீன சான்றிதழை முடிக்க கீழே உள்ள சாதன ஐடியைப் பகிரவும்.</string>
+
+    <string name="collections_title">ஒதுக்கப்பட்ட வசூல் பணிகள்</string>
+    <string name="collections_status_label">நிலை: %1$s</string>
+    <string name="collections_post_for">இதற்கான கள வசூலைப் பதிவு செய்யவும்: %1$s</string>
+    <string name="collections_amount_label">வசூலிக்கப்பட்ட தொகை (₹)</string>
+    <string name="collections_amount_invalid">சரியான தொகையை உள்ளிடவும் (அதிகபட்சம் 2 தசம இடங்கள்).</string>
+    <string name="collections_submit">வசூல் ரசீதைப் பதிவு செய்யவும்</string>
+    <string name="collections_posted">பண பணம் பாதுகாப்பாகப் பதிவு செய்யப்பட்டு ஒத்திசைவுக்கு வரிசைப்படுத்தப்பட்டது!</string>
+
+    <string name="kyc_title">கடன் வாங்குபவர் KYC சேர்க்கை</string>
+    <string name="kyc_borrower_name">கடன் வாங்குபவரின் முழுப் பெயர்</string>
+    <string name="kyc_mobile_number">மொபைல் எண் (இந்தியா)</string>
+    <string name="kyc_permission_denied">இணக்கமான KYC பதிவுக்கு கேமரா மற்றும் துல்லியமான இருப்பிட அனுமதிகள் தேவை.</string>
+    <string name="kyc_photo_captured">📷 நேரடி புகைப்படம் பதிவு செய்யப்பட்டது</string>
+    <string name="kyc_grant_access">பதிவைத் தொடங்க கேமரா மற்றும் இருப்பிட அணுகலை வழங்கவும்.</string>
+    <string name="kyc_capture_retake">✓ நேரடி புகைப்படத்தை மீண்டும் எடு</string>
+    <string name="kyc_capture_action">📷 நேரடி புகைப்படம் + GPS லாக் பதிவு செய்யவும்</string>
+    <string name="kyc_gps_failed">GPS லாக் தோல்வியடைந்தது: %1$s</string>
+    <string name="kyc_photo_failed">புகைப்படம் பதிவு தோல்வியடைந்தது: %1$s</string>
+    <string name="kyc_missing_fields">பெயர், மொபைல், நேரடி புகைப்படம் மற்றும் GPS லாக் அனைத்தும் கட்டாயம்.</string>
+    <string name="kyc_queue_action">சேர்க்கை லீட்டை பாதுகாப்பாக வரிசைப்படுத்தவும்</string>
+    <string name="kyc_queued">KYC பாதுகாப்பாக ஆஃப்லைன் ஒத்திசைவு வரிசையில் சேமிக்கப்பட்டது!</string>
+
+    <string name="collateral_title">அடமானம் / பாதுகாப்பு ஆய்வு</string>
+    <string name="collateral_description_label">சொத்து விவரம்</string>
+    <string name="collateral_valuation_label">மதிப்பிடப்பட்ட மதிப்பு (₹)</string>
+    <string name="collateral_valuation_invalid">சரியான மதிப்பீட்டுத் தொகையை உள்ளிடவும் (அதிகபட்சம் 2 தசம இடங்கள்).</string>
+    <string name="collateral_missing_fields">விவரம், மதிப்பீடு, வன்பொருள்-முத்திரையிடப்பட்ட புகைப்படம் மற்றும் GPS லாக் அனைத்தும் கட்டாயம்.</string>
+    <string name="collateral_queue_action">மதிப்பீட்டு அறிக்கையை பாதுகாப்பாக வரிசைப்படுத்தவும்</string>
+    <string name="collateral_queued">அடமான மதிப்பீடு பாதுகாப்பாக ஆஃப்லைன் ஒத்திசைவு வரிசையில் சேமிக்கப்பட்டது!</string>
+
+    <string name="sync_queue_title">ஒத்திசைவு அவுட்பாக்ஸ் வரிசை</string>
+    <string name="sync_queue_pending_total">%1$d நிலுவையில் · %2$d மொத்தம்</string>
+    <string name="sync_queue_envelope_id">என்வலப் ஐடி: %1$s…</string>
+    <string name="sync_queue_type">வகை: %1$s</string>
+    <string name="sync_queue_status">நிலை: %1$s</string>
+    <string name="sync_queue_digest">சைபர்டெக்ஸ்ட் டைஜெஸ்ட்: %1$s…</string>
+    <string name="sync_queue_action">பின்தளத்துடன் ஒத்திசைக்கவும்</string>
+    <string name="sync_queue_success">ஒத்திசைவு வெற்றிகரமாக முடிந்தது!</string>
+    <string name="sync_queue_failure">ஒத்திசைவு தோல்வியடைந்தது: %1$s</string>
+
+    <string name="key_lease_failed">இந்தப் பதிவுக்கான குறியாக்க விசையைப் பெற முடியவில்லை (%1$s). சிக்னல் மேம்படும்போது மீண்டும் முயற்சிக்கவும்.</string>
+</resources>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">LoanOS DSA मूल</string>
+
+    <string name="login_title">LoanOS DSA मूल</string>
+    <string name="login_subtitle">अपने कॉर्पोरेट पहचान प्रदाता के साथ साइन इन करें। MFA IdP द्वारा अनिवार्य है।</string>
+    <string name="login_tenant_id">टेनेंट आईडी</string>
+    <string name="login_policy_id">फेडरेशन पॉलिसी आईडी</string>
+    <string name="login_sign_in">कॉर्पोरेट IdP से साइन इन करें</string>
+
+    <string name="nav_lead_intake">लीड प्रविष्टि</string>
+    <string name="nav_consent_qr">सहमति QR</string>
+    <string name="nav_my_referrals">मेरे रेफरल</string>
+    <string name="action_sign_out">साइन आउट करें</string>
+</resources>

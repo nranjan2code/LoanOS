@@ -77,9 +77,30 @@ dependencies {
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
     implementation("com.google.code.gson:gson:2.10.1")
+    // Pin OkHttp to a Kotlin-native 4.x release (Retrofit 2.9.0 otherwise pulls
+    // OkHttp 3.x transitively, whose Java-style Cookie.name()/expiresAt() methods
+    // don't map to Kotlin property syntax).
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
+    // Coroutines (suspendCancellableCoroutine, Task<T>.await())
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
 
     // Play Integrity API
     implementation("com.google.android.play:integrity:1.3.0")
+
+    // Biometric step-up gate (Compliance Gated Field Access)
+    implementation("androidx.biometric:biometric:1.1.0")
+    implementation("androidx.fragment:fragment-ktx:1.6.2")
+
+    // Location (GPS lock for KYC/collateral geotagging)
+    implementation("com.google.android.gms:play-services-location:21.1.0")
+
+    // CameraX (live KYC photo capture)
+    implementation("androidx.camera:camera-core:1.3.1")
+    implementation("androidx.camera:camera-camera2:1.3.1")
+    implementation("androidx.camera:camera-lifecycle:1.3.1")
+    implementation("androidx.camera:camera-view:1.3.1")
 
     // Testing
     testImplementation("junit:junit:4.13.2")

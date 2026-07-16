@@ -43,9 +43,9 @@ graph TD
 ```
 
 ### 3.1 Authentication & Session Hygiene
-* **Federated OIDC:** Agents authenticate using OIDC (OpenID Connect) with PKCE (Proof Key for Code Exchange) via their corporate Identity Provider (IdP).
-* **MFA Enforced:** Multi-Factor Authentication (biometric or OTP) is required on every login.
-* **Short-Lived Tokens:** Access tokens are strictly limited to **one hour**. No long-lived offline refresh tokens are stored. The session key is stored exclusively in Android's secure `EncryptedSharedPreferences`.
+* **Federated OIDC:** Agents authenticate using OIDC (OpenID Connect) with PKCE (Proof Key for Code Exchange) via their corporate Identity Provider (IdP). Implemented as: `LoginScreen` generates an S256 PKCE pair, calls `POST /auth/federated/start` with `tenantId`/`policyId`/`redirectUri`/`codeChallenge`, and opens the returned `authorizationUrl` in a Custom Tab. The IdP redirects to `com.loanos.dsaops://callback` (registered as a `BROWSABLE` intent filter on `MainActivity`, `launchMode="singleTask"`), which exchanges `code`+`codeVerifier` via `POST /auth/federated/exchange`.
+* **MFA Enforced:** Multi-Factor Authentication (biometric or OTP) is required on every login by the IdP itself, outside the app's control.
+* **Short-Lived Tokens:** Access tokens are strictly limited to **one hour**. No long-lived offline refresh tokens are stored. The backend resolves sessions from the `Cookie` header only (`sessionTokenFromRequest`), so the session credential is a cookie, not a bearer token — it is persisted via a Keystore-backed `PersistentCookieJar` (`EncryptedSharedPreferences`), not sent as `Authorization: Bearer`. Non-secret session metadata (tenantId, userId, partnerId derived from `channelScope.partnerIds`, expiresAt) is tracked separately in `SessionManager` and never holds the credential itself.
 
 ### 3.2 Runtime Device Posture Checks
 At startup and periodically during use, the app performs lightweight runtime checks:
@@ -57,11 +57,12 @@ At startup and periodically during use, the app performs lightweight runtime che
 
 ## 4. Origination API Sequence & Entitlement Scoping
 
-Every DSA is provisioned with a specific partner scope. The backend restricts what data is readable:
+Every DSA is provisioned with a specific partner scope (`channelScope.mode === "partner"` on their `tenant_user` record). The backend restricts what data is readable:
 
-1. **Write-Only Lead Intake:** The agent posts basic lead details to `/channels/leads`.
-2. **Deduplication Check:** The backend checks contacts without revealing existing customer records to the agent (preventing phishing). If a contact exists, it enters `/duplicate_review` internally.
-3. **Referred Portfolio View:** The agent can query only their own submitted leads (`GET /channels/leads?partnerId={id}`). Response objects are heavily redacted to show only names, product type, application status, and pipeline stages—never bank account numbers, tax documents, or underwriting audit logs.
+1. **Lead Intake:** The agent posts to `POST /channels/leads`. The backend's `createChannelLead` requires more than the original "basic lead details" concept — `programmeId`, `requestedProductPolicyId`, `postalCode`, `contact` (name + mobile/email), `requestedAmountPaise`, `attribution`, `consentRef`, `disclosureRef`, and (for the `dsa` channel) `conductAttestationRef`. `LeadFormScreen` fetches eligible programmes/products from `/channels/operations` at runtime rather than hardcoding them, and requires the agent to confirm a code-of-conduct attestation checkbox before submit.
+2. **Deduplication Check:** The backend checks contacts without revealing existing customer records to the agent (preventing phishing). If a contact exists, the lead enters `duplicate_review` status internally.
+3. **Referred Portfolio View:** The doc originally specified a dedicated `GET /channels/leads?partnerId={id}` endpoint; **the backend does not implement it.** `PortfolioScreen` instead consumes `GET /channels/operations`, which is already partner-scoped server-side via the authenticated session's `channelScope` and includes `channelLeads`. The screen only ever renders name, product, and pipeline stage client-side — never contact details, bank account numbers, tax documents, or underwriting audit logs — even though the current payload technically carries contact fields; a dedicated pre-redacted projection endpoint remains a backend follow-up.
+4. **Zero-Touch Consent:** Because there is no backend callback that returns a `consentRef`/`disclosureRef` once the borrower completes the Consent QR flow on their own device, the agent-facing app currently synthesizes those reference strings client-side (`consent:{partnerId}:{timestamp}`) rather than receiving a server-issued reference. This is a placeholder pending a real consent-completion callback API.
 
 ---
 

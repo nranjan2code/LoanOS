@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">LoanOS DSA தோற்றம்</string>
+
+    <string name="login_title">LoanOS DSA தோற்றம்</string>
+    <string name="login_subtitle">உங்கள் நிறுவன அடையாள வழங்குநருடன் உள்நுழையவும். MFA IdP ஆல் கட்டாயப்படுத்தப்படுகிறது.</string>
+    <string name="login_tenant_id">டெனன்ட் ஐடி</string>
+    <string name="login_policy_id">கூட்டமைப்பு கொள்கை ஐடி</string>
+    <string name="login_sign_in">நிறுவன IdP மூலம் உள்நுழையவும்</string>
+
+    <string name="nav_lead_intake">லீட் உள்ளீடு</string>
+    <string name="nav_consent_qr">ஒப்புதல் QR</string>
+    <string name="nav_my_referrals">எனது பரிந்துரைகள்</string>
+    <string name="action_sign_out">வெளியேறு</string>
+</resources>

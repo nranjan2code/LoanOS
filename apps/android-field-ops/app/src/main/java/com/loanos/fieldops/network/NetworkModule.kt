@@ -1,5 +1,6 @@
 package com.loanos.fieldops.network
 
+import android.content.Context
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.Response
@@ -8,42 +9,55 @@ import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
 object NetworkModule {
-    private const val BASE_URL = "https://api.demo.aitailorworkshop.in/v1/" // Production compliance endpoint
+    private const val BASE_URL = "https://api.demo.aitailorworkshop.in/v1/"
+
+    private lateinit var retrofit: Retrofit
+    lateinit var apiService: LoanOsApiClient
+        private set
+    private lateinit var cookieJar: PersistentCookieJar
 
     @Volatile
-    private var accessToken: String? = null
+    private var initialized = false
 
-    fun setToken(token: String) {
-        accessToken = token
-    }
+    /**
+     * Must be called once (e.g. from Application.onCreate) before [apiService] is used —
+     * the cookie jar needs a Context to reach EncryptedSharedPreferences.
+     */
+    fun init(context: Context) {
+        if (initialized) return
+        synchronized(this) {
+            if (initialized) return
 
-    private val authInterceptor = object : Interceptor {
-        override fun intercept(chain: Interceptor.Chain): Response {
-            val original = chain.request()
-            val requestBuilder = original.newBuilder()
-                .header("Accept", "application/json")
-                .header("X-Client-Platform", "android")
-            
-            accessToken?.let {
-                requestBuilder.header("Authorization", "Bearer $it")
+            cookieJar = PersistentCookieJar(context)
+
+            val platformInterceptor = Interceptor { chain ->
+                val request = chain.request().newBuilder()
+                    .header("Accept", "application/json")
+                    .header("X-Client-Platform", "android")
+                    .build()
+                chain.proceed(request)
             }
 
-            return chain.proceed(requestBuilder.build())
+            val okHttpClient = OkHttpClient.Builder()
+                .cookieJar(cookieJar)
+                .addInterceptor(platformInterceptor)
+                .connectTimeout(15, TimeUnit.SECONDS)
+                .readTimeout(15, TimeUnit.SECONDS)
+                .writeTimeout(15, TimeUnit.SECONDS)
+                .build()
+
+            retrofit = Retrofit.Builder()
+                .baseUrl(BASE_URL)
+                .client(okHttpClient)
+                .addConverterFactory(GsonConverterFactory.create())
+                .build()
+
+            apiService = retrofit.create(LoanOsApiClient::class.java)
+            initialized = true
         }
     }
 
-    private val okHttpClient = OkHttpClient.Builder()
-        .addInterceptor(authInterceptor)
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
-        .writeTimeout(15, TimeUnit.SECONDS)
-        .build()
-
-    val retrofit: Retrofit = Retrofit.Builder()
-        .baseUrl(BASE_URL)
-        .client(okHttpClient)
-        .addConverterFactory(GsonConverterFactory.create())
-        .build()
-
-    val apiService: LoanOsApiClient = retrofit.create(LoanOsApiClient::class.java)
+    fun clearSession() {
+        cookieJar.clear()
+    }
 }

@@ -3,23 +3,27 @@ package com.loanos.fieldops.security
 import android.content.Context
 import com.google.android.play.core.integrity.IntegrityManagerFactory
 import com.google.android.play.core.integrity.IntegrityTokenRequest
-import java.util.UUID
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
-import kotlin.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.suspendCancellableCoroutine
 
 /**
  * Communicates with Google Play Integrity API to fetch a cryptographically signed hardware
  * attestation token used to certify field devices (`certifyFieldDevice`).
+ *
+ * Fail-closed: if Play Integrity is unavailable or errors, no token is produced and the
+ * caller must treat the device as uncertified. A fabricated fallback token would let an
+ * uncertified device onto the compliance plane, so none is ever returned.
  */
 class DeviceAttestation(private val context: Context) {
 
     /**
      * Retrieves the Google Play Integrity token asynchronously.
-     * Fallbacks to a secure, mock-signed token if Play Services are unavailable (e.g. during emulator tests).
+     * Returns a failed [Result] when attestation cannot be obtained — callers must
+     * block certification and field allocation download in that case.
      */
-    suspend fun fetchAttestationToken(cloudProjectNumber: Long, nonce: String): String {
-        return try {
+    suspend fun fetchAttestationToken(cloudProjectNumber: Long, nonce: String): Result<String> {
+        return runCatching {
             suspendCancellableCoroutine { continuation ->
                 val integrityManager = IntegrityManagerFactory.create(context)
                 val request = IntegrityTokenRequest.builder()
@@ -32,13 +36,9 @@ class DeviceAttestation(private val context: Context) {
                         continuation.resume(response.token())
                     }
                     .addOnFailureListener { exception ->
-                        // Fallback to secure mock trace in debug/UAT environments
-                        val mockToken = "mock_attestation_token_${UUID.randomUUID()}_sha256_${nonce}"
-                        continuation.resume(mockToken)
+                        continuation.resumeWithException(exception)
                     }
             }
-        } catch (e: Exception) {
-            "mock_attestation_fallback_token_err_${e.message}"
         }
     }
 }

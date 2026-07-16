@@ -69,9 +69,20 @@ dependencies {
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
     implementation("com.google.code.gson:gson:2.10.1")
+    // Pin OkHttp to a Kotlin-native 4.x release (Retrofit 2.9.0 otherwise pulls
+    // OkHttp 3.x transitively, whose Java-style Cookie.name()/expiresAt() methods
+    // don't map to Kotlin property syntax).
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
     // QR Code visual generator helper
     implementation("com.google.zxing:core:3.5.3")
+
+    // Custom Tabs for the OIDC+PKCE federated login redirect
+    implementation("androidx.browser:browser:1.8.0")
+
+    // Biometric step-up for sensitive actions (e.g. consent OTP dispatch)
+    implementation("androidx.biometric:biometric:1.1.0")
+    implementation("androidx.fragment:fragment-ktx:1.6.2")
 
     // Testing
     testImplementation("junit:junit:4.13.2")

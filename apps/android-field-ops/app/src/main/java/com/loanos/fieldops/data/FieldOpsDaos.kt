@@ -34,6 +34,9 @@ interface AssignmentDao {
     @Query("SELECT * FROM assignments WHERE type = :type ORDER BY scheduledAt DESC")
     suspend fun getAssignmentsByType(type: String): List<AssignmentEntity>
 
+    @Query("SELECT * FROM assignments WHERE id = :id LIMIT 1")
+    suspend fun getAssignmentById(id: String): AssignmentEntity?
+
     @Query("UPDATE assignments SET status = :status WHERE id = :id")
     suspend fun updateStatus(id: String, status: String)
 
