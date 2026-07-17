@@ -801,7 +801,7 @@ async function route(req, res, dataDir, platformAdminKey, observability, allowDi
   // --- Canonical LoanOS Guide & Academy. Tenant/RE overlays will be added
   // only through an explicitly authorised, tenant-isolated content boundary. ---
   if (method === "GET" && (path === "/help" || path === "/help/")) {
-    return serveStaticFile(res, appsRoot, "help", "/index.html", "/help/");
+    return serveStaticFile(res, appsRoot, "help", "/help/index.html", "/help/");
   }
   if (method === "GET" && path.startsWith("/help/")) {
     return serveStaticFile(res, appsRoot, "help", path, "/help/");
@@ -10918,6 +10918,9 @@ async function serveStaticFile(res, appsRoot, appDir, urlPath, urlPrefix, req = 
     let fileSubpath = urlPath.slice(urlPrefix.length);
     if (fileSubpath === "" || fileSubpath === "index.html") {
       fileSubpath = "index.html";
+    }
+    if (fileSubpath.endsWith("/")) {
+      fileSubpath += "index.html";
     }
     if (fileSubpath.includes("..")) {
       res.writeHead(403);

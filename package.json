@@ -14,6 +14,8 @@
     "dashboard:watch": "node scripts/watch-dashboard.mjs",
     "web:check": "node apps/web/scripts/validate-public-site.mjs",
     "web:content:check": "node docs/gtm/automation/gtm-backlog-sync.mjs && node apps/web/scripts/validate-public-site.mjs",
+    "technical-academy:build": "node scripts/build-technical-academy.mjs",
+    "technical-academy:check": "node scripts/build-technical-academy.mjs --check",
     "demo:audit": "node scripts/demo-system.mjs audit",
     "demo:showcase": "node scripts/demo-system.mjs showcase",
     "demo:workshop": "node scripts/demo-system.mjs workshop",

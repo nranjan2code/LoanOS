@@ -21,6 +21,12 @@ Every published guide records:
 
 The existing product, architecture, compliance and decision-record documents remain authoritative. User guidance must use the maturity language from `product/product-journey-support-matrix.md`; a guide existing is not evidence of production readiness.
 
+## Technical Academy course surface
+
+The Technical Academy at `/help/technical-academy/` is the system-level learning path. Its curriculum contract is `docs/product/technical-academy-curriculum.md`; structured content lives under `apps/help/technical-academy/content/`. It covers the product definition, architecture, code/runtime boundaries, complete lending lifecycle, control plane, integrations, security and operations. All 21 canonical product contracts generate their own detailed journey lesson with contract facts/evidence, lifecycle, API/state/evidence map, regulatory controls, maturity boundary and mandatory adverse-case matrix. Every session carries a generated accessible SVG flow and direct repository sources.
+
+`npm run technical-academy:build` renders the static course and `npm run technical-academy:check` verifies drift. The generator validates cited sources, regulatory IDs and complete 21-journey coverage. The course is explanatory and does not elevate any capability or journey to production-ready.
+
 ## Future tenant and regulated-entity customization
 
 Customization is intentionally deferred. A future overlay must:
