@@ -1,3 +1,20 @@
+/**
+ * Loan policy: the JS-side compliance gate for the origination -> KFS ->
+ * sanction -> disbursement path (RBI Digital Lending Directions 2025, KFS
+ * 2024, KYC 2016, DPDP 2023/2025, Aadhaar, penal-charge rules — see
+ * `compliance-controls.js` for the full register). Every public function
+ * here follows the same shape: gather `findings` (each tagged with the
+ * `controlId` it enforces via `createFinding`), roll them up with
+ * `summarizeFindings`, and fail closed — any "error" finding blocks the
+ * caller from proceeding, never a permissive default.
+ *
+ * Distinct from the Rust decision engine (`rules/`): this module checks
+ * *compliance* preconditions (is the application even eligible to be
+ * decided on — KYC done, consent captured, KFS correct, funds flowing to a
+ * permitted account), not the underwriting/pricing *decision* itself, which
+ * is versioned policy data evaluated by the engine per AGENTS.md's
+ * "policy is data" rule.
+ */
 import { createFinding, summarizeFindings } from "./compliance-controls.js";
 import { evaluateModelUse } from "./model-governance.js";
 import { GST_RATE_BPS, summarizeGst, withGstDisclosure } from "./tax.js";
@@ -38,14 +55,17 @@ const ALLOWED_LOAN_CURRENCIES = new Set(["INR"]);
 const ALLOWED_ACCOUNT_ROLES_FOR_DISBURSEMENT = new Set(["borrower", "end_beneficiary"]);
 const PROHIBITED_FUND_CONTROL_ROLES = new Set(["lsp", "dla", "pass_through", "pool_account"]);
 
+/** @param {string} [prefix] @returns {string} a globally unique loan-domain id, e.g. "loan_<uuid>". */
 export function createLoanId(prefix = "loan") {
   return `${prefix}_${randomUUID()}`;
 }
 
+/** Round to 2 decimal places (paise), guarding against float error; null for non-finite input. */
 function roundMoney(value) {
   return Number.isFinite(value) ? Math.round((value + Number.EPSILON) * 100) / 100 : null;
 }
 
+/** Add `days` calendar days to `date`, skipping Sat/Sun — used for KFS proposal validity windows. */
 function addWorkingDays(date, days) {
   const result = new Date(date);
   let remaining = days;
@@ -57,6 +77,20 @@ function addWorkingDays(date, days) {
   return result;
 }
 
+/**
+ * APR (in bps) as the cash-flow-effective annualized rate implied by netting
+ * mandatory upfront charges off the principal and solving for the periodic
+ * IRR that equates the amortization schedule's cash flows to that net
+ * disbursal — the KFS APR definition required by RBI-KFS-2024, not the
+ * nominal/nameplate interest rate. Solved by bisection (100 iterations over
+ * [0, 10] per-period rate) since there's no closed form for an arbitrary
+ * schedule; returns null if there's no positive net disbursal or schedule.
+ * @param {number} principalAmount
+ * @param {number} upfrontCharges - GST-inclusive mandatory charges deducted at disbursal.
+ * @param {Array<{totalDue: number}>} schedule - amortization schedule rows.
+ * @param {number} [periodsPerYear] - compounding periods/year for annualization.
+ * @returns {number|null} APR in basis points, or null if not computable.
+ */
 function calculateCashFlowAprBps(principalAmount, upfrontCharges, schedule, periodsPerYear = 12) {
   const netDisbursal = principalAmount - upfrontCharges;
   if (!Number.isFinite(netDisbursal) || netDisbursal <= 0 || !Array.isArray(schedule) || schedule.length === 0) return null;
@@ -72,6 +106,11 @@ function calculateCashFlowAprBps(principalAmount, upfrontCharges, schedule, peri
   return Math.round((((1 + monthlyIrr) ** periodsPerYear) - 1) * 10000);
 }
 
+/**
+ * @param {string|Date} dateOfBirth
+ * @param {Date} [now] - clock override.
+ * @returns {number|null} whole-year age as of `now` (UTC calendar), or null if `dateOfBirth` is missing/invalid.
+ */
 export function calculateAgeYears(dateOfBirth, now = new Date()) {
   if (!dateOfBirth) {
     return null;
@@ -90,6 +129,19 @@ export function calculateAgeYears(dateOfBirth, now = new Date()) {
   return age;
 }
 
+/**
+ * Run every compliance precondition gate against a loan application: tenant
+ * (RE) licensing, India-only residency, consent, KYC/screening, economic
+ * profile, product bounds, data residency, fund-flow account controls, KFS
+ * (if already attached), and AI-decision governance (if an `aiDecision` is
+ * present). Fails closed via `summarizeFindings` — this function only
+ * *reports*, callers decide what to do with a "blocked" summary.
+ * @param {object} application - the application record; see the individual
+ *   `check*` helpers below for exactly which fields each one reads.
+ * @param {{now?: Date, modelRegistry?: object}} [options] - `modelRegistry`
+ *   is passed through to `evaluateModelUse` when an AI decision is present.
+ * @returns {{findings: Array<object>, summary: object}}
+ */
 export function evaluateLoanApplication(application, options = {}) {
   const findings = [];
   const now = options.now ?? new Date();
@@ -112,6 +164,19 @@ export function evaluateLoanApplication(application, options = {}) {
   };
 }
 
+/**
+ * Build a Key Facts Statement (RBI-KFS-2024) proposal: the borrower-facing
+ * disclosure of principal, tenor, rate, APR (cash-flow method — see
+ * `calculateCashFlowAprBps`), full amortization schedule, GST-inclusive
+ * charge breakdown, cooling-off period, and prepayment/foreclosure terms.
+ * A revolving facility (credit line/overdraft) gets an *illustrative*
+ * schedule assuming full-limit utilization for the full tenor, since there's
+ * no fixed drawdown to amortize against a real schedule.
+ * @param {object} application - must carry `product`; `borrower`/`tenant`/`origination` feed disclosure fields.
+ * @param {object} [terms] - proposed terms, overriding `application.product` defaults field-by-field.
+ * @param {Date} [now] - clock override; also anchors `validUntil`.
+ * @returns {object} a KFS object shaped for `validateKfs`/`attachKfs`.
+ */
 export function buildKeyFactStatement(application, terms, now = new Date()) {
   const product = application.product ?? {};
   const charges = Array.isArray(terms?.charges) ? terms.charges : product.charges ?? [];
@@ -204,6 +269,15 @@ export function buildKeyFactStatement(application, terms, now = new Date()) {
   };
 }
 
+/**
+ * Attach a freshly-built KFS to an application, resetting its acceptance
+ * fields — a KFS is issued unaccepted; `acceptKfs` is the only path that
+ * fills those in, so re-issuing a KFS can never carry over a stale
+ * acceptance.
+ * @param {object} application
+ * @param {object} kfs - output of `buildKeyFactStatement`.
+ * @returns {object} the application with `kfs` attached.
+ */
 export function attachKfs(application, kfs) {
   return {
     ...application,
@@ -211,6 +285,17 @@ export function attachKfs(application, kfs) {
   };
 }
 
+/**
+ * Record borrower acceptance of an attached KFS. Fails closed if there's no
+ * KFS, the proposal has expired (`validUntil` passed), acceptance isn't
+ * bound to an authenticated borrower with evidence, or — when the KFS was
+ * issued in a non-English language — the borrower hasn't confirmed
+ * understanding in that same language (RBI-FPC).
+ * @param {object} application - must carry an attached `kfs`.
+ * @param {{acceptedBy: string, acceptanceEvidenceRef: string, acceptanceChannel?: string, understoodLanguage?: string, languageConfirmationRef?: string}} [input]
+ * @param {Date} [now] - clock override; used against `kfs.validUntil`.
+ * @returns {{application: object, findings: Array<object>, summary: object}}
+ */
 export function acceptKfs(application, input = {}, now = new Date()) {
   const findings = [];
   if (!application?.kfs) {
@@ -250,6 +335,20 @@ export function acceptKfs(application, input = {}, now = new Date()) {
   };
 }
 
+/**
+ * Validate a KFS document's own internal completeness/correctness against
+ * RBI-KFS-2024 and related directions: required identifiers and expiry,
+ * INR-only currency, disclosed language, APR and computation sheet, a
+ * complete amortization schedule matching tenor/frequency, revolving-facility
+ * disclosures, cooling-off period, grievance officer, recovery mechanism,
+ * and per-charge shape/type rules — including the floating-rate individual
+ * retail-loan prohibition on prepayment/foreclosure charges (RBI-FPC-PENAL)
+ * and the ban on disguising penalties as "penal interest" or capitalizing
+ * penal charges. Does not compare against the underlying application/product
+ * — see `validateKfsBeforeDecision` for that cross-check.
+ * @param {object} kfs
+ * @returns {{findings: Array<object>, summary: object}}
+ */
 export function validateKfs(kfs) {
   const findings = [];
 
@@ -344,6 +443,17 @@ export function validateKfs(kfs) {
   };
 }
 
+/**
+ * The pre-sanction gate: runs `validateKfs` on the application's KFS, then
+ * additionally requires borrower acceptance and digital-delivery evidence,
+ * and cross-checks the KFS against the underlying `application.product` —
+ * principal/tenor/rate must match exactly, and every KFS charge (incl.
+ * prepayment/foreclosure fee and lock-in) must be disclosed in and no more
+ * costly than the product policy. This is what stands between an approved
+ * application and disbursement — see `validateDisbursement`.
+ * @param {object} application - must carry `kfs` to check anything meaningful.
+ * @returns {{findings: Array<object>, summary: object}}
+ */
 export function validateKfsBeforeDecision(application) {
   const kfsResult = validateKfs(application.kfs);
   const findings = [...kfsResult.findings];
@@ -470,6 +580,16 @@ export function validateKfsBeforeDecision(application) {
   };
 }
 
+/**
+ * The final gate before money moves: application must be `approved`, its
+ * KFS must clear `validateKfsBeforeDecision`, and the disbursement
+ * destination account must be an India-based, verified account owned by the
+ * borrower or a permitted end-beneficiary — never an LSP/DLA/pass-through/
+ * pool account (RBI-DL-2025's direct-fund-flow requirement).
+ * @param {object} application
+ * @param {{destinationAccount: object}} disbursement
+ * @returns {{findings: Array<object>, summary: object}}
+ */
 export function validateDisbursement(application, disbursement) {
   const findings = [];
 
@@ -503,6 +623,12 @@ export function validateDisbursement(application, disbursement) {
     summary: summarizeFindings(findings)
   };
 }
+
+// Private check* helpers below: each inspects one slice of `application` and
+// pushes "error"/"warning" findings (mutating the shared `findings` array)
+// onto it, tagged with the regulatory control id each check enforces (see
+// `compliance-controls.js`). Field/condition names double as the spec, so
+// this note marks the shared pattern once instead of repeating it per function.
 
 function checkTenant(application, findings) {
   if (!application.regulatedEntityId) {
@@ -730,6 +856,8 @@ function checkKfsIfPresent(application, findings) {
   findings.push(...kfsValidation.findings);
 }
 
+// Only applies when the application carries an AI-influenced decision;
+// delegates the actual kill-switch/validation-status gate to model-governance.js.
 function checkAiDecision(application, findings, modelRegistry) {
   if (!application.aiDecision?.modelId) {
     return;
@@ -738,6 +866,11 @@ function checkAiDecision(application, findings, modelRegistry) {
   findings.push(...modelResult.findings);
 }
 
+// Independent bank-account verification (penny-drop/name-match, not just a
+// syntactically valid account number) is required before funds move, and the
+// verification evidence must actually match the account being paid — the
+// ifsc/accountNumberLast4 cross-checks stop a verified-but-different account
+// being substituted after verification.
 function checkDisbursementAccountVerification(account, path, findings) {
   const verification = account.bankAccountVerification ?? account.verification;
   if (!verification) {
@@ -828,6 +961,9 @@ function checkDisbursementAccountVerification(account, path, findings) {
   }
 }
 
+// Shared by disbursement and repayment account checks; `controlId`/`label`
+// let callers attribute the finding to the right regulatory control and a
+// readable field name.
 function checkAccountIndia(controlId, label, account, path, findings) {
   if (account.country !== "IN") {
     findings.push(createFinding("error", controlId, `${label} country must be IN.`, `${path}.country`));
@@ -837,6 +973,9 @@ function checkAccountIndia(controlId, label, account, path, findings) {
   }
 }
 
+// Enforces the direct-fund-flow rule: money must move between borrower/
+// end-beneficiary and the RE directly, never staged through an LSP, DLA, or
+// pooling/pass-through account (see PROHIBITED_FUND_CONTROL_ROLES above).
 function checkNoProhibitedFundControl(ownerRole, path, findings) {
   if (PROHIBITED_FUND_CONTROL_ROLES.has(ownerRole)) {
     findings.push(createFinding("error", "RBI-DL-2025", "LSP/DLA/pass-through/pool accounts cannot control fund flow.", path));

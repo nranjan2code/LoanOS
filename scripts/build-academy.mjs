@@ -13,9 +13,26 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const OUT = join(ROOT, "apps/help/academy");
 const BASE = "/help/academy";
 const CHECK = process.argv.includes("--check");
-const PRESERVED = new Set(["content", "academy.css"]);
+const PRESERVED = new Set(["content", "assets", "academy.css"]);
 const PLATFORM_TYPES = new Set(["doc", "code", "capability", "surface", "guide"]);
 const PLATFORM_LABEL = { doc: "Document", code: "Code", capability: "Capability", surface: "App surface", guide: "Operating guide" };
+const MODULE_VISUALS = {
+  "m01-landscape": { src: "/assets/images/loanos-people-and-platform.jpg", alt: "Indian business owner and lending team connected through one accountable operating platform", focus: "center" },
+  "m02-onboarding": { src: `${BASE}/assets/images/onboarding-consent.webp`, alt: "Indian customer reviewing consent and onboarding details with a lending officer", focus: "center" },
+  "m03-underwriting": { src: "/assets/images/loanos-lending-team.jpg", alt: "Indian lending team reviewing evidence and a credit case together", focus: "center" },
+  "m04-kfs-sanction": { src: "/shared/images/loanos-india-customer-home.jpg", alt: "Indian customers carefully reviewing their loan information at home", focus: "center" },
+  "m05-lms": { src: `${BASE}/assets/images/loan-servicing.webp`, alt: "Indian customer and servicing specialist reviewing a repayment statement together", focus: "center" },
+  "m06-collections": { src: `${BASE}/assets/images/respectful-collections.webp`, alt: "Indian small-business owner discussing repayment options with a respectful lender representative", focus: "center" },
+  "m07-lws": { src: "/shared/images/loanos-india-operations-team.jpg", alt: "Indian lending operations team coordinating customer work", focus: "center" },
+  "m08-partners": { src: "/assets/images/loanos-partner-workshop.jpg", alt: "Lending partner and MSME team reviewing work in an Indian manufacturing unit", focus: "center" },
+  "m09-compliance": { src: "/assets/images/loanos-trust-review.jpg", alt: "Indian risk and compliance leaders reviewing policy and audit evidence", focus: "center" },
+  "m10-product-customer": { src: "/assets/images/loanos-product-library.jpg", alt: "Indian business owner representing the customer need behind a lending product", focus: "center" },
+  "m11-lending-terms": { src: "/shared/images/loanos-india-customer-home.jpg", alt: "Indian customers reviewing the terms and records that define their loan", focus: "center" },
+  "m12-collateral": { src: "/assets/images/loanos-msme-manufacturing.jpg", alt: "Indian manufacturing business and productive assets supported by secured finance", focus: "center" },
+  "m13-ba-practice": { src: "/assets/images/loanos-resource-workshop.jpg", alt: "Indian business analysts mapping requirements, evidence and controls in a working session", focus: "center" },
+  journeys: { src: "/assets/images/loanos-product-library.jpg", alt: "Indian business owner representing the real needs behind lending product journeys", focus: "center" },
+  "m10-capstone": { src: "/assets/images/loanos-resource-workshop.jpg", alt: "Indian business analysts mapping a lending journey in a working session", focus: "center" }
+};
 
 const { course, glossary } = await import(pathToFileURL(join(OUT, "content/course.mjs")).href);
 const { PRODUCT_JOURNEY_CONTRACTS } = await import(pathToFileURL(join(ROOT, "packages/core/src/product-journey-contracts.js")).href);
@@ -113,7 +130,14 @@ function render() {
 }
 
 function esc(text) {
-  return String(text).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+  return typography(text).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+}
+
+function typography(text) {
+  return String(text)
+    .replace(/\s*—\s*/g, " — ")
+    .replace(/[ \t]+([,;:!?])/g, "$1")
+    .replace(/([,;:!?])(?=[A-Za-z])/g, "$1 ");
 }
 
 function inline(text) {
@@ -125,16 +149,32 @@ function slug(term) {
 }
 
 function prose(body) {
-  return body.split(/\n\n+/).map((block) => {
-    const lines = block.split("\n");
+  return typography(body).trim().split(/\n\s*\n+/).map((block) => {
+    const lines = block.split("\n").map((line) => line.trim()).filter(Boolean);
     if (lines.every((line) => line.startsWith("- "))) return `<ul>${lines.map((line) => `<li>${inline(line.slice(2))}</li>`).join("")}</ul>`;
     if (lines.every((line) => /^\d+\.\s/.test(line))) return `<ol>${lines.map((line) => `<li>${inline(line.replace(/^\d+\.\s*/, ""))}</li>`).join("")}</ol>`;
-    return `<p>${lines.map(inline).join("<br>")}</p>`;
+    const sentences = [...new Intl.Segmenter("en", { granularity: "sentence" }).segment(lines.join(" "))]
+      .map(({ segment }) => segment.trim()).filter(Boolean);
+    if (sentences.length <= 2) return `<p>${inline(lines.join(" "))}</p>`;
+    return sentences.map((sentence) => `<p>${inline(sentence)}</p>`).join("");
   }).join("");
 }
 
 function minutes(duration) {
   return Number(/(\d+)/.exec(duration)?.[1] ?? 0);
+}
+
+function visual(module, lesson) {
+  if (module.id === "journeys" && lesson) return {
+    src: `/assets/images/products/${lesson.id}.jpg`,
+    alt: `${lesson.title}: a real Indian customer, business or lending team in the product context`,
+    focus: "center"
+  };
+  return MODULE_VISUALS[module.id];
+}
+
+function figure(item, className = "course-visual", loading = "lazy") {
+  return `<figure class="${className}"><img src="${item.src}" alt="${esc(item.alt)}" loading="${loading}" decoding="async" style="object-position:${item.focus}"></figure>`;
 }
 
 function page(title, description, body, { crumbs = [] } = {}) {
@@ -176,19 +216,25 @@ function homePage(flat) {
   const totalMinutes = flat.reduce((sum, entry) => sum + minutes(entry.lesson.duration), 0);
   const body = `
 <section class="hero">
+  ${figure(MODULE_VISUALS["m01-landscape"], "hero-visual", "eager")}
+  <div class="hero-copy">
   <p class="eyebrow">End-to-end training for business analysts</p>
   <h1>${esc(course.title)}</h1>
   <p class="lede">${esc(course.subtitle)}</p>
   <p class="audience">${esc(course.audience)}</p>
   <div class="stats"><span><strong>${course.modules.length}</strong> modules</span><span><strong>${flat.length}</strong> lessons</span><span><strong>~${Math.round(totalMinutes / 60)} h</strong> total</span><span>Verified ${esc(course.verified)}</span></div>
   <p><a class="primary" href="${BASE}/${course.modules[0].id}/${course.modules[0].lessons[0].id}.html">Start lesson 1.1 →</a></p>
+  </div>
 </section>
 <section class="module-list">
 ${course.modules.map((module) => `  <article class="module-card">
+    ${figure(visual(module), "module-card-visual")}
+    <div class="module-card-copy">
     <p class="eyebrow">Module ${module.number}</p>
     <h2><a href="${BASE}/${module.id}/">${esc(module.title)}</a></h2>
     <p class="tagline">${esc(module.tagline)}</p>
     <ol class="lesson-links">${module.lessons.map((lesson) => `<li><a href="${BASE}/${module.id}/${lesson.id}.html">${esc(lesson.title)}</a><span class="duration">${esc(lesson.duration)}</span></li>`).join("")}</ol>
+    </div>
   </article>`).join("\n")}
 </section>`;
   return page(course.title, course.subtitle, body, { crumbs: [] });
@@ -197,10 +243,13 @@ ${course.modules.map((module) => `  <article class="module-card">
 function modulePage(module, previous, next) {
   const body = `
 <section class="hero">
+  ${figure(visual(module), "hero-visual", "eager")}
+  <div class="hero-copy">
   <p class="eyebrow">Module ${module.number} of ${course.modules.length}</p>
   <h1>${esc(module.title)}</h1>
   <p class="lede">${esc(module.tagline)}</p>
   <p>${esc(module.summary)}</p>
+  </div>
 </section>
 <section class="lesson-cards">
 ${module.lessons.map((lesson, index) => `  <article class="lesson-card">
@@ -227,6 +276,7 @@ function lessonPage(module, lesson, previous, next) {
   const body = `
 <article class="lesson">
   <header class="lesson-head">
+    ${figure(visual(module, lesson), "lesson-visual", "eager")}
     <p class="eyebrow">Lesson ${number} · ${esc(lesson.duration)} · Verified ${esc(lesson.verified)}</p>
     <h1>${esc(lesson.title)}</h1>
     <div class="objectives"><strong>After this lesson you can:</strong><ul>${lesson.objectives.map((objective) => `<li>${esc(objective)}</li>`).join("")}</ul></div>

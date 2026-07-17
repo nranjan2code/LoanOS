@@ -2,15 +2,19 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
-import { course } from "../apps/help/technical-academy/content/course.mjs";
+import { capabilityCoverage, course } from "../apps/help/technical-academy/content/course.mjs";
 import { technicalJourneyTypes } from "../apps/help/technical-academy/content/journey-lessons.mjs";
 
 const root = new URL("../", import.meta.url);
 function run(command,args){return new Promise((resolve,reject)=>{const child=spawn(command,args,{cwd:root,stdio:"pipe"});let stderr="";child.stderr.on("data",d=>stderr+=d);child.on("close",code=>code?reject(new Error(stderr)):resolve());});}
 
 test("technical academy contract covers the platform and all journey archetypes", async () => {
-  assert.equal(course.modules.length, 6);
-  assert.equal(course.modules.reduce((sum,module)=>sum+module.lessons.length,0), 45);
+  assert.equal(course.modules.length, 12);
+  assert.equal(course.modules.reduce((sum,module)=>sum+module.lessons.length,0), 71);
+  assert.deepEqual(Object.keys(capabilityCoverage).map(Number), Array.from({length:33},(_,index)=>index+1));
+  const engine = course.modules.find((module)=>module.id==="t04-rules-engine");
+  assert.equal(engine.lessons.length, 6);
+  assert.deepEqual(engine.lessons.map((lesson)=>lesson.id), ["engine-contract","model-expression","bundle-governance","evaluation","runtime-topology","replay-testing-operations"]);
   const journeys = course.modules.find((module)=>module.id==="t05-journeys");
   assert.equal(journeys.lessons.length, 25);
   assert.deepEqual(journeys.lessons.filter((lesson)=>lesson.journeyType).map((lesson)=>lesson.journeyType), technicalJourneyTypes);
@@ -33,6 +37,9 @@ test("technical academy pages are generated, visual and current", async () => {
   const html=await readFile(new URL("apps/help/technical-academy/index.html",root),"utf8");
   const lesson=await readFile(new URL("apps/help/technical-academy/t01-system/platform-map.html",root),"utf8");
   assert.match(html,/LoanOS Technical Academy/);
+  assert.match(html,/The Rules Engine/);
+  assert.match(html,/Explore the enterprise architecture/);
+  assert.match(html,/<strong>463<\/strong> (?:capability records|capabilities)/);
   assert.match(lesson,/<svg/);
   assert.match(lesson,/System sources/);
   assert.doesNotMatch(lesson,/localStorage|sessionStorage|indexedDB/);
@@ -40,6 +47,45 @@ test("technical academy pages are generated, visual and current", async () => {
   assert.match(journey,/Complete case matrix/);
   assert.match(journey,/Maturity and production boundary/);
   assert.match(journey,/Provider timeout/);
+});
+
+test("enterprise architecture explorer links every layer to role-relevant learning", async () => {
+  const html=await readFile(new URL("apps/help/technical-academy/architecture/index.html",root),"utf8");
+  assert.equal((html.match(/class="architecture-layer/g)??[]).length,6);
+  assert.match(html,/View by responsibility/);
+  assert.match(html,/Study this subsystem/);
+  assert.match(html,/architecture-explorer\.js/);
+  assert.doesNotMatch(html,/3D|HUD|sci-fi/i);
+});
+
+test("capability atlas renders every individual catalogue record", async () => {
+  const atlas=await readFile(new URL("apps/help/technical-academy/capability-atlas/index.html",root),"utf8");
+  assert.equal((atlas.match(/class="atlas-family-card"/g)??[]).length,33);
+  let records=0;
+  for(let number=1;number<=33;number++){
+    const page=await readFile(new URL(`apps/help/technical-academy/capability-atlas/family-${String(number).padStart(2,"0")}.html`,root),"utf8");
+    records+=(page.match(/class="capability-writeup"/g)??[]).length;
+    assert.match(page,/Open the primary technical lesson/);
+    assert.match(page,/Acceptance boundary/);
+    assert.match(page,/Current maturity and gap/);
+    assert.match(page,/Implementation and verification evidence/);
+  }
+  assert.equal(records,463);
+});
+
+test("integration atlas renders every external boundary with safe-failure guidance", async () => {
+  const atlas=await readFile(new URL("apps/help/technical-academy/integration-atlas/index.html",root),"utf8");
+  assert.equal((atlas.match(/class="atlas-family-card"/g)??[]).length,12);
+  let records=0;
+  for(const prefix of ["cus","los","rsk","lws","lms","col","colat","fin","reg","prt","plt","adm"]){
+    const page=await readFile(new URL(`apps/help/technical-academy/integration-atlas/${prefix}.html`,root),"utf8");
+    records+=(page.match(/class="integration-writeup"/g)??[]).length;
+    assert.match(page,/Required external contract/);
+    assert.match(page,/Current implementation boundary/);
+    assert.match(page,/Mandatory failure behavior/);
+    assert.match(page,/Certification and production checklist/);
+  }
+  assert.equal(records,115);
 });
 
 test("all 21 journeys render the complete visual and regulatory blueprint", async () => {

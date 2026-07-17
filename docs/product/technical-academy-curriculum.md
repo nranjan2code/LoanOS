@@ -16,13 +16,23 @@ A lesson, route or screen is not evidence of production readiness. The course mu
 
 ## Curriculum
 
-The course has six modules and 45 deep-dive sessions. The journey module contains one composition overview, one dedicated lesson for each of the 21 canonical product journeys, and three shared casebooks for adverse outcomes, state/evidence tracing and production certification.
+The course has twelve modules and 71 deep-dive sessions. The journey module contains one composition overview, one dedicated lesson for each of the 21 canonical product journeys, and three shared casebooks for adverse outcomes, state/evidence tracing and production certification.
+
+The generated Capability Atlas is the exhaustive individual-requirement companion to the curriculum. It publishes all 463 unique capability IDs from the 33-family complete-system catalogue with their canonical names, applicability and current status, plus a route into the primary technical lesson for each family. Every individual record includes its acceptance boundary, current maturity/gap, accountable owner, plane, dependencies, review date and expandable implementation/test/document evidence from `capability-trace.json`. The build fails if a capability disappears, an ID is duplicated, a write-up or evidence set is incomplete, catalogue and trace disagree, a family lacks a lesson mapping or the rendered atlas drifts from its source.
+
+The generated Integration Atlas is the exhaustive external-boundary companion. It renders all 115 `INT-*` contracts from the platform module integration and API map across 12 domains. Each write-up includes required operations, direction and response, current mock/live boundary, downstream consumers, restrictive failure behavior and the certification/production checklist. The build fails if an integration disappears, duplicates another ID or rendered content drifts.
 
 - System orientation: whole-platform map, product planes, request lifecycle and sources of truth.
 - Tenancy, identity and activation: isolation, staffing authority and organisation bootstrap.
+- Channels, APIs, storage and data: user-surface authority, API composition and idempotency, file/PostgreSQL storage with RLS, and governed reporting/data products.
+- Customers, identity and application risk: CRM/party graphs, consent and data-principal rights, KYC/CDD/AML, fraud operations, and document/OCR custody.
 - Lending lifecycle: origination, KFS/contract/disbursement, LMS exact-money ledger, servicing through closure.
-- Workflow, policy, AI and evidence: LWS, deterministic Rust engine, governed workers and audit/compliance.
+- Credit, collateral and payments: CAM and human underwriting, asset/security perfection, payment rails, allocation and reconciliation.
+- The Rules Engine: architecture invariants, typed facts and expressions, bundle compilation/signing, exact deterministic evaluation, per-tenant runtime topology, gateways, replay, testing and fleet operations.
+- Workflow, AI and evidence: LWS, governed workers and audit/compliance around deterministic decisions.
 - All product journeys: the composition framework; 21 individual end-to-end technical lessons; and adverse-case, state/evidence and production-certification casebooks.
+- Institutional control and economics: product administration, partner economics, finance/tax/treasury, portfolio risk, customer protection and regulatory reporting.
+- Field delivery, implementation and engineering quality: branch/DSA/field architecture, migration/UAT/adoption and the repository definition of done.
 - Integrations, security and operations: provider conformance, data/security, AWS releases, observability/recovery and an end-to-end capstone.
 
 Every session contains 2–3 learning outcomes, at least three detailed explanations, an accessible generated SVG technical flow and at least two existing repository sources. Every individual journey lesson additionally exposes its exact contract facts/evidence, facility/security/accounting model, eight lifecycle sections, current maturity boundary and a 17-case matrix covering happy path, policy decline, evidence failure, provider timeout, replay, stale versions, tenant/role/self-approval violations, revocation, reconciliation/accounting failures, delinquency, cancellation, closure, rollback and audit replay. Content lives in `apps/help/technical-academy/content/`; generated HTML is never edited directly.

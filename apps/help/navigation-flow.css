@@ -1,0 +1,6 @@
+.path-nav{position:sticky;top:78px;z-index:4;display:flex;gap:8px;margin:18px 0 0;padding:10px;border:1px solid var(--line);border-radius:12px;background:rgba(251,250,246,.95);backdrop-filter:blur(12px)}
+.path-nav button{padding:9px 13px;border:0;border-radius:8px;background:transparent;color:var(--forest);font-size:.72rem;font-weight:700;cursor:pointer}
+.path-nav button:hover,.path-nav button:focus-visible{background:var(--sand)}
+#curriculum,#role-practice,#task-guides{scroll-margin-top:145px}
+.module-position{display:block;margin-bottom:7px;color:var(--muted);font-size:.6rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+@media(max-width:600px){.path-nav{top:78px;overflow-x:auto}.path-nav button{white-space:nowrap}}

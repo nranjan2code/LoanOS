@@ -41,6 +41,14 @@ export const AUDIT_DATA_CLASSES = {
   OPERATIONAL: "operational"
 };
 
+/**
+ * Infer the data-sensitivity class for an audit event from its `type` string,
+ * so every event gets a classification even if the caller didn't set one.
+ * Order matters: patterns are checked personal -> financial -> model
+ * governance -> platform, falling back to `operational`.
+ * @param {string} type - the event's `type` field (e.g. "loan.disbursed").
+ * @returns {string} one of the `AUDIT_DATA_CLASSES` values.
+ */
 export function classifyAuditDataClass(type) {
   const value = String(type ?? "");
   if (/borrower|consent|kyc|complaint|grievance|communication|vcip/.test(value)) {
@@ -68,6 +76,14 @@ export function classifyAuditDataClass(type) {
 
 // Fill the provenance envelope on any not-yet-sealed event, never overriding a
 // value a handler set explicitly (e.g. break-glass stamps its own actor).
+/**
+ * @param {Array<object>} events - raw events, sealed or not.
+ * @param {{actor?: string|null, actorType?: string}} [opts] - default provenance
+ *   to apply when an event doesn't already specify its own.
+ * @returns {Array<object>} events with `actor`/`actorType`/`dataClass` filled
+ *   in. Already-sealed events (carrying `hash`) pass through unchanged so a
+ *   past attestation can never be retroactively re-stamped.
+ */
 export function stampAuditEvents(events, { actor = null, actorType = AUDIT_ACTOR_TYPES.SYSTEM } = {}) {
   const source = Array.isArray(events) ? events : [];
   return source.map((event) => {
@@ -83,12 +99,26 @@ export function stampAuditEvents(events, { actor = null, actorType = AUDIT_ACTOR
   });
 }
 
+/**
+ * The chain's root hash for a given tenant — the `previousHash` of event 0.
+ * Deriving it from `tenantId` (rather than a fixed constant) is what makes a
+ * chain non-transplantable: replaying tenant A's events against tenant B's
+ * genesis hash breaks the chain at the very first link.
+ * @param {string|null|undefined} tenantId
+ * @returns {string} hex sha256 digest.
+ */
 export function auditGenesisHash(tenantId) {
   return createHash("sha256").update(`${GENESIS_PREFIX}${tenantId ?? ""}`).digest("hex");
 }
 
-// Deterministic serialization: sort object keys recursively so the hash is
-// stable regardless of key insertion order across load/save round-trips.
+/**
+ * Deterministic serialization: sort object keys recursively so the hash is
+ * stable regardless of key insertion order across load/save round-trips.
+ * Not general-purpose JSON canonicalization — it's only correct for the
+ * plain-data shapes audit events actually contain (no Dates, Maps, etc).
+ * @param {*} value
+ * @returns {string}
+ */
 function canonicalize(value) {
   if (Array.isArray(value)) {
     return `[${value.map(canonicalize).join(",")}]`;
@@ -100,11 +130,27 @@ function canonicalize(value) {
   return JSON.stringify(value ?? null);
 }
 
+/**
+ * The chain-link hash: covers the previous event's hash plus this event's own
+ * fields (its own `hash`, if present, is excluded so the function is usable
+ * both to seal a new event and to re-derive/verify an existing one).
+ * @param {object} event - a sealed or about-to-be-sealed event.
+ * @param {string} previousHash - hash of the immediately preceding event (or
+ *   the tenant's genesis hash for the first event).
+ * @returns {string} hex sha256 digest.
+ */
 export function computeAuditHash(event, previousHash) {
   const { hash, ...rest } = event;
   return createHash("sha256").update(`${previousHash}\n${canonicalize(rest)}`).digest("hex");
 }
 
+/**
+ * Drop the chain-managed structural fields (`RESERVED_FIELDS`), leaving only
+ * the caller-supplied payload. Used when sealing so a handler can't smuggle a
+ * forged `sequence`/`hash`/`previousHash` into its own event.
+ * @param {object} event
+ * @returns {object} payload with reserved fields removed.
+ */
 function stripReserved(event) {
   const payload = {};
   for (const [key, value] of Object.entries(event)) {
@@ -115,9 +161,18 @@ function stripReserved(event) {
   return payload;
 }
 
-// Seal any not-yet-sealed events at the tail of the chain. Already-sealed events
-// (those carrying a `hash`) are trusted and left untouched, so sealing is
-// idempotent and cheap to run on every save.
+/**
+ * Seal any not-yet-sealed events at the tail of the chain. Already-sealed
+ * events (those carrying a `hash`) are trusted and left untouched, so sealing
+ * is idempotent and cheap to run on every save — call it with the full event
+ * list each time rather than tracking "new" events separately.
+ * @param {Array<object>} events - full ordered event list for one tenant;
+ *   a prefix may already be sealed.
+ * @param {string|null} tenantId - binds the chain root; must match the
+ *   tenant these events belong to.
+ * @param {{now?: Date}} [opts] - clock override for deterministic tests.
+ * @returns {Array<object>} the full list with every event sealed.
+ */
 export function sealAuditChain(events, tenantId, { now = new Date() } = {}) {
   const source = Array.isArray(events) ? events : [];
   const sealed = [];
@@ -147,6 +202,16 @@ export function sealAuditChain(events, tenantId, { now = new Date() } = {}) {
   return sealed;
 }
 
+/**
+ * Walk the chain from the tenant's genesis hash and confirm every event's
+ * sequence number, `previousHash` linkage, and content hash are all
+ * consistent. Returns at the first break rather than continuing, since one
+ * broken link invalidates everything after it anyway.
+ * @param {Array<object>} events - ordered, presumed-sealed events.
+ * @param {string|null} tenantId - must match the tenant the chain was sealed
+ *   under, or verification will fail at index 0.
+ * @returns {{valid: boolean, brokenAt: number|null, reason: string|null, eventId?: string|null, count?: number, headHash?: string}}
+ */
 export function verifyAuditChain(events, tenantId) {
   const source = Array.isArray(events) ? events : [];
   let previousHash = auditGenesisHash(tenantId);
@@ -166,6 +231,15 @@ export function verifyAuditChain(events, tenantId) {
   return { valid: true, brokenAt: null, reason: null, count: source.length, headHash: previousHash };
 }
 
+/**
+ * @param {object} event
+ * @param {{type?: string, from?: string, to?: string, subjectId?: string|number}} [filters]
+ *   `from`/`to` compare lexicographically against `occurredAt` (ISO strings
+ *   sort correctly this way); `subjectId` matches if *any* field on the event
+ *   stringifies to that value, since the id of interest lives under a
+ *   different key per event type (loanId, applicationId, borrowerId, ...).
+ * @returns {boolean}
+ */
 function matchesFilters(event, filters = {}) {
   if (filters.type && event.type !== filters.type) {
     return false;
@@ -189,6 +263,18 @@ function matchesFilters(event, filters = {}) {
 // filtered) plus an integrity attestation covering the whole chain. The
 // integrity verdict always covers the full chain, not just the filtered view,
 // so a filtered export still proves the underlying record is untampered.
+/**
+ * @param {Array<object>} events - full ordered event list for one tenant.
+ * @param {string|null} tenantId
+ * @param {{now?: Date, filters?: object}} [opts] - `filters` narrows which
+ *   events are included in the export; `now` is a clock override for tests.
+ * @returns {{tenantId: string|null, generatedAt: string, eventCount: number,
+ *   exportedCount: number, firstEventAt: string|null, lastEventAt: string|null,
+ *   genesisHash: string, headHash: string, integrity: object, events: Array<object>}}
+ *   an evidence pack whose `integrity` verdict always covers the *full*
+ *   chain, independent of `filters` — a filtered export still proves the
+ *   underlying record is untampered.
+ */
 export function buildAuditEvidencePack(events, tenantId, { now = new Date(), filters } = {}) {
   const source = Array.isArray(events) ? events : [];
   const integrity = verifyAuditChain(source, tenantId);

@@ -1,3 +1,19 @@
+/**
+ * Eligibility & affordability assessment (RBI-DL-2025's requirement that
+ * borrower creditworthiness be assessed from economic-profile data before a
+ * credit decision). Combines loan-parameter bounds, age, income/FOIR
+ * affordability, and credit-bureau underwriting into one `evaluateEligibility`
+ * call whose most conservative finding decides the outcome: eligible / refer
+ * (manual underwriting) / ineligible.
+ *
+ * Money math here is intentionally not floating point: JSON numbers are
+ * quantised once into integer paise/BigInt at the JS boundary
+ * (`toScaledInteger`/`toPaise`) and every ratio/EMI/affordability
+ * calculation is done in that integer domain, converting back to a Number
+ * only for the final reported figure. This mirrors the `rust_decimal`-only
+ * discipline the Rust decision engine enforces (INV-6) — an approval must
+ * never hinge on floating-point drift, even though this module is JS, not Rust.
+ */
 import { createFinding, summarizeFindings } from "./compliance-controls.js";
 import { calculateAgeYears, createLoanId } from "./loan-policy.js";
 
@@ -43,6 +59,14 @@ const MAX_SAFE_MONEY_PAISE = BigInt(Number.MAX_SAFE_INTEGER) * PAISE_PER_RUPEE;
 // at that boundary, then perform every affordability calculation as integer
 // paise. This deliberately replaces the former Number.EPSILON-based money
 // math: an approval must never depend on floating-point drift.
+/**
+ * Convert a decimal Number into a fixed-point BigInt with `fractionDigits`
+ * digits after the point, via string formatting (never float multiplication,
+ * which would reintroduce the drift this module exists to avoid).
+ * @param {number} value
+ * @param {number} fractionDigits
+ * @returns {bigint|null} null if `value` isn't finite or is too large to round-trip through `toFixed`.
+ */
 function toScaledInteger(value, fractionDigits) {
   if (!Number.isFinite(value) || Math.abs(value) >= 1e21) return null;
   const negative = value < 0;
@@ -53,27 +77,40 @@ function toScaledInteger(value, fractionDigits) {
   return negative ? -scaled : scaled;
 }
 
+/** @param {number} value - a rupee amount. @returns {bigint|null} the amount in integer paise. */
 function toPaise(value) {
   return toScaledInteger(value, 2);
 }
 
+/** Integer division rounded to nearest (half up), avoiding float division entirely. @returns {bigint|null} null if `denominator <= 0`. */
 function roundedDivide(numerator, denominator) {
   if (denominator <= 0n) return null;
   return (numerator * 2n + denominator) / (denominator * 2n);
 }
 
+/** @param {bigint} paise @returns {number|null} rupee amount, or null if out of the safe-integer range. */
 function moneyFromPaise(paise) {
   if (paise === null || paise < 0n || paise > MAX_SAFE_MONEY_PAISE) return null;
   return Number(paise) / Number(PAISE_PER_RUPEE);
 }
 
+/** @param {bigint} value - a value scaled by `RATIO_SCALE`. @returns {number|null} the unscaled ratio. */
 function ratioFromScaled(value) {
   if (value === null || value < 0n || value > BigInt(Number.MAX_SAFE_INTEGER)) return null;
   return Number(value) / Number(RATIO_SCALE);
 }
 
-// Reducing-balance EMI, matching the amortization used by the LMS schedule so
-// affordability is assessed on the same repayment the borrower will owe.
+/**
+ * Reducing-balance EMI, matching the amortization used by the LMS schedule
+ * so affordability is assessed on the same repayment the borrower will owe.
+ * All arithmetic is integer-paise/BigInt (see file header); a zero-rate loan
+ * short-circuits to a plain principal/tenor split since the standard EMI
+ * formula divides by rate.
+ * @param {number} principalAmount - rupees.
+ * @param {number} annualInterestRateBps - annual rate in basis points; must be a non-negative safe integer.
+ * @param {number} tenorMonths - must be a positive safe integer.
+ * @returns {number|null} monthly EMI in rupees, or null if any input is invalid.
+ */
 export function estimateEmi(principalAmount, annualInterestRateBps, tenorMonths) {
   if (!Number.isFinite(principalAmount) || principalAmount <= 0) {
     return null;
@@ -100,9 +137,23 @@ export function estimateEmi(principalAmount, annualInterestRateBps, tenorMonths)
   return moneyFromPaise(roundedDivide(numerator, denominator));
 }
 
-// Policy-driven creditworthiness/affordability assessment. Anchored to the
-// RBI Digital Lending obligation that borrower creditworthiness be assessed
-// using economic-profile data before a credit decision is taken.
+/**
+ * Policy-driven creditworthiness/affordability assessment. Anchored to the
+ * RBI Digital Lending obligation that borrower creditworthiness be assessed
+ * using economic-profile data before a credit decision is taken. Checks, in
+ * order: loan-amount/tenor against product bounds, borrower age at
+ * application and at maturity, income floor, credit-bureau underwriting
+ * (`evaluateBureauReports`), and FOIR (fixed obligation-to-income ratio,
+ * income preferring Account Aggregator-verified data over self-declared,
+ * obligations taking the most conservative of declared/bureau-derived/
+ * AA-derived). The overall `summary.status` maps to a decision: any error
+ * -> `ineligible`, else any warning -> `refer` (manual underwriting), else
+ * `eligible`.
+ * @param {object} application - `product`, `borrower`, `economicProfile`,
+ *   optionally `bureauReport(s)`/`aaAnalytics`.
+ * @param {{now?: Date, eligibilityId?: string}} [options]
+ * @returns {{assessment: object, findings: Array<object>, summary: object}}
+ */
 export function evaluateEligibility(application, options = {}) {
   const now = options.now ?? new Date();
   const findings = [];

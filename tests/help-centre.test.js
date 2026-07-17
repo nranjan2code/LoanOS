@@ -3,9 +3,11 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 test("help centre exposes role guidance, learning paths and governed status labels", async () => {
-  const [html, js] = await Promise.all([
+  const [html, js, roleCss, navigationCss] = await Promise.all([
     readFile(new URL("../apps/help/index.html", import.meta.url), "utf8"),
-    readFile(new URL("../apps/help/help.js", import.meta.url), "utf8")
+    readFile(new URL("../apps/help/help.js", import.meta.url), "utf8"),
+    readFile(new URL("../apps/help/responsibility-paths.css", import.meta.url), "utf8"),
+    readFile(new URL("../apps/help/navigation-flow.css", import.meta.url), "utf8")
   ]);
   assert.match(html, /Guide & Academy/);
   assert.match(html, /My learning/);
@@ -14,6 +16,16 @@ test("help centre exposes role guidance, learning paths and governed status labe
   assert.match(js, /Controlled first slice/);
   assert.match(js, /Content scope: LoanOS canonical/);
   assert.match(js, /first-compliant-loan/);
+  assert.match(html, /BA Lending Academy/);
+  assert.match(html, /Sequenced curriculum/);
+  assert.match(js, /const roleCurricula=/);
+  assert.equal((js.match(/practice:\[/g) || []).length, 8, "every responsibility has an applied case");
+  assert.match(roleCss, /\.path-module/);
+  assert.match(html, /aria-label="Responsibility path"/);
+  assert.match(js, /history\.pushState/);
+  assert.match(js, /popstate/);
+  assert.match(js, /sourceRole/);
+  assert.match(navigationCss, /\.path-nav/);
   assert.doesNotMatch(js, /localStorage|sessionStorage|indexedDB/);
 });
 

@@ -12,6 +12,10 @@ import m08 from "./m08-partners.mjs";
 import m09 from "./m09-compliance.mjs";
 import m10 from "./m10-capstone.mjs";
 import m11 from "./m11-journeys.mjs";
+import mProductCustomer from "./m10-product-customer.mjs";
+import mLendingTerms from "./m11-lending-terms.mjs";
+import mCollateral from "./m12-collateral.mjs";
+import mBaPractice from "./m13-ba-practice.mjs";
 
 export const course = {
   id: "ba-lending-academy",
@@ -20,7 +24,7 @@ export const course = {
   audience: "Business analysts, implementation consultants and product managers working on LoanOS or a regulated-entity programme.",
   verified: "17 Jul 2026",
   disclaimer: "Educational content, not legal advice. Regulatory statements summarise the control families in the India regulatory register and must be verified with compliance and counsel before reliance. A capability citation reflects catalogue status, not production readiness.",
-  modules: [m01, m02, m03, m04, m05, m06, m07, m08, m09, m11, m10]
+  modules: [m01, m02, m03, m04, m05, m06, m07, m08, m09, mProductCustomer, mLendingTerms, mCollateral, mBaPractice, m11, m10]
 };
 
 // Course glossary. Lessons reference these terms by exact name; the generator

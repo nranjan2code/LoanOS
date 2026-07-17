@@ -1,3 +1,21 @@
+/**
+ * Model governance: the source of truth for the AI/model kill switch (see
+ * AGENTS.md's "AI is gated" rule and DEC-4). This module owns the model
+ * inventory, its governed lifecycle (draft -> validation -> approved ->
+ * active -> suspended/retired), drift-triggered auto-suspension, and the
+ * global and per-model kill switches.
+ *
+ * This is state management + policy, not enforcement: it decides and records
+ * whether a model may be used (`evaluateModelUse`) and whether/why it has
+ * been killed, but the Rust decision engine (`rules/`) is what actually
+ * enforces the kill switch at evaluation time by reading this state — see
+ * `apps/api/src/rules-engine.js` for the gateway. Every mutating function
+ * here follows the same shape: validate against findings (fail closed on any
+ * "error"-severity finding via `summarizeFindings`), then return a new
+ * immutable registry plus an audit-shaped event. Nothing here reads a clock
+ * or RNG implicitly — `now` is always passed in — so callers can replay
+ * these functions deterministically.
+ */
 import { createFinding, summarizeFindings } from "./compliance-controls.js";
 
 const ACTIVE_STATUSES = new Set(["active"]);
@@ -27,6 +45,11 @@ const MODEL_TRANSITIONS = {
 
 const REASON_REQUIRED_ACTIONS = new Set(["suspend", "retire", "return_for_rework"]);
 
+/**
+ * @returns {object} an empty, correctly-shaped model registry: no models, no
+ *   incidents, no events, and the global kill switch inactive. Use this as
+ *   the initial state for a new tenant's registry.
+ */
 export function createModelRegistryState() {
   return {
     globalKillSwitch: {
@@ -50,6 +73,14 @@ function createGovernanceId(prefix) {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
+/**
+ * Coerce a possibly-partial or missing persisted registry into the full,
+ * well-shaped state every other function in this module expects. Safe to
+ * call on `undefined`/malformed input (e.g. first load for a new tenant) —
+ * falls back to `createModelRegistryState()`.
+ * @param {object|null|undefined} state - persisted registry state, if any.
+ * @returns {object} a normalized registry with all required top-level keys.
+ */
 export function normalizeModelRegistryState(state) {
   if (!state || typeof state !== "object") {
     return createModelRegistryState();
@@ -66,6 +97,23 @@ export function normalizeModelRegistryState(state) {
   };
 }
 
+/**
+ * Push "error" findings (mutating the given array) for any missing or
+ * malformed high-risk-model evidence: SHA-256 evidence hashes, a structured
+ * fairness report (disparate-impact ratio within the 0.8-1.25 corridor,
+ * demographic parity difference, protected attributes), and a structured
+ * explainability report (method + feature importances). Only applies
+ * anything when `riskTier` (from `input` or falling back to `model`) is
+ * `"high"` — low/medium-risk models are exempt from this evidence bar.
+ * Shared by `registerModel`, `transitionModel` (validation + activation
+ * gates), so the bar is identical wherever a high-risk model crosses a
+ * governance checkpoint.
+ * @param {object|null} model - existing model record, or null if not yet registered.
+ * @param {object} input - the caller's request, whose fields take precedence
+ *   over `model`'s when both are present.
+ * @param {Array<object>} findings - findings array to push onto (side effect).
+ * @returns {void}
+ */
 export function validateAIEvidence(model, input, findings) {
   const fairnessAssessmentHash = input?.fairnessAssessmentHash ?? model?.fairnessAssessmentHash;
   const explainabilityHash = input?.explainabilityHash ?? model?.explainabilityHash;
@@ -128,6 +176,17 @@ export function validateAIEvidence(model, input, findings) {
   }
 }
 
+/**
+ * Add a new model to the inventory, or re-register (update) an existing one
+ * under the same `modelId`. Fails closed: if any required field is missing,
+ * or a high-risk model lacks its independent-validation/fairness/
+ * explainability/monitoring evidence, the registry is returned unchanged
+ * (`summary.status === "blocked"`) and no model or event is written.
+ * @param {object} state - current registry state (any shape `normalizeModelRegistryState` accepts).
+ * @param {object} input - model fields; see the `model` object built below for the full shape.
+ * @param {Date} [now] - clock override for deterministic tests.
+ * @returns {{registry: object, model?: object, findings: Array<object>, summary: object}}
+ */
 export function registerModel(state, input, now = new Date()) {
   const registry = normalizeModelRegistryState(state);
   const findings = [];
@@ -237,6 +296,21 @@ export function registerModel(state, input, now = new Date()) {
   };
 }
 
+/**
+ * Move a model through its governed lifecycle per `MODEL_TRANSITIONS`
+ * (e.g. `approve_validation`, `activate`, `suspend`, `retire`). Fails closed
+ * on: an unknown action, a `from` status that doesn't match the model's
+ * current status, a missing reason on a reason-required action, or (for
+ * `approve_validation`) missing/self-approved validation evidence — a
+ * model's owner cannot approve their own model's validation, and a
+ * high-risk or generative model additionally needs fairness/explainability/
+ * monitoring/red-team/hallucination evidence before it can be approved or
+ * activated.
+ * @param {object} state - current registry state.
+ * @param {{modelId: string, action: string, actor: string, reason?: string, [key: string]: *}} input
+ * @param {Date} [now] - clock override.
+ * @returns {{registry: object, model?: object, findings: Array<object>, summary: object}}
+ */
 export function transitionModel(state, input, now = new Date()) {
   const registry = normalizeModelRegistryState(state);
   const findings = [];
@@ -366,6 +440,17 @@ export function transitionModel(state, input, now = new Date()) {
   };
 }
 
+/**
+ * Trip a kill switch — global (all models, all tenants' use of this
+ * registry) or scoped to one model — and open an incident recording why.
+ * A global trip degrades every model-dependent decision to manual review
+ * until `clearGlobalKillSwitch` runs (which itself requires a reviewed
+ * incident); a model-scoped trip just suspends that one model.
+ * @param {object} state - current registry state.
+ * @param {{scope: "global"|"model", reason: string, actor: string, modelId?: string}} input
+ * @param {Date} [now] - clock override.
+ * @returns {{registry: object, incident?: object, findings: Array<object>, summary: object}}
+ */
 export function triggerKillSwitch(state, input, now = new Date()) {
   const registry = normalizeModelRegistryState(state);
   const scope = input?.scope ?? "global";
@@ -469,11 +554,19 @@ export function triggerKillSwitch(state, input, now = new Date()) {
   };
 }
 
-// Drift monitoring: record a metric reading (e.g. PSI, population stability, or
-// a performance measure) against an active model. A reading that breaches the
-// model's drift threshold is a monitoring failure, so it auto-trips a
-// model-scoped kill switch — suspending the model and opening an incident that
-// must be reviewed before the model can run again.
+/**
+ * Drift monitoring: record a metric reading (e.g. PSI, population stability,
+ * or a performance measure) against an active model. A reading that breaches
+ * the model's drift threshold (from the observation, falling back to the
+ * model's own `driftThreshold`) is a monitoring failure, so it auto-trips a
+ * model-scoped kill switch — suspending the model and opening an incident
+ * that must be reviewed before the model can run again. Only applies to
+ * models currently `active`; blocked otherwise.
+ * @param {object} state - current registry state.
+ * @param {{modelId: string, metric: string, value: number, actor: string, threshold?: number, observedAt?: string}} input
+ * @param {Date} [now] - clock override.
+ * @returns {{registry: object, model?: object, observation: object|null, breached: boolean, incident: object|null, findings: Array<object>, summary: object}}
+ */
 export function recordDriftObservation(state, input, now = new Date()) {
   const registry = normalizeModelRegistryState(state);
   const model = registry.models[input?.modelId] ?? null;
@@ -559,8 +652,16 @@ export function recordDriftObservation(state, input, now = new Date()) {
   };
 }
 
-// A kill-switch incident must be reviewed before the switch can be cleared: the
-// review captures root cause and remediation and is retained as evidence.
+/**
+ * A kill-switch incident must be reviewed before the switch can be cleared:
+ * the review captures root cause and remediation and is retained as
+ * evidence. Fails closed if the incident doesn't exist, is already closed,
+ * or any of `reviewedBy`/`reviewRef`/`rootCause`/`remediation` is missing.
+ * @param {object} state - current registry state.
+ * @param {{incidentId: string, reviewedBy: string, reviewRef: string, rootCause: string, remediation: string}} input
+ * @param {Date} [now] - clock override.
+ * @returns {{registry: object, incident?: object, findings: Array<object>, summary: object}}
+ */
 export function recordPostIncidentReview(state, input, now = new Date()) {
   const registry = normalizeModelRegistryState(state);
   const findings = [];
@@ -628,6 +729,17 @@ export function recordPostIncidentReview(state, input, now = new Date()) {
   };
 }
 
+/**
+ * Deactivate the global kill switch. Fails closed unless the switch is
+ * currently active, its incident has a recorded post-incident review, and
+ * the caller supplies both an `actor` and an `approvalRef` — clearing is
+ * deliberately a two-person-attributable action (see AGENTS.md: release/
+ * production-affecting approvals require independent authenticated humans).
+ * @param {object} state - current registry state.
+ * @param {{actor: string, approvalRef: string}} input
+ * @param {Date} [now] - clock override.
+ * @returns {{registry: object, incident?: object|null, findings: Array<object>, summary: object}}
+ */
 export function clearGlobalKillSwitch(state, input, now = new Date()) {
   const registry = normalizeModelRegistryState(state);
   const findings = [];
@@ -698,6 +810,20 @@ export function clearGlobalKillSwitch(state, input, now = new Date()) {
   };
 }
 
+/**
+ * The gate every AI-influenced decision must pass before its model output
+ * may be used: checks the global kill switch, that the model exists, is
+ * `active`, has approved validation, and (for high-risk models) an
+ * independent-validation reference. Also raises non-blocking warnings when a
+ * material-decision model lacks a human-review reference or a
+ * customer-facing model lacks a customer-disclosure reference (FREE-AI-2025
+ * — these degrade the decision but don't block it outright). This is a pure
+ * read/check — it never mutates the registry; callers combine `allowed`
+ * with their own decision logic.
+ * @param {object} state - current registry state.
+ * @param {{modelId: string, humanReviewRef?: string, customerDisclosureRef?: string}} input
+ * @returns {{allowed: boolean, model: object|null, findings: Array<object>, summary: object}}
+ */
 export function evaluateModelUse(state, input) {
   const registry = normalizeModelRegistryState(state);
   const findings = [];

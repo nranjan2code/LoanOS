@@ -25,7 +25,7 @@ A BA who completes the course can:
 
 ## Module map
 
-Eleven modules, fifty-seven lessons. Order is the lending lifecycle, book-ended by the regulatory landscape and a capstone, with a per-journey reference track before the capstone.
+Fifteen modules, seventy-eight lessons. Order follows the lending lifecycle, then closes the previously implicit BA knowledge areas—product/party/document design, the shared lending term set, collateral/finance/reporting and delivery practice—before the per-journey deep dives and capstone.
 
 | # | Module | Lessons |
 | --- | --- | --- |
@@ -38,8 +38,12 @@ Eleven modules, fifty-seven lessons. Order is the lending lifecycle, book-ended 
 | 7 | LWS — Workflow and human control | Queues, SLA and attribution · Maker-checker and committees · Grievance and fraud cases |
 | 8 | Partnerships and product families | LSP and DLA governance · Default Loss Guarantee · Co-lending · Product families |
 | 9 | Compliance operations, data and AI governance | Audit chain and evidence packs · CIC reporting · Data protection operations · Model and AI governance |
-| 10 | The 21 product journeys: deep dives | One lesson per canonical journey — personal loan through trade finance, co-lending and working capital (module id `journeys`) |
-| 11 | Capstone | Trace one compliant loan end to end · The BA toolkit (module id `m10-capstone`; display numbers derive from course order) |
+| 10 | Product, pricing, parties and documents | Product architecture · Pricing and economics · Party model · Document lifecycle · Communications and accessibility |
+| 11 | The lending term set | Facilities and drawdowns · Security and credit support · Cash-flow and pricing terms · Working-capital and trade terms · Asset quality and resolution · Control and evidence terms |
+| 12 | Secured lending, finance and portfolio control | Collateral lifecycle · Security perfection · Accounting and reconciliation · Portfolio and regulatory reporting |
+| 13 | Business analysis practice for lending | Scope and stakeholders · Process/state modelling · Data and migration · Control requirements · Acceptance/UAT · Change and rollout |
+| 14 | The 21 product journeys: deep dives | One lesson per canonical journey — personal loan through trade finance, co-lending and working capital (module id `journeys`) |
+| 15 | Capstone | Trace one compliant loan end to end · The BA toolkit (module id `m10-capstone`; display numbers derive from course order) |
 
 ## Lesson content contract
 
@@ -69,7 +73,7 @@ Citation rules:
 
 1. Loads `apps/help/academy/content/course.mjs`.
 2. Validates the full contract above — unique ids, resolvable `related` links, known regulatory IDs (against the register file), known glossary terms, minimum citations and checks. Validation failure stops the build; no partial output.
-3. Emits static pages under `apps/help/academy/`: course home (`index.html`), one module page per module, one page per lesson, and `glossary.html`. Lesson pages carry breadcrumbs, previous/next lesson navigation, an in-page contents list, "Where this lives in LoanOS" citation panels, glossary term links and related-lesson links.
+3. Emits static pages under `apps/help/academy/`: course home (`index.html`), one module page per module, one page per lesson, and `glossary.html`. Lesson pages carry breadcrumbs, previous/next lesson navigation, an in-page contents list, "Where this lives in LoanOS" citation panels, glossary term links and related-lesson links. Course, module and lesson headers use subject-relevant, human-led Indian photography shared with the public site and portals; journey lessons resolve to the matching product photograph. Academy-only photographs live under `apps/help/academy/assets/images/`, use descriptive alternative text and are preserved across generated-page rebuilds.
 4. `--check` verifies the committed pages are byte-identical to a fresh render (drift gate for CI and reviews).
 
 Commands: `npm run academy:build` (render) and `npm run academy:check` (drift gate). Generated files carry a do-not-edit header; content changes happen only in `content/*.mjs` followed by a rebuild. Pages are static, self-contained, use the shared design tokens, and store nothing in the browser. Because `apps/help` is a whole-directory entry in `deploy/aws/demo-package-manifest.txt`, the rendered course ships with the AWS showcase without packaging changes.

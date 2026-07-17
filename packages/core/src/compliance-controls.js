@@ -1,3 +1,18 @@
+/**
+ * The regulatory control register: the canonical, in-code list of the Indian
+ * lending regulations this platform is built to satisfy (RBI digital lending
+ * directions, KFS, KYC, DPDP, Aadhaar, CERSAI/CKYC, dark-patterns rules,
+ * etc). Each entry names the regulator, the source instrument, and the
+ * concrete obligations it imposes — this is what other compliance checks
+ * cite by `id` (e.g. "RBI-DL-2025") when a `finding` needs to point at *why*
+ * something is blocked, not just that it is.
+ *
+ * This is documentation-as-data: the definitive human-and-regulator-facing
+ * list lives in `docs/compliance/india-regulatory-register.md`
+ * (see AGENTS.md's "load-bearing documents" table) — keep the two in sync
+ * when a control is added, amended, or its status changes (e.g.
+ * "draft" -> "final").
+ */
 export const REGULATORY_CONTROLS = [
   {
     id: "RBI-DL-2025",
@@ -208,14 +223,33 @@ export const REGULATORY_CONTROLS = [
   }
 ];
 
+/**
+ * @returns {Array<object>} a shallow-copied list of every registered control,
+ *   safe for callers to filter/map without mutating the register.
+ */
 export function listRegulatoryControls() {
   return REGULATORY_CONTROLS.map((control) => ({ ...control }));
 }
 
+/**
+ * @param {string} id - a control id, e.g. "RBI-DL-2025".
+ * @returns {object|null} the matching control, or null if unknown.
+ */
 export function getRegulatoryControl(id) {
   return REGULATORY_CONTROLS.find((control) => control.id === id) ?? null;
 }
 
+/**
+ * Build one compliance finding tying a message back to the control it
+ * violates. Callers (KYC, KFS, loan policy, etc. checks) use this as the
+ * uniform finding shape so findings from unrelated checks can be merged and
+ * summarized together via `summarizeFindings`.
+ * @param {"error"|"warning"} severity - "error" blocks; "warning" needs review.
+ * @param {string} controlId - id from `REGULATORY_CONTROLS`.
+ * @param {string} message - human-readable description of the violation.
+ * @param {string|null} [path] - optional pointer to the offending field/record.
+ * @returns {{severity: string, controlId: string, message: string, path: string|null}}
+ */
 export function createFinding(severity, controlId, message, path = null) {
   return {
     severity,
@@ -225,6 +259,14 @@ export function createFinding(severity, controlId, message, path = null) {
   };
 }
 
+/**
+ * Roll a list of findings up into a single verdict: any error blocks
+ * ("blocked"), else any warning needs a human look ("review"), else clean
+ * ("ready"). This fail-closed ordering means a single error always wins over
+ * any number of warnings.
+ * @param {Array<{severity: string}>} findings
+ * @returns {{status: "blocked"|"review"|"ready", errorCount: number, warningCount: number}}
+ */
 export function summarizeFindings(findings) {
   const errors = findings.filter((finding) => finding.severity === "error");
   const warnings = findings.filter((finding) => finding.severity === "warning");

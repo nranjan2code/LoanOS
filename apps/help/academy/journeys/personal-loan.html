@@ -17,18 +17,19 @@
   <a class="brand" href="/help/" aria-label="LoanOS Guide and Academy"><span class="brand-mark">L</span><span><strong>LoanOS</strong><small>BA Lending Academy</small></span></a>
   <nav aria-label="Academy"><a href="/help/academy/">Course home</a><a href="/help/academy/glossary.html">Glossary</a><a href="/help/">Guide</a></nav>
 </header>
-<nav class="crumbs" aria-label="Breadcrumb"><a href="/help/">Guide &amp; Academy</a><span class="crumb-sep">/</span><a href="/help/academy/">BA Lending Academy</a><span class="crumb-sep">/</span><a href="/help/academy/journeys/">Module 10</a><span class="crumb-sep">/</span><span aria-current="page">Lesson 10.1</span></nav>
+<nav class="crumbs" aria-label="Breadcrumb"><a href="/help/">Guide &amp; Academy</a><span class="crumb-sep">/</span><a href="/help/academy/">BA Lending Academy</a><span class="crumb-sep">/</span><a href="/help/academy/journeys/">Module 14</a><span class="crumb-sep">/</span><span aria-current="page">Lesson 14.1</span></nav>
 <main id="main">
 
 <article class="lesson">
   <header class="lesson-head">
-    <p class="eyebrow">Lesson 10.1 · 10 min · Verified 17 Jul 2026</p>
+    <figure class="lesson-visual"><img src="/assets/images/products/personal-loan.jpg" alt="Personal loan: a real Indian customer, business or lending team in the product context" loading="eager" decoding="async" style="object-position:center"></figure>
+    <p class="eyebrow">Lesson 14.1 · 10 min · Verified 17 Jul 2026</p>
     <h1>Personal loan</h1>
     <div class="objectives"><strong>After this lesson you can:</strong><ul><li>Explain the unsecured personal term loan end to end</li><li>Name the affordability tests and rails that carry it</li></ul></div>
   </header>
   <aside class="toc"><strong>On this page</strong><ol><li>The product</li><li>What a BA watches</li><li>Journey contract</li><li>Platform support</li><li>Where this lives in LoanOS</li><li>Knowledge check</li></ol></aside>
   <section><h2>1. The product</h2><p>The baseline of this whole course: an unsecured term loan to a salaried or self-employed individual, repaid by monthly EMI, collected by NACH/UPI mandate. No collateral means underwriting *is* the product: bureau history, verified income, existing obligations and FOIR carry the entire risk decision, and pricing reflects it.</p><p>Because it is unsecured, delinquency management leans on conduct-bound collections and bureau consequences rather than enforcement — modules 5 and 6 apply almost verbatim.</p></section>
-  <section><h2>2. What a BA watches</h2><p>Speed-versus-control is the tension: personal loans are the most digital, most automated journey, so every shortcut proposal (skip a verification, pre-approve on thin data) lands here first. The KFS, cooling-off and fund-flow controls are non-negotiable regardless of how instant the experience feels. This is also LoanOS's deepest journey — the first-slice controlled path traced in the capstone.</p></section>
+  <section><h2>2. What a BA watches</h2><p>Speed-versus-control is the tension: personal loans are the most digital, most automated journey, so every shortcut proposal (skip a verification, pre-approve on thin data) lands here first.</p><p>The KFS, cooling-off and fund-flow controls are non-negotiable regardless of how instant the experience feels.</p><p>This is also LoanOS's deepest journey — the first-slice controlled path traced in the capstone.</p></section>
   <section class="panel journey"><h2>Journey contract <span class="muted">(derived from code at build time)</span></h2>
     <p class="muted">Source: <code>packages/core/src/product-journey-contracts.js</code> · <code>product-journey/personal_loan</code> v1 · checksum <code>135d8b76c64f…</code></p>
     <dl class="contract">
@@ -53,10 +54,10 @@
   <section class="panel platform"><h2>Where this lives in LoanOS</h2><ul><li><span class="cite-type">Capability</span> <code>UWG-009</code> — EMI, FOIR, age, amount and tenor eligibility.</li><li><span class="cite-type">Code</span> <code>packages/core/src/product-journey-contracts.js</code> — The checksummed product contract this page's derived panel is built from.</li></ul></section>
   <section class="terms"><h2>Key terms</h2><p><a class="term" href="/help/academy/glossary.html#emi">EMI</a> <a class="term" href="/help/academy/glossary.html#foir">FOIR</a> <a class="term" href="/help/academy/glossary.html#nach">NACH</a> <a class="term" href="/help/academy/glossary.html#kfs">KFS</a></p></section>
   <section class="panel checks"><h2>Knowledge check</h2><div class="check"><p class="check-q">1. Why does underwriting carry the whole risk decision in this journey?</p><ol class="check-options" type="A"><li>Regulation forbids collateral</li><li>It is unsecured — there is nothing to enforce, so credit assessment is the only protection</li><li>EMIs are small</li><li>The bureau insures it</li></ol><details><summary>Show answer</summary><p><strong>B.</strong> With no security interest, recovery depends on the borrower's capacity and intent — both judged before sanction.</p></details></div></section>
-  <section class="related"><h2>Related lessons</h2><ul><li><a href="/help/academy/m03-underwriting/policy-as-data.html">Credit policy as data: eligibility and the decision engine</a> <span class="muted">(module 3)</span></li><li><a href="/help/academy/m10-capstone/trace-a-loan.html">Capstone: trace one compliant loan end to end</a> <span class="muted">(module 11)</span></li></ul></section>
+  <section class="related"><h2>Related lessons</h2><ul><li><a href="/help/academy/m03-underwriting/policy-as-data.html">Credit policy as data: eligibility and the decision engine</a> <span class="muted">(module 3)</span></li><li><a href="/help/academy/m10-capstone/trace-a-loan.html">Capstone: trace one compliant loan end to end</a> <span class="muted">(module 15)</span></li></ul></section>
 </article>
 <nav class="pager" aria-label="Lesson navigation">
-  <a class="prev" href="/help/academy/m09-compliance/model-governance.html">← Model risk and AI governance: the full picture</a>
+  <a class="prev" href="/help/academy/m13-ba-practice/change-rollout.html">← Change impact, rollout and post-release control</a>
   <a class="next" href="/help/academy/journeys/msme-term-loan.html">MSME term loan →</a>
 </nav>
 </main>
