@@ -225,7 +225,11 @@ package_and_upload() {
     RELEASE_ID="$commit_sha"
   fi
   ARCHIVE_PATH=$(mktemp "/tmp/loanos-showcase-${commit_sha:0:12}.XXXXXX.tar.gz")
-  "$ROOT_DIR/deploy/aws/package-demo.sh" "$ARCHIVE_PATH" "${package_args[@]}"
+  if [[ ${#package_args[@]} -gt 0 ]]; then
+    "$ROOT_DIR/deploy/aws/package-demo.sh" "$ARCHIVE_PATH" "${package_args[@]}"
+  else
+    "$ROOT_DIR/deploy/aws/package-demo.sh" "$ARCHIVE_PATH"
+  fi
   ARCHIVE_SHA=$(shasum -a 256 "$ARCHIVE_PATH" | awk '{print $1}')
   SOURCE_KEY=${SOURCE_KEY:-"releases/${RELEASE_ID}/loanos-server-web.tar.gz"}
   aws s3 cp "$ARCHIVE_PATH" "s3://${SOURCE_BUCKET}/${SOURCE_KEY}" \
