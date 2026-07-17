@@ -21,11 +21,17 @@ Every published guide records:
 
 The existing product, architecture, compliance and decision-record documents remain authoritative. User guidance must use the maturity language from `product/product-journey-support-matrix.md`; a guide existing is not evidence of production readiness.
 
+## BA Lending Academy course surface
+
+The Academy additionally publishes the BA Lending Academy — an end-to-end Indian-lending training course (LOS, LMS, LWS, collections, partnerships, compliance operations) for business analysts — at `/help/academy/`. The curriculum design, module map, per-lesson content contract and governance live in `docs/product/ba-lending-academy-curriculum.md`.
+
+Course pages are generated, never hand-edited: curriculum content is data under `apps/help/academy/content/`, and `scripts/build-academy.mjs` validates the contract (regulatory anchors against the India regulatory register, capability citations against the capability catalogue, guide references against published Guide articles, glossary and cross-link integrity) before rendering static, cross-linked pages. `npm run academy:build` renders; `npm run academy:check` is the drift gate; `tests/ba-academy.test.js` enforces both in CI. The course inherits this document's boundaries: LoanOS-canonical content only, no tenant-authored material, no browser storage, maturity language deferred to the capability catalogue and journey support matrix.
+
 ## Technical Academy course surface
 
-The Technical Academy at `/help/technical-academy/` is the system-level learning path. Its curriculum contract is `docs/product/technical-academy-curriculum.md`; structured content lives under `apps/help/technical-academy/content/`. It covers the product definition, architecture, code/runtime boundaries, complete lending lifecycle, control plane, integrations, security and operations. All 21 canonical product contracts generate their own detailed journey lesson with contract facts/evidence, lifecycle, API/state/evidence map, regulatory controls, maturity boundary and mandatory adverse-case matrix. Every session carries a generated accessible SVG flow and direct repository sources.
+The Technical Academy at `/help/technical-academy/` is the system-level companion to the BA course. Its curriculum contract is `docs/product/technical-academy-curriculum.md`; structured content lives under `apps/help/technical-academy/content/`. It covers the product definition, architecture, code/runtime boundaries, complete lending lifecycle, control plane, integrations, security and operations. All 21 canonical product contracts generate their own detailed journey lesson with contract facts/evidence, lifecycle, API/state/evidence map, maturity boundary and mandatory adverse-case matrix; shared casebooks cover failure handling and production certification. Every session carries a generated accessible SVG flow and direct repository sources.
 
-`npm run technical-academy:build` renders the static course and `npm run technical-academy:check` verifies drift. The generator validates cited sources, regulatory IDs and complete 21-journey coverage. The course is explanatory and does not elevate any capability or journey to production-ready.
+`npm run technical-academy:build` renders the static course and `npm run technical-academy:check` verifies drift. The generator validates cited sources and requires the canonical journey support matrix to contain all 21 journeys. Like the BA course, it is explanatory and does not elevate any capability or journey to production-ready.
 
 ## Future tenant and regulated-entity customization
 

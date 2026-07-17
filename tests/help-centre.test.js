@@ -18,13 +18,27 @@ test("help centre exposes role guidance, learning paths and governed status labe
 });
 
 test("platform surfaces link users to the canonical guide", async () => {
-  const [dashboard, tenant, publicNavigation, resources, server] = await Promise.all([
-    readFile(new URL("../apps/dashboard/index.html", import.meta.url), "utf8"),
-    readFile(new URL("../apps/tenant/index.html", import.meta.url), "utf8"),
-    readFile(new URL("../apps/web/assets/site.js", import.meta.url), "utf8"),
-    readFile(new URL("../apps/web/resources/index.html", import.meta.url), "utf8"),
-    readFile(new URL("../apps/api/src/server.js", import.meta.url), "utf8")
-  ]);
-  for (const surface of [dashboard, tenant, publicNavigation, resources]) assert.match(surface, /\/help\//);
-  assert.match(server, /appsRoot, "help"/);
+  const institutionalSurfaces = [
+    "../apps/dashboard/index.html",
+    "../apps/dashboard/workspaces.html",
+    "../apps/tenant/index.html",
+    "../apps/administration/index.html",
+    "../apps/banker-application/index.html",
+    "../apps/platform-administration/index.html",
+    "../apps/web/assets/site.js",
+    "../apps/web/resources/index.html"
+  ];
+  for (const surface of institutionalSurfaces) {
+    assert.match(await readFile(new URL(surface, import.meta.url), "utf8"), /\/help\//, `${surface} links to the guide`);
+  }
+  const server = await readFile(new URL("../apps/api/src/server.js", import.meta.url), "utf8");
+  assert.match(server, /appsRoot, "help", "\/help\/index\.html"/, "the /help entry route resolves the real index file");
+  assert.match(server, /fileSubpath \+= "index\.html"/, "directory URLs resolve to their index page");
+});
+
+test("borrower and channel surfaces do not import institutional guidance", async () => {
+  for (const surface of ["../apps/customer/index.html", "../apps/customer-application/index.html", "../apps/partner/index.html", "../apps/partner-application/index.html"]) {
+    const html = await readFile(new URL(surface, import.meta.url), "utf8");
+    assert.doesNotMatch(html, /\/help\//, `${surface} stays inside the customer-channel guidance boundary`);
+  }
 });
