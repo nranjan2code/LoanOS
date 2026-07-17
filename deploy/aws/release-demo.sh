@@ -185,6 +185,7 @@ status() {
     value=$(optional_output "$key")
     [[ -n "$value" ]] && printf '%s: %s\n' "$key" "$value"
   done
+  return 0
 }
 
 smoke_url() {
