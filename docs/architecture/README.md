@@ -17,6 +17,8 @@ This index is the navigation root for LoanOS architecture. The current implement
 - [PostgreSQL migration and RLS](postgres-migration.md)
 - [Decision engine design](decision-engine-design.md)
 - [Tenant roles, staffing and feature gating](tenant-role-staffing-and-feature-gating.md)
+- [Testing strategy](testing-strategy.md)
+- [Design system](design-system.md)
 
 ## Agentic AI
 

@@ -69,6 +69,13 @@
       "message": "The API composition seam or the @loanos/core barrel changed — confirm current-implementation.md still maps where each control lives."
     },
     {
+      "id": "design-system-standard",
+      "label": "Design-system standard",
+      "when": ["apps/shared/design-tokens.css"],
+      "expect": ["docs/architecture/design-system.md"],
+      "message": "The shared design tokens changed — confirm docs/architecture/design-system.md still describes the standard."
+    },
+    {
       "id": "adr-index",
       "label": "Irreversible technical decision",
       "when": ["docs/decisions/**"],

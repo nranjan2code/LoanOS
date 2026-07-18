@@ -35,6 +35,8 @@ They meet at two deliberately isolated gateways: `apps/api/src/rules-engine.js` 
 | `docs/architecture/help-centre-and-academy.md` | Canonical human guidance contract, verification metadata and future tenant/RE overlay boundary. |
 | `docs/architecture/tenant-role-staffing-and-feature-gating.md` | Canonical roles, feature staffing, IdP/SCIM, agents, revocation/pause and activity-attribution source. |
 | `docs/compliance/india-regulatory-register.md` | Regulatory control families (RBI Digital Lending Directions 2025 etc.). |
+| `docs/architecture/testing-strategy.md` | Canonical test-layer map and rules: adverse path first, golden corpora, evidence floors. Read before adding or restructuring tests. |
+| `docs/architecture/design-system.md` | Canonical UI standard: warm-paper light theme, shared tokens (`apps/shared/design-tokens.css`), accessibility bar. Read before touching any frontend. |
 | `docs/operations/demo-handbook.md` | Canonical showcase/workshop demo operating model, AWS release, presentation, recovery and teardown guide. |
 | `docs/README.md` | Documentation map + definition of done: features are incomplete until the relevant docs are updated. |
 

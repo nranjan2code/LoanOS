@@ -29,7 +29,7 @@ else's drift.
    implementation plan's skeleton and the commit's documentation obligation.
 4. **Tests define done — restrictive path first.** For anything that gates,
    verifies or moves money, write the fail-closed/adverse test before the
-   happy path. New lending or guardrail policy is a decision model (JSON +
+   happy path (`docs/architecture/testing-strategy.md` maps the layers). New lending or guardrail policy is a decision model (JSON +
    golden corpus), never scattered `if`s (AGENTS.md: policy is data).
 5. **Build the smallest honest vertical slice** — domain kernel in
    `@loanos/core`, HTTP in a route module, evidence wired — rather than a

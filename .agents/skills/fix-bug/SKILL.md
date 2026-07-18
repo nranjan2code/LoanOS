@@ -13,9 +13,9 @@ code, then correct the record.
 ## Workflow
 
 1. **Reproduce as a failing test first.** A `node:test` case in `tests/` (or a
-   Rust test in `rules/`) that fails for the reported reason. If you cannot
-   reproduce it, you do not yet understand it — keep isolating before editing
-   product code.
+   Rust test in `rules/`) that fails for the reported reason — the layer map
+   is `docs/architecture/testing-strategy.md`. If you cannot reproduce it, you
+   do not yet understand it — keep isolating before editing product code.
 2. **Classify the blast radius, and route:**
    - Lending eligibility or engine-mirrored decision logic →
      `change-lending-policy` (the corpus gate is why).
