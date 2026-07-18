@@ -929,7 +929,7 @@
     "acceptance": "Approved tenant contracts rate immutable usage in integer paise against pinned dimensions and expose reconciliable tenant/platform reports.",
     "dependencies": [
       "PLT-008",
-      "FIN-013",
+      "FIN-003",
       "AUD-001"
     ],
     "notes": "Remaining gap: budgets/reservations and GST-ready invoice aggregation are implemented, but tax validation, legal invoicing, credits, collections and accounting export are not yet implemented.",
@@ -994,7 +994,7 @@
     ],
     "acceptance": "Activation fails closed until four distinct authenticated humans satisfy the FST-034 business, model-risk/compliance, information-security/data and operations-control positions and control-engine approval is current.",
     "dependencies": [
-      "IAM-002",
+      "SEC-002",
       "OPS-005",
       "AIG-003"
     ],
@@ -1195,7 +1195,7 @@
     "acceptance": "Every retrieval, communication, eligibility influence and case mutation is mapped to a purpose-built deterministic policy with prohibited actions, require-human outcomes and golden/adverse corpus coverage.",
     "dependencies": [
       "AIG-020",
-      "DEC-001",
+      "UWG-018",
       "SEC-005"
     ],
     "notes": "First policy-bundle slice is implemented and directly callable. Remaining gap: a live model/agent runtime and domain workflows must invoke the applicable guardrail before retrieval, dispatch, credit workflow handoff or case mutation.",

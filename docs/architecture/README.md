@@ -6,6 +6,7 @@ This index is the navigation root for LoanOS architecture. The current implement
 
 - [LoanOS India blueprint](loanos-india-blueprint.md)
 - [Current implementation map](current-implementation.md)
+- [Knowledge-to-execution stack audit](knowledge-execution-stack/README.md)
 - [Persistent specialist journey service](persistent-specialist-journey-service.md)
 - [Archetype journey workspaces](archetype-journey-workspaces.md)
 - [Greenfield product applications](greenfield-product-applications.md)

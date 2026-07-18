@@ -57,6 +57,10 @@ They meet at two deliberately isolated gateways: `apps/api/src/rules-engine.js` 
 npm test                                   # Node suite (148+ tests)
 npm run dev:api                            # local API (file store)
 ./loanos.sh build|start|stop|clean         # orchestration
+npm run knowledge:check                    # docs + evidence + cross-link graph + currency, in one pass
+npm run graph:check                        # identifier cross-links resolve (see docs/identifier-registry.md)
+npm run currency:check -- --staged         # advisory: did companion docs move with this change?
+npm run corpus:check                       # fail if the JS↔Rust eligibility corpus drifted
 npm run demo:audit                         # validate canonical synthetic showcase profile
 ./deploy/aws/package-demo.sh --help        # inspect selective server/browser packaging options
 ./deploy/aws/release-demo.sh deploy --email you@example.com  # create/update the generation-2 showcase
@@ -73,6 +77,7 @@ CI (`.github/workflows/ci.yml`): Node tests (file + Postgres drivers) and the Ru
 ## Conventions
 
 - Commit messages: `feat(scope): summary` with body explaining invariants touched; cite INV/DEC/SEC IDs where relevant.
+- Identifiers are a graph. Capability (`PREFIX-NNN`), engine (`INV/DEC/SEC/PH-n`), ADR (`NNNN`) and claim (`C-NN`) IDs cite one another; the schemes and the gates that keep citations from dangling are in `docs/identifier-registry.md`. Namespace any document-local invariant scheme (e.g. `ORG-INV-n`) so it is not read as an engine ID.
 - The repo commits directly to `main` (single-maintainer trunk flow).
 - ESM JavaScript throughout (`import`/`export`); no new npm dependencies without strong cause (the API deliberately has one: `pg`).
 - Import the domain kernel as `@loanos/core` (barrel) or `@loanos/core/<domain>/<module>.js` — never by relative path across the package boundary (ADR 0008). Inside `packages/core`, plain relative specifiers.

@@ -1,0 +1,44 @@
+{
+  "description": "Machine-checkable form of the required-update matrix in documentation-governance.md. Each rule fires when a changed file matches `when` but none of `expect` also changed, and prints an advisory (see scripts/check-currency.mjs). Advisory by design: a rule can be legitimately skipped, so this nudges rather than blocks. Globs support `*` (within a path segment) and `**` (any segments).",
+  "rules": [
+    {
+      "id": "capability-catalogue-sync",
+      "label": "Product capability or maturity",
+      "when": ["docs/product/complete-system-capability-catalog.md"],
+      "expect": ["docs/product/capability-trace.json", "docs/dashboard-data.json"],
+      "message": "Capability catalogue changed — run `npm run dashboard` to re-sync the evidence trace and dashboard artifacts."
+    },
+    {
+      "id": "eligibility-corpus",
+      "label": "JS lending policy ↔ Rust differential corpus",
+      "when": ["packages/core/src/lending/eligibility.js"],
+      "expect": ["rules/fixtures/eligibility-corpus.json"],
+      "message": "Eligibility policy changed — regenerate the differential corpus: `node rules/tools/gen-eligibility-corpus.mjs`. CI also enforces this as a hard gate."
+    },
+    {
+      "id": "aws-demo-docs",
+      "label": "Demo seed, deployment, artifact, domain, mock, persona or operating flow",
+      "when": ["deploy/aws/**"],
+      "expect": [
+        "docs/architecture/aws-showcase-deployment.md",
+        "docs/operations/demo-handbook.md",
+        "docs/architecture/current-implementation.md"
+      ],
+      "message": "AWS demo surface changed — review the showcase architecture, demo handbook and current-implementation map (AGENTS.md non-negotiable)."
+    },
+    {
+      "id": "engine-design-invariants",
+      "label": "Architecture or service boundary (decision engine)",
+      "when": ["rules/crates/**"],
+      "expect": ["docs/architecture/decision-engine-design.md"],
+      "message": "Engine crate changed — confirm the INV/DEC/SEC/PH tables in decision-engine-design.md still describe the code (cite IDs in the commit)."
+    },
+    {
+      "id": "commands-and-agent-rules",
+      "label": "Repository layout, command or agent rule",
+      "when": ["package.json", ".github/workflows/ci.yml", "loanos.sh"],
+      "expect": ["AGENTS.md"],
+      "message": "Commands, CI or orchestration changed — update the Commands / rules section of AGENTS.md if the change is agent-facing."
+    }
+  ]
+}

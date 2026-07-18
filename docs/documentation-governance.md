@@ -17,6 +17,14 @@ When sources disagree, executable policy and load-bearing architecture/control d
 
 ## Required update matrix
 
+This matrix has a machine-checkable form in
+[documentation-governance-rules.json](documentation-governance-rules.json),
+evaluated diff-aware by `npm run currency:check`
+([check-currency.mjs](../scripts/check-currency.mjs)). It is advisory: it nudges
+the author when a companion document looks stale, it does not block. The
+identifier schemes these documents share are catalogued in the
+[identifier registry](identifier-registry.md).
+
 | Change | Required documentation |
 | --- | --- |
 | User-visible workflow or error | Guide article, verification date and current implementation map |

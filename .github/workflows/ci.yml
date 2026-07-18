@@ -35,6 +35,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # depth 2 so the currency advisory can diff HEAD~1..HEAD
+          fetch-depth: 2
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
@@ -44,10 +47,18 @@ jobs:
         run: npm run docs:check
       - name: Capability evidence integrity gate
         run: npm run trace:validate
+      - name: Knowledge-graph integrity gate
+        run: npm run graph:check
       - name: Dashboard source and artifact integrity gate
         run: npm run dashboard:check
       - name: Public-site content gate
         run: npm run web:content:check
+      - name: Eligibility differential corpus is in sync
+        # Regenerates the corpus from the JS policy; fails if the committed
+        # fixture drifted (would let JS and the Rust engine diverge silently).
+        run: npm run corpus:check
+      - name: Documentation currency advisory (non-blocking)
+        run: npm run currency:check -- --base HEAD~1
       - run: npm test
 
   android:

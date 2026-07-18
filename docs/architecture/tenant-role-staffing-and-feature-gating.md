@@ -66,6 +66,27 @@ The executable source is `CANONICAL_ROLE_CATALOGUE` in `packages/core/src/identi
 
 The hard incompatibility register includes platform administration/audit, release maker/checker, user administration/access review, security administration/audit, every operational maker/checker pair, Principal Officer/Designated Director, CISO/Head of IT, model owner/validator, fraud investigation/classification, vendor/change/recovery/migration/privacy/grievance pairs, and internal audit versus security/finance/integration/workflow administration.
 
+## 5.1. Role→Academy→Capability Plane mapping
+
+To ensure operational readiness, each canonical role maps to a required learning path in the Guide & Academy and acts within specific capability planes. Before assignment of any role to a principal is approved under S2a/maker-checker authority, the candidate should complete the corresponding Academy path.
+
+| Role | Primary Academy Learning Path | Primary Capability Planes |
+| --- | --- | --- |
+| `platform_admin`, `tenant_provisioner`, `platform_security_admin`, `platform_auditor` | Technical Academy: Platform Administration & Operations | AI & Model Governance · Compliance OS |
+| `tenant_owner`, `tenant_admin`, `user_admin`, `security_admin`, `access_reviewer`, `auditor`, `workflow_admin` | Technical Academy: Controls & Tenant Security | Compliance OS · LWS |
+| `product_manager`, `product_approver`, `journey_admin`, `product_owner`, `product_checker` | BA Academy: Product Definition & Journeys | LOS |
+| `loan_officer`, `credit_maker`, `credit_officer`, `credit_checker`, `human_reviewer` | BA Academy: Underwriting & Credit Policy | LOS |
+| `kyc_officer`, `kyc_checker` | BA Academy: KYC & Onboarding | LOS |
+| `disbursement_maker`, `disbursement_checker` | BA Academy: Disbursement & Booking | LOS · LMS |
+| `servicing_maker`, `servicing_checker`, `reconciliation_maker`, `reconciliation_checker` | BA Academy: Servicing & LWS Queues | LMS · LWS |
+| `collections_manager`, `collections_maker`, `collections_checker`, `legal_maker`, `legal_checker` | BA Academy: Collections & Legal Recovery | LMS · LWS |
+| `finance_admin`, `finance_maker`, `finance_checker`, `treasury_maker`, `treasury_checker` | BA Academy: Compliance Operations & Finance Close | LMS |
+| `tax_maker`, `tax_checker` | BA Academy: GST/TDS Compliance | LMS |
+| `grievance_officer`, `grievance_checker` | BA Academy: Customer Protection & Redressal | LWS · Compliance OS |
+| `compliance_officer`, `compliance_analyst`, `principal_officer`, `designated_director`, `reporting_officer`, `regulatory_reporting_maker`, `regulatory_reporting_checker` | BA Academy: Compliance, AML & Reporting | Compliance OS |
+| `portfolio_risk_manager`, `risk_manager`, `model_risk_manager`, `model_owner`, `model_validator` | Technical Academy: AI Workers & Model Governance | AI & Model Governance |
+| `chief_information_security_officer`, `head_of_it`, `internal_auditor` | Technical Academy: Cyber Controls & Security Audit | Compliance OS · AI & Model Governance |
+
 ## 6. Exhaustive feature staffing baseline
 
 `A|B` means any one role in the set. A semicolon separates required sets. The minimum is the number of distinct verified active humans across all required sets. Conditional independent pairs apply only when that alternative role is staffed.

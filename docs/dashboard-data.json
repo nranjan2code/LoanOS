@@ -1,56 +1,66 @@
 {
   "schemaVersion": 2,
-  "generated": "2026-07-18T00:20:59.983Z",
-  "sourceDigest": "f666b733b8a6ae52",
-  "snapshotId": "d56619d563f5486d",
+  "generated": "2026-07-18T01:06:10.355Z",
+  "sourceDigest": "9794edfa4385f995",
+  "snapshotId": "48bb42e2a3cf48fc",
   "sources": {
     "catalogue": "docs/product/complete-system-capability-catalog.md",
     "trace": "docs/product/capability-trace.json",
     "planes": "scripts/planes.mjs",
     "backlog": "docs/product/build-backlog.md",
-    "tests": "reused build test log"
+    "tests": "live Node test run"
   },
   "git": {
     "branch": "main",
-    "sha": "8b1c3bdb384e",
-    "count": 220,
+    "sha": "edb1a8b8ac88",
+    "count": 222,
     "dirty": true,
-    "changeCount": 544,
+    "changeCount": 16,
     "commits": [
+      {
+        "hash": "edb1a8b",
+        "subject": "docs: deep documentation pass for the @loanos/core package boundary",
+        "when": "35 minutes ago"
+      },
+      {
+        "hash": "4a9ef90",
+        "subject": "refactor(core): group domain kernel into @loanos/core package domains",
+        "when": "40 minutes ago"
+      },
       {
         "hash": "8b1c3bd",
         "subject": "docs(core): add JSDoc/rustdoc documentation pass for humans and AI agents",
-        "when": "20 minutes ago"
+        "when": "65 minutes ago"
       },
       {
         "hash": "bce5d2f",
         "subject": "feat(academy): implement technical academy and update compliance controls",
-        "when": "7 hours ago"
+        "when": "8 hours ago"
       },
       {
         "hash": "3aa511b",
         "subject": "fix(aws): return successful status without domains",
-        "when": "10 hours ago"
+        "when": "11 hours ago"
       },
       {
         "hash": "f98d662",
         "subject": "fix(aws): support committed release on macOS bash",
-        "when": "10 hours ago"
+        "when": "11 hours ago"
       },
       {
         "hash": "5ed96b1",
         "subject": "feat: implement Banker Academy curriculum, build scripts, and updates to help centre",
-        "when": "11 hours ago"
+        "when": "12 hours ago"
       },
       {
         "hash": "ac6bb2c",
         "subject": "feat(help): add complete technical academy",
-        "when": "12 hours ago"
+        "when": "13 hours ago"
       },
       {
         "hash": "c1196e1",
         "subject": "feat(deploy): update AWS showcase deployment, demo script, and architecture documentation",
-        "when": "34 hours ago"
+        "when": "35 hours ago"
       },
       {
         "hash": "d435445",
@@ -65,16 +75,6 @@
       {
         "hash": "f4a8b75",
         "subject": "feat(applications): establish greenfield product web platform",
-        "when": "2 days ago"
-      },
-      {
-        "hash": "67494ec",
-        "subject": "feat(applications): establish greenfield product web platform",
-        "when": "2 days ago"
-      },
-      {
-        "hash": "dbe3031",
-        "subject": "feat(android): wire real backend integration for field-ops and DSA apps",
         "when": "2 days ago"
       }
     ]
@@ -11437,7 +11437,7 @@
           "acceptance": "Approved tenant contracts rate immutable usage in integer paise against pinned dimensions and expose reconciliable tenant/platform reports.",
           "dependencies": [
             "PLT-008",
-            "FIN-013",
+            "FIN-003",
             "AUD-001"
           ],
           "notes": "Remaining gap: budgets/reservations and GST-ready invoice aggregation are implemented, but tax validation, legal invoicing, credits, collections and accounting export are not yet implemented.",
@@ -11502,7 +11502,7 @@
           "owner": "Model Risk, Information Security and Operations Control",
           "acceptance": "Activation fails closed until four distinct authenticated humans satisfy the FST-034 business, model-risk/compliance, information-security/data and operations-control positions and control-engine approval is current.",
           "dependencies": [
-            "IAM-002",
+            "SEC-002",
             "OPS-005",
             "AIG-003"
           ],
@@ -11703,7 +11703,7 @@
           "acceptance": "Every retrieval, communication, eligibility influence and case mutation is mapped to a purpose-built deterministic policy with prohibited actions, require-human outcomes and golden/adverse corpus coverage.",
           "dependencies": [
             "AIG-020",
-            "DEC-001",
+            "UWG-018",
             "SEC-005"
           ],
           "notes": "First policy-bundle slice is implemented and directly callable. Remaining gap: a live model/agent runtime and domain workflows must invoke the applicable guardrail before retrieval, dispatch, credit workflow handoff or case mutation.",
@@ -16411,7 +16411,7 @@
       "notes": "Remaining gap: budgets/reservations and GST-ready invoice aggregation are implemented, but tax validation, legal invoicing, credits, collections and accounting export are not yet implemented.",
       "dependencies": [
         "PLT-008",
-        "FIN-013",
+        "FIN-003",
         "AUD-001"
       ],
       "evidence": [
@@ -16512,7 +16512,7 @@
       "notes": "First policy-bundle slice is implemented and directly callable. Remaining gap: a live model/agent runtime and domain workflows must invoke the applicable guardrail before retrieval, dispatch, credit workflow handoff or case mutation.",
       "dependencies": [
         "AIG-020",
-        "DEC-001",
+        "UWG-018",
         "SEC-005"
       ],
       "evidence": [
@@ -25416,9 +25416,9 @@
     "cancelled": 0,
     "todo": 0,
     "total": 697,
-    "durationMs": 23668.744666,
+    "durationMs": 22664.284084,
     "ran": true,
-    "source": "provided-log",
+    "source": "live",
     "error": ""
   }
 }

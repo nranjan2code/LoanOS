@@ -12,7 +12,8 @@ This folder is the working documentation set for the LoanOS India build. It expl
 6. [Platform module integration and API map](architecture/platform-module-integration-api-map.md)
 7. [Build backlog](product/build-backlog.md)
 8. [Documentation governance and audit](documentation-governance.md)
-9. [AWS synthetic showcase deployment architecture](architecture/aws-showcase-deployment.md)
+9. [Identifier registry — the knowledge graph](identifier-registry.md)
+10. [AWS synthetic showcase deployment architecture](architecture/aws-showcase-deployment.md)
 
 Section indexes: [Architecture](architecture/README.md) · [Product](product/README.md) · [Compliance](compliance/README.md) · [Decision records](decisions/README.md) · [Operations](operations/README.md) · [GTM](gtm/README.md)
 
@@ -30,6 +31,7 @@ Section indexes: [Architecture](architecture/README.md) · [Product](product/REA
 | [Composed product-journey lifecycle](architecture/composed-product-journey-lifecycle.md) | JD-04 architecture, state machine, version/evidence contract, maker-checker transitions, pause/revocation containment, compensation, APIs and operations boundary for all 21 journeys. |
 | [LoanOS Guide and Academy](architecture/help-centre-and-academy.md) | Platform-owned role-based help, interactive learning boundary, governed content contract, and the future tenant/RE customization model. |
 | [Documentation governance and audit](documentation-governance.md) | Audience map, source hierarchy, required update matrix, latest repository-wide documentation audit and known follow-on work. |
+| [Identifier registry — the knowledge graph](identifier-registry.md) | Every cross-referencing ID scheme (capability, engine INV/DEC/SEC/PH, ADR, GTM claim, epic, integration), its authoritative source, and the CI gates that keep citations from dangling. |
 | [Capability & build dashboard](dashboard.md) | How `docs/dashboard.html` is generated: plane/category/feature status view, completion scoring, product-plane mapping, and how it auto-updates on `./loanos.sh build`. |
 | [Roadmap](product/roadmap.md) | Phased delivery plan from compliance foundation to AI governance hardening. |
 | [Build backlog](product/build-backlog.md) | Actionable engineering backlog grouped by epic. |
@@ -53,6 +55,7 @@ Section indexes: [Architecture](architecture/README.md) · [Product](product/REA
 | [Synthetic demo operator handbook](operations/demo-handbook.md) | Canonical showcase/workshop field guide: automation boundary, 21 journeys, 14 personas, mocked integrations, release and DNS operation, smoke tests, troubleshooting, evidence, cost and teardown. |
 | [Agent guide](../AGENTS.md) | Orientation for AI coding agents and new engineers: architecture map, load-bearing documents, non-negotiable engineering rules, commands. (`CLAUDE.md` imports it.) |
 | [Current implementation map](architecture/current-implementation.md) | What code exists today, how it runs, and where each current control lives. |
+| [Knowledge-to-execution stack audit](architecture/knowledge-execution-stack/README.md) | Six-layer audit from sources of truth and stable identifiers through graph enforcement, agent execution and human readiness, with a repository-local status infographic. |
 | [Governed digital origination journey](architecture/origination-journey.md) | Borrower self-service intake, product-driven document controls, conditions precedent, sanction validity, KFS language evidence, fail-closed gates, and production boundaries. |
 | [Provider integration governance](architecture/provider-integration-governance.md) | Certification lifecycle, live-readiness gates, India-residency posture, provider transports, signed callbacks, and external onboarding boundaries. |
 | [Audit integrity and data governance](architecture/data-governance.md) | External-anchor evidence, business-event completeness, evidence custody/legal hold/deletion proof, field lineage, and data-quality certification. |
