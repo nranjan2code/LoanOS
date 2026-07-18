@@ -1,3 +1,28 @@
+/**
+ * Co-lending finance: the money side of a co-lending arrangement (RBI's
+ * co-origination/co-lending model, typically bank + NBFC) — transfer
+ * pricing between partners, partner settlement statements and payments,
+ * their journal postings, ECL provision splitting/journals, and the GST/TDS
+ * tax-exchange lifecycle for the originator's servicing fee. This module
+ * does not own the co-lending *policy* (each loan's per-leg share
+ * percentages, roles, transfer-price/servicing-fee rates) — that comes in
+ * on `arrangement.partners`/`allocation.legs` from `co-lending.js`; this
+ * module only computes money flows from those already-decided shares.
+ *
+ * Every monetary computation here is done in integer paise
+ * (`money()`/`paise()` convert at the boundary), and `splitPaise` always
+ * assigns the *last* leg the remainder of a split rather than its
+ * proportional share — this guarantees a paise-exact partition with no
+ * rounding leakage, at the cost of concentrating rounding into whichever
+ * leg happens to be ordered last (`orderedLegs` puts the originating
+ * partner last on purpose, so it absorbs the remainder rather than a
+ * lending partner). Settlement payments are reconciled by exact-paise
+ * match against the approved statement leg (`paise(input.amount) ===
+ * paise(leg.netPayable)`); a mismatch is recorded as an `"exception"`, not
+ * silently accepted. Statement creation and tax-exchange creation both
+ * require independent proposer/approver, per the platform's general
+ * four-eyes discipline.
+ */
 import { createHash } from "node:crypto";
 import { createFinding, summarizeFindings } from "./compliance-controls.js";
 
@@ -6,6 +31,22 @@ const money = (value) => Math.round(Number(value ?? 0) * 100) / 100;
 const paise = (value) => Math.round(Number(value ?? 0) * 100);
 const validDate = (value) => { if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value ?? ""))) return false; const parsed = new Date(`${value}T00:00:00.000Z`); return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value; };
 
+/**
+ * Compute each partner's transfer-pricing and collections position for an
+ * arrangement over `[from, to]`: opening/closing principal outstanding,
+ * principal/interest/fee actually collected in the window, the resulting
+ * transfer-pricing carrying cost (on average outstanding, at the partner's
+ * `transferPriceBps`, day-counted over the period), and — for the
+ * `"partner"` role only — the servicing fee/GST/TDS deduction and net
+ * payable. This is a pure read/report; it does not create a settlement
+ * (see `createCoLendingSettlementStatement`, which calls this and then
+ * persists the result).
+ * @param {object} state - holds `loanAccounts`.
+ * @param {object} arrangement - co-lending arrangement with `partners` and `allocations`.
+ * @param {string} from - ISO date (yyyy-mm-dd), inclusive.
+ * @param {string} to - ISO date (yyyy-mm-dd), inclusive.
+ * @returns {object} per-partner rows plus arrangement totals.
+ */
 export function buildCoLendingTransferPricingReport(state, arrangement, from, to) {
   if (!arrangement || !validDate(from) || !validDate(to) || from > to) throw new Error("Arrangement and valid from/to dates are required.");
   const start = new Date(`${from}T00:00:00.000Z`).getTime(); const end = new Date(`${to}T23:59:59.999Z`).getTime(); const days = Math.max(1, Math.floor((new Date(`${to}T00:00:00.000Z`).getTime() - new Date(`${from}T00:00:00.000Z`).getTime()) / 86400000) + 1);
@@ -25,6 +66,19 @@ export function buildCoLendingTransferPricingReport(state, arrangement, from, to
   return { coLendingArrangementId: arrangement.coLendingArrangementId, agreementRef: arrangement.agreementRef, from, to, days, partners, totals: sumPartnerRows(partners) };
 }
 
+/**
+ * Freeze a transfer-pricing report into an immutable, checksummed
+ * settlement statement for a period. Fails closed unless the arrangement
+ * is active, the period is valid, and independent proposer/approver are
+ * present. Each partner leg starts `"pending"` (owed) or `"not_payable"`
+ * (originating role, or zero net payable); the statement itself starts
+ * `"pending_payment"` if any leg is pending, else `"settled"`.
+ * @param {object} state - holds `loanAccounts`, passed through to `buildCoLendingTransferPricingReport`.
+ * @param {object} arrangement - the active co-lending arrangement.
+ * @param {object} input - statementId, from, to, proposedBy, approvedBy, approvalRef.
+ * @param {Date} [now]
+ * @returns {{statement: object|null, findings: Array<object>, summary: object}}
+ */
 export function createCoLendingSettlementStatement(state, arrangement, input, now = new Date()) {
   const findings = [];
   if (!arrangement || arrangement.status !== "active") findings.push(createFinding("error", "RBI-DL-2025", "An active co-lending arrangement is required.", "coLendingArrangementId"));
@@ -37,6 +91,18 @@ export function createCoLendingSettlementStatement(state, arrangement, input, no
   return { statement: { ...immutable, checksumSha256, status: partnerLegs.some((leg) => leg.settlementStatus === "pending") ? "pending_payment" : "settled", approvedAt: now.toISOString(), updatedAt: now.toISOString() }, findings, summary };
 }
 
+/**
+ * Record a partner settlement payment against a statement's pending leg.
+ * Requires independent recorder/approver. If the paid amount doesn't
+ * exactly match the approved `netPayable` (to the paisa), the payment is
+ * still recorded but tagged `outcome: "exception"` with a `differenceAmount`
+ * and returned as a warning — the statement itself is *not* advanced to
+ * paid, so an exact rematch/correction is still required.
+ * @param {object} statement - existing settlement statement.
+ * @param {object} input - regulatedEntityId, paymentId, bankReference, amount, recordedBy, approvedBy, approvalRef, escrowInstructionId, paidAt.
+ * @param {Date} [now]
+ * @returns {{statement: object, payment: object|null, findings: Array<object>, summary: object}}
+ */
 export function recordCoLendingSettlementPayment(statement, input, now = new Date()) {
   const findings = []; const leg = statement?.partnerLegs?.find((record) => record.regulatedEntityId === input?.regulatedEntityId && record.role === "partner");
   if (!statement || !leg || leg.settlementStatus !== "pending") findings.push(createFinding("error", "RBI-IT-GRC", "A pending partner settlement leg is required.", "regulatedEntityId"));
@@ -49,6 +115,17 @@ export function recordCoLendingSettlementPayment(statement, input, now = new Dat
   return { statement: { ...statement, partnerLegs, status: settled ? "settled" : "partially_settled", updatedAt: now.toISOString() }, payment, findings, summary };
 }
 
+/**
+ * Project every reconciled co-lending settlement payment into its double-
+ * entry journals: a partner-entity journal (cash paid, servicing fee
+ * expense, input GST, against collections clearing and TDS payable) and,
+ * when a servicing fee was actually charged, a matching originator-entity
+ * journal recognizing the servicing fee income/output GST. Only
+ * `outcome === "reconciled"` payments are projected — exceptions are
+ * excluded until corrected.
+ * @param {object} state - holds `coLendingSettlementPayments`, `coLendingArrangements`.
+ * @returns {Array<object>} journal entries, one or two per reconciled payment.
+ */
 export function buildCoLendingSettlementJournals(state) {
   return Object.values(state.coLendingSettlementPayments ?? {}).filter((payment) => payment.outcome === "reconciled").flatMap((payment) => {
     const net = money(payment.amount); const fee = money(payment.servicingFee); const gst = money(payment.servicingGst); const tds = money(payment.servicingTds); const gross = money(net + fee + gst - tds); const partnerDebit = money(net + fee + gst); const partnerCredit = money(gross + tds); const partnerJournal = { journalId: `jrnl_${payment.paymentId}:partner`, eventId: payment.paymentId, eventType: "co_lending_partner_settlement", eventDate: payment.paidAt, currency: "INR", entityId: payment.regulatedEntityId, coLendingArrangementId: payment.coLendingArrangementId, book: "co_lending_entity", lines: [{ account: "bank_clearing", side: "debit", amount: net }, ...(fee ? [{ account: "co_lending_servicing_fee_expense", side: "debit", amount: fee }] : []), ...(gst ? [{ account: "input_gst_receivable", side: "debit", amount: gst }] : []), { account: "co_lending_collections_clearing", side: "credit", amount: gross }, ...(tds ? [{ account: "tds_payable", side: "credit", amount: tds }] : [])], debitTotal: partnerDebit, creditTotal: partnerCredit };
@@ -56,6 +133,16 @@ export function buildCoLendingSettlementJournals(state) {
   });
 }
 
+/**
+ * Report each loan's ECL (expected credit loss) provision, split across
+ * co-lending partners by their share, for one arrangement as of an
+ * optional cutoff date.
+ * @param {object} state - holds `eclProvisions`, `loanAccounts`.
+ * @param {string} arrangementId
+ * @param {string|null} [asOf] - ISO date (yyyy-mm-dd); only provisions on or before this date are included.
+ * @returns {object} per-provision-per-partner rows plus arrangement totals.
+ * @throws {Error} if the arrangement doesn't exist.
+ */
 export function buildCoLendingProvisionReport(state, arrangementId, asOf = null) {
   const arrangement = state.coLendingArrangements?.[arrangementId];
   if (!arrangement) throw new Error("Co-lending arrangement not found.");
@@ -66,6 +153,14 @@ export function buildCoLendingProvisionReport(state, arrangementId, asOf = null)
   return { coLendingArrangementId: arrangementId, asOf, rowCount: rows.length, expectedCreditLoss: money(rows.reduce((sum, row) => sum + row.expectedCreditLoss, 0)), movementAmount: money(rows.reduce((sum, row) => sum + row.movementAmount, 0)), rows };
 }
 
+/**
+ * Project every ECL provision movement (increase or decrease from the
+ * prior provision) into per-partner journals, debiting/crediting ECL
+ * expense against the loss-allowance account depending on the direction of
+ * movement.
+ * @param {object} state - holds `eclProvisions`, `loanAccounts`.
+ * @returns {Array<object>} one journal entry per provision-record-per-partner.
+ */
 export function buildCoLendingProvisionJournals(state) {
   return Object.values(state.eclProvisions ?? {}).flatMap((record) => {
     const account = state.loanAccounts?.[record.loanAccountId];
@@ -74,6 +169,19 @@ export function buildCoLendingProvisionJournals(state) {
   });
 }
 
+/**
+ * Create a GST/TDS tax-exchange record for a partner's taxable servicing
+ * fee on a settled leg. Fails closed unless the leg has a positive
+ * servicing fee, invoice/GSTIN/place-of-supply/TDS-section identifiers are
+ * present, and proposer/approver are independent. The tax figures
+ * (`taxableValue`, `gstAmount`, `tdsAmount`) are taken directly from the
+ * statement leg, not recomputed — this record only packages them for
+ * exchange with the partner, it does not recalculate tax.
+ * @param {object} statement - existing settlement statement with the taxable leg.
+ * @param {object} input - regulatedEntityId, taxExchangeId, invoiceNumber, supplierGstin, recipientGstin, placeOfSupply, tdsSection, proposedBy, approvedBy, approvalRef.
+ * @param {Date} [now]
+ * @returns {{taxExchange: object|null, findings: Array<object>, summary: object}}
+ */
 export function createCoLendingTaxExchange(statement, input, now = new Date()) {
   const findings = []; const leg = statement?.partnerLegs?.find((row) => row.regulatedEntityId === input?.regulatedEntityId && row.role === "partner");
   if (!statement || !leg || leg.servicingFee <= 0) findings.push(createFinding("error", "GST-ACT-2017", "A statement partner leg with a taxable servicing fee is required.", "regulatedEntityId"));
@@ -84,6 +192,17 @@ export function createCoLendingTaxExchange(statement, input, now = new Date()) {
   return { taxExchange: { ...immutable, checksumSha256: createHash("sha256").update(JSON.stringify(immutable)).digest("hex"), status: "pending_partner_acknowledgement", approvedAt: now.toISOString(), acknowledgement: null }, findings, summary };
 }
 
+/**
+ * Record the partner's acknowledgement of a tax exchange. Accepted only if
+ * the partner's own checksum, GST amount, and TDS amount (to the paisa)
+ * exactly match what was sent — any discrepancy (including a merely-
+ * malformed acknowledgement, `blocked: true`) resolves to `"rejected"`
+ * rather than silently accepting a partial or divergent confirmation.
+ * @param {object} taxExchange - existing `"pending_partner_acknowledgement"` tax exchange.
+ * @param {object} input - acknowledgementRef, status, checksumSha256, gstAmount, tdsAmount, recordedBy.
+ * @param {Date} [now]
+ * @returns {{taxExchange: object, accepted: boolean, blocked: boolean}}
+ */
 export function acknowledgeCoLendingTaxExchange(taxExchange, input, now = new Date()) {
   const exact = input?.status === "accepted" && input?.checksumSha256 === taxExchange?.checksumSha256 && paise(input?.gstAmount) === paise(taxExchange?.gstAmount) && paise(input?.tdsAmount) === paise(taxExchange?.tdsAmount);
   const acknowledgement = { acknowledgementRef: input?.acknowledgementRef ?? null, providerStatus: input?.status ?? null, checksumSha256: input?.checksumSha256 ?? null, gstAmount: input?.gstAmount ?? null, tdsAmount: input?.tdsAmount ?? null, recordedBy: input?.recordedBy ?? null, acknowledgedAt: now.toISOString() };
@@ -91,11 +210,20 @@ export function acknowledgeCoLendingTaxExchange(taxExchange, input, now = new Da
   return { taxExchange: { ...taxExchange, status: exact ? "accepted" : "rejected", acknowledgement }, accepted: exact, blocked: false };
 }
 
+// Split one ECL provision record's expected-loss and prior-provision
+// amounts across an account's co-lending legs by share, deriving each
+// partner's movement (this period's expected loss minus its prior
+// provision) for journaling.
 function splitProvisionRecord(account, record) {
   const legs = orderedLegs(account.coLendingAllocation.legs); const expected = splitPaise(paise(record.expectedCreditLoss), legs, "sharePercent"); const prior = splitPaise(paise(record.priorProvisionAmount), legs, "sharePercent");
   return legs.map((leg) => ({ provisionId: record.provisionId, loanAccountId: record.loanAccountId, coLendingArrangementId: account.coLendingAllocation.coLendingArrangementId, regulatedEntityId: leg.regulatedEntityId, role: leg.role, sharePercent: leg.sharePercent, stage: record.stage, assetClass: record.assetClass, asOf: record.asOf, expectedCreditLoss: expected.get(leg.regulatedEntityId) / 100, priorProvisionAmount: prior.get(leg.regulatedEntityId) / 100, movementAmount: (expected.get(leg.regulatedEntityId) - prior.get(leg.regulatedEntityId)) / 100 }));
 }
 
+// Put the originating partner last, so splitPaise's remainder-absorption
+// lands on the originator rather than a lending partner.
 function orderedLegs(legs = []) { return [...legs].sort((left, right) => (left.role === "originating" ? 1 : 0) - (right.role === "originating" ? 1 : 0)); }
+// Partition an integer-paise total across legs by their share field
+// (falling back to sharePercent); the last leg absorbs whatever rounding
+// remainder is left so the split always sums exactly to totalPaise.
 function splitPaise(totalPaise, legs, shareField) { let allocated = 0; const values = new Map(); for (let index = 0; index < legs.length; index += 1) { const leg = legs[index]; const value = index === legs.length - 1 ? totalPaise - allocated : Math.round((totalPaise * Number(leg[shareField] ?? leg.sharePercent)) / 100); if (index !== legs.length - 1) allocated += value; values.set(leg.regulatedEntityId, value); } return values; }
 function sumPartnerRows(rows) { const fields = ["allocatedPrincipal", "openingPrincipal", "closingPrincipal", "principalCollected", "interestCollected", "feesCollected", "grossCollections", "servicingFee", "servicingGst", "servicingTds", "serviceDeduction", "netPayable", "transferPricingCost", "contributionMargin"]; return Object.fromEntries(fields.map((field) => [field, money(rows.reduce((sum, row) => sum + row[field], 0))])); }

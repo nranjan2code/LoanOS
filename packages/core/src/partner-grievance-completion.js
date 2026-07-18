@@ -1,3 +1,20 @@
+/**
+ * Partner (LSP/DLA) oversight and grievance-completion controls that round out
+ * the outsourcing and redress lifecycle: partner incident/breach handling,
+ * approved servicing/portfolio transfers, partner oversight scorecards,
+ * grievance RCA/CAPA with redress, assisted (branch/call-centre) complaint
+ * intake, board-level grievance analytics, and RBI Ombudsman award closure.
+ * This module does not own the base LSP/DLA registry records themselves
+ * (`registries.js` owns `validateLendingServiceProvider`/`validateDigitalLendingApp`)
+ * or the customer-initiated grievance workflow those registries feed —
+ * it only adds the oversight, incident, transfer, RCA/CAPA, and award-closure
+ * actions layered on top. Every mutating action here is immutable and
+ * idempotent by `idempotencyKey`/`incidentId`/etc.: a replay with identical
+ * content returns the same record, and a replay with different content is a
+ * blocked idempotency-conflict finding, never a silent overwrite. All
+ * decisions requiring approval enforce maker-checker (`proposedBy` !==
+ * `approvedBy`) as a blocking finding, not a warning.
+ */
 import { createHash } from "node:crypto";
 import { createFinding, summarizeFindings } from "./compliance-controls.js";
 
@@ -8,6 +25,17 @@ const exact = (v, positive = false) => Number.isSafeInteger(v) && (positive ? v 
 const approval = (i) => i?.proposedBy && i?.approvedBy && i.proposedBy !== i.approvedBy && i.approvalRef;
 const instant = (v) => Boolean(v) && !Number.isNaN(new Date(v).getTime());
 
+/**
+ * Record a partner (LSP) breach/incident and its approved disposition
+ * (remediate/suspend/exit). Suspension or exit additionally requires
+ * customer-continuity and data return/deletion plans so a partner cannot be
+ * cut off mid-flight without a documented path for affected customers and
+ * data. Idempotent on `incidentId`/`idempotencyKey`.
+ * @param {Array<object>} existing - prior incident records.
+ * @param {object} input - incident details, chosen action, and approval.
+ * @param {Date} [now]
+ * @returns {{incident: object|null, idempotent: boolean, findings: Array, summary: object}}
+ */
 export function manageLspIncident(existing = [], input, now = new Date()) {
   const findings = [];
   if (!input?.incidentId || !input?.idempotencyKey || !input?.partnerId || !["breach", "incident"].includes(input?.type) || !input?.evidenceRef || !input?.impactAssessmentRef || !input?.remediationPlanRef || !instant(input?.remediationDueAt)) findings.push(error("Partner incident, impact, remediation, due date, and evidence are required.", "incident"));
@@ -20,6 +48,16 @@ export function manageLspIncident(existing = [], input, now = new Date()) {
   return out([], { incident: { ...body, checksumSha256: hash(body), status: input.action === "remediate" ? "remediation_open" : input.action === "suspend" ? "suspended" : "exit_controlled", recordedAt: now.toISOString() }, idempotent: false });
 }
 
+/**
+ * Approve a servicing/portfolio transfer between two entities (transfer,
+ * sale, assignment, or participation) with full due-diligence, reconciliation
+ * and data-migration evidence, plus independent maker-checker approval.
+ * Returns an "approved for controlled execution" record — actual account
+ * migration happens elsewhere; this only gates the decision to proceed.
+ * @param {object} input - transfer parties, account manifest, and evidence refs.
+ * @param {Date} [now]
+ * @returns {{transfer: object|null, findings: Array, summary: object}}
+ */
 export function approveServicingPortfolioTransfer(input, now = new Date()) {
   const findings = [];
   if (!input?.transferId || !input?.fromEntityId || !input?.toEntityId || input.fromEntityId === input.toEntityId || !["servicing_transfer", "portfolio_sale", "assignment", "participation"].includes(input?.transferType)) findings.push(error("Distinct transfer parties and a supported transfer type are required.", "transfer"));
@@ -31,6 +69,15 @@ export function approveServicingPortfolioTransfer(input, now = new Date()) {
   return out([], { transfer: { ...body, checksumSha256: hash(body), status: "approved_for_controlled_execution", approvedAt: now.toISOString() } });
 }
 
+/**
+ * Score a partner's periodic oversight (SLA attainment, exposure
+ * concentration, audit outcome) against its own approved targets, deriving an
+ * "effective"/"remediation_required" outcome from whichever thresholds it
+ * breaches (SLA shortfall, concentration over limit, or a non-effective audit
+ * outcome) rather than a single pass/fail flag.
+ * @param {object} input - partner id, period, metrics (in basis points), and evidence refs.
+ * @returns {{assessment: object|null, findings: Array, summary: object}}
+ */
 export function assessPartnerOversight(input) {
   const findings = [];
   if (!input?.partnerId || !input?.period || !input?.slaEvidenceRef || !input?.auditEvidenceRef || !input?.concentrationPolicyRef) findings.push(error("Partner, period, SLA, audit, and concentration evidence are required.", "oversight"));
@@ -42,6 +89,16 @@ export function assessPartnerOversight(input) {
   return out([], { assessment: { ...body, checksumSha256: hash(body), outcome: breaches.length ? "remediation_required" : "effective" } });
 }
 
+/**
+ * Approve a root-cause-analysis and corrective/preventive action (RCA/CAPA)
+ * plan for a grievance case, together with its exact-paise restitution and
+ * compensation redress calculation. Requires independent approval; the
+ * redress total is computed here (not trusted from the caller) so it can
+ * never silently drift from restitution + compensation.
+ * @param {object} input - case id, root cause, CAPA owner/due date, redress amounts (paise), evidence, approval.
+ * @param {Date} [now]
+ * @returns {{capa: object|null, findings: Array, summary: object}}
+ */
 export function approveGrievanceRcaCapa(input, now = new Date()) {
   const findings = [];
   if (!input?.caseId || !input?.rootCauseCode || !input?.rootCauseEvidenceRef || !input?.correctiveAction || !input?.preventiveAction || !input?.ownerId || !instant(input?.dueAt)) findings.push(error("Evidence-bound RCA, CAPA, owner, and due date are required.", "capa"));
@@ -51,6 +108,17 @@ export function approveGrievanceRcaCapa(input, now = new Date()) {
   return out([], { capa: { ...body, checksumSha256: hash(body), status: "approved_pending_execution", approvedAt: now.toISOString() } });
 }
 
+/**
+ * Register a complaint lodged on a customer's behalf via an assisted channel
+ * (branch/call centre). Requires positive customer acknowledgement of what
+ * was recorded, and — for a customer flagged vulnerable — a documented
+ * accessibility adjustment and a named priority owner, so assisted intake
+ * cannot silently drop the extra protections a self-service channel would
+ * otherwise prompt for.
+ * @param {object} input - complaint text, language, assistance mode, vulnerability flags.
+ * @param {Date} [now]
+ * @returns {{complaint: object|null, findings: Array, summary: object}}
+ */
 export function createAssistedComplaint(input, now = new Date()) {
   const findings = [];
   if (!input?.caseId || !input?.customerId || !input?.complaintText || !input?.preferredLanguage || !input?.assistanceMode || !input?.assistedBy || !input?.customerAcknowledgementRef) findings.push(error("Complaint, language, assistance, and acknowledgement are required.", "complaint"));

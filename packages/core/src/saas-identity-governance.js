@@ -1,3 +1,25 @@
+/**
+ * SaaS-platform identity, role and feature-staffing governance: the canonical
+ * catalogue of control-plane and tenant roles (`CANONICAL_ROLE_CATALOGUE`),
+ * segregation-of-duties rules, and the feature-staffing policies
+ * (`FEATURE_STAFFING_POLICIES`) that gate a tenant feature "on" only when it
+ * has the roles, independence and minimum head-count the policy demands. This
+ * module owns bootstrap ownership hand-off, maker-checker role grant/revoke,
+ * ownership transfer, break-glass emergency access, and the safety response
+ * that automatically opens a staffing escalation (and can force an
+ * administrative-lockout escalation) whenever a role revocation or principal
+ * suspension would leave a previously-ready feature under-staffed. It does
+ * NOT own workflow/task routing, product-journey business logic, or the
+ * Rust decision engine's own guardrail evaluation — this is the identity and
+ * staffing substrate those layers are authorized against. See
+ * `docs/architecture/tenant-role-staffing-and-feature-gating.md` for the
+ * canonical roles/staffing/IdP/agents/revocation contract this file
+ * implements, and AGENTS.md's "AI is gated" / "agent actions go through
+ * guardrail.*" rule for why agent principals (`fixed_agent`/`dynamic_agent`)
+ * are deliberately restricted to a narrow, non-human-control role set here
+ * (`AGENT_ASSIGNABLE_ROLE_IDS`) and always denied when a human-only action
+ * requires a human principal (`authorizeStaffedFeatureAction`).
+ */
 const MAX_BOOTSTRAP_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_EMERGENCY_MS = 4 * 60 * 60 * 1000;
 const MAX_DYNAMIC_AGENT_MS = 24 * 60 * 60 * 1000;
@@ -194,10 +216,12 @@ export const FEATURE_STAFFING_POLICIES = Object.freeze(Object.fromEntries([
 export const FEATURE_STAFFING_POLICY_IDS = Object.freeze(Object.keys(FEATURE_STAFFING_POLICIES));
 export const AGENT_ASSIGNABLE_ROLE_IDS = Object.freeze(["automation_agent", "ai_agent", "integration_worker"]);
 
+/** Looks up a role in the canonical catalogue; fails closed on any unknown roleId rather than treating it as no-access. */
 export function getCanonicalRole(roleId) {
   return CANONICAL_ROLE_CATALOGUE[required(roleId, "roleId")] ?? fail("saas_role_unknown", `Unknown canonical role: ${roleId}.`);
 }
 
+/** Validates a set of proposed role ids against the canonical catalogue, de-duplicating and rejecting anything unknown. */
 export function validateCanonicalRoles(roleIds) {
   if (!Array.isArray(roleIds) || !roleIds.length) fail("saas_roles_required", "At least one canonical role is required.");
   const unique = [...new Set(roleIds.map((roleId) => required(roleId, "roleId")))];
@@ -205,6 +229,14 @@ export function validateCanonicalRoles(roleIds) {
   return unique;
 }
 
+/**
+ * Records which of a tenant's gated features (per `FEATURE_STAFFING_POLICIES`)
+ * are requested enabled/disabled, at which scope. This is a maker-checker
+ * configuration step only — it does not itself grant staffing readiness;
+ * `assessFeatureStaffingReadiness`/`projectTenantFeatureStaffing` compute
+ * whether the configured features are actually operable.
+ * @returns {{state: object, configuration: object, readiness: object}}
+ */
 export function configureTenantFeatureStaffing(state = {}, input, now = new Date()) {
   const tenantId = required(input?.tenantId, "tenantId");
   const proposedBy = sameTenantPrincipal(state, tenantId, input.proposedBy, { active: true, human: true, now }).principalId;
@@ -239,6 +271,17 @@ export function configureTenantFeatureStaffing(state = {}, input, now = new Date
   return { state: next, configuration, readiness: projectTenantFeatureStaffing(next, tenantId, now) };
 }
 
+/**
+ * The single source of truth for whether one feature, at one scope, is
+ * actually staffed well enough to operate: every required-role-set has at
+ * least one active, verified human covering it, every independent-pair is
+ * covered by two distinct principals (not the same person wearing both
+ * hats), no segregation-of-duties rule is violated, the configured minimum
+ * distinct-principal count is met, there's no open operational-pause
+ * escalation, and the feature was actually configured "enabled". Any one
+ * failure adds to `blockers` and the feature is fail-closed to "disabled".
+ * @returns {object} readiness projection including `ready`, `blockers`, `roleCoverage`.
+ */
 export function assessFeatureStaffingReadiness(state = {}, input, now = new Date()) {
   const tenantId = required(input?.tenantId, "tenantId");
   const featureId = required(input?.featureId, "featureId");
@@ -288,6 +331,7 @@ export function assessFeatureStaffingReadiness(state = {}, input, now = new Date
   };
 }
 
+/** Read-only projection of every configured feature's staffing readiness for a tenant, used for dashboards and as the "before" snapshot staffing-safety responses diff against. */
 export function projectTenantFeatureStaffing(state = {}, tenantId, now = new Date()) {
   required(tenantId, "tenantId");
   const configuration = records(state, "tenantFeatureStaffingConfigs")[tenantId] ?? null;

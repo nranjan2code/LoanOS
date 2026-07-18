@@ -9,6 +9,17 @@ import { createLoanId } from "./loan-policy.js";
 
 const ACTIVE_STATUS = "active";
 
+/**
+ * Generate the mandated AI-interaction disclosure for a customer-facing
+ * model. Fails closed unless the model exists, is customer-facing, is
+ * `"active"`, and the global AI kill switch is not tripped — a killed
+ * model must route customers to a human, not receive a disclosure implying
+ * it's still operating.
+ * @param {object} modelRegistryState - model governance registry (see `model-governance.js`).
+ * @param {object} input - modelId, disclosureId, grievanceChannel.
+ * @param {Date} [now]
+ * @returns {{disclosure: object|null, findings: Array<object>, summary: object}}
+ */
 export function buildAiDisclosure(modelRegistryState, input = {}, now = new Date()) {
   const registry = normalizeModelRegistryState(modelRegistryState);
   const findings = [];
@@ -51,6 +62,17 @@ export function buildAiDisclosure(modelRegistryState, input = {}, now = new Date
 
 export const HANDOFF_STATUSES = { PENDING: "pending", HANDLED: "handled" };
 
+/**
+ * Record a borrower's request to escalate from an AI interaction to a
+ * human. Fails closed unless a borrower or session reference and a reason
+ * are given, and — if a model is named — that model exists and is
+ * customer-facing. Always lands in the `"customer_support"` queue.
+ * @param {Record<string, object>} registry - handoffId -> request record.
+ * @param {object} input - handoffId, borrowerId, sessionRef, modelId, reason, requestedAt.
+ * @param {{modelRegistry?: object}} [context] - for the model existence/customer-facing check.
+ * @param {Date} [now]
+ * @returns {{registry: object, request: object|null, event: object|null, findings: Array<object>, summary: object}}
+ */
 export function requestHumanHandoff(registry = {}, input = {}, context = {}, now = new Date()) {
   const findings = [];
   if (!input.borrowerId && !input.sessionRef) {
@@ -103,6 +125,15 @@ export function requestHumanHandoff(registry = {}, input = {}, context = {}, now
   };
 }
 
+/**
+ * Mark a pending handoff request as handled by a human agent. Fails closed
+ * if the request doesn't exist, is already handled, or no `handledBy`
+ * agent is given.
+ * @param {object} request - existing `"pending"` handoff request.
+ * @param {object} input - handledBy, resolutionNotes.
+ * @param {Date} [now]
+ * @returns {{request: object, event: object|null, findings: Array<object>, summary: object}}
+ */
 export function resolveHumanHandoff(request, input = {}, now = new Date()) {
   const findings = [];
   if (!request) {
@@ -137,6 +168,12 @@ export function resolveHumanHandoff(request, input = {}, now = new Date()) {
   return { request: updated, event, findings: [], summary: summarizeFindings([]) };
 }
 
+/**
+ * List handoff requests, optionally filtered by status and/or borrower.
+ * @param {Record<string, object>} registry - handoffId -> request record.
+ * @param {{status?: string, borrowerId?: string}} [filters]
+ * @returns {Array<object>}
+ */
 export function listHumanHandoffRequests(registry = {}, filters = {}) {
   return Object.values(registry).filter(
     (record) =>

@@ -1,5 +1,21 @@
+/**
+ * Simulator-only conformance testing for the identity integration surface
+ * (OIDC, SAML gateway, SCIM, device posture, control-engine mTLS, SIEM WORM
+ * export). This module does NOT talk to any real identity provider — every
+ * campaign runs against `IDENTITY_CONFORMANCE_CATALOG`'s fixed scenario
+ * catalog with `executionMode: "simulated"` and `commerciallyLive: false`
+ * stamped permanently on every record it produces. It exists to let a tenant
+ * certify "if a commercial connector were installed, our contract/fail-closed
+ * expectations are exercised" before any live connector exists; it is not
+ * itself an integration and cannot become "live" by any input (attempts to
+ * pass `executionMode !== "simulated"` are rejected). Campaign
+ * creation/approval is a proposer/approver four-eyes flow (see
+ * `approveIdentityConformanceCampaign`); real-provider wiring, if ever added,
+ * belongs in a separate connector module, not here.
+ */
 import { createHash } from "node:crypto";
 
+// The identity-related integration surfaces this platform can certify test coverage for.
 export const IDENTITY_INTEGRATION_FAMILIES = Object.freeze([
   "oidc",
   "saml_gateway",
@@ -9,6 +25,7 @@ export const IDENTITY_INTEGRATION_FAMILIES = Object.freeze([
   "siem_worm"
 ]);
 
+// Failure modes every family must be tested against, regardless of its own family-specific cases.
 const COMMON = ["success", "invalid_signature", "wrong_tenant", "replay", "stale_evidence", "provider_outage"];
 const FAMILY_CASES = Object.freeze({
   oidc: [...COMMON, "pkce_downgrade", "nonce_mismatch", "issuer_mismatch", "audience_mismatch", "jwks_rollover"],
@@ -19,6 +36,10 @@ const FAMILY_CASES = Object.freeze({
   siem_worm: [...COMMON, "export_gap", "custody_checksum_mismatch", "retention_shortfall", "destination_unavailable"]
 });
 
+// The full fixed catalog of required scenarios across every family, each pre-scored with the
+// disposition it must produce: fail_closed for anything hostile/stale, accept for success and for
+// the specific rollover/duplicate/rehire cases that are expected to be handled gracefully rather
+// than rejected.
 export const IDENTITY_CONFORMANCE_CATALOG = Object.freeze(IDENTITY_INTEGRATION_FAMILIES.flatMap((family) =>
   [...new Set(FAMILY_CASES[family])].map((name) => Object.freeze({
     scenarioId: `${family}.${name}`,
@@ -30,6 +51,17 @@ export const IDENTITY_CONFORMANCE_CATALOG = Object.freeze(IDENTITY_INTEGRATION_F
   }))
 ));
 
+/**
+ * Open a new conformance campaign for one integration family. Always created
+ * `pending_approval` and forced to `executionMode: "simulated"` — a caller
+ * cannot request a live campaign (`commercial connector` claims are rejected)
+ * so the certification scope stays honestly scoped to "LoanOS contract and
+ * simulator only".
+ * @param {object} registry - campaignId -> campaign map.
+ * @param {object} input - campaignId, tenantId, family, providerProfileRef, proposedBy.
+ * @param {Date} [now]
+ * @returns {{registry: object, campaign: object}}
+ */
 export function createIdentityConformanceCampaign(registry = {}, input = {}, now = new Date()) {
   required(input.campaignId, "campaignId");
   required(input.tenantId, "tenantId");
@@ -61,6 +93,15 @@ export function createIdentityConformanceCampaign(registry = {}, input = {}, now
   return { registry: { ...registry, [campaign.campaignId]: campaign }, campaign };
 }
 
+/**
+ * Four-eyes approval: the campaign proposer cannot also approve their own
+ * campaign. Approval is what unblocks scenario execution
+ * (`recordIdentityConformanceResult` requires `approved`/`running` status).
+ * @param {object} registry
+ * @param {object} input - campaignId, approvedBy, approvalRef.
+ * @param {Date} [now]
+ * @returns {{registry: object, campaign: object}}
+ */
 export function approveIdentityConformanceCampaign(registry = {}, input = {}, now = new Date()) {
   const campaign = campaignFor(registry, input.campaignId);
   required(input.approvedBy, "approvedBy");
@@ -71,6 +112,18 @@ export function approveIdentityConformanceCampaign(registry = {}, input = {}, no
   return { registry: { ...registry, [campaign.campaignId]: approved }, campaign: approved };
 }
 
+/**
+ * Run one scenario against the built-in simulator: since there is no real
+ * provider to test against, the simulator's `observedDisposition` always
+ * equals the catalog's `expectedDisposition` — this proves the *contract* is
+ * exercised, not that any live integration behaves this way. The result is
+ * checksummed so `assessIdentityConformanceCampaign`'s manifest can be tied
+ * back to specific evidence.
+ * @param {object} campaign - must be a non-live campaign whose scenarioIds includes scenarioId.
+ * @param {string} scenarioId
+ * @param {Date} [now]
+ * @returns {object} frozen evidence record with `evidenceChecksumSha256`.
+ */
 export function simulateIdentityConformanceScenario(campaign, scenarioId, now = new Date()) {
   if (!campaign?.scenarioIds?.includes(scenarioId)) fail("identity_conformance_scenario_invalid", "Scenario is outside this campaign.");
   if (campaign.executionMode !== "simulated" || campaign.commerciallyLive) fail("identity_conformance_execution_invalid", "Simulator can run only a non-live campaign.");
@@ -89,6 +142,17 @@ export function simulateIdentityConformanceScenario(campaign, scenarioId, now = 
   return Object.freeze({ ...evidence, evidenceChecksumSha256: checksum(evidence) });
 }
 
+/**
+ * Record a scenario result against an approved campaign, either by running
+ * the simulator (default) or, if `input.simulate === false`, accepting a
+ * caller-supplied `observedDisposition` (still forced to
+ * `executionMode: "simulated"` — see `normalizeSuppliedResult`). Moves the
+ * campaign to `running` on first result.
+ * @param {object} registry
+ * @param {object} input - campaignId, scenarioId, executedBy, and optionally simulate/observedDisposition/evidenceRef.
+ * @param {Date} [now]
+ * @returns {{registry: object, campaign: object, result: object}}
+ */
 export function recordIdentityConformanceResult(registry = {}, input = {}, now = new Date()) {
   const campaign = campaignFor(registry, input.campaignId);
   if (!['approved', 'running'].includes(campaign.status)) fail("identity_conformance_campaign_not_approved", "Campaign must be approved before execution.");
@@ -100,6 +164,17 @@ export function recordIdentityConformanceResult(registry = {}, input = {}, now =
   return { registry: { ...registry, [campaign.campaignId]: updated }, campaign: updated, result: updated.results[input.scenarioId] };
 }
 
+/**
+ * Certify (or block) a campaign: `simulator_certified` only if every
+ * required scenario has a passing result, else `blocked`. Produces a
+ * checksummed manifest binding the outcome to the specific per-scenario
+ * evidence checksums, so certification can't be claimed without the
+ * underlying evidence.
+ * @param {object} registry
+ * @param {object} input - campaignId, assessedBy.
+ * @param {Date} [now]
+ * @returns {{registry: object, campaign: object, assessment: object}}
+ */
 export function assessIdentityConformanceCampaign(registry = {}, input = {}, now = new Date()) {
   const campaign = campaignFor(registry, input.campaignId);
   required(input.assessedBy, "assessedBy");
@@ -128,6 +203,7 @@ function normalizeSuppliedResult(campaign, input, now) {
   return { ...result, evidenceChecksumSha256: checksum(result) };
 }
 
+// Looks up a campaign or fails closed if it doesn't exist.
 function campaignFor(registry, campaignId) {
   const campaign = registry[campaignId];
   if (!campaign) fail("identity_conformance_campaign_missing", "Campaign was not found.");

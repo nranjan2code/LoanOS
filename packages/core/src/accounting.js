@@ -1,8 +1,32 @@
 // Finance-grade journal projection from immutable loan events. Entries are
 // derived, never manually editable; the originating ledger event remains the
 // source of truth and every journal is balanced by construction.
+//
+// This module owns only the projection from ledger event -> double-entry
+// journal lines; it does not own the ledger itself (event sourcing/append
+// lives wherever `account.ledger` is written) and does not own co-lending
+// split *policy* (share percentages, leg roles) — it only applies whatever
+// `account.coLendingAllocation` already carries (see `co-lending.js` /
+// `co-lending-finance.js` for where that allocation is decided). A
+// co-lending loan's single ledger event fans out into one balanced journal
+// per participating entity (`splitCoLendingJournal`), each closed with an
+// intercompany due-to/due-from line for any rounding remainder, so every
+// per-entity book still balances exactly even though shares are computed in
+// integer paise.
 const abs = (value) => Math.abs(Number(value ?? 0));
 
+/**
+ * Project a loan account's immutable ledger events into balanced double-entry
+ * journal entries. A `"reversal"` event replays the original event's lines
+ * with debit/credit flipped (`reverseLines`) rather than re-deriving from
+ * scratch, so a reversal always exactly cancels what it reverses. Throws if
+ * any single-entity journal doesn't balance to the paisa — that indicates a
+ * bug in `journalLines`, not a legitimate business state, so it is not
+ * caught/degraded here (fail loud at the projection boundary rather than
+ * persist an unbalanced book).
+ * @param {object} account - loan account with `ledger` events, `accountingProfile`, and optional `coLendingAllocation`.
+ * @returns {Array<object>} one journal entry per ledger event (or per co-lending leg).
+ */
 export function buildLoanJournalEntries(account) {
   const entries = [];
   const linesByEventId = new Map();
@@ -25,6 +49,13 @@ export function buildLoanJournalEntries(account) {
   return entries;
 }
 
+// Fan a single-entity journal out into one journal per co-lending leg,
+// allocating each line's amount by the leg's share (interest/fee/principal
+// shares can differ per leg) in integer paise, with the last leg absorbing
+// any rounding remainder so paise-level splits always sum exactly to the
+// original amount. Each per-leg journal is force-balanced with an
+// intercompany due-to/due-from line since splitting by share can leave a
+// leg's debits and credits momentarily unequal.
 function splitCoLendingJournal(account, event, lines, allocation) {
   const ordered = [...allocation.legs].sort((left, right) => (left.role === "originating" ? 1 : 0) - (right.role === "originating" ? 1 : 0));
   const partnerLines = new Map(ordered.map((leg) => [leg.regulatedEntityId, []]));
@@ -45,12 +76,17 @@ function splitCoLendingJournal(account, event, lines, allocation) {
   });
 }
 
+// Pick which of a leg's differentiated share percentages applies to a given
+// account line (interest vs. fee/GST vs. the default principal share).
 function shareForLine(account, leg) {
   if (String(account).includes("interest")) return Number(leg.interestSharePercent ?? leg.sharePercent);
   if (String(account).includes("charges") || String(account).includes("gst")) return Number(leg.feeSharePercent ?? leg.sharePercent);
   return Number(leg.sharePercent);
 }
 
+// Retarget the shared "bank_clearing" account to the partner-specific
+// funding/collections clearing account for a co-lending partner's leg, so
+// partner cash flows are distinguishable from the originating entity's own.
 function coLendingAccount(account, side, eventType, role) {
   if (role !== "partner" || account !== "bank_clearing") return account;
   if (eventType === "disbursement" && side === "credit") return "co_lending_funding_clearing";
@@ -58,6 +94,9 @@ function coLendingAccount(account, side, eventType, role) {
   return account;
 }
 
+// The actual chart-of-accounts mapping: which debit/credit lines a given
+// ledger event type produces. `configuredAccounts` lets a tenant override
+// individual GL account codes without changing the debit/credit structure.
 function journalLines(event, configuredAccounts = {}) {
   const accounts = {
     bankClearing: "bank_clearing", principalReceivable: "loan_principal_receivable", interestReceivable: "interest_receivable", interestIncome: "interest_income", chargesReceivable: "charges_receivable", chargesIncome: "charges_income", outputGstPayable: "output_gst_payable", customerCreditBalance: "customer_credit_balance", chargeWaiverExpense: "charge_waiver_expense", settlementLoss: "settlement_loss",
@@ -86,6 +125,8 @@ function journalLines(event, configuredAccounts = {}) {
   return [];
 }
 
+// Flip debit<->credit on every line, so replaying a reversal event exactly
+// cancels the original event's journal impact.
 function reverseLines(lines) {
   return lines.map((line) => ({ ...line, side: line.side === "debit" ? "credit" : "debit" }));
 }

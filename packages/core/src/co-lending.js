@@ -39,6 +39,9 @@ function toNumber(value) {
   return Number.isFinite(n) ? n : NaN;
 }
 
+// Fill partner defaults: interest/fee shares fall back to the overall
+// sharePercent when not separately disclosed, and unset fee-related bps
+// default to zero rather than undefined.
 function normalizePartner(partner = {}) {
   const sharePercent = partner.sharePercent ?? null;
   return {
@@ -55,6 +58,14 @@ function normalizePartner(partner = {}) {
   };
 }
 
+/**
+ * Sum each partner's total allocated principal (in integer paise
+ * internally, INR externally) and loan count across an arrangement's
+ * allocations. Pure read/report — used both standalone and as part of
+ * `upsertCoLendingArrangement`'s return value.
+ * @param {object} arrangement - co-lending arrangement with `partners`/`allocations`.
+ * @returns {{totalAllocatedInr: number, loanCount: number, partners: Array<object>}}
+ */
 export function computeCoLendingExposure(arrangement) {
   const allocations = arrangement?.allocations ?? [];
   const byPartner = {};
@@ -79,6 +90,20 @@ export function computeCoLendingExposure(arrangement) {
   };
 }
 
+/**
+ * Validate a co-lending arrangement against the RBI CLA Directions 2025
+ * hard rules (see file header): required agreement/escrow/blended-rate
+ * disclosures, exactly one originating partner, every partner referencing
+ * an active regulated entity, share/interest-share/fee-share percentages
+ * each summing to 100% (within `SHARE_TOLERANCE_PERCENT`), servicing-fee/
+ * GST/TDS bps within valid ranges and not exceeding the partner's gross
+ * collection entitlement, and the originating RE retaining at least
+ * `MIN_ORIGINATING_RETENTION_PERCENT`. Pure validation — never mutates the
+ * arrangement.
+ * @param {object} arrangement - candidate or existing arrangement.
+ * @param {{regulatedEntities?: object}} [context] - regulatedEntityId -> entity record, for the active-entity check.
+ * @returns {{findings: Array<object>, summary: object}}
+ */
 export function validateCoLendingArrangement(arrangement, context = {}) {
   const { regulatedEntities = {} } = context;
   const findings = [];
@@ -166,6 +191,16 @@ export function validateCoLendingArrangement(arrangement, context = {}) {
   return { findings, summary: summarizeFindings(findings) };
 }
 
+/**
+ * Merge a caller-supplied `input` over an `existing` arrangement (or
+ * defaults, for a new one), normalizing partners via `normalizePartner`.
+ * Pure data shaping — does not validate; pair with
+ * `validateCoLendingArrangement` (as `upsertCoLendingArrangement` does).
+ * @param {object} input - partial arrangement fields to apply.
+ * @param {object} [existing] - the current stored arrangement, if any.
+ * @param {Date} [now]
+ * @returns {object} the merged, normalized arrangement.
+ */
 export function normalizeCoLendingArrangement(input, existing = {}, now = new Date()) {
   return {
     coLendingArrangementId: input.coLendingArrangementId ?? existing.coLendingArrangementId,
@@ -182,6 +217,19 @@ export function normalizeCoLendingArrangement(input, existing = {}, now = new Da
   };
 }
 
+/**
+ * Create or update a co-lending arrangement: normalize, validate, and (if
+ * valid) persist into the registry. Additionally fails closed on a rule
+ * `validateCoLendingArrangement` doesn't cover: once at least one loan has
+ * been allocated under an arrangement, its agreement reference, escrow
+ * account, and partner economics become immutable — a partner's share
+ * cannot be quietly changed after loans already reference the old shares.
+ * @param {Record<string, object>} registry - coLendingArrangementId -> arrangement.
+ * @param {object} input - fields to merge, see `normalizeCoLendingArrangement`.
+ * @param {{regulatedEntities?: object}} [context] - passed to `validateCoLendingArrangement`.
+ * @param {Date} [now]
+ * @returns {{registry: object, coLendingArrangement: object, exposure: object, findings: Array<object>, summary: object}}
+ */
 export function upsertCoLendingArrangement(registry, input, context = {}, now = new Date()) {
   const existing = (registry ?? {})[input?.coLendingArrangementId] ?? {};
   const arrangement = normalizeCoLendingArrangement(input, existing, now);
@@ -202,9 +250,21 @@ export function upsertCoLendingArrangement(registry, input, context = {}, now = 
   };
 }
 
-// Split one loan's principal across the co-lending partners per the arrangement
-// shares, enforcing that the legs reconcile to the total and match the disclosed
-// proportions within rounding tolerance.
+/**
+ * Split one loan's principal across the co-lending partners per the
+ * arrangement shares, enforcing that the legs reconcile to the total and
+ * match the disclosed proportions within rounding tolerance. Fails closed
+ * unless the arrangement is active, either `loanAccountId` or
+ * `loanApplicationId` is given, the allocation/loan isn't already
+ * allocated under this arrangement, and `principalInr` is a positive,
+ * paise-exact amount. The originating partner (sorted last via
+ * `ordered`) absorbs any paise-level rounding remainder, so legs always
+ * sum exactly to the principal.
+ * @param {object} arrangement - the active co-lending arrangement.
+ * @param {object} input - allocationId, loanAccountId, loanApplicationId, principalInr, blendedRateBps.
+ * @param {Date} [now]
+ * @returns {{arrangement: object, allocation?: object, exposure?: object, findings: Array<object>, summary: object}}
+ */
 export function recordCoLendingLoanAllocation(arrangement, input = {}, now = new Date()) {
   const findings = [];
   if (!arrangement) {

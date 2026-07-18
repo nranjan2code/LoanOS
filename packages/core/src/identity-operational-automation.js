@@ -1,3 +1,24 @@
+/**
+ * Automated identity-operations reactions: applying signed federated
+ * logout/revocation events from an upstream IdP to local sessions, planning
+ * a periodic operational health run across federation/conformance/access
+ * review state (`planIdentityOperationalRun`), and running/witnessing
+ * tabletop identity incident drills. This module does not decide staffing or
+ * feature-gating policy itself — see `saas-identity-governance.js`
+ * (`projectTenantFeatureStaffing`) for that; it only reads staffing readiness
+ * to fold into `projectIdentityOperationalReadiness` blockers. It also does
+ * not perform live provider I/O for conformance families — see
+ * `identity-integration-conformance.js`, which this module reads for
+ * required-family certification status.
+ *
+ * Fail-closed pattern: `planIdentityOperationalRun` only ever *proposes*
+ * session revocations as `automaticActions`; anything requiring judgment
+ * (approving a role, approving recovery, activating federation, closing an
+ * escalation) is explicitly listed in `prohibitedAutomaticActions` and must
+ * go through a human-approved flow elsewhere. `executeIdentityOperationalRun`
+ * further guards this by verifying the plan's checksum wasn't tampered with
+ * between planning and execution.
+ */
 import { createHash } from "node:crypto";
 import { revokePrincipalSessions } from "./identity-operations.js";
 import { IDENTITY_INTEGRATION_FAMILIES } from "./identity-integration-conformance.js";
@@ -5,6 +26,25 @@ import { IDENTITY_INTEGRATION_FAMILIES } from "./identity-integration-conformanc
 export const FEDERATED_REVOCATION_PROTOCOLS = Object.freeze(["oidc_backchannel_logout", "oidc_token_revocation", "saml_single_logout", "provider_session_revocation"]);
 export const IDENTITY_DRILL_SCENARIOS = Object.freeze(["idp_outage", "signing_key_compromise", "scim_credential_compromise", "leaver_containment", "control_engine_outage", "siem_worm_outage", "metadata_rollover", "directory_drift"]);
 
+/**
+ * Apply a signed front-channel/back-channel logout or revocation event from
+ * a federated IdP, revoking any matching local sessions. Verifies signature,
+ * cryptographic-verifier lineage, tenant/policy/issuer/audience binding, and
+ * a tight freshness window (issued within the last 5 minutes, not future
+ * beyond clock skew tolerance, validity window <= 10 minutes) before acting —
+ * a stale or forged event must never revoke or fail to revoke a session.
+ * Idempotent by `eventId`: replaying the same event with identical evidence
+ * is a no-op returning the original result; reusing an `eventId` with
+ * different evidence is rejected as a replay conflict.
+ * @param {object} eventRegistry - eventId -> applied event map.
+ * @param {object} sessions - sessionId -> session map.
+ * @param {object} policies - policyId -> federation policy map.
+ * @param {object} users - userId -> user map (to resolve federated subject to local user).
+ * @param {object} input - eventId, tenantId, policyId, protocol, issuer, audience, subject,
+ *   providerEvidenceRef, evidenceChecksumSha256, verification{...}, issuedAt, expiresAt.
+ * @param {Date} [now]
+ * @returns {{events: object, sessions: object, event: object, revokedSessionIds: string[], idempotent: boolean}}
+ */
 export function applyFederatedRevocationEvent(eventRegistry = {}, sessions = {}, policies = {}, users = {}, input = {}, now = new Date()) {
   for (const field of ["eventId", "tenantId", "policyId", "protocol", "issuer", "audience", "subject", "providerEvidenceRef", "evidenceChecksumSha256"]) required(input[field], field);
   if (!FEDERATED_REVOCATION_PROTOCOLS.includes(input.protocol)) fail("federated_revocation_protocol_invalid", "Federated revocation protocol is unsupported.");
@@ -39,6 +79,23 @@ export function applyFederatedRevocationEvent(eventRegistry = {}, sessions = {},
   return { events: { ...eventRegistry, [event.eventId]: event }, sessions: nextSessions, event, revokedSessionIds, idempotent: false };
 }
 
+/**
+ * Sweep identity-related state (federation metadata expiry, conformance
+ * campaign coverage/staleness, overdue rotation/recovery/role requests,
+ * overdue access reviews, stale directory reconciliations, orphaned active
+ * sessions, uncustodied activity export batches) and produce a checksummed,
+ * read-only plan: findings plus a containment list of session revocations
+ * that `executeIdentityOperationalRun` may apply. Deliberately does not
+ * touch state — planning is safe to run repeatedly/concurrently; only
+ * execution mutates.
+ * @param {object} state - full identity-domain state slice (federationPolicies, users, etc).
+ * @param {object} sessions - sessionId -> session map.
+ * @param {object} input - runId, tenantId, plannedBy, and tunable thresholds
+ *   (metadataWarningDays, conformanceMaxAgeDays, requestSlaHours, reconciliationMaxAgeHours).
+ * @param {Date} [now]
+ * @returns {object} frozen plan with `findings`, `containment`, `automaticActions`,
+ *   `prohibitedAutomaticActions`, `status`, and `planChecksumSha256`.
+ */
 export function planIdentityOperationalRun(state = {}, sessions = {}, input = {}, now = new Date()) {
   required(input.runId, "runId"); required(input.tenantId, "tenantId"); required(input.plannedBy, "plannedBy");
   const metadataWarningMs = bounded(input.metadataWarningDays ?? 30, 1, 180, "metadataWarningDays") * 86_400_000;
@@ -79,6 +136,19 @@ export function planIdentityOperationalRun(state = {}, sessions = {}, input = {}
   return Object.freeze({ ...plan, planChecksumSha256: hash(plan) });
 }
 
+/**
+ * Execute a previously computed plan's containment actions (session
+ * revocations only — see module header). Re-derives the plan's checksum and
+ * rejects if it doesn't match `plan.planChecksumSha256`, so a plan can't be
+ * edited between being generated and being executed. Rejects re-execution of
+ * a `runId` that has already run.
+ * @param {object} state
+ * @param {object} sessions
+ * @param {object} plan - output of `planIdentityOperationalRun`.
+ * @param {object} input - executedBy, executionEvidenceRef.
+ * @param {Date} [now]
+ * @returns {{state: object, sessions: object, run: object}}
+ */
 export function executeIdentityOperationalRun(state = {}, sessions = {}, plan, input = {}, now = new Date()) {
   required(input.executedBy, "executedBy"); required(input.executionEvidenceRef, "executionEvidenceRef");
   if (!plan || plan.planChecksumSha256 !== hash(without(plan, "planChecksumSha256"))) fail("identity_operational_plan_tampered", "Operational plan checksum is invalid.");
@@ -92,6 +162,17 @@ export function executeIdentityOperationalRun(state = {}, sessions = {}, plan, i
   return { state: { ...state, identityOperationalRuns: { ...(state.identityOperationalRuns ?? {}), [run.runId]: run } }, sessions: nextSessions, run };
 }
 
+/**
+ * Propose a tabletop/simulated identity incident drill (e.g. IdP outage,
+ * signing-key compromise). Always `simulation: true` / `commerciallyLive:
+ * false` and requires target detection/containment/recovery SLAs up front,
+ * so the drill has an objective pass/fail bar before it's run.
+ * @param {object} state
+ * @param {object} input - drillId, tenantId, scenario, proposedBy, objective,
+ *   runbookRef, targetDetectionMs, targetContainmentMs, targetRecoveryMs.
+ * @param {Date} [now]
+ * @returns {{state: object, drill: object}}
+ */
 export function proposeIdentityOperationsDrill(state = {}, input = {}, now = new Date()) {
   for (const field of ["drillId", "tenantId", "scenario", "proposedBy", "objective", "runbookRef"]) required(input[field], field);
   if (!IDENTITY_DRILL_SCENARIOS.includes(input.scenario)) fail("identity_drill_scenario_invalid", "Identity drill scenario is unsupported.");

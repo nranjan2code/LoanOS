@@ -1,3 +1,26 @@
+/**
+ * CKYCRR (Central KYC Records Registry) reporting: builds and submits the
+ * canonical CKYCRR packet for a verified KYC record (RBI-KYC-2016 /
+ * CERSAI-CKYC), tracks the submission through the registry's async
+ * accept/reject/probable-match response cycle, and validates the separate
+ * consent + authentication-factor preconditions for *downloading* someone
+ * else's CKYC record. This module does not perform KYC verification itself
+ * (`kycRecord.status !== "verified"` blocks packet building outright) and
+ * does not talk to the CKYCRR SFTP/portal transport — `submitCkycrrSubmission`
+ * only records that transmission evidence (signature, transport ref,
+ * file size) already exists.
+ *
+ * CKYCRR's own document-format rules are enforced exactly, not
+ * approximately: individual photographs must be a 200x230 colour JPEG
+ * under 100 KB; scanned originals must be TIFF/JPEG/PDF at 150-200 DPI,
+ * under 350 KB (individual) or 5 MB (legal entity), each with its own
+ * SHA-256 checksum. A `"probable_match"` response starts a 7-day
+ * reconciliation clock (`reconciliationDueDate`); if that deadline passes
+ * before `resolveCkycrrProbableMatch` is called, the submission is
+ * auto-withdrawn rather than left in limbo. Every accepted or confirmed
+ * CKYC identifier must be shared back to the customer via evidenced
+ * SMS/email (RBI-KYC-2016) before the flow is considered complete.
+ */
 import { createHash } from "node:crypto";
 import { createFinding, summarizeFindings } from "./compliance-controls.js";
 import { createLoanId } from "./loan-policy.js";
@@ -13,6 +36,10 @@ function addDays(value, days) { const date = new Date(`${value}T00:00:00.000Z`);
 function required(findings, value, path, label = path) { if (value === null || value === undefined || value === "") findings.push(createFinding("error", "CERSAI-CKYC", `${label} is required.`, path)); }
 function validCkycIdentifier(value) { return typeof value === "string" && /^[SLMO]?\d{14}$/.test(value); }
 
+// CKYCRR's exact document-format rules: file type, size ceiling (tighter
+// for individuals), DPI band, a SHA-256 checksum per document, and — for
+// individuals — a dedicated cropped photograph meeting its own stricter
+// colour/dimension/size limits.
 function validateDocuments(documents, customerType, findings) {
   if (!Array.isArray(documents) || documents.length === 0) {
     findings.push(createFinding("error", "CERSAI-CKYC", "At least one scanned original supporting document is required.", "documents")); return;
@@ -34,6 +61,22 @@ function validateDocuments(documents, customerType, findings) {
   if (customerType === "individual" && !documents.some((item) => item.documentType === "photograph")) findings.push(createFinding("error", "CERSAI-CKYC", "A separately cropped individual photograph is required.", "documents"));
 }
 
+/**
+ * Build (but do not submit) a canonical CKYCRR packet from a borrower and
+ * their verified KYC record. Fails closed unless: the KYC record is
+ * `"verified"`, the operation is `new`/`update` (update requires a valid
+ * existing CKYC identifier), all customer-type-specific fields are present
+ * (individual: name/DOB/gender/identity; legal entity: legal name/PAN/
+ * constitution/incorporation date), documents pass `validateDocuments`, and
+ * independent maker-checker approval is present. The packet's
+ * `checksumSha256` is computed over its canonical JSON so the exact
+ * submitted content is fixed at build time.
+ * @param {object} borrower - borrower profile record.
+ * @param {object} kycRecord - the borrower's KYC record (must be `"verified"`).
+ * @param {object} input - operation, ckycIdentifier (for update), institutionCode, branchCode, documents, proposedBy, approvedBy, approvalRef.
+ * @param {Date} [now]
+ * @returns {{packet: object|null, findings: Array<object>, summary: object}}
+ */
 export function buildCkycrrPacket(borrower, kycRecord, input = {}, now = new Date()) {
   const findings = [];
   const operation = input.operation ?? "new";
@@ -75,6 +118,18 @@ export function buildCkycrrPacket(borrower, kycRecord, input = {}, now = new Dat
   return { packet: { ...packetBody, generatedAt: now.toISOString(), checksumSha256: hash(canonicalContent), canonicalContent }, findings, summary };
 }
 
+/**
+ * Build a packet and register it as a `"ready"` CKYCRR submission.
+ * Idempotent on `submissionId` (a repeat call with the same id returns the
+ * existing submission unchanged). Fails closed if the KYC record doesn't
+ * actually belong to the named borrower, in addition to every
+ * `buildCkycrrPacket` precondition.
+ * @param {Record<string, object>} registry - submissionId -> submission record.
+ * @param {{borrowerProfiles?: object, kycRecords?: object}} context - lookup maps for the borrower/KYC record.
+ * @param {object} input - submissionId, borrowerId, kycRecordId, +buildCkycrrPacket fields.
+ * @param {Date} [now]
+ * @returns {{registry: object, submission: object|null, findings: Array<object>, summary: object, idempotent: boolean}}
+ */
 export function createCkycrrSubmission(registry = {}, context = {}, input = {}, now = new Date()) {
   const submissionId = input.submissionId ?? createLoanId("ckycsub");
   if (registry[submissionId]) return { registry, submission: registry[submissionId], findings: [], summary: summarizeFindings([]), idempotent: true };
@@ -86,6 +141,18 @@ export function createCkycrrSubmission(registry = {}, context = {}, input = {}, 
   return { registry: { ...registry, [submissionId]: submission }, submission, findings, summary, idempotent: false };
 }
 
+/**
+ * Record that a `"ready"` submission has been transmitted to CKYCRR.
+ * Fails closed unless: transmitter, transport (`sftp`/`portal`), digital
+ * signature, and file-name evidence are all present, the file size is a
+ * positive integer, and — CKYCRR's own rule — a `portal` upload stays
+ * under 20 MB (larger files must use `sftp`).
+ * @param {Record<string, object>} registry - submissionId -> submission record.
+ * @param {string} submissionId
+ * @param {object} input - transmittedBy, transport, transportRef, digitalSignatureRef, fileName, fileSizeBytes.
+ * @param {Date} [now]
+ * @returns {{registry: object, submission: object, findings: Array<object>, summary: object}}
+ */
 export function submitCkycrrSubmission(registry = {}, submissionId, input = {}, now = new Date()) {
   const submission = registry[submissionId]; const findings = [];
   if (!submission || submission.status !== CKYCRR_STATUSES.READY) findings.push(createFinding("error", "CERSAI-CKYC", "A ready CKYCRR submission is required.", "submissionId"));
@@ -97,6 +164,19 @@ export function submitCkycrrSubmission(registry = {}, submissionId, input = {}, 
   return { registry: { ...registry, [submissionId]: updated }, submission: updated, findings, summary };
 }
 
+/**
+ * Apply CKYCRR's response to a `"submitted"` record: accepted (with a
+ * fresh CKYC identifier and evidenced customer notification), rejected
+ * (with error code/message), or probable_match (with at least one valid
+ * candidate identifier, starting the 7-day reconciliation clock via
+ * `reconciliationDueDate`). Fails closed unless the outcome's own required
+ * fields are present.
+ * @param {Record<string, object>} registry - submissionId -> submission record.
+ * @param {string} submissionId
+ * @param {object} input - responseRef, receivedBy, outcome, ckycIdentifier, customerNotification, errorCode, errorMessage, matches.
+ * @param {Date} [now]
+ * @returns {{registry: object, submission: object, findings: Array<object>, summary: object}}
+ */
 export function recordCkycrrResponse(registry = {}, submissionId, input = {}, now = new Date()) {
   const submission = registry[submissionId]; const findings = [];
   if (!submission || submission.status !== CKYCRR_STATUSES.SUBMITTED) findings.push(createFinding("error", "CERSAI-CKYC", "A submitted CKYCRR record is required.", "submissionId"));
@@ -110,6 +190,21 @@ export function recordCkycrrResponse(registry = {}, submissionId, input = {}, no
   return { registry: { ...registry, [submissionId]: updated }, submission: updated, findings, summary };
 }
 
+/**
+ * Resolve a `"probable_match"` submission with an independent reviewed
+ * decision (exact_match or no_match). If the 7-day reconciliation deadline
+ * has already passed, the submission is instead auto-withdrawn (a warning
+ * finding, not blocked) regardless of what decision was supplied — the
+ * caller must re-upload rather than resolve a stale probable match.
+ * Otherwise fails closed unless reviewer/approver are independent, a
+ * reason is given, and an `exact_match` decision selects one of the
+ * originally-returned candidates plus evidenced customer notification.
+ * @param {Record<string, object>} registry - submissionId -> submission record.
+ * @param {string} submissionId
+ * @param {object} input - reviewedBy, approvedBy, reason, decision, ckycIdentifier, customerNotification.
+ * @param {Date} [now]
+ * @returns {{registry: object, submission: object, findings: Array<object>, summary: object}}
+ */
 export function resolveCkycrrProbableMatch(registry = {}, submissionId, input = {}, now = new Date()) {
   const submission = registry[submissionId]; const findings = [];
   if (!submission || submission.status !== CKYCRR_STATUSES.PROBABLE_MATCH) findings.push(createFinding("error", "CERSAI-CKYC", "A probable-match submission is required.", "submissionId"));
@@ -127,6 +222,18 @@ export function resolveCkycrrProbableMatch(registry = {}, submissionId, input = 
   return { registry: { ...registry, [submissionId]: updated }, submission: updated, findings, summary };
 }
 
+/**
+ * Validate the preconditions for *downloading* a CKYC record (a distinct,
+ * more sensitive operation than reporting one): a valid CKYC identifier, an
+ * active, non-expired, purpose-matched (`"ckyc"`) borrower consent record,
+ * a supported authentication factor with evidence, and download
+ * provider/actor references. Pure validation — never mutates state or
+ * performs the download itself.
+ * @param {object} input - ckycIdentifier, borrowerId, consentId, authenticationFactor, downloadRef, downloadedBy.
+ * @param {Record<string, object>} consentRecords - consentId -> consent record.
+ * @param {Date} [now]
+ * @returns {{findings: Array<object>, summary: object}}
+ */
 export function validateCkycrrDownload(input = {}, consentRecords = {}, now = new Date()) {
   const findings = []; if (!validCkycIdentifier(input.ckycIdentifier)) findings.push(createFinding("error", "CERSAI-CKYC", "Valid CKYC identifier is required.", "ckycIdentifier"));
   const consent = consentRecords[input.consentId];

@@ -1,3 +1,26 @@
+/**
+ * Control-assurance and audit-engagement lifecycle: the second/third-line
+ * governance layer that plans control testing (`createAssurancePlan`),
+ * records test results (`recordControlTest`), tracks deficiencies through
+ * remediation (`createAssuranceIssue`/`transitionAssuranceIssue`), certifies
+ * control effectiveness (`createControlCertification`/
+ * `approveControlCertification`), manages external audit/inspection
+ * engagements (`createAuditEngagement`/`respondAuditRequest`/
+ * `transitionAuditEngagement`), and rolls all of it up into a periodic
+ * governance pack (`generateGovernancePack`) for board/committee
+ * consumption. `projectControlAssurance` is the read model that replays a
+ * platform event log back into this module's entity shapes.
+ *
+ * This module does not itself define *what* the controls are — it
+ * references `knownControlIds` from the regulatory control library (see
+ * `compliance-controls.js`'s `REGULATORY_CONTROLS`) and only checks that a
+ * plan's `controlIds` are drawn from that library. Segregation of duties
+ * is enforced throughout: an issue's remediator cannot verify their own
+ * fix, a verifier cannot close their own verification, a certification's
+ * signer cannot approve their own certification, and an audit engagement's
+ * respondent cannot close their own engagement — each of these throws
+ * `assurance_four_eyes_required` rather than silently allowing self-review.
+ */
 import { createHash } from "node:crypto";
 
 const PLAN_FREQUENCIES = new Set(["monthly", "quarterly", "half_yearly", "annual", "event_driven"]);
@@ -8,6 +31,17 @@ const CERTIFICATION_RESULTS = new Set(["effective", "exception"]);
 const ENGAGEMENT_TYPES = new Set(["internal_audit", "statutory_audit", "rbi_inspection", "regulatory_review"]);
 const ENGAGEMENT_STATUSES = new Set(["planned", "in_progress", "fieldwork_complete", "responded", "closed"]);
 
+/**
+ * Create an approved control-testing plan for a period. Requires a unique
+ * `planId`, a valid period (start before end), every `controlIds` entry to
+ * exist in the regulatory control library, and independent proposer/
+ * approver.
+ * @param {object} input - planId, name, periodStart, periodEnd, frequency, controlIds, methodologyRef, sampleStrategy, owner, proposedBy, approvedBy, approvalRef.
+ * @param {string[]} [knownControlIds] - valid control ids from the regulatory register.
+ * @param {Array<object>} [existing] - existing plans, for the duplicate check.
+ * @param {Date} [now]
+ * @returns {object} the new `"active"` plan record.
+ */
 export function createAssurancePlan(input, knownControlIds = [], existing = [], now = new Date()) {
   requireText(input.planId, "planId");
   if (existing.some((item) => item.planId === input.planId)) throw assuranceError("assurance_plan_duplicate", "planId already exists.");
@@ -21,6 +55,19 @@ export function createAssurancePlan(input, knownControlIds = [], existing = [], 
   return { planId: String(input.planId), name: String(input.name), periodStart: isoDate(input.periodStart), periodEnd: isoDate(input.periodEnd), frequency: input.frequency, controlIds, methodologyRef: String(input.methodologyRef), sampleStrategy: String(input.sampleStrategy), owner: String(input.owner), proposedBy: String(input.proposedBy), approvedBy: String(input.approvedBy), approvalRef: String(input.approvalRef), status: "active", approvedAt: now.toISOString() };
 }
 
+/**
+ * Record the result of a control test performed under an active plan.
+ * Requires the plan to be active and actually cover `controlId`, a sample
+ * size not exceeding the population, workpaper/procedure/evidence
+ * references, and — if the result is `"deficiency"` — at least one
+ * recorded finding (a deficiency cannot be logged without saying what was
+ * found).
+ * @param {object} input - testId, planId, controlId, populationSize, sampleSize, sampleRef, procedureRef, tester, workpaperRef, evidenceRefs, result, findings, testedAt.
+ * @param {Array<object>} [plans] - existing plans, to find the active covering plan.
+ * @param {Array<object>} [existing] - existing tests, for the duplicate check.
+ * @param {Date} [now]
+ * @returns {object} the new test record.
+ */
 export function recordControlTest(input, plans = [], existing = [], now = new Date()) {
   requireText(input.testId, "testId");
   if (existing.some((item) => item.testId === input.testId)) throw assuranceError("control_test_duplicate", "testId already exists.");
@@ -38,6 +85,16 @@ export function recordControlTest(input, plans = [], existing = [], now = new Da
   return { testId: String(input.testId), planId: plan.planId, controlId: String(input.controlId), populationSize, sampleSize, sampleRef: String(input.sampleRef), procedureRef: String(input.procedureRef), tester: String(input.tester), workpaperRef: String(input.workpaperRef), evidenceRefs, result: input.result, findings, testedAt, recordedAt: now.toISOString() };
 }
 
+/**
+ * Open a remediation issue against a control test that came back
+ * `"deficiency"` — an issue cannot exist without a deficient test backing
+ * it. Requires a future `dueAt`.
+ * @param {object} input - issueId, testId, severity, title, description, owner, remediationPlan, detectedBy, dueAt.
+ * @param {Array<object>} [tests] - existing tests, to find the deficient test.
+ * @param {Array<object>} [existing] - existing issues, for the duplicate check.
+ * @param {Date} [now]
+ * @returns {object} the new `"open"` issue record.
+ */
 export function createAssuranceIssue(input, tests = [], existing = [], now = new Date()) {
   requireText(input.issueId, "issueId");
   if (existing.some((item) => item.issueId === input.issueId)) throw assuranceError("assurance_issue_duplicate", "issueId already exists.");
@@ -50,6 +107,19 @@ export function createAssuranceIssue(input, tests = [], existing = [], now = new
   return { issueId: String(input.issueId), testId: test.testId, planId: test.planId, controlId: test.controlId, title: String(input.title), description: String(input.description), severity: input.severity, owner: String(input.owner), remediationPlan: String(input.remediationPlan), detectedBy: String(input.detectedBy), dueAt: new Date(input.dueAt).toISOString(), status: "open", createdAt: now.toISOString(), updatedAt: now.toISOString() };
 }
 
+/**
+ * Advance an issue through its remediation lifecycle (open ->
+ * in_remediation -> remediated -> verified -> closed, with rework loops
+ * back to in_remediation). Each transition demands its own evidence
+ * (`changeTicket`/`remediationEvidenceRef`/`retestEvidenceRef`/
+ * `closureApprovalRef`), and both `"verified"` and `"closed"` enforce
+ * segregation of duties: the verifier cannot be the remediator, and the
+ * closer cannot be the verifier.
+ * @param {object} issue - existing issue record.
+ * @param {object} input - status, updatedBy, +status-specific evidence fields.
+ * @param {Date} [now]
+ * @returns {object} the updated issue record.
+ */
 export function transitionAssuranceIssue(issue, input, now = new Date()) {
   requireText(input.updatedBy, "updatedBy");
   if (!ISSUE_STATUSES.has(input.status)) throw assuranceError("assurance_issue_transition_invalid", "status is invalid.");
@@ -63,6 +133,19 @@ export function transitionAssuranceIssue(issue, input, now = new Date()) {
   return next;
 }
 
+/**
+ * Draft a control-effectiveness certification for a completed period.
+ * Requires the period to have already ended, every referenced test/issue
+ * to actually exist for this control, an `"exception"` result to link at
+ * least one issue, and an `"effective"` result to exclude any deficient
+ * test (effectiveness cannot be certified while citing a test that failed).
+ * @param {object} input - certificationId, controlId, periodStart, periodEnd, result, testIds, issueIds, evidenceRefs, certifiedBy, statement.
+ * @param {Array<object>} [tests] - existing tests, to validate testIds.
+ * @param {Array<object>} [issues] - existing issues, to validate issueIds.
+ * @param {Array<object>} [existing] - existing certifications, for the duplicate check.
+ * @param {Date} [now]
+ * @returns {object} the new `"pending_approval"` certification record.
+ */
 export function createControlCertification(input, tests = [], issues = [], existing = [], now = new Date()) {
   requireText(input.certificationId, "certificationId");
   if (existing.some((item) => item.certificationId === input.certificationId)) throw assuranceError("certification_duplicate", "certificationId already exists.");
@@ -81,6 +164,14 @@ export function createControlCertification(input, tests = [], issues = [], exist
   return { certificationId: String(input.certificationId), controlId: String(input.controlId), periodStart: isoDate(input.periodStart), periodEnd: isoDate(input.periodEnd), testIds, issueIds, evidenceRefs: stringList(input.evidenceRefs, "evidenceRefs", true), result: input.result, statement: String(input.statement), certifiedBy: String(input.certifiedBy), status: "pending_approval", certifiedAt: now.toISOString() };
 }
 
+/**
+ * Approve a pending certification. Requires an approver independent of
+ * whoever certified it.
+ * @param {object} certification - existing certification (must be `"pending_approval"`).
+ * @param {object} input - approvedBy, approvalRef.
+ * @param {Date} [now]
+ * @returns {object} the updated, `"approved"` certification record.
+ */
 export function approveControlCertification(certification, input, now = new Date()) {
   if (!certification || certification.status !== "pending_approval") throw assuranceError("certification_transition_invalid", "Certification is not pending approval.");
   requireText(input.approvedBy, "approvedBy"); requireText(input.approvalRef, "approvalRef");
@@ -88,6 +179,18 @@ export function approveControlCertification(certification, input, now = new Date
   return { ...certification, status: "approved", approvedBy: String(input.approvedBy), approvalRef: String(input.approvalRef), approvedAt: now.toISOString() };
 }
 
+/**
+ * Open a new external audit/inspection engagement (internal audit,
+ * statutory audit, RBI inspection, regulatory review) with its information
+ * request list. Requires at least one request with a unique `requestId`,
+ * and every `linkedIssueIds` entry to reference an existing assurance
+ * issue.
+ * @param {object} input - engagementId, type, title, authority, scope, periodStart, periodEnd, owner, createdBy, requests, linkedIssueIds.
+ * @param {Array<object>} [existing] - existing engagements, for the duplicate check.
+ * @param {Array<object>} [knownIssues] - existing issues, to validate linkedIssueIds.
+ * @param {Date} [now]
+ * @returns {object} the new `"planned"` engagement record.
+ */
 export function createAuditEngagement(input, existing = [], knownIssues = [], now = new Date()) {
   requireText(input.engagementId, "engagementId");
   if (existing.some((item) => item.engagementId === input.engagementId)) throw assuranceError("audit_engagement_duplicate", "engagementId already exists.");
@@ -102,6 +205,14 @@ export function createAuditEngagement(input, existing = [], knownIssues = [], no
   return { engagementId: String(input.engagementId), type: input.type, title: String(input.title), authority: String(input.authority), scope: String(input.scope), periodStart: isoDate(input.periodStart), periodEnd: isoDate(input.periodEnd), owner: String(input.owner), createdBy: String(input.createdBy), status: "planned", requests, linkedIssueIds, createdAt: now.toISOString(), updatedAt: now.toISOString() };
 }
 
+/**
+ * Respond to a single open information request within an active
+ * engagement.
+ * @param {object} engagement - existing engagement (must not be `"closed"`).
+ * @param {object} input - requestId, respondedBy, response, evidenceRefs.
+ * @param {Date} [now]
+ * @returns {object} the engagement with the matching request updated to `"responded"`.
+ */
 export function respondAuditRequest(engagement, input, now = new Date()) {
   if (!engagement || engagement.status === "closed") throw assuranceError("audit_request_invalid", "Request response requires an active engagement.");
   const request = engagement.requests.find((item) => item.requestId === input.requestId);
@@ -111,6 +222,19 @@ export function respondAuditRequest(engagement, input, now = new Date()) {
   return { ...engagement, requests: engagement.requests.map((item) => item.requestId === updated.requestId ? updated : item), updatedAt: now.toISOString() };
 }
 
+/**
+ * Advance an engagement through its lifecycle (planned -> in_progress ->
+ * fieldwork_complete -> responded -> closed, with rework loops back to
+ * in_progress). Fieldwork cannot complete (or later stages be reached)
+ * while any request is still unanswered; closure additionally requires
+ * every linked assurance issue to already be closed, and the closer to be
+ * independent of whoever gave the management response.
+ * @param {object} engagement - existing engagement record.
+ * @param {object} input - status, updatedBy, +status-specific evidence fields.
+ * @param {Array<object>} [issues] - existing issues, to check linked-issue closure.
+ * @param {Date} [now]
+ * @returns {object} the updated engagement record.
+ */
 export function transitionAuditEngagement(engagement, input, issues = [], now = new Date()) {
   requireText(input.updatedBy, "updatedBy");
   if (!ENGAGEMENT_STATUSES.has(input.status)) throw assuranceError("audit_engagement_transition_invalid", "status is invalid.");
@@ -124,6 +248,18 @@ export function transitionAuditEngagement(engagement, input, issues = [], now = 
   return next;
 }
 
+/**
+ * Roll up a completed period's tests, issues, certifications, and
+ * engagements into a single checksummed governance-committee pack.
+ * Requires the period to have already ended and independent generator/
+ * approver. `exceptions` surfaces only still-open critical/high-severity
+ * issues — the list a committee actually needs to act on, not the full
+ * issue history.
+ * @param {object} input - packId, committee, periodStart, periodEnd, generatedBy, approvedBy, approvalRef, sourceEvidenceRef.
+ * @param {{tests: object[], issues: object[], certifications: object[], engagements: object[]}} projection - from `projectControlAssurance`.
+ * @param {Date} [now]
+ * @returns {object} the pack, with a `packSha256` content hash.
+ */
 export function generateGovernancePack(input, projection, now = new Date()) {
   for (const field of ["packId", "committee", "generatedBy", "approvedBy", "approvalRef"]) requireText(input[field], field);
   if (input.generatedBy === input.approvedBy) throw assuranceError("assurance_four_eyes_required", "Governance pack requires independent approval.");
@@ -140,6 +276,16 @@ export function generateGovernancePack(input, projection, now = new Date()) {
   return { ...body, packSha256: digest(body), generatedBy: String(input.generatedBy), approvedBy: String(input.approvedBy), approvalRef: String(input.approvalRef), generatedAt: now.toISOString() };
 }
 
+/**
+ * Rebuild the current control-assurance state (plans, tests, issues,
+ * certifications, engagements, governance packs) by replaying a platform
+ * event log — the read model this module's write functions are eventually
+ * persisted through. Tests accumulate as a plain list (append-only);
+ * everything else is keyed by id so a later event for the same id
+ * naturally supersedes an earlier one.
+ * @param {Array<object>} [events] - platform events, filtered by `type` prefix.
+ * @returns {{plans: object[], tests: object[], issues: object[], certifications: object[], engagements: object[], governancePacks: object[]}}
+ */
 export function projectControlAssurance(events = []) {
   const plans = new Map(); const tests = []; const issues = new Map(); const certifications = new Map(); const engagements = new Map(); const governancePacks = [];
   for (const event of events) {

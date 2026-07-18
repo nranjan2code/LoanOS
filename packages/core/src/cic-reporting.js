@@ -1,3 +1,27 @@
+/**
+ * Credit Information Company (CIC) reporting: builds the canonical UCRF
+ * (Uniform Credit Reporting Format) record for a loan account (RBI Credit
+ * Information Reporting 2025), batches records into a fortnightly
+ * submission cycle (15th or calendar month-end only —
+ * `deriveCicReportingPeriod`), and tracks the batch through submission,
+ * CIC acknowledgement (accepted/rejected/partially rejected), resubmission
+ * of rejected records, and the separate borrower-initiated correction-
+ * request lifecycle. This module does not compute the account's actual
+ * balances/DPD/asset-classification itself — it calls
+ * `generateCicSnapshot` (`loan-account.js`) and reshapes that snapshot into
+ * the CIC's field-per-field schema.
+ *
+ * Any record reporting a positive `daysPastDue` requires evidenced
+ * customer default-alert notification (SMS/email) before the batch can
+ * actually be submitted (`submitCicBatch` fails closed otherwise) — RBI
+ * requires borrowers be told before their default is reported. A
+ * resubmission (`createCicResubmission`) may only correct records that
+ * were actually rejected, and cannot change a record's identity (segment,
+ * account, member, cycle) — only the erroneous fields. Borrower correction
+ * requests carry their own SLA clock: 21 days for the institution, 30 days
+ * overall, accruing a per-day rupee compensation once the overall deadline
+ * is breached (`enrichCicCorrection`).
+ */
 import { createHash } from "node:crypto";
 import { createFinding, summarizeFindings } from "./compliance-controls.js";
 import { generateCicSnapshot } from "./loan-account.js";
@@ -48,6 +72,13 @@ function clean(value) {
   return value === undefined ? null : value;
 }
 
+/**
+ * Determine whether a candidate date is a valid CIC reporting cycle date
+ * (must be the 15th of the month or the calendar month-end) and, if so,
+ * the fortnightly submission due date (cycle date + 7 days).
+ * @param {string|Date} cycleDateInput
+ * @returns {{cycleDate: string, frequency: "fortnightly", submissionDueDate: string}|null} null if the date isn't a valid cycle date.
+ */
 export function deriveCicReportingPeriod(cycleDateInput) {
   const cycleDate = isoDate(cycleDateInput);
   if (!cycleDate) return null;
@@ -62,6 +93,20 @@ function required(findings, value, path, message) {
   }
 }
 
+/**
+ * Build one canonical UCRF record (consumer or commercial schema, per
+ * `borrower.borrowerType`) for a loan account at a given cycle date. Fails
+ * closed unless the cycle date is valid, the account/borrower/CIC-member
+ * identifiers are present, and the segment-specific identity/address
+ * fields (name+DOB+identity for consumer; legal name+constitution+PAN for
+ * commercial) are all present. Numeric fields are shaped through `money()`
+ * (fixed 2-decimal string) to match the CIC's exact reporting format.
+ * @param {object} account - loan account.
+ * @param {object} borrower - borrower profile.
+ * @param {{memberCode: string, memberName: string}} member - reporting CIC member identity.
+ * @param {string|Date} cycleDateInput
+ * @returns {{record: object|null, findings: Array<object>, summary: object}}
+ */
 export function buildCicUcrfRecord(account, borrower, member, cycleDateInput) {
   const findings = [];
   const period = deriveCicReportingPeriod(cycleDateInput);
@@ -163,6 +208,19 @@ export function buildCicUcrfRecord(account, borrower, member, cycleDateInput) {
   return { record: { recordId, segment, schema: `ucrf.${segment}.canonical.v1`, data }, findings, summary };
 }
 
+/**
+ * Build a `"ready"` submission batch: one UCRF record per in-scope loan
+ * account for the cycle, plus a default-alert placeholder for any record
+ * reporting a positive DPD. Idempotent on `batchId`. Fails closed unless
+ * the cycle date is valid and not in the future, the CIC and regulated-
+ * entity type are recognized, and independent maker-checker approval is
+ * present.
+ * @param {Record<string, object>} registry - batchId -> batch record.
+ * @param {{loanAccounts?: object, borrowerProfiles?: object}} context
+ * @param {object} input - batchId, cycleDate, cic, regulatedEntityType, regulatedEntityId, member, proposedBy, approvedBy, approvalRef.
+ * @param {Date} [now]
+ * @returns {{registry: object, batch: object|null, findings: Array<object>, summary: object, idempotent: boolean}}
+ */
 export function createCicSubmissionBatch(registry = {}, context = {}, input = {}, now = new Date()) {
   const findings = [];
   const period = deriveCicReportingPeriod(input.cycleDate);
@@ -214,6 +272,20 @@ export function createCicSubmissionBatch(registry = {}, context = {}, input = {}
   return { registry: { ...registry, [batchId]: batch }, batch, findings, summary, idempotent: false };
 }
 
+/**
+ * Submit a `"ready"` batch to the CIC. Fails closed unless: transport
+ * evidence (provider submission ref, transmitter, transport evidence ref)
+ * is present, and every record flagged for a customer default alert has
+ * matching evidenced delivery (SMS/email, with a delivery ref and time) —
+ * a batch cannot go out reporting a default the borrower wasn't told
+ * about. Flags `lateSubmission` if submitted after the cycle's due date,
+ * without blocking it.
+ * @param {Record<string, object>} registry - batchId -> batch record.
+ * @param {string} batchId
+ * @param {object} input - providerSubmissionRef, transmittedBy, transportEvidenceRef, customerAlertEvidence.
+ * @param {Date} [now]
+ * @returns {{registry: object, batch: object, findings: Array<object>, summary: object}}
+ */
 export function submitCicBatch(registry = {}, batchId, input = {}, now = new Date()) {
   const batch = registry[batchId];
   const findings = [];
@@ -232,6 +304,19 @@ export function submitCicBatch(registry = {}, batchId, input = {}, now = new Dat
   return { registry: { ...registry, [batchId]: submitted }, batch: submitted, findings, summary };
 }
 
+/**
+ * Apply the CIC's acknowledgement to a `"submitted"` batch. Fails closed
+ * unless `recordResults` contains exactly one valid, uniquely-keyed result
+ * per record in the batch, and every `"rejected"` result carries a reject
+ * code and message. The batch's overall status becomes `"accepted"`
+ * (no rejects), `"rejected"` (all rejected), or `"partially_rejected"`
+ * (mixed); any rejects open a 7-day repair window (`repairDueDate`).
+ * @param {Record<string, object>} registry - batchId -> batch record.
+ * @param {string} batchId
+ * @param {object} input - acknowledgementRef, receivedBy, recordResults.
+ * @param {Date} [now]
+ * @returns {{registry: object, batch: object, findings: Array<object>, summary: object}}
+ */
 export function acknowledgeCicBatch(registry = {}, batchId, input = {}, now = new Date()) {
   const batch = registry[batchId];
   const findings = [];
@@ -249,6 +334,21 @@ export function acknowledgeCicBatch(registry = {}, batchId, input = {}, now = ne
   return { registry: { ...registry, [batchId]: acknowledged }, batch: acknowledged, findings, summary };
 }
 
+/**
+ * Create a repair batch containing corrected versions of a rejected/
+ * partially-rejected source batch's rejected records. Idempotent on
+ * `batchId`. Fails closed unless: independent repair approval and source-
+ * correction evidence are present, every rejected record (and only those)
+ * is corrected exactly once, and each correction preserves the original
+ * record's identity (schema/segment/account/member/cycle) and every
+ * canonical required field — a repair can fix the erroneous values, not
+ * relabel which record/account/cycle is being reported.
+ * @param {Record<string, object>} registry - batchId -> batch record.
+ * @param {string} sourceBatchId - must reference a rejected/partially-rejected batch.
+ * @param {object} input - batchId, proposedBy, approvedBy, approvalRef, correctionEvidenceRef, correctedRecords.
+ * @param {Date} [now]
+ * @returns {{registry: object, batch: object|null, findings: Array<object>, summary: object, idempotent: boolean}}
+ */
 export function createCicResubmission(registry = {}, sourceBatchId, input = {}, now = new Date()) {
   const source = registry[sourceBatchId];
   const findings = [];
@@ -280,6 +380,19 @@ export function createCicResubmission(registry = {}, sourceBatchId, input = {}, 
   return { registry: { ...registry, [batchId]: batch }, batch, findings, summary, idempotent: false };
 }
 
+/**
+ * Open a borrower-initiated correction request against a previously
+ * reported field. Idempotent on `correctionId`. Fails closed unless the
+ * borrower and loan account exist and actually match, and all correction
+ * fields (fieldPath, reportedValue, requestedValue, reason, submittedBy,
+ * sourceReportRef) are present. Sets the 21-day institution and 30-day
+ * overall SLA due dates and a fixed compensation rate at open time.
+ * @param {Record<string, object>} registry - correctionId -> correction record.
+ * @param {{borrowerProfiles?: object, loanAccounts?: object}} context
+ * @param {object} input - correctionId, borrowerId, loanAccountId, fieldPath, reportedValue, requestedValue, reason, sourceReportRef, submittedBy.
+ * @param {Date} [now]
+ * @returns {{registry: object, correction: object|null, findings: Array<object>, summary: object, idempotent: boolean}}
+ */
 export function createCicCorrectionRequest(registry = {}, context = {}, input = {}, now = new Date()) {
   const findings = [];
   if (!context.borrowerProfiles?.[input.borrowerId]) findings.push(createFinding("error", "RBI-CIR-2025", "Borrower was not found.", "borrowerId"));
@@ -294,6 +407,19 @@ export function createCicCorrectionRequest(registry = {}, context = {}, input = 
   return { registry: { ...registry, [correctionId]: correction }, correction, findings, summary, idempotent: false };
 }
 
+/**
+ * Resolve an open correction request as accepted or rejected. Requires an
+ * independent resolver/approver and a decision reason; an `"accepted"`
+ * decision additionally requires source-correction evidence and a valid
+ * next reporting cycle date to actually push the fix. Computes
+ * `compensationDueRupees` from however many days past `overallDueDate` the
+ * resolution landed (0 if resolved on time).
+ * @param {Record<string, object>} registry - correctionId -> correction record.
+ * @param {string} correctionId
+ * @param {object} input - resolvedBy, approvedBy, decision, decisionReason, sourceCorrectionRef, nextReportingCycleDate.
+ * @param {Date} [now]
+ * @returns {{registry: object, correction: object, findings: Array<object>, summary: object}}
+ */
 export function resolveCicCorrectionRequest(registry = {}, correctionId, input = {}, now = new Date()) {
   const correction = registry[correctionId];
   const findings = [];
@@ -307,6 +433,14 @@ export function resolveCicCorrectionRequest(registry = {}, correctionId, input =
   return { registry: { ...registry, [correctionId]: resolved }, correction: resolved, findings, summary };
 }
 
+/**
+ * Derive read-only SLA status on an open correction: whether the
+ * institution's 21-day internal deadline or the overall 30-day deadline
+ * has been breached, and the compensation accrued so far if it has.
+ * @param {object} correction
+ * @param {Date} [asOf]
+ * @returns {object|null} the correction with `institutionSlaBreached`/`overallSlaBreached`/`accruedCompensationRupees` added, or null if none given.
+ */
 export function enrichCicCorrection(correction, asOf = new Date()) {
   if (!correction) return null;
   const open = correction.status === CIC_CORRECTION_STATUSES.OPEN;

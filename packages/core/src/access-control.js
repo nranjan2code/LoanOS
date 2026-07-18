@@ -1,3 +1,15 @@
+/**
+ * Role-based access control for staff-actor operations across the platform:
+ * given a registry of staff actors and an action's actor id(s), returns
+ * `createFinding`-shaped findings (never throws) if the actor doesn't
+ * exist, isn't active, lacks the required role, or lacks queue access for a
+ * workflow task. This module is pure authorization logic — it does not own
+ * identity, session, or the staff/user record shape itself (see the comment
+ * below on the registry merge into tenant users), and it does not decide
+ * *what* the action does, only *whether the actor may perform it* (RBI-IT-GRC,
+ * segregation-of-duties-flavored checks like maker/checker independence live
+ * in the calling modules, e.g. `loan-policy.js`'s four-eyes checks).
+ */
 import { createFinding, summarizeFindings } from "./compliance-controls.js";
 
 export const STAFF_ACTOR_STATUSES = {
@@ -31,15 +43,37 @@ const ACTIVE_STATUS = STAFF_ACTOR_STATUSES.ACTIVE;
 // `{id: {status, roles, queues, canAssignQueues}}` map — callers now pass
 // `state.users` directly.
 
+/**
+ * Require the proposer of a credit decision (`input.proposedBy`, falling
+ * back to the legacy `decidedBy` field) to be an active `credit_officer`.
+ * @param {Record<string, object>} staffActors - actorId -> {status, roles, queues}.
+ * @param {{proposedBy?: string, decidedBy?: string}} input
+ * @returns {Array<object>} findings (empty if access is valid).
+ */
 export function validateDecisionProposalAccess(staffActors = {}, input) {
   const actorId = input?.proposedBy ?? input?.decidedBy;
   return validateActorRole(staffActors, actorId, STAFF_ROLES.CREDIT_OFFICER, "proposedBy");
 }
 
+/**
+ * Require the approver of a credit decision to be an active
+ * `credit_checker` — the independent checker role in the maker/checker
+ * split enforced alongside this by the caller (e.g. `loan-policy.js`).
+ * @param {Record<string, object>} staffActors
+ * @param {{approvedBy?: string}} input
+ * @returns {Array<object>} findings.
+ */
 export function validateDecisionApprovalAccess(staffActors = {}, input) {
   return validateActorRole(staffActors, input?.approvedBy, STAFF_ROLES.CREDIT_CHECKER, "approvedBy");
 }
 
+/**
+ * Require a manual underwriting override to be performed by an active
+ * `credit_officer`.
+ * @param {Record<string, object>} staffActors
+ * @param {{manualUnderwriting?: {underwriterId?: string}}} input
+ * @returns {Array<object>} findings.
+ */
 export function validateManualUnderwritingAccess(staffActors = {}, input) {
   return validateActorRole(
     staffActors,
@@ -49,26 +83,71 @@ export function validateManualUnderwritingAccess(staffActors = {}, input) {
   );
 }
 
+/**
+ * Require access to a borrower document packet to be by an active `loan_officer`.
+ * @param {Record<string, object>} staffActors
+ * @param {string} actorId
+ * @param {string} [path] - field path used in findings.
+ * @returns {Array<object>} findings.
+ */
 export function validateDocumentPacketAccess(staffActors = {}, actorId, path = "actor") {
   return validateActorRole(staffActors, actorId, STAFF_ROLES.LOAN_OFFICER, path);
 }
 
+/**
+ * Require an AI/model-assisted decision's human review to be performed by an
+ * active `human_reviewer` — the access-control half of the model-governance
+ * "material decisions need a human review reference" rule (see `model-governance.js`).
+ * @param {Record<string, object>} staffActors
+ * @param {{reviewedBy?: string}} input
+ * @returns {Array<object>} findings.
+ */
 export function validateHumanReviewAccess(staffActors = {}, input) {
   return validateActorRole(staffActors, input?.reviewedBy, STAFF_ROLES.HUMAN_REVIEWER, "reviewedBy");
 }
 
+/**
+ * Require a collections-recovery case assignment to be made by an active
+ * `collections_manager`.
+ * @param {Record<string, object>} staffActors
+ * @param {{assignedBy?: string}} input
+ * @returns {Array<object>} findings.
+ */
 export function validateRecoveryAssignmentAccess(staffActors = {}, input) {
   return validateActorRole(staffActors, input?.assignedBy, STAFF_ROLES.COLLECTIONS_MANAGER, "assignedBy");
 }
 
+/**
+ * Require a cash-recovery approval to be made by an active `collections_manager`.
+ * @param {Record<string, object>} staffActors
+ * @param {{approvedBy?: string}} input
+ * @returns {Array<object>} findings.
+ */
 export function validateCashRecoveryApprovalAccess(staffActors = {}, input) {
   return validateActorRole(staffActors, input?.approvedBy, STAFF_ROLES.COLLECTIONS_MANAGER, "approvedBy");
 }
 
+/**
+ * Require grievance-handling access to be by an active `grievance_officer`.
+ * @param {Record<string, object>} staffActors
+ * @param {string} actorId
+ * @param {string} [path]
+ * @returns {Array<object>} findings.
+ */
 export function validateGrievanceOfficerAccess(staffActors = {}, actorId, path = "actor") {
   return validateActorRole(staffActors, actorId, STAFF_ROLES.GRIEVANCE_OFFICER, path);
 }
 
+/**
+ * Validate a workflow-queue task assignment from both sides: the assigner
+ * must be active and either a `workflow_admin` or explicitly permitted to
+ * assign the task's queue (`canAssignQueues`); the assignee must be active
+ * and hold the task's required role plus access to its queue.
+ * @param {Record<string, object>} staffActors
+ * @param {{queue: string, role: string}} task
+ * @param {{assignedBy?: string, assignedTo?: string}} input
+ * @returns {Array<object>} findings.
+ */
 export function validateWorkflowAssignmentAccess(staffActors = {}, task, input) {
   const findings = [];
   findings.push(...validateActiveActor(staffActors, input?.assignedBy, "assignedBy"));
@@ -86,6 +165,16 @@ export function validateWorkflowAssignmentAccess(staffActors = {}, task, input) 
   return findings;
 }
 
+/**
+ * Validate that a single actor may operate on a workflow task, whether by
+ * working it directly (has the task's role + queue access) or by virtue of
+ * being able to assign it (e.g. a `workflow_admin`).
+ * @param {Record<string, object>} staffActors
+ * @param {{queue: string, role: string}} task
+ * @param {string} actorId
+ * @param {string} [path]
+ * @returns {Array<object>} findings.
+ */
 export function validateWorkflowActorAccess(staffActors = {}, task, actorId, path = "actor") {
   const findings = validateActiveActor(staffActors, actorId, path);
   const actor = staffActors[actorId];
@@ -95,6 +184,8 @@ export function validateWorkflowActorAccess(staffActors = {}, task, actorId, pat
   return findings;
 }
 
+// Shared shape behind every role-specific validator: actor must exist, be
+// active, and hold `role`.
 function validateActorRole(staffActors, actorId, role, path) {
   const findings = validateActiveActor(staffActors, actorId, path);
   const actor = staffActors[actorId];
@@ -104,6 +195,7 @@ function validateActorRole(staffActors, actorId, role, path) {
   return findings;
 }
 
+// Base existence/active check shared by every access validator above.
 function validateActiveActor(staffActors, actorId, path) {
   const findings = [];
   if (!actorId) {
@@ -121,10 +213,14 @@ function validateActiveActor(staffActors, actorId, path) {
   return findings;
 }
 
+// An actor may assign a task's queue if they're a workflow_admin or the
+// queue is explicitly listed in their `canAssignQueues`.
 function canAssignTask(actor, task) {
   return hasRole(actor, STAFF_ROLES.WORKFLOW_ADMIN) || actor.canAssignQueues?.includes(task.queue);
 }
 
+// An actor may work a task if they hold its role (or are a workflow_admin,
+// who can work anything) and have access to its queue.
 function canWorkTask(actor, task) {
   return (hasRole(actor, STAFF_ROLES.WORKFLOW_ADMIN) || hasRole(actor, task.role)) && hasQueueAccess(actor, task.queue);
 }
@@ -133,6 +229,7 @@ function hasRole(actor, role) {
   return actor?.roles?.includes(role);
 }
 
+// "*" is the wildcard queue grant; workflow_admin implicitly has access to every queue.
 function hasQueueAccess(actor, queue) {
   return actor?.queues?.includes(queue) || actor?.queues?.includes("*") || hasRole(actor, STAFF_ROLES.WORKFLOW_ADMIN);
 }

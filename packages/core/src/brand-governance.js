@@ -1,3 +1,29 @@
+/**
+ * Brand governance: a tenant's white-label brand identity (theme, legal
+ * identity, localized copy, channel overlays, co-branding, asset manifest)
+ * as a versioned, checksum-sealed, four-eyes-approved release, layered by
+ * scope (tenant -> regulated_entity -> programme -> product) so a more
+ * specific scope's release overlays the broader one rather than replacing
+ * it wholesale (`resolveBrandExperience`'s `chain`/`deepMerge`). This
+ * module owns brand *content* and its release lifecycle (propose -> approve
+ * -> publish -> supersede/rollback) — it does not own product/journey
+ * definitions themselves (`applicableJourneyTypes` must reference canonical
+ * types from `product-journey-administration.js`) nor rendering; consumers
+ * call `resolveBrandExperience` to get the fully merged theme/content/
+ * assets for a given tenant/journey/channel/locale.
+ *
+ * Every release is content-addressed: `seal()`/`checksum()` compute a
+ * canonical-JSON SHA-256 over the release body, and `verify()` re-derives
+ * it before trusting a stored release — this catches any out-of-band
+ * mutation of persisted state. Proposing, approving, and publishing each
+ * require a distinct actor from the prior step (four-eyes, plus publisher
+ * independence from the proposer) — a release cannot go live without two
+ * independent humans having acted on it. Publishing a release
+ * automatically supersedes any prior `"published"` release at the *same
+ * scope* (`scopeKey`), and `rollbackBrandRelease` can restore a specific
+ * superseded release back to published, itself requiring independent
+ * proposer/approver.
+ */
 import { createHash } from "node:crypto";
 
 import { PRODUCT_JOURNEY_TYPES } from "./product-journey-administration.js";
@@ -7,6 +33,20 @@ export const BRAND_CHANNELS = Object.freeze(["borrower", "partner", "branch", "f
 
 const ENTITY_TYPES = new Set(["bank", "nbfc", "nbfc_mfi", "housing_finance_company", "cooperative_bank", "other_regulated_entity"]);
 
+/**
+ * Propose a new brand release for a scope. Idempotent on
+ * `(tenantId, releaseId)`: an identical repeat proposal returns the
+ * existing one; a reused id with different content is a conflict. Fails
+ * closed if a `"product"`-scoped release doesn't bind exactly its scoped
+ * canonical journey type, or if any nested content (theme colours, legal
+ * identity, localized copy per journey, channel overlays, co-branding,
+ * asset manifest) fails its own shape checks. The release is checksum-
+ * sealed (`seal()`) as part of construction.
+ * @param {object} state - holds `brandReleaseProposals`/`brandReleases`.
+ * @param {object} input - tenantId, releaseId, proposedBy, scope, version, applicableJourneyTypes, defaultLocale, theme, legalIdentity, localizedContent, channelOverlays, coBranding, assetManifest.
+ * @param {Date} [now]
+ * @returns {{state: object, release: object, idempotent: boolean}}
+ */
 export function proposeBrandRelease(state = {}, input = {}, now = new Date()) {
   const tenantId = text(input.tenantId, "tenantId");
   const releaseId = text(input.releaseId, "releaseId");
@@ -48,6 +88,15 @@ export function proposeBrandRelease(state = {}, input = {}, now = new Date()) {
   return { state: put(state, "brandReleaseProposals", key, release), release, idempotent: false };
 }
 
+/**
+ * Approve a `"pending_approval"` proposal in the same tenant. Verifies the
+ * proposal's checksum first (`verify()`) and requires an approver
+ * independent of the proposer.
+ * @param {object} state - holds `brandReleaseProposals`.
+ * @param {object} input - tenantId, releaseId, approvedBy.
+ * @param {Date} [now]
+ * @returns {{state: object, release: object}}
+ */
 export function approveBrandRelease(state = {}, input = {}, now = new Date()) {
   const tenantId = text(input.tenantId, "tenantId");
   const releaseId = text(input.releaseId, "releaseId");
@@ -61,6 +110,17 @@ export function approveBrandRelease(state = {}, input = {}, now = new Date()) {
   return { state: put(state, "brandReleaseProposals", key, approved), release: approved };
 }
 
+/**
+ * Publish an `"approved"` proposal, making it the live release for its
+ * scope. Requires a publisher independent of the proposer. Any other
+ * currently `"published"` release at the *same scope* is automatically
+ * moved to `"superseded"` first, so exactly one release is ever live per
+ * scope.
+ * @param {object} state - holds `brandReleaseProposals`/`brandReleases`.
+ * @param {object} input - tenantId, releaseId, publishedBy.
+ * @param {Date} [now]
+ * @returns {{state: object, release: object}}
+ */
 export function publishBrandRelease(state = {}, input = {}, now = new Date()) {
   const tenantId = text(input.tenantId, "tenantId");
   const releaseId = text(input.releaseId, "releaseId");
@@ -82,6 +142,16 @@ export function publishBrandRelease(state = {}, input = {}, now = new Date()) {
   return { state: next, release: published };
 }
 
+/**
+ * Roll back to a previously superseded release for the same scope,
+ * re-publishing it and superseding the current one. Requires independent
+ * proposer/approver; both the current and target releases' checksums are
+ * re-verified before the swap.
+ * @param {object} state - holds `brandReleases`.
+ * @param {object} input - tenantId, currentReleaseId, targetReleaseId, proposedBy, approvedBy.
+ * @param {Date} [now]
+ * @returns {{state: object, release: object}} `release` is the restored, now-`"published"` release.
+ */
 export function rollbackBrandRelease(state = {}, input = {}, now = new Date()) {
   const tenantId = text(input.tenantId, "tenantId");
   const currentReleaseId = text(input.currentReleaseId, "currentReleaseId");
@@ -102,6 +172,20 @@ export function rollbackBrandRelease(state = {}, input = {}, now = new Date()) {
   return { state: next, release: restored };
 }
 
+/**
+ * Resolve the fully merged brand experience for a tenant/journey/channel/
+ * locale request: starts from the required tenant-scoped published
+ * release, then layers (via `deepMerge`) any matching regulated_entity,
+ * programme, and product-scoped published releases on top, in that
+ * broad-to-narrow order. Fails closed if no tenant release is published,
+ * or if more than one published release exists for any single scope
+ * (`one()` — ambiguous scope, should never happen given `publishBrandRelease`'s
+ * supersession, but checked anyway). Every release in the chain has its
+ * checksum re-verified before use.
+ * @param {object} state - holds `brandReleases`.
+ * @param {object} input - tenantId, journeyType, channel, locale, programmeRef, regulatedEntityRef.
+ * @returns {object} frozen resolved experience: theme, content, assets, legalIdentity, coBranding, releaseLineage.
+ */
 export function resolveBrandExperience(state = {}, input = {}) {
   const tenantId = text(input.tenantId, "tenantId");
   const journeyType = input.journeyType == null ? null : canonicalJourney(input.journeyType, "journeyType");
@@ -138,6 +222,13 @@ export function resolveBrandExperience(state = {}, input = {}) {
   });
 }
 
+/**
+ * Read-only tenant view of all brand proposals and releases, plus a
+ * summary of which scopes currently have a published release.
+ * @param {object} state - holds `brandReleaseProposals`/`brandReleases`.
+ * @param {{tenantId: string}} input
+ * @returns {object} frozen `{tenantId, proposals, releases, activeScopes}`.
+ */
 export function projectBrandAdministration(state = {}, input = {}) {
   const tenantId = text(input.tenantId, "tenantId");
   const proposals = sameTenant(state.brandReleaseProposals, tenantId);
@@ -145,6 +236,7 @@ export function projectBrandAdministration(state = {}, input = {}) {
   return Object.freeze({ tenantId, proposals, releases, activeScopes: releases.filter((item) => item.status === "published").map((item) => ({ scope: item.scope, releaseId: item.releaseId, version: item.version })) });
 }
 
+// Validate and freeze a release's scope; a "product" scope's ref must itself be a canonical journey type.
 function normalizeScope(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) fail("brand_scope_required", "scope is required.");
   const level = enumValue(value.level, BRAND_SCOPE_LEVELS, "scope.level");
@@ -232,6 +324,8 @@ function seal(value) { return Object.freeze({ ...value, contentChecksumSha256: c
 function reseal(value) { return seal(value); }
 function verify(value) { if (checksum(withoutChecksum(value)) !== value.contentChecksumSha256) fail("brand_release_integrity_failure", "Brand release integrity verification failed.", 409); }
 function checksum(value) { return createHash("sha256").update(JSON.stringify(canonical(value))).digest("hex"); }
+// Sort object keys recursively so the checksum is stable regardless of key insertion order.
 function canonical(value) { if (Array.isArray(value)) return value.map(canonical); if (value && typeof value === "object") return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonical(value[key])])); return value; }
+// Recursive object merge (overlay wins per-key); arrays and non-object overlay values replace outright rather than merging element-wise.
 function deepMerge(base, overlay) { if (!overlay || typeof overlay !== "object" || Array.isArray(overlay)) return overlay ?? base; const result = { ...(base ?? {}) }; for (const [key, value] of Object.entries(overlay)) result[key] = value && typeof value === "object" && !Array.isArray(value) ? deepMerge(result[key], value) : value; return result; }
 function fail(code, message, statusCode = 422) { const error = new Error(message); error.code = code; error.statusCode = statusCode; throw error; }

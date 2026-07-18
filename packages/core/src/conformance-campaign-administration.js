@@ -1,3 +1,31 @@
+/**
+ * Conformance campaign administration: runs a candidate provider (an
+ * organisation-admission integration or enterprise-platform family)
+ * through its canonical adverse-scenario conformance pack in a
+ * deterministic *simulator only* — this module is structurally incapable
+ * of certifying a live/production integration. Every profile, manifest,
+ * campaign, and evidence result carries `executionMode: "simulated"`,
+ * `simulated: true`, `commerciallyLive: false`; any attempt to claim
+ * otherwise is rejected outright (`rejectLiveClaim`), and every read path
+ * (`verifyProfile`/`verifyCampaign`/`verifyResult`/`assertCanonicalManifest`)
+ * re-checks these flags plus a chain of content checksums before trusting
+ * persisted state — a tampered or forged "live" claim cannot slip through
+ * even if the raw JSON were edited directly. This module does not own the
+ * actual scenario definitions (`ORGANISATION_ADMISSION_CONFORMANCE_PACKS`/
+ * `ENTERPRISE_PLATFORM_CONFORMANCE_PACKS`, imported from their own
+ * modules) — it only manifests, executes-against, and certifies them.
+ *
+ * Lifecycle: register a candidate profile -> propose a campaign against a
+ * target within that profile's declared scope -> approve (four-eyes,
+ * proposer != approver) -> record per-scenario evidence (idempotent,
+ * append-only — once a scenario's evidence is recorded it is immutable) ->
+ * assess (requires every manifest scenario to have a valid, passing
+ * result, and the assessor to be independent of every evidence executor)
+ * -> `simulator_certified` for up to `CONFORMANCE_CERTIFICATION_MAX_DAYS`
+ * (366 days), after which `expireConformanceCampaigns` moves it to
+ * `"expired"` and a fresh campaign must be proposed via
+ * `proposeConformanceReassessment`.
+ */
 import { createHash } from "node:crypto";
 
 import {
@@ -25,6 +53,18 @@ export const CONFORMANCE_CAMPAIGN_STATUSES = Object.freeze([
 
 export const CONFORMANCE_CERTIFICATION_MAX_DAYS = 366;
 
+/**
+ * Register a candidate provider profile scoped to one or more known
+ * organisation-admission integrations and/or enterprise-platform
+ * families. Idempotent on `(tenantId, profileId)`: an identical repeat
+ * returns the existing profile; a conflicting reuse fails. Fails closed on
+ * any live/production claim (`rejectLiveClaim`), an empty scope, or an
+ * unrecognized integration/family id.
+ * @param {Record<string, object>} registry - `${tenantId}:${profileId}` -> profile.
+ * @param {object} input - tenantId, profileId, providerName, providerCategory, adapterContractVersion, simulatorConfigurationRef, dueDiligenceRef, organisationAdmissionIntegrationIds, enterprisePlatformFamilies, createdBy.
+ * @param {Date} [now]
+ * @returns {{registry: object, profile: object, idempotent: boolean}}
+ */
 export function registerConformanceCandidateProfile(registry = {}, input = {}, now = new Date()) {
   const tenantId = required(input.tenantId, "tenantId");
   const profileId = required(input.profileId, "profileId");
@@ -71,6 +111,19 @@ export function registerConformanceCandidateProfile(registry = {}, input = {}, n
   return { registry: { ...registry, [key]: profile }, profile, idempotent: false };
 }
 
+/**
+ * Propose a new campaign for a target within a registered profile's scope.
+ * Builds the immutable scenario manifest (`buildManifest`) from the
+ * canonical conformance pack for the target. Fails closed on a duplicate
+ * campaign id, a target outside the profile's declared scope
+ * (`assertProfileScope`), a `validityDays` exceeding
+ * `CONFORMANCE_CERTIFICATION_MAX_DAYS`, or a live/production claim.
+ * @param {Record<string, object>} registry - `${tenantId}:${campaignId}` -> campaign.
+ * @param {Record<string, object>} profileRegistry - `${tenantId}:${profileId}` -> profile.
+ * @param {object} input - tenantId, campaignId, profileId, targetType, targetId, validityDays, proposedBy, proposalRef, reassessmentOfCampaignId.
+ * @param {Date} [now]
+ * @returns {{registry: object, campaign: object}} the new `"pending_approval"` campaign.
+ */
 export function proposeConformanceCampaign(registry = {}, profileRegistry = {}, input = {}, now = new Date()) {
   const tenantId = required(input.tenantId, "tenantId");
   const campaignId = required(input.campaignId, "campaignId");
@@ -124,6 +177,16 @@ export function proposeConformanceCampaign(registry = {}, profileRegistry = {}, 
   return { registry: { ...registry, [key]: campaign }, campaign };
 }
 
+/**
+ * Approve a pending campaign. Idempotent if replayed with the identical
+ * approver/ref while already approved. Fails closed unless the campaign is
+ * `"pending_approval"` and the approver differs from the proposer.
+ * @param {Record<string, object>} registry
+ * @param {Record<string, object>} profileRegistry
+ * @param {object} input - tenantId, campaignId, approvedBy, approvalRef.
+ * @param {Date} [now]
+ * @returns {{registry: object, campaign: object, idempotent: boolean}}
+ */
 export function approveConformanceCampaign(registry = {}, profileRegistry = {}, input = {}, now = new Date()) {
   const tenantId = required(input.tenantId, "tenantId");
   const campaign = campaignFor(registry, tenantId, required(input.campaignId, "campaignId"), profileRegistry);
@@ -138,6 +201,20 @@ export function approveConformanceCampaign(registry = {}, profileRegistry = {}, 
   return { registry: replaceCampaign(registry, approved), campaign: approved, idempotent: false };
 }
 
+/**
+ * Record one scenario's execution evidence against an approved/running
+ * campaign, moving it to `"running"`. Idempotent on `idempotencyKey`
+ * (hashed into a replay index): a replay with identical evidence content
+ * returns the prior result; a replay under the same key but different
+ * content, or a scenario id whose evidence already exists, is rejected —
+ * recorded evidence is immutable and cannot be overwritten. Fails closed
+ * on a live/production claim or an unrecognized scenario id.
+ * @param {Record<string, object>} registry
+ * @param {Record<string, object>} profileRegistry
+ * @param {object} input - tenantId, campaignId, scenarioId, idempotencyKey, observedDisposition, observedSafetyState, runId, evidenceRef, executedBy.
+ * @param {Date} [now]
+ * @returns {{registry: object, campaign: object, result: object, idempotent: boolean}}
+ */
 export function recordConformanceCampaignEvidence(registry = {}, profileRegistry = {}, input = {}, now = new Date()) {
   const tenantId = required(input.tenantId, "tenantId");
   const campaign = campaignFor(registry, tenantId, required(input.campaignId, "campaignId"), profileRegistry);
@@ -169,6 +246,20 @@ export function recordConformanceCampaignEvidence(registry = {}, profileRegistry
   return { registry: replaceCampaign(registry, updated), campaign: updated, result, idempotent: false };
 }
 
+/**
+ * Assess a campaign's evidence against its manifest: `"simulator_certified"`
+ * only if every scenario has recorded, valid, passing evidence — any
+ * missing, tampered, or failed scenario yields `"blocked"` instead. Fails
+ * closed if the assessor executed any of the campaign's own evidence
+ * (assessor independence from every executor, not just avoiding self-
+ * approval of a single action). A certified campaign's validity window
+ * (`certifiedUntil`) is computed from the manifest's `validityDays`.
+ * @param {Record<string, object>} registry
+ * @param {Record<string, object>} profileRegistry
+ * @param {object} input - tenantId, campaignId, assessedBy, assessmentRef.
+ * @param {Date} [now]
+ * @returns {{registry: object, campaign: object, assessment: object}}
+ */
 export function assessConformanceCampaign(registry = {}, profileRegistry = {}, input = {}, now = new Date()) {
   const tenantId = required(input.tenantId, "tenantId");
   const campaign = campaignFor(registry, tenantId, required(input.campaignId, "campaignId"), profileRegistry);
@@ -218,6 +309,15 @@ export function assessConformanceCampaign(registry = {}, profileRegistry = {}, i
   };
 }
 
+/**
+ * Sweep a tenant's `"simulator_certified"` campaigns and move any whose
+ * `certifiedUntil` has passed to `"expired"`. Re-verifies each candidate
+ * campaign's integrity before touching it.
+ * @param {Record<string, object>} registry
+ * @param {{tenantId: string}} input
+ * @param {Date} [now]
+ * @returns {{registry: object, expiredCampaignIds: string[], changed: boolean}}
+ */
 export function expireConformanceCampaigns(registry = {}, input = {}, now = new Date()) {
   const tenantId = required(input.tenantId, "tenantId");
   const at = normalizeTime(now);
@@ -236,6 +336,19 @@ export function expireConformanceCampaigns(registry = {}, input = {}, now = new 
   return { registry: changed ? next : registry, expiredCampaignIds: Object.freeze(expiredCampaignIds.sort()), changed };
 }
 
+/**
+ * Propose a fresh campaign continuing from a previous one (same profile/
+ * target), linked via `reassessmentOfCampaignId`. Fails closed unless the
+ * previous campaign is in a terminal-ish state (`simulator_certified`,
+ * `blocked`, or `expired`) and, if still certified, its validity window
+ * has actually elapsed — a current certification cannot be reassessed
+ * early. Delegates to `proposeConformanceCampaign` for the actual creation.
+ * @param {Record<string, object>} registry
+ * @param {Record<string, object>} profileRegistry
+ * @param {object} input - tenantId, previousCampaignId, +proposeConformanceCampaign fields.
+ * @param {Date} [now]
+ * @returns {{registry: object, campaign: object}}
+ */
 export function proposeConformanceReassessment(registry = {}, profileRegistry = {}, input = {}, now = new Date()) {
   const tenantId = required(input.tenantId, "tenantId");
   const previous = campaignFor(registry, tenantId, required(input.previousCampaignId, "previousCampaignId"), profileRegistry);
@@ -253,6 +366,15 @@ export function proposeConformanceReassessment(registry = {}, profileRegistry = 
   }, now);
 }
 
+/**
+ * Read-only tenant view: all candidate profiles and campaigns (each
+ * re-verified for integrity), plus status counts including how many
+ * certifications are currently current vs. due for reassessment.
+ * @param {object} state - holds `conformanceCandidateProfiles`, `conformanceCampaigns`.
+ * @param {string} tenantId
+ * @param {Date} [now]
+ * @returns {object} frozen administration view.
+ */
 export function projectConformanceCampaignAdministration(state = {}, tenantId, now = new Date()) {
   required(tenantId, "tenantId");
   const profiles = Object.values(state.conformanceCandidateProfiles ?? {}).filter((item) => item?.tenantId === tenantId);
@@ -279,6 +401,9 @@ export function projectConformanceCampaignAdministration(state = {}, tenantId, n
   });
 }
 
+// Pull the canonical scenario pack for the target (organisation-admission
+// vs. enterprise-platform packs have different shapes/safety-state
+// semantics) and seal it into an immutable, checksummed manifest.
 function buildManifest({ tenantId, campaignId, profile, targetType, targetId, validityDays, reassessmentOfCampaignId }) {
   const scenarios = targetType === "organisation_admission"
     ? ORGANISATION_ADMISSION_CONFORMANCE_PACKS[targetId].map((item) => ({
@@ -312,6 +437,9 @@ function buildManifest({ tenantId, campaignId, profile, targetType, targetId, va
   return deepFreeze({ ...unsigned, manifestChecksumSha256: checksum(unsigned) });
 }
 
+// Shape one scenario's evidence into its canonical, checksummable form,
+// including the pass/fail determination against the scenario's expected
+// disposition/safety-state.
 function resultCanonical(campaign, definition, input, recordedAt) {
   const expectedSafetyState = definition.expectedSafetyState;
   const observedDisposition = required(input.observedDisposition, "observedDisposition");
@@ -342,6 +470,8 @@ function resultCanonical(campaign, definition, input, recordedAt) {
   };
 }
 
+// Look up a campaign scoped to its tenant, verify its integrity, and
+// confirm its profile lineage hasn't drifted from the current profile record.
 function campaignFor(registry, tenantId, campaignId, profileRegistry) {
   const campaign = registry[scopedKey(tenantId, campaignId)];
   if (!campaign) fail("conformance_campaign_missing", "Campaign was not found for this tenant.");
@@ -351,6 +481,7 @@ function campaignFor(registry, tenantId, campaignId, profileRegistry) {
   return campaign;
 }
 
+// Look up a candidate profile scoped to its tenant and verify its integrity.
 function profileFor(registry, tenantId, profileId) {
   const profile = registry[scopedKey(tenantId, profileId)];
   if (!profile) fail("conformance_candidate_profile_missing", "Candidate profile was not found for this tenant.");
@@ -358,6 +489,8 @@ function profileFor(registry, tenantId, profileId) {
   return profile;
 }
 
+// Fail closed unless the profile is tenant-scoped, simulator-only, and its
+// two-layer checksum (envelope, then immutable content) both re-derive correctly.
 function verifyProfile(profile, tenantId = profile?.tenantId) {
   if (!profile || profile.tenantId !== tenantId || profile.executionMode !== "simulated" || profile.simulated !== true || profile.commerciallyLive !== false || profile.activationAuthority !== "none") {
     fail("conformance_candidate_profile_invalid", "A tenant-bound non-live candidate profile is required.");
@@ -369,6 +502,11 @@ function verifyProfile(profile, tenantId = profile?.tenantId) {
   if (normalizeTime(createdAt) !== createdAt) fail("conformance_candidate_profile_invalid", "Candidate profile creation time is invalid.");
 }
 
+// Fail closed unless the campaign is tenant-scoped, simulator-only, its
+// manifest matches its own checksum and the canonical scenario pack
+// (assertCanonicalManifest), every recorded result verifies
+// (verifyResult), the replay index exactly covers the results with no
+// orphaned or duplicate entries, and the campaign's own state checksum re-derives.
 function verifyCampaign(campaign, tenantId = campaign?.tenantId) {
   if (!campaign || campaign.tenantId !== tenantId || campaign.executionMode !== "simulated" || campaign.simulated !== true || campaign.commerciallyLive !== false || !CONFORMANCE_CAMPAIGN_STATUSES.includes(campaign.status)) {
     fail("conformance_campaign_invalid", "A tenant-bound simulator-only campaign is required.");
@@ -395,6 +533,10 @@ function verifyCampaign(campaign, tenantId = campaign?.tenantId) {
   if (checksum(unsignedCampaign) !== campaignStateChecksumSha256) fail("conformance_campaign_state_tampered", "Campaign state checksum validation failed.");
 }
 
+// Fail closed unless the manifest declares itself simulator-only under the
+// current schema, and rebuilding it from the canonical scenario pack
+// produces the identical checksum — a stale manifest (e.g. after the
+// underlying conformance pack changed) is rejected rather than trusted.
 function assertCanonicalManifest(manifest) {
   if (manifest.schemaVersion !== "conformance-campaign-manifest/v1" || manifest.executionMode !== "simulated" || manifest.simulated !== true || manifest.commerciallyLive !== false || manifest.certificationScope !== "LoanOS canonical contract and deterministic simulator only") {
     fail("conformance_campaign_manifest_invalid", "Campaign manifest is not simulator-only or uses an unsupported schema.");
@@ -411,6 +553,10 @@ function assertCanonicalManifest(manifest) {
   if (expected.manifestChecksumSha256 !== manifest.manifestChecksumSha256) fail("conformance_campaign_manifest_stale", "Campaign manifest no longer matches the canonical scenario pack.");
 }
 
+// Fail closed unless a scenario result is scoped to its campaign, its
+// checksum re-derives, its expectations match the manifest's scenario
+// definition, and its recorded `passed` flag is actually consistent with
+// the observed vs. expected disposition/safety-state (not just asserted).
 function verifyResult(campaign, result) {
   if (!result || result.tenantId !== campaign.tenantId || result.campaignId !== campaign.campaignId || result.profileId !== campaign.profileId || result.targetType !== campaign.targetType || result.targetId !== campaign.targetId || result.executionMode !== "simulated" || result.simulated !== true || result.commerciallyLive !== false || result.manifestChecksumSha256 !== campaign.manifestChecksumSha256) {
     fail("conformance_campaign_evidence_invalid", "Evidence is outside the campaign scope or claims live execution.");
@@ -424,12 +570,16 @@ function verifyResult(campaign, result) {
   if (result.passed !== expectedPass) fail("conformance_campaign_evidence_tampered", "Evidence pass status is inconsistent with observed outcomes.");
 }
 
+// Look up a scenario definition within an immutable manifest by id.
 function scenarioDefinition(manifest, scenarioId) {
   const definition = manifest.scenarios.find((item) => item.scenarioId === scenarioId);
   if (!definition) fail("conformance_campaign_scenario_invalid", "Scenario is outside the immutable campaign manifest.");
   return definition;
 }
 
+// Fail closed unless targetType is recognized and targetId is within the
+// profile's declared organisation-admission integrations or
+// enterprise-platform families for that type.
 function assertProfileScope(profile, targetType, targetId) {
   if (!CONFORMANCE_CAMPAIGN_TARGET_TYPES.includes(targetType)) fail("conformance_campaign_target_invalid", "Unsupported campaign target type.");
   const allowed = targetType === "organisation_admission"
@@ -442,11 +592,16 @@ function replaceCampaign(registry, campaign) {
   return { ...registry, [scopedKey(campaign.tenantId, campaign.campaignId)]: campaign };
 }
 
+// Recompute and stamp the campaign's overall state checksum (dropping any
+// prior one first) and deep-freeze the result; called on every campaign mutation.
 function sealCampaign(value) {
   const { campaignStateChecksumSha256: _priorChecksum, ...unsigned } = value;
   return deepFreeze({ ...unsigned, campaignStateChecksumSha256: checksum(unsigned) });
 }
 
+// The core "simulator only" guardrail: reject any caller input that claims
+// non-simulated execution mode, commercial liveness, or production
+// activation authority.
 function rejectLiveClaim(input) {
   if (input.executionMode && input.executionMode !== "simulated") fail("conformance_campaign_live_claim_forbidden", "Only simulated conformance administration is available.");
   if (input.commerciallyLive === true || input.activationAuthority === "production") fail("conformance_campaign_live_claim_forbidden", "Simulator evidence cannot establish a commercial or production activation.");

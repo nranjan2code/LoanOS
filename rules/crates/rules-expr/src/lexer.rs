@@ -6,6 +6,10 @@ use std::str::FromStr;
 
 use crate::ExprError;
 
+/// A single lexical token of the expression language. Kept small and
+/// `Copy`-free (strings/decimals own their data) since tokens are collected
+/// into a `Vec` up front rather than streamed (SPEC.md: the grammar is small
+/// enough that a full token buffer is simpler than a lazy iterator).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Token {
     Int(i64),
@@ -33,6 +37,16 @@ pub enum Token {
     Comma,
 }
 
+/// Tokenize a source expression into the full token stream.
+///
+/// Byte-indexed (not `chars()`) because every accepted character class here
+/// (whitespace, digits, ASCII identifiers, operators, and quoted string
+/// bodies) is ASCII; only string-literal contents are UTF-8 validated
+/// explicitly before being retained. Returns `ExprError::Lex` fail-closed on
+/// the first unterminated string, malformed number, or unrecognized
+/// character — there is no recovery/skip mode (INV-5 applies to authoring
+/// tooling too: a bad expression must never silently coerce to something
+/// evaluable).
 pub fn lex(src: &str) -> Result<Vec<Token>, ExprError> {
     let mut tokens = Vec::new();
     let bytes = src.as_bytes();

@@ -1,3 +1,28 @@
+/**
+ * Customer-facing distribution and lifecycle operations: channel-partner
+ * (DSA/BC/connector/dealer/merchant/LSP) onboarding and commission
+ * assessment/settlement, lead capture and routing/deduplication, customer
+ * relationships (co-applicant/guarantor/nominee/legal-heir/etc.), customer
+ * merge (duplicate-record consolidation), and bereavement/succession
+ * servicing (nominee/legal-heir claims against a deceased borrower's
+ * accounts). This module does not own the underlying loan-account ledger or
+ * settlement math — succession service actions call through to
+ * `loan-account.js` (`postPaymentToLoanAccount`, `generateClosureCertificate`,
+ * `settleLoanAccount`) for the actual money movement, and this module only
+ * gates *whether* a claimant is authorised to trigger those actions.
+ *
+ * Style note: this file (and its siblings in this batch) uses a deliberately
+ * terse "fail-fast" idiom instead of the findings/summary pattern used
+ * elsewhere in packages/core — validation helpers (`fail`, `text`,
+ * `required`, `oneOf`, `fourEyes`, etc.) throw immediately with a `code` on
+ * the error, rather than accumulating findings. Every mutating export
+ * requires an independent proposer/approver pair (`fourEyes`) for
+ * governance-sensitive actions (partner onboarding, commission approval,
+ * merges, succession authority), consistent with the platform's four-eyes
+ * convention. `evidenceChecksumSha256` fields are a tamper-evidence seal
+ * over the record's own content, not a substitute for the audit hash chain
+ * in `audit.js`.
+ */
 import { createHash } from "node:crypto";
 import { generateClosureCertificate, postPaymentToLoanAccount, settleLoanAccount, summarizeLoanAccount } from "./loan-account.js";
 
@@ -6,6 +31,12 @@ const PARTNER_TYPES = ["dsa", "bc", "connector", "dealer", "merchant", "lsp"];
 const RELATIONSHIP_TYPES = ["co_applicant", "co_borrower", "guarantor", "household", "group", "jlg", "connected_party", "nominee", "legal_heir", "authorised_representative"];
 const LANGUAGES = ["en", "hi", "bn", "gu", "kn", "ml", "mr", "or", "pa", "ta", "te", "ur"];
 
+/**
+ * Onboard a channel partner (DSA/BC/connector/dealer/merchant/LSP). Requires
+ * four-eyes approval, an active operating unit and programme, and — for an
+ * `lsp` partner — a registered LSP record. Throws (fail-fast) rather than
+ * returning findings on any violation.
+ */
 export function registerChannelPartner(registry = {}, state = {}, input = {}, now = new Date()) {
   text(input.partnerId, "partnerId"); if (registry[input.partnerId]) fail("channel_partner_duplicate", "partnerId already exists."); fourEyes(input);
   const partnerType = oneOf(input.partnerType, PARTNER_TYPES, "partnerType"); if (partnerType === "lsp" && !state.lendingServiceProviders?.[input.lspId]) fail("channel_lsp_missing", "An LSP channel partner requires a registered LSP.");
@@ -15,6 +46,11 @@ export function registerChannelPartner(registry = {}, state = {}, input = {}, no
   return { registry: { ...registry, [partner.partnerId]: partner }, partner };
 }
 
+/**
+ * Register a commission policy (flat amount or bps-of-disbursed-amount) for
+ * an active channel partner, scoped to specific active lending programmes
+ * the partner is actually authorised for.
+ */
 export function registerPartnerCommissionPolicy(registry = {}, state = {}, input = {}, now = new Date()) {
   text(input.policyId, "policyId"); if (registry[input.policyId]) fail("commission_policy_duplicate", "policyId already exists."); fourEyes(input); const partner = state.channelPartners?.[input.partnerId]; if (!partner || partner.status !== "active") fail("channel_partner_missing", "An active channel partner is required.");
   const basis = oneOf(input.basis, ["flat", "disbursed_amount_bps"], "basis"); const flatAmountPaise = basis === "flat" ? positiveMoney(input.flatAmountPaise, "flatAmountPaise") : null; const rateBps = basis === "disbursed_amount_bps" ? boundedInteger(input.rateBps, 1, 10000, "rateBps") : null;
@@ -22,16 +58,36 @@ export function registerPartnerCommissionPolicy(registry = {}, state = {}, input
   const policy = { policyId: input.policyId, partnerId: partner.partnerId, programmeIds, basis, flatAmountPaise, rateBps, maximumPayoutPaise: positiveMoney(input.maximumPayoutPaise, "maximumPayoutPaise"), eligibleEvent: oneOf(input.eligibleEvent, ["disbursement", "first_repayment", "seasoning_complete"], "eligibleEvent"), clawbackDays: boundedInteger(input.clawbackDays, 0, 365, "clawbackDays"), taxTreatmentRef: required(input.taxTreatmentRef, "taxTreatmentRef"), proposedBy: input.proposedBy, approvedBy: input.approvedBy, approvalRef: input.approvalRef, status: "active", approvedAt: now.toISOString(), evidenceChecksumSha256: hash(input) }; return { registry: { ...registry, [policy.policyId]: policy }, policy };
 }
 
+/**
+ * Compute the commission owed on a converted lead once its policy's
+ * eligible event (disbursement/first-repayment/seasoning) has actually been
+ * met: applies the policy's flat/bps formula, caps at `maximumPayoutPaise`,
+ * and nets off any withheld tax. Rounding uses banker's-style half-up on
+ * bps (`+5000n / 10000n`) to stay in exact-paise integer math.
+ */
 export function assessPartnerCommission(registry = {}, state = {}, input = {}, now = new Date()) {
   text(input.assessmentId, "assessmentId"); if (registry[input.assessmentId]) fail("commission_assessment_duplicate", "assessmentId already exists."); const lead = state.channelLeads?.[input.leadId]; if (!lead || lead.status !== "converted" || !lead.partnerId) fail("commission_lead_invalid", "A converted partner lead is required."); const policy = state.partnerCommissionPolicies?.[input.policyId]; if (!policy || policy.status !== "active" || policy.partnerId !== lead.partnerId || !policy.programmeIds.includes(lead.programmeId)) fail("commission_policy_invalid", "An active policy for the lead partner and programme is required."); const eligibleEvent = oneOf(input.eligibleEvent, ["disbursement", "first_repayment", "seasoning_complete"], "eligibleEvent"); if (eligibleEvent !== policy.eligibleEvent) fail("commission_event_invalid", "The policy eligibility event has not been met.");
   const baseAmountPaise = positiveMoney(input.baseAmountPaise, "baseAmountPaise"); const calculated = policy.basis === "flat" ? BigInt(policy.flatAmountPaise) : (BigInt(baseAmountPaise) * BigInt(policy.rateBps) + 5000n) / 10000n; const gross = calculated < BigInt(policy.maximumPayoutPaise) ? calculated : BigInt(policy.maximumPayoutPaise); const taxWithheldPaise = money(input.taxWithheldPaise ?? "0", "taxWithheldPaise"); if (BigInt(taxWithheldPaise) > gross) fail("commission_tax_invalid", "Tax withholding cannot exceed gross commission."); const assessment = { assessmentId: input.assessmentId, policyId: policy.policyId, partnerId: lead.partnerId, leadId: lead.leadId, applicationId: lead.convertedApplicationId, borrowerId: lead.convertedBorrowerId, eligibleEvent, eligibleEventRef: required(input.eligibleEventRef, "eligibleEventRef"), eligibleAt: nonFuture(input.eligibleAt, now, "eligibleAt"), baseAmountPaise, grossCommissionPaise: gross.toString(), taxWithheldPaise, netPayablePaise: (gross - BigInt(taxWithheldPaise)).toString(), assessedBy: required(input.assessedBy, "assessedBy"), status: "assessed", history: [{ action: "assessed", actor: input.assessedBy, at: now.toISOString() }], assessedAt: now.toISOString(), evidenceChecksumSha256: hash(input) }; return { registry: { ...registry, [assessment.assessmentId]: assessment }, assessment };
 }
 
+/**
+ * Move a commission assessment through assessed -> approved -> settled (or
+ * clawed_back). `approve` requires four-eyes independent of the original
+ * assessor; `claw_back` is only permitted within the policy's
+ * `clawbackDays` window from `eligibleAt`.
+ */
 export function transitionPartnerCommission(assessment, state = {}, input = {}, now = new Date()) {
   if (!assessment) fail("commission_assessment_missing", "Commission assessment is required."); const action = oneOf(input.action, ["approve", "settle", "claw_back"], "action"); const allowed = { assessed: ["approve"], approved: ["settle"], settled: ["claw_back"] }[assessment.status] ?? []; if (!allowed.includes(action)) fail("commission_transition_invalid", "Commission action is not allowed from the current status."); if (action === "approve") { fourEyes({ proposedBy: assessment.assessedBy, approvedBy: input.actor, approvalRef: input.approvalRef }); } const policy = state.partnerCommissionPolicies?.[assessment.policyId]; if (!policy) fail("commission_policy_missing", "Commission policy is required."); if (action === "claw_back") { const deadline = Date.parse(assessment.eligibleAt) + policy.clawbackDays * 86400000; if (now.getTime() > deadline) fail("commission_clawback_expired", "Commission clawback window has expired."); }
   const event = { action, actor: required(input.actor, "actor"), reason: required(input.reason, "reason"), evidenceRef: required(input.evidenceRef, "evidenceRef"), approvalRef: input.approvalRef ?? null, paymentRef: action === "settle" ? required(input.paymentRef, "paymentRef") : null, reconciliationRef: action === "settle" ? required(input.reconciliationRef, "reconciliationRef") : null, at: now.toISOString() }; const status = { approve: "approved", settle: "settled", claw_back: "clawed_back" }[action]; const history = [...assessment.history, event]; return { ...assessment, status, paymentRef: event.paymentRef ?? assessment.paymentRef ?? null, reconciliationRef: event.reconciliationRef ?? assessment.reconciliationRef ?? null, history, updatedAt: now.toISOString(), evidenceChecksumSha256: hash(history) };
 }
 
+/**
+ * Capture a new lead and route it to a serviceable operating unit. Performs
+ * duplicate/known-borrower detection by hashing contact channels
+ * (`contactKeys`) rather than storing raw email/mobile in the dedup index,
+ * and flags the lead `duplicate_review` if it collides with an open lead or
+ * an existing borrower rather than silently merging.
+ */
 export function createChannelLead(registry = {}, state = {}, input = {}, now = new Date()) {
   text(input.leadId, "leadId"); if (registry[input.leadId]) fail("lead_duplicate", "leadId already exists."); const channel = oneOf(input.channel, CHANNELS, "channel"); const partner = input.partnerId ? state.channelPartners?.[input.partnerId] : null;
   if (PARTNER_TYPES.includes(channel) && (!partner || partner.status !== "active" || partner.partnerType !== channel)) fail("lead_partner_invalid", `An active ${channel} partner is required.`);
@@ -45,26 +101,55 @@ export function createChannelLead(registry = {}, state = {}, input = {}, now = n
   return { registry: { ...registry, [lead.leadId]: lead }, lead };
 }
 
+/** Move a lead through its funnel (contact/qualify/follow-up/convert/abandon/resolve_duplicate). */
 export function transitionChannelLead(lead, input = {}, now = new Date()) {
   if (!lead) fail("lead_missing", "Lead is required."); const action = oneOf(input.action, ["contact", "qualify", "schedule_follow_up", "resolve_duplicate", "convert", "abandon"], "action"); const allowed = { new: ["contact", "qualify", "schedule_follow_up", "abandon"], contacted: ["qualify", "schedule_follow_up", "abandon"], follow_up: ["contact", "qualify", "abandon"], duplicate_review: ["resolve_duplicate", "abandon"], qualified: ["convert", "schedule_follow_up", "abandon"] }[lead.status] ?? []; if (!allowed.includes(action)) fail("lead_transition_invalid", "Lead action is not allowed from its current status.");
   const nextStatus = { contact: "contacted", qualify: "qualified", schedule_follow_up: "follow_up", resolve_duplicate: input.disposition === "continue" ? "new" : "abandoned", convert: "converted", abandon: "abandoned" }[action]; if (action === "schedule_follow_up") future(input.followUpAt, now, "followUpAt"); if (action === "resolve_duplicate" && !["continue", "duplicate"].includes(input.disposition)) fail("lead_duplicate_disposition", "Duplicate disposition is required."); if (action === "convert" && (!input.borrowerId || !input.applicationId)) fail("lead_conversion_missing", "Conversion requires borrowerId and applicationId.");
   const event = { action, from: lead.status, to: nextStatus, actor: required(input.actor, "actor"), reason: required(input.reason, "reason"), evidenceRef: required(input.evidenceRef, "evidenceRef"), followUpAt: input.followUpAt ?? null, disposition: input.disposition ?? null, borrowerId: input.borrowerId ?? null, applicationId: input.applicationId ?? null, at: now.toISOString() }; const history = [...lead.history, event]; return { ...lead, status: nextStatus, nextFollowUpAt: action === "schedule_follow_up" ? new Date(input.followUpAt).toISOString() : null, convertedBorrowerId: action === "convert" ? input.borrowerId : lead.convertedBorrowerId ?? null, convertedApplicationId: action === "convert" ? input.applicationId : lead.convertedApplicationId ?? null, history, updatedAt: now.toISOString(), evidenceChecksumSha256: hash(history) };
 }
 
+/**
+ * Register a directed relationship between two existing customers
+ * (co-applicant/guarantor/nominee/legal-heir/etc.), with an optional
+ * liability type and validity window. Rejects a self-referential
+ * relationship.
+ */
 export function registerCustomerRelationship(registry = {}, state = {}, input = {}, now = new Date()) {
   text(input.relationshipId, "relationshipId"); if (registry[input.relationshipId]) fail("customer_relationship_duplicate", "relationshipId already exists."); fourEyes(input); if (input.fromBorrowerId === input.toBorrowerId) fail("customer_relationship_self", "A customer cannot relate to itself."); if (!state.borrowerProfiles?.[input.fromBorrowerId] || !state.borrowerProfiles?.[input.toBorrowerId]) fail("customer_relationship_borrower_missing", "Both customers must exist.");
   const relationship = { relationshipId: input.relationshipId, fromBorrowerId: input.fromBorrowerId, toBorrowerId: input.toBorrowerId, relationshipType: oneOf(input.relationshipType, RELATIONSHIP_TYPES, "relationshipType"), groupRef: input.groupRef ?? null, liabilityType: oneOf(input.liabilityType ?? "none", ["none", "joint", "several", "guarantee"], "liabilityType"), validFrom: nonFuture(input.validFrom ?? now.toISOString(), now, "validFrom"), validUntil: input.validUntil ? future(input.validUntil, now, "validUntil") : null, evidenceRef: required(input.evidenceRef, "evidenceRef"), proposedBy: input.proposedBy, approvedBy: input.approvedBy, approvalRef: input.approvalRef, status: "active", registeredAt: now.toISOString(), evidenceChecksumSha256: hash(input) }; return { registry: { ...registry, [relationship.relationshipId]: relationship }, relationship };
 }
 
+/**
+ * Propose (but do not execute) a plan to merge duplicate customer records
+ * into a survivor. Recorded as `approved_not_executed`; actual execution is
+ * a separate step (`executeCustomerMerge`) gated on the impact snapshot
+ * still matching what was approved.
+ */
 export function createCustomerMergePlan(registry = {}, state = {}, input = {}, now = new Date()) {
   text(input.mergePlanId, "mergePlanId"); if (registry[input.mergePlanId]) fail("customer_merge_duplicate", "mergePlanId already exists."); fourEyes(input); const duplicateBorrowerIds = strings(input.duplicateBorrowerIds, "duplicateBorrowerIds", true); if (duplicateBorrowerIds.includes(input.survivorBorrowerId)) fail("customer_merge_invalid", "Survivor cannot also be a duplicate."); for (const id of [input.survivorBorrowerId, ...duplicateBorrowerIds]) if (!state.borrowerProfiles?.[id]) fail("customer_merge_borrower_missing", `Customer ${id} does not exist.`);
   const plan = { mergePlanId: input.mergePlanId, survivorBorrowerId: input.survivorBorrowerId, duplicateBorrowerIds, matchEvidenceRefs: strings(input.matchEvidenceRefs, "matchEvidenceRefs", true), conflictResolutions: object(input.conflictResolutions, "conflictResolutions"), migrationScope: strings(input.migrationScope, "migrationScope", true), rollbackRef: required(input.rollbackRef, "rollbackRef"), proposedBy: input.proposedBy, approvedBy: input.approvedBy, approvalRef: input.approvalRef, status: "approved_not_executed", approvedAt: now.toISOString(), evidenceChecksumSha256: hash(input) }; return { registry: { ...registry, [plan.mergePlanId]: plan }, plan };
 }
 
+/**
+ * Snapshot every record across the plan's migration scope (plus
+ * `customerRelationships`, always included) that references a duplicate
+ * borrower, and seal it with a checksum. `executeCustomerMerge` compares
+ * this checksum against what was approved so the merge cannot silently run
+ * against a changed data set.
+ */
 export function assessCustomerMergeImpact(state = {}, plan) {
   if (!plan || plan.status !== "approved_not_executed") fail("customer_merge_plan_invalid", "An approved unexecuted merge plan is required."); const duplicateIds = new Set(plan.duplicateBorrowerIds); const collections = mergeCollections(plan.migrationScope); const counts = {}; const recordIds = {}; for (const collection of collections) { const matches = Object.entries(state[collection] ?? {}).filter(([, record]) => recordReferencesBorrower(record, duplicateIds)); counts[collection] = matches.length; recordIds[collection] = matches.map(([id]) => id); } const relationships = Object.entries(state.customerRelationships ?? {}).filter(([, record]) => duplicateIds.has(record.fromBorrowerId) || duplicateIds.has(record.toBorrowerId)); if (!collections.includes("customerRelationships")) { counts.customerRelationships = relationships.length; recordIds.customerRelationships = relationships.map(([id]) => id); } const snapshot = { mergePlanId: plan.mergePlanId, survivorBorrowerId: plan.survivorBorrowerId, duplicateBorrowerIds: plan.duplicateBorrowerIds, collections: [...new Set([...collections, "customerRelationships"])], counts, recordIds }; return { ...snapshot, impactChecksumSha256: hash(snapshot) };
 }
 
+/**
+ * Execute an approved merge plan: re-points every referencing record's
+ * borrower-id field(s) from the duplicates to the survivor
+ * (`remapBorrowerRefs`), marks self-referencing relationships
+ * `merged_duplicate`, and marks the duplicate borrower profiles `merged`.
+ * Fails closed if the current impact checksum no longer matches
+ * `expectedImpactChecksumSha256` from approval time (data changed since the
+ * plan was approved).
+ */
 export function executeCustomerMerge(state = {}, plan, input = {}, now = new Date()) {
   const impact = assessCustomerMergeImpact(state, plan); if (input.expectedImpactChecksumSha256 !== impact.impactChecksumSha256) fail("customer_merge_impact_changed", "Merge impact changed after approval; reassess before execution."); fourEyes(input); const evidenceRefs = strings(input.executionEvidenceRefs, "executionEvidenceRefs", true); const duplicateIds = new Set(plan.duplicateBorrowerIds); const collections = mergeCollections(plan.migrationScope); const next = { ...state };
   for (const collection of collections) { const source = state[collection] ?? {}; const target = {}; for (const [id, record] of Object.entries(source)) target[id] = recordReferencesBorrower(record, duplicateIds) ? remapBorrowerRefs(record, duplicateIds, plan.survivorBorrowerId, plan.mergePlanId) : record; next[collection] = target; }
@@ -72,40 +157,87 @@ export function executeCustomerMerge(state = {}, plan, input = {}, now = new Dat
   next.borrowerProfiles = { ...state.borrowerProfiles }; for (const id of plan.duplicateBorrowerIds) next.borrowerProfiles[id] = { ...state.borrowerProfiles[id], status: "merged", mergedIntoBorrowerId: plan.survivorBorrowerId, customerMergePlanId: plan.mergePlanId, mergedAt: now.toISOString() }; const execution = { mergePlanId: plan.mergePlanId, survivorBorrowerId: plan.survivorBorrowerId, duplicateBorrowerIds: plan.duplicateBorrowerIds, impact, rollbackRef: plan.rollbackRef, executionEvidenceRefs: evidenceRefs, proposedBy: input.proposedBy, approvedBy: input.approvedBy, approvalRef: input.approvalRef, status: "executed", executedAt: now.toISOString(), evidenceChecksumSha256: hash({ impact, evidenceRefs, approvalRef: input.approvalRef }) }; next.customerMergePlans = { ...state.customerMergePlans, [plan.mergePlanId]: { ...plan, status: "executed", executedAt: execution.executedAt, executionChecksumSha256: execution.evidenceChecksumSha256 } }; next.customerMergeExecutions = { ...(state.customerMergeExecutions ?? {}), [plan.mergePlanId]: execution }; return { state: next, execution };
 }
 
+/** Record a customer's language, accessibility, vulnerability, and do-not-contact preferences. */
 export function recordCustomerPreferences(registry = {}, state = {}, input = {}, now = new Date()) {
   if (!state.borrowerProfiles?.[input.borrowerId]) fail("customer_preferences_borrower_missing", "Customer does not exist."); const preferredLanguage = oneOf(input.preferredLanguage, LANGUAGES, "preferredLanguage"); const communicationLanguages = array(input.communicationLanguages, "communicationLanguages", true).map((value) => oneOf(value, LANGUAGES, "communicationLanguages")); const doNotContactChannels = strings(input.doNotContactChannels, "doNotContactChannels"); if (doNotContactChannels.some((value) => !["voice", "sms", "email", "whatsapp", "postal"].includes(value))) fail("customer_preferences_invalid", "Unknown do-not-contact channel.");
   const preferences = { borrowerId: input.borrowerId, preferredLanguage, communicationLanguages: [...new Set(communicationLanguages)], vulnerabilityFlags: strings(input.vulnerabilityFlags, "vulnerabilityFlags"), accessibilityNeeds: strings(input.accessibilityNeeds, "accessibilityNeeds"), assistedJourney: Boolean(input.assistedJourney), doNotContactChannels, permittedContactWindows: strings(input.permittedContactWindows, "permittedContactWindows"), consentRef: required(input.consentRef, "consentRef"), recordedBy: required(input.recordedBy, "recordedBy"), recordedAt: now.toISOString(), evidenceChecksumSha256: hash(input) }; return { registry: { ...registry, [input.borrowerId]: preferences }, preferences };
 }
 
+/**
+ * Open a succession/bereavement case for a deceased borrower: requires an
+ * existing active relationship of type nominee/legal_heir/
+ * authorised_representative between the borrower and claimant. Newly
+ * reported cases are `manual_review_only` until legally reviewed and
+ * approved.
+ */
 export function createSuccessionCase(registry = {}, state = {}, input = {}, now = new Date()) {
   text(input.caseId, "caseId"); if (registry[input.caseId]) fail("succession_case_duplicate", "caseId already exists."); if (!state.borrowerProfiles?.[input.borrowerId] || !state.borrowerProfiles?.[input.claimantBorrowerId]) fail("succession_borrower_missing", "Borrower and claimant must exist."); const relationship = state.customerRelationships?.[input.relationshipId]; if (!relationship || relationship.status !== "active" || relationship.fromBorrowerId !== input.borrowerId || relationship.toBorrowerId !== input.claimantBorrowerId || !["nominee", "legal_heir", "authorised_representative"].includes(relationship.relationshipType)) fail("succession_relationship_invalid", "An active nominee, legal-heir, or authorised-representative relationship is required.");
   const successionCase = { caseId: input.caseId, borrowerId: input.borrowerId, claimantBorrowerId: input.claimantBorrowerId, relationshipId: relationship.relationshipId, deathCertificateRef: required(input.deathCertificateRef, "deathCertificateRef"), identityEvidenceRefs: strings(input.identityEvidenceRefs, "identityEvidenceRefs", true), legalEvidenceRefs: strings(input.legalEvidenceRefs, "legalEvidenceRefs", true), affectedLoanAccountIds: strings(input.affectedLoanAccountIds, "affectedLoanAccountIds", true), servicingRestriction: "manual_review_only", status: "reported", reportedBy: required(input.reportedBy, "reportedBy"), history: [{ action: "reported", actor: input.reportedBy, at: now.toISOString() }], createdAt: now.toISOString(), evidenceChecksumSha256: hash(input) }; return { registry: { ...registry, [successionCase.caseId]: successionCase }, successionCase };
 }
 
+/**
+ * Move a succession case through reported -> verified -> approved ->
+ * completed (or rejected). Only on reaching `completed` does the case
+ * become `claimant_authorised`, unlocking `issueSuccessionAuthority`.
+ */
 export function transitionSuccessionCase(successionCase, input = {}, now = new Date()) {
   if (!successionCase) fail("succession_case_missing", "Succession case is required."); const action = oneOf(input.action, ["verify", "approve", "reject", "complete"], "action"); const allowed = { reported: ["verify", "reject"], verified: ["approve", "reject"], approved: ["complete"] }[successionCase.status] ?? []; if (!allowed.includes(action)) fail("succession_transition_invalid", "Succession action is not allowed."); if (["approve", "reject"].includes(action)) fourEyes(input); const status = { verify: "verified", approve: "approved", reject: "rejected", complete: "completed" }[action]; const event = { action, actor: required(input.actor, "actor"), reason: required(input.reason, "reason"), evidenceRefs: strings(input.evidenceRefs, "evidenceRefs", true), proposedBy: input.proposedBy ?? null, approvedBy: input.approvedBy ?? null, approvalRef: input.approvalRef ?? null, at: now.toISOString() }; const history = [...successionCase.history, event]; return { ...successionCase, status, servicingRestriction: status === "completed" ? "claimant_authorised" : successionCase.servicingRestriction, history, updatedAt: now.toISOString(), evidenceChecksumSha256: hash(history) };
 }
 
+/**
+ * Grant a claimant explicit, time-boxed, scope-limited authority over a
+ * deceased borrower's accounts, once the succession case is completed and
+ * claimant-authorised. Authority is restricted to the case's affected
+ * accounts and an allow-listed set of servicing actions — it can never be
+ * used to widen scope beyond what the succession case covers.
+ */
 export function issueSuccessionAuthority(registry = {}, state = {}, input = {}, now = new Date()) {
   text(input.authorityId, "authorityId"); if (registry[input.authorityId]) fail("succession_authority_duplicate", "authorityId already exists."); fourEyes(input); const successionCase = state.successionCases?.[input.caseId]; if (!successionCase || successionCase.status !== "completed" || successionCase.servicingRestriction !== "claimant_authorised") fail("succession_case_not_completed", "A completed claimant-authorised succession case is required."); const loanAccountIds = strings(input.loanAccountIds, "loanAccountIds", true); if (loanAccountIds.some((id) => !successionCase.affectedLoanAccountIds.includes(id) || state.loanAccounts?.[id]?.borrowerId !== successionCase.borrowerId)) fail("succession_account_invalid", "Authority may cover only the deceased borrower's affected loan accounts."); const permittedActions = strings(input.permittedActions, "permittedActions", true); const allowed = ["communication", "statement_access", "repayment", "closure_request", "settlement_request", "transfer_request", "mandate_change_request"]; if (permittedActions.some((action) => !allowed.includes(action))) fail("succession_action_invalid", "Authority contains a prohibited servicing action."); const authority = { authorityId: input.authorityId, caseId: successionCase.caseId, borrowerId: successionCase.borrowerId, claimantBorrowerId: successionCase.claimantBorrowerId, loanAccountIds, permittedActions, legalReviewRef: required(input.legalReviewRef, "legalReviewRef"), identityReverificationRef: required(input.identityReverificationRef, "identityReverificationRef"), communicationAddressRef: required(input.communicationAddressRef, "communicationAddressRef"), validFrom: now.toISOString(), validUntil: future(input.validUntil, now, "validUntil"), status: "active", proposedBy: input.proposedBy, approvedBy: input.approvedBy, approvalRef: input.approvalRef, history: [{ action: "issued", actor: input.approvedBy, at: now.toISOString() }], issuedAt: now.toISOString(), evidenceChecksumSha256: hash(input) }; return { registry: { ...registry, [authority.authorityId]: authority }, authority };
 }
 
+/**
+ * Record a claimant's requested servicing action against a deceased
+ * borrower's account, checked against an active unexpired succession
+ * authority's permitted actions and account scope. Irreversible/
+ * value-moving actions (closure/settlement/transfer/mandate-change) require
+ * four-eyes; the resulting record is `approved_request` (pending execution)
+ * for those, `recorded` otherwise (e.g. `communication`, `statement_access`).
+ */
 export function recordSuccessionServiceAction(registry = {}, state = {}, input = {}, now = new Date()) {
   text(input.actionId, "actionId"); if (registry[input.actionId]) fail("succession_action_duplicate", "actionId already exists."); const authority = state.successionAuthorities?.[input.authorityId]; if (!authority || authority.status !== "active" || Date.parse(authority.validUntil) <= now.getTime()) fail("succession_authority_inactive", "An active unexpired succession authority is required."); const actionType = oneOf(input.actionType, ["communication", "statement_access", "repayment", "closure_request", "settlement_request", "transfer_request", "mandate_change_request"], "actionType"); if (!authority.permittedActions.includes(actionType) || !authority.loanAccountIds.includes(input.loanAccountId)) fail("succession_action_unauthorised", "Action or loan account is outside claimant authority."); if (["closure_request", "settlement_request", "transfer_request", "mandate_change_request"].includes(actionType)) fourEyes(input); const amountPaise = ["repayment", "settlement_request"].includes(actionType) ? positiveMoney(input.amountPaise, "amountPaise") : null; const requestDetails = successionRequestDetails(state, authority, actionType, input); const action = { actionId: input.actionId, authorityId: authority.authorityId, caseId: authority.caseId, borrowerId: authority.borrowerId, claimantBorrowerId: authority.claimantBorrowerId, loanAccountId: input.loanAccountId, actionType, amountPaise, requestDetails, requestRef: required(input.requestRef, "requestRef"), evidenceRefs: strings(input.evidenceRefs, "evidenceRefs", true), actor: required(input.actor, "actor"), proposedBy: input.proposedBy ?? null, approvedBy: input.approvedBy ?? null, approvalRef: input.approvalRef ?? null, status: actionType.endsWith("_request") ? "approved_request" : "recorded", recordedAt: now.toISOString(), evidenceChecksumSha256: hash(input) }; return { registry: { ...registry, [action.actionId]: action }, action };
 }
 
+/** Assign a legal reviewer to opine on a pending succession service action before it can execute. */
 export function createSuccessionLegalReview(registry = {}, state = {}, input = {}, now = new Date()) {
   text(input.reviewId, "reviewId"); if (registry[input.reviewId]) fail("succession_legal_review_duplicate", "reviewId already exists."); const action = state.successionServiceActions?.[input.actionId]; if (!action || action.status === "executed") fail("succession_action_not_reviewable", "A pending succession action is required."); const review = { reviewId: input.reviewId, actionId: action.actionId, caseId: action.caseId, authorityId: action.authorityId, assignedTo: required(input.assignedTo, "assignedTo"), assignedBy: required(input.assignedBy, "assignedBy"), dueAt: future(input.dueAt, now, "dueAt"), checklistEvidenceRefs: strings(input.checklistEvidenceRefs, "checklistEvidenceRefs", true), legalBasisRef: required(input.legalBasisRef, "legalBasisRef"), status: "assigned", history: [{ action: "assigned", actor: input.assignedBy, at: now.toISOString() }], createdAt: now.toISOString(), evidenceChecksumSha256: hash(input) }; return { registry: { ...registry, [review.reviewId]: review }, review };
 }
 
+/**
+ * Record the assigned legal reviewer's decision (approve/reject/
+ * request_information). Only the assigned reviewer may act; approve/reject
+ * additionally require four-eyes on top of that assignment check.
+ */
 export function transitionSuccessionLegalReview(review, input = {}, now = new Date()) {
   if (!review || !["assigned", "information_requested"].includes(review.status)) fail("succession_legal_review_inactive", "An open succession legal review is required."); const action = oneOf(input.action, ["approve", "reject", "request_information"], "action"); if (["approve", "reject"].includes(action)) { fourEyes(input); if (input.proposedBy !== review.assignedTo) fail("succession_legal_reviewer_invalid", "The assigned legal reviewer must propose the decision."); } else if (input.actor !== review.assignedTo) fail("succession_legal_reviewer_invalid", "Only the assigned legal reviewer may request information."); const event = { action, actor: required(input.actor, "actor"), reason: required(input.reason, "reason"), opinionRef: required(input.opinionRef, "opinionRef"), evidenceRefs: strings(input.evidenceRefs, "evidenceRefs", true), proposedBy: input.proposedBy ?? null, approvedBy: input.approvedBy ?? null, approvalRef: input.approvalRef ?? null, at: now.toISOString() }; const status = { approve: "approved", reject: "rejected", request_information: "information_requested" }[action]; const history = [...review.history, event]; return { ...review, status, decisionRef: event.opinionRef, history, updatedAt: now.toISOString(), evidenceChecksumSha256: hash(history) };
 }
 
+/** Revoke an active succession authority (e.g. a dispute or fraud concern arises). */
 export function revokeSuccessionAuthority(authority, input = {}, now = new Date()) {
   if (!authority || authority.status !== "active") fail("succession_authority_inactive", "Active succession authority is required."); fourEyes(input); const event = { action: "revoked", actor: input.approvedBy, reason: required(input.reason, "reason"), evidenceRefs: strings(input.evidenceRefs, "evidenceRefs", true), approvalRef: input.approvalRef, at: now.toISOString() }; const history = [...authority.history, event]; return { ...authority, status: "revoked", revokedAt: now.toISOString(), history, evidenceChecksumSha256: hash(history) };
 }
 
+/**
+ * Execute a legally-reviewed-and-approved succession servicing action
+ * against the loan account: re-validates the authority is still active and
+ * in-scope at execution time (not just at request time), requires the
+ * matching approved legal review, and dispatches to the concrete effect
+ * (repayment posting, closure certificate, settlement, servicing-successor
+ * transfer, or mandate migration) via the existing `loan-account.js`
+ * primitives — this function never re-implements loan-account money math
+ * itself. `transfer_request`/`mandate_change_request` change *who services*
+ * the account without changing the original borrower of record
+ * (`originalBorrowerPreserved: true`).
+ */
 export function executeSuccessionServiceAction(registry = {}, state = {}, input = {}, now = new Date()) {
   text(input.executionId, "executionId"); if (registry[input.executionId]) fail("succession_execution_duplicate", "executionId already exists."); fourEyes(input); const action = state.successionServiceActions?.[input.actionId]; if (!action || !["recorded", "approved_request"].includes(action.status)) fail("succession_action_not_executable", "A pending succession servicing action is required."); const authority = state.successionAuthorities?.[action.authorityId]; if (!authority || authority.status !== "active" || Date.parse(authority.validUntil) <= now.getTime()) fail("succession_authority_inactive", "Execution requires the original active unexpired authority."); if (!authority.loanAccountIds.includes(action.loanAccountId) || !authority.permittedActions.includes(action.actionType)) fail("succession_execution_scope_invalid", "Execution is outside the original authority scope."); const account = state.loanAccounts?.[action.loanAccountId]; if (!account || account.borrowerId !== authority.borrowerId) fail("succession_account_invalid", "The authorised deceased-borrower loan account is required.");
   const evidenceRefs = strings(input.evidenceRefs, "evidenceRefs", true); const legalReview = state.successionLegalReviews?.[input.legalReviewId]; if (!legalReview || legalReview.actionId !== action.actionId || legalReview.status !== "approved") fail("succession_legal_review_required", "An approved legal review for this action is required."); const legalReviewRef = legalReview.decisionRef; const notificationRef = required(input.notificationRef, "notificationRef"); const reversalPlanRef = required(input.reversalPlanRef, "reversalPlanRef"); let loanAccount = account; let paymentRails = state.paymentRails ?? {}; let effect;
@@ -118,6 +250,13 @@ export function executeSuccessionServiceAction(registry = {}, state = {}, input 
   const execution = { executionId: input.executionId, actionId: action.actionId, authorityId: authority.authorityId, caseId: action.caseId, borrowerId: action.borrowerId, claimantBorrowerId: action.claimantBorrowerId, loanAccountId: action.loanAccountId, actionType: action.actionType, effect, legalReviewId: legalReview.reviewId, legalReviewRef, notificationRef, reversalPlanRef, evidenceRefs, proposedBy: input.proposedBy, approvedBy: input.approvedBy, approvalRef: input.approvalRef, status: "executed", executedAt: now.toISOString(), evidenceChecksumSha256: hash({ input, effect }) }; const nextAction = { ...action, status: "executed", executionId: execution.executionId, executedAt: execution.executedAt, executionChecksumSha256: execution.evidenceChecksumSha256 }; return { state: { ...state, loanAccounts: { ...state.loanAccounts, [loanAccount.loanAccountId]: loanAccount }, paymentRails, successionServiceActions: { ...state.successionServiceActions, [action.actionId]: nextAction }, successionServiceExecutions: { ...registry, [execution.executionId]: execution } }, execution };
 }
 
+/**
+ * Assemble a single-borrower operational view (applications, accounts,
+ * aggregate exposure, complaints, consents, documents, succession cases)
+ * across the borrower and every customer it has an active relationship
+ * with (co-applicants, guarantors, etc.) — a pure read/aggregate, not
+ * persisted.
+ */
 export function buildCustomer360(state = {}, borrowerId, now = new Date()) {
   const borrower = state.borrowerProfiles?.[borrowerId]; if (!borrower) fail("customer_360_missing", "Customer does not exist."); const relationships = Object.values(state.customerRelationships ?? {}).filter((item) => item.status === "active" && (item.fromBorrowerId === borrowerId || item.toBorrowerId === borrowerId)); const relatedIds = new Set([borrowerId, ...relationships.flatMap((item) => [item.fromBorrowerId, item.toBorrowerId])]); const accounts = Object.values(state.loanAccounts ?? {}).filter((item) => relatedIds.has(item.borrowerId)); const exposures = accounts.map((account) => { const summary = summarizeLoanAccount(account, now); return { loanAccountId: account.loanAccountId, borrowerId: account.borrowerId, status: account.status, principalOutstandingPaise: toPaiseString(summary.principalOutstanding) }; }); const aggregate = exposures.reduce((sum, item) => sum + BigInt(item.principalOutstandingPaise), 0n);
   return { borrower, preferences: state.customerPreferences?.[borrowerId] ?? null, relationships, relatedBorrowers: [...relatedIds].filter((id) => id !== borrowerId).map((id) => state.borrowerProfiles[id]).filter(Boolean), applications: Object.values(state.loanApplications ?? {}).filter((item) => relatedIds.has(item.borrowerId)), loanAccounts: exposures, aggregateExposurePaise: aggregate.toString(), complaints: Object.values(state.complaints ?? {}).filter((item) => relatedIds.has(item.borrowerId)), consents: Object.values(state.consentRecords ?? {}).filter((item) => relatedIds.has(item.borrowerId)), documents: Object.values(state.documentVault ?? {}).filter((item) => relatedIds.has(item.borrowerId)), successionCases: Object.values(state.successionCases ?? {}).filter((item) => item.borrowerId === borrowerId || item.claimantBorrowerId === borrowerId), generatedAt: now.toISOString(), evidenceChecksumSha256: hash({ borrowerId, relatedIds: [...relatedIds], exposures }) };

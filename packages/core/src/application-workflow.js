@@ -1,3 +1,28 @@
+/**
+ * Loan application workflow state machine: the sequence an application
+ * moves through from compliance preflight, through KFS, to a maker-checker
+ * decision (propose -> approve/reject), through disbursement. This module
+ * owns the *workflow* (status transitions, event trail, maker-checker
+ * gating) — it does not own compliance checking itself (delegates to
+ * `validateKfsBeforeDecision` from `loan-policy.js`), the eligibility
+ * decision (`application.eligibility.decision`, computed elsewhere), or
+ * model governance state (only reads it via `normalizeModelRegistryState`
+ * to snapshot evidence onto a proposed decision).
+ *
+ * Every workflow-mutating function appends to `application.workflow.events`
+ * via `withWorkflowEvent` so the application always carries its own audit
+ * trail alongside the top-level audit chain. Decision approval is
+ * maker-checker: the approver must differ from both the proposer and (if
+ * present) the manual-underwriting underwriter (RBI-IT-GRC). A `"refer"`
+ * eligibility outcome being approved requires a documented manual
+ * underwriting override (RBI Digital Lending Directions require a human
+ * creditworthiness judgement when the affordability engine can't clear the
+ * borrower straight through) and, if a workflow task exists for it, the
+ * override's underwriter must match whoever the task was actually assigned
+ * to. A decline must carry one of `DECLINE_REASON_CODES` (free-text `other`
+ * requires a narrative) so adverse-action communication and CIC reporting
+ * have a consistent, queryable trail instead of free text.
+ */
 import { createFinding, summarizeFindings } from "./compliance-controls.js";
 import { createLoanId, validateKfsBeforeDecision } from "./loan-policy.js";
 import { normalizeModelRegistryState } from "./model-governance.js";
@@ -35,6 +60,15 @@ export const DECLINE_REASON_CODES = {
 
 const DECLINE_REASON_CODE_VALUES = new Set(Object.keys(DECLINE_REASON_CODES));
 
+/**
+ * Set the application's initial workflow status from its compliance
+ * preflight result: `"blocked_compliance"` if the preflight found any
+ * blocking finding, else `"ready_for_kfs"`.
+ * @param {object} application
+ * @param {{summary?: {status: string}}} compliance - preflight compliance result.
+ * @param {Date} [now]
+ * @returns {object} application with status set and a workflow event appended.
+ */
 export function initializeApplicationWorkflow(application, compliance, now = new Date()) {
   const status = compliance?.summary?.status === "blocked" ? APPLICATION_STATUSES.BLOCKED_COMPLIANCE : APPLICATION_STATUSES.READY_FOR_KFS;
   return withWorkflowEvent(
@@ -51,6 +85,17 @@ export function initializeApplicationWorkflow(application, compliance, now = new
   );
 }
 
+/**
+ * Advance the workflow after KFS is generated: blocked if the KFS-stage
+ * compliance check found blocking findings; otherwise checks
+ * `validateKfsBeforeDecision` and moves to `"ready_for_decision"` if that
+ * clears, or stays `"kfs_issued"` if it doesn't (e.g. KFS not yet accepted
+ * by the borrower).
+ * @param {object} application
+ * @param {{summary?: {status: string}}} compliance - KFS-stage compliance result.
+ * @param {Date} [now]
+ * @returns {object} application with status set and a workflow event appended.
+ */
 export function applyKfsWorkflow(application, compliance, now = new Date()) {
   if (compliance?.summary?.status === "blocked") {
     return withWorkflowEvent(
@@ -87,6 +132,19 @@ export function applyKfsWorkflow(application, compliance, now = new Date()) {
   );
 }
 
+/**
+ * Record a human's review of an AI-assisted decision path. Fails closed
+ * unless `reviewedBy`, `reviewRef`, and a recognized `outcome` are given.
+ * If the application was sitting in `"human_review_required"` and the
+ * outcome is `"approved_to_continue"`, advances it back to
+ * `"ready_for_decision"`; also back-fills `aiDecision.humanReviewRef` if
+ * not already set, satisfying the model-governance material-decision
+ * evidence requirement.
+ * @param {object} application
+ * @param {{reviewId?: string, reviewRef: string, reviewedBy: string, outcome: "approved_to_continue"|"requires_rework"|"declined", notes?: string}} input
+ * @param {Date} [now]
+ * @returns {{application: object, humanReview?: object, findings: Array<object>, summary: object}}
+ */
 export function recordHumanReview(application, input, now = new Date()) {
   const findings = [];
   if (!input?.reviewedBy) {
@@ -151,6 +209,27 @@ export function recordHumanReview(application, input, now = new Date()) {
   };
 }
 
+/**
+ * Propose a lending decision (the "maker" half of maker-checker). Fails
+ * closed unless the application is decision-ready, a proposer is named,
+ * status is `approved`/`declined`, and — depending on the case —
+ * manual-underwriting evidence (`manualUnderwritingFindings`) or a decline
+ * reason code (`declineReasonFindings`) checks out. If any finding flags a
+ * missing `aiDecision.humanReviewRef`, the application is routed to
+ * `"human_review_required"` instead of proceeding (`requiresHumanReview:
+ * true`) rather than being blocked outright — this is the fail-closed-but-
+ * recoverable path for a material AI-assisted decision lacking review.
+ * On success, locks a snapshot of the AI decision's model evidence (from
+ * `options.modelRegistry`, if given) onto the proposal so later review of
+ * the decision doesn't depend on the model registry still having the same
+ * state.
+ * @param {object} application
+ * @param {object} input - proposedBy/decidedBy, status, reason, manualUnderwriting, declineReasonCode, declineNarrative, aiDecision, proposalId.
+ * @param {Array<object>} [findings] - pre-existing findings to fold in.
+ * @param {{activeTasks?: Array<object>, modelRegistry?: object}|Date} [options] - may be passed as `now` for legacy call sites (positional shift is handled).
+ * @param {Date} [now]
+ * @returns {{application: object, proposal?: object, findings: Array<object>, summary: object, requiresHumanReview: boolean}}
+ */
 export function proposeDecision(application, input, findings = [], options = {}, now = new Date()) {
   let opts = options;
   let date = now;
@@ -282,6 +361,19 @@ export function proposeDecision(application, input, findings = [], options = {},
   };
 }
 
+/**
+ * Approve or reject a pending decision proposal (the "checker" half).
+ * Fails closed unless: a pending decision actually exists, `approvedBy`/
+ * `approvalRef`/`outcome` are present, and the approver is independent of
+ * both the proposer and (if applicable) the manual-underwriting
+ * underwriter. On `"approved"`, materializes the proposal into
+ * `application.decision`; on `"rejected"`, moves to
+ * `"decision_rejected"` without recording a decision.
+ * @param {object} application - must have `status === "pending_decision_approval"` with a `pendingDecision`.
+ * @param {object} input - approvedBy, approvalRef, outcome, notes, approvalId.
+ * @param {Date} [now]
+ * @returns {{application: object, approval?: object, findings: Array<object>, summary: object}}
+ */
 export function applyDecisionApproval(application, input, now = new Date()) {
   const findings = [];
   if (application.status !== APPLICATION_STATUSES.PENDING_DECISION_APPROVAL || !application.pendingDecision) {
@@ -372,6 +464,13 @@ export function applyDecisionApproval(application, input, now = new Date()) {
   };
 }
 
+/**
+ * Mark the application as disbursed, attaching the disbursement record.
+ * @param {object} application
+ * @param {object} disbursement
+ * @param {Date} [now]
+ * @returns {object} application with status `"disbursed"` and a workflow event appended.
+ */
 export function markDisbursed(application, disbursement, now = new Date()) {
   return withWorkflowEvent(
     {
@@ -388,6 +487,14 @@ export function markDisbursed(application, disbursement, now = new Date()) {
   );
 }
 
+/**
+ * Attach a generated loan-document packet to the application (status
+ * unchanged) and log the event.
+ * @param {object} application
+ * @param {object} packet
+ * @param {Date} [now]
+ * @returns {object} application with `documentPacket` set and a workflow event appended.
+ */
 export function recordDocumentPacketGenerated(application, packet, now = new Date()) {
   return withWorkflowEvent(
     {
@@ -404,6 +511,14 @@ export function recordDocumentPacketGenerated(application, packet, now = new Dat
   );
 }
 
+/**
+ * Attach a delivered loan-document packet to the application (status
+ * unchanged) and log the event.
+ * @param {object} application
+ * @param {object} packet
+ * @param {Date} [now]
+ * @returns {object} application with `documentPacket` set and a workflow event appended.
+ */
 export function recordDocumentPacketDelivered(application, packet, now = new Date()) {
   return withWorkflowEvent(
     {
@@ -429,6 +544,11 @@ function requiresManualUnderwriting(application, input) {
   return application.eligibility?.decision === "refer" && input?.status === "approved";
 }
 
+// Validate the manual-underwriting override required to approve a
+// "refer"-band application: underwriterId/reason/policyReference must be
+// present, and if a workflow task for this override exists, the override's
+// underwriter must be whoever the task was actually assigned to (not just
+// anyone claiming the override).
 function manualUnderwritingFindings(application, input, options = {}) {
   if (!requiresManualUnderwriting(application, input)) {
     return [];
@@ -473,6 +593,8 @@ function manualUnderwritingFindings(application, input, options = {}) {
   return findings;
 }
 
+// Shape the manual-underwriting override into the evidence record attached
+// to a decision proposal, once `manualUnderwritingFindings` has cleared it.
 function manualUnderwritingEvidence(application, input, now) {
   if (!requiresManualUnderwriting(application, input) || !input.manualUnderwriting) {
     return null;
@@ -489,6 +611,7 @@ function manualUnderwritingEvidence(application, input, now) {
   };
 }
 
+// A decline must carry a recognized code; "other" additionally requires a narrative.
 function declineReasonFindings(input) {
   if (input?.status !== "declined") {
     return [];
@@ -507,6 +630,7 @@ function declineReasonFindings(input) {
   return [];
 }
 
+// Shape the decline reason into the evidence record attached to a decision proposal.
 function declineReasonEvidence(input) {
   if (input?.status !== "declined" || !DECLINE_REASON_CODE_VALUES.has(input?.declineReasonCode)) {
     return null;
@@ -519,6 +643,8 @@ function declineReasonEvidence(input) {
   };
 }
 
+// Shared event-append helper: every workflow mutation in this module routes
+// through here so `application.workflow.events` is a complete, ordered trail.
 function withWorkflowEvent(application, event, now = new Date()) {
   const workflow = application.workflow ?? {
     events: []

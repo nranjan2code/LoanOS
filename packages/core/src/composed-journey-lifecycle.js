@@ -1,3 +1,31 @@
+/**
+ * Composed journey lifecycle: an end-to-end state machine spanning a
+ * loan's full path across every subsystem — application capture, KYC/AML,
+ * specialist assessment, credit decision, KFS acceptance, contracting,
+ * disbursement, LMS accounting, servicing, collections, regulatory
+ * reporting, closure, completed (`COMPOSED_JOURNEY_STAGES`). This module
+ * does not perform the work of any stage itself (it doesn't run KYC,
+ * decide credit, or post accounting entries) — it only enforces that a
+ * lifecycle instance moves through stages in the fixed order, with
+ * verifiable evidence for each transition, and that every stage's
+ * lineage (product template, workspace schema, policy bundle, workflow,
+ * accounting policy, tenant configuration — each pinned by id+version+
+ * checksum) matches the tenant's actually-governed configuration exactly.
+ *
+ * Every mutating transition is maker-checker: `proposeComposedJourneyTransition`/
+ * `resumeComposedJourneyInstance` only create a pending transition
+ * request, never advance the lifecycle directly — `approveComposedJourneyTransition`
+ * is the sole place execution happens, and it fails closed unless the
+ * approver is assigned to the lifecycle, is not the proposer, and the
+ * lifecycle hasn't changed (revision + state checksum + current stage all
+ * re-checked) since the proposal was made. Every persisted lifecycle/
+ * transition/pause record is content-hashed (`sealLifecycle`/`checksum`)
+ * and re-verified on every read (`verifySealed`) so tampering with stored
+ * state is detected rather than silently trusted. A recorded failure
+ * (`recordComposedJourneyFailure`) automatically pauses the lifecycle and
+ * opens a critical escalation — a lifecycle never sits in a failed state
+ * without triggering an operational alert.
+ */
 import { createHash } from "node:crypto";
 
 import { PRODUCT_JOURNEY_TYPES } from "./product-journey-administration.js";
@@ -54,6 +82,15 @@ const LINEAGE_FIELDS = Object.freeze([
   ["tenantConfigurationRef", "tenantConfigurationVersion", "tenantConfigurationChecksumSha256"]
 ]);
 
+/**
+ * Self-check the module's own static catalogues: exactly 13 ordered stages
+ * ending in `"completed"`, a stage definition (with a non-empty required-
+ * evidence contract) for each non-terminal stage whose `nextStage` matches
+ * the actual next entry in `COMPOSED_JOURNEY_STAGES`, and all 21 canonical
+ * product journeys mapped to a workspace archetype. Meant to be run as a
+ * startup/test invariant, not per-request.
+ * @returns {{valid: boolean, errors: string[], journeyCount: number, stageCount: number}}
+ */
 export function validateComposedJourneyLifecycleCatalogue() {
   const errors = [];
   if (COMPOSED_JOURNEY_STAGES.length !== 13 || COMPOSED_JOURNEY_STAGES.at(-1) !== "completed") errors.push("The lifecycle must contain 12 ordered stages and terminal completed.");
@@ -70,6 +107,24 @@ export function validateComposedJourneyLifecycleCatalogue() {
   return { valid: errors.length === 0, errors, journeyCount: products.size, stageCount: COMPOSED_JOURNEY_STAGES.length };
 }
 
+/**
+ * Start a new composed-journey lifecycle instance. Idempotent on
+ * `(tenantId, idempotencyKey)` (and `lifecycleId`): an identical repeat
+ * returns the existing instance; a conflicting reuse is rejected. Fails
+ * closed unless: the journey type is canonical, the tenant currently has
+ * an active entitlement for it (`assertEntitled`), at least two distinct
+ * human principals are assigned (a composed journey is never single-
+ * operator) and the creator is one of them, and the supplied lineage
+ * exactly matches the tenant's governed workspace schema and product
+ * template (id, version, and checksum all must match — `validateLineage`
+ * plus the schema/template equality checks) — including, for persistent-
+ * specialist journey types, an active same-tenant specialist
+ * configuration pinned by version and checksum.
+ * @param {object} state - holds `composedJourneyLifecycles`, `tenantProductSubscriptions`, `specialistJourneyConfigurations`.
+ * @param {object} input - tenantId, lifecycleId/instanceId, journeyType, createdBy, assignedPrincipalIds, requestedAmountPaise, lineage, subjectRef, applicationRef, idempotencyKey.
+ * @param {string} [now] - ISO timestamp.
+ * @returns {{state: object, lifecycle: object, idempotent: boolean}}
+ */
 export function createComposedJourneyInstance(state, input, now = new Date().toISOString()) {
   const tenantId = required(input.tenantId, "tenantId");
   const lifecycleId = required(input.lifecycleId ?? input.instanceId, "lifecycleId");
@@ -131,6 +186,17 @@ export function createComposedJourneyInstance(state, input, now = new Date().toI
   };
 }
 
+/**
+ * Propose advancing an active lifecycle to the single stage that legally
+ * follows its current one (fails closed on any stage skip), with an
+ * evidence manifest satisfying that stage's required evidence kinds
+ * (`validateEvidenceManifest`). Creates only a pending transition request
+ * — never advances the lifecycle itself; see `approveComposedJourneyTransition`.
+ * @param {object} state
+ * @param {object} input - tenantId, lifecycleId/instanceId, proposedBy, expectedRevision, expectedCurrentStage, targetStage, evidenceManifest, transitionId, idempotencyKey, purpose.
+ * @param {string} [now] - ISO timestamp.
+ * @returns {{state: object, lifecycle: object, transition: object, idempotent: boolean}}
+ */
 export function proposeComposedJourneyTransition(state, input, now = new Date().toISOString()) {
   const tenantId = required(input.tenantId, "tenantId");
   const lifecycle = findLifecycle(state, tenantId, required(input.lifecycleId ?? input.instanceId, "lifecycleId"));
@@ -153,8 +219,17 @@ export function proposeComposedJourneyTransition(state, input, now = new Date().
   }, now);
 }
 
-// A resume is itself a pending maker-checker request. This function never
-// resumes work directly; approveComposedJourneyTransition performs execution.
+/**
+ * Propose resuming a paused (or manual-intervention) lifecycle. A resume
+ * is itself a pending maker-checker request — this function never resumes
+ * work directly; `approveComposedJourneyTransition` performs execution.
+ * Requires at least one blocker-resolution reference explaining why the
+ * pause condition is now resolved.
+ * @param {object} state
+ * @param {object} input - tenantId, lifecycleId/instanceId, resumedBy/proposedBy, expectedRevision, blockerResolutionRefs, transitionId, idempotencyKey, purpose.
+ * @param {string} [now] - ISO timestamp.
+ * @returns {{state: object, lifecycle: object, transition: object, idempotent: boolean}}
+ */
 export function resumeComposedJourneyInstance(state, input, now = new Date().toISOString()) {
   const tenantId = required(input.tenantId, "tenantId");
   const lifecycle = findLifecycle(state, tenantId, required(input.lifecycleId ?? input.instanceId, "lifecycleId"));
@@ -175,6 +250,23 @@ export function resumeComposedJourneyInstance(state, input, now = new Date().toI
   }, now);
 }
 
+/**
+ * Approve (or, implicitly by never being called, leave pending) a
+ * transition request — the only place a composed-journey lifecycle
+ * actually advances. Fails closed unless: the transition exists, is
+ * still sealed/untampered and `"pending"`, the approver differs from the
+ * proposer, the approver is assigned to the lifecycle, and the lifecycle's
+ * revision/state-checksum/current-stage still match what the transition
+ * was proposed against (a stale transition — the lifecycle changed in the
+ * meantime — is rejected rather than silently applied). An `"advance"`
+ * transition moves `currentStage`/`status`; a `"resume"` transition
+ * resolves the lifecycle's open failures and pause, and clears the linked
+ * escalation.
+ * @param {object} state
+ * @param {object} input - tenantId, transitionId, approvedBy, approvalRef.
+ * @param {string} [now] - ISO timestamp.
+ * @returns {{state: object, lifecycle: object, transition: object, blocked: boolean, resolvedFailureIds: string[], resolvedEscalationId: string|null}}
+ */
 export function approveComposedJourneyTransition(state, input, now = new Date().toISOString()) {
   const tenantId = required(input.tenantId, "tenantId");
   const transitionId = required(input.transitionId, "transitionId");
@@ -213,6 +305,19 @@ export function approveComposedJourneyTransition(state, input, now = new Date().
   };
 }
 
+/**
+ * Pause a lifecycle (or move it to `"manual_intervention"` if
+ * `input.manualIntervention`), opening a critical escalation and
+ * invalidating any pending transition requests for it. Idempotent: a
+ * repeat pause with the identical cause type/ref while already paused for
+ * that same cause is a no-op. Fails closed if the lifecycle is already
+ * `"completed"` (completed work cannot be paused through the normal
+ * workflow).
+ * @param {object} state
+ * @param {object} input - tenantId, lifecycleId/instanceId, causeType, causeRef/evidenceRef, pausedBy/actor, ownerRole, manualIntervention, escalationId, triggerPrincipalId.
+ * @param {string} [now] - ISO timestamp.
+ * @returns {{state: object, lifecycle: object, escalation: object|null, idempotent: boolean}}
+ */
 export function pauseComposedJourneyInstance(state, input, now = new Date().toISOString()) {
   const tenantId = required(input.tenantId, "tenantId");
   const lifecycle = findLifecycle(state, tenantId, required(input.lifecycleId ?? input.instanceId, "lifecycleId"));
@@ -260,6 +365,19 @@ export function pauseComposedJourneyInstance(state, input, now = new Date().toIS
   };
 }
 
+/**
+ * Record an operational failure against a lifecycle and immediately pause
+ * it (via `pauseComposedJourneyInstance`) with a critical escalation.
+ * Idempotent on `(failureId, idempotencyKey)`. Requires a governed
+ * compensation plan: a recognized `mode` (retry/reconcile/reverse/
+ * manual_intervention/cancel), an action reference, an owning role, and a
+ * future due date — a failure can never be recorded without a plan and
+ * deadline to resolve it.
+ * @param {object} state
+ * @param {object} input - tenantId, lifecycleId/instanceId, failureId, idempotencyKey, recordedBy, failedOperation, failureCode, failureMessage, evidenceRef, evidenceChecksumSha256, expectedRevision, compensation.
+ * @param {string} [now] - ISO timestamp.
+ * @returns {{state: object, lifecycle: object, escalation: object|null, failure: object, idempotent: boolean}}
+ */
 export function recordComposedJourneyFailure(state, input, now = new Date().toISOString()) {
   const tenantId = required(input.tenantId, "tenantId");
   const lifecycle = findLifecycle(state, tenantId, required(input.lifecycleId ?? input.instanceId, "lifecycleId"));
@@ -309,6 +427,16 @@ export function recordComposedJourneyFailure(state, input, now = new Date().toIS
   return { ...paused, failure, idempotent: false };
 }
 
+/**
+ * Bulk-pause every non-completed lifecycle a principal is assigned to (or
+ * has a pending transition on) in a tenant — e.g. for an access-revocation
+ * or security-incident response. Delegates each pause to
+ * `pauseComposedJourneyInstance` individually.
+ * @param {object} state
+ * @param {object} input - tenantId, principalId, actor, causeType, causeRef.
+ * @param {string} [now] - ISO timestamp.
+ * @returns {{state: object, affectedLifecycleIds: string[], escalations: object[]}}
+ */
 export function pauseComposedJourneysForPrincipal(state, input, now = new Date().toISOString()) {
   const tenantId = required(input.tenantId, "tenantId");
   const principalId = required(input.principalId, "principalId");
@@ -335,6 +463,14 @@ export function pauseComposedJourneysForPrincipal(state, input, now = new Date()
   return { state: next, affectedLifecycleIds, escalations };
 }
 
+/**
+ * Bulk-pause every non-completed lifecycle of a given product journey type
+ * in a tenant — e.g. for a product-level policy or systems incident.
+ * @param {object} state
+ * @param {object} input - tenantId, journeyType, actor, causeType, causeRef, ownerRole.
+ * @param {string} [now] - ISO timestamp.
+ * @returns {{state: object, affectedLifecycleIds: string[], escalations: object[]}}
+ */
 export function pauseComposedJourneysForProduct(state, input, now = new Date().toISOString()) {
   const tenantId = required(input.tenantId, "tenantId");
   const journeyType = required(input.journeyType, "journeyType");
@@ -351,10 +487,24 @@ export function pauseComposedJourneysForProduct(state, input, now = new Date().t
   return { state: next, affectedLifecycleIds, escalations };
 }
 
+/**
+ * Read-only projection of one lifecycle instance (verifies its integrity
+ * seal before returning).
+ * @param {object} state
+ * @param {{tenantId: string, lifecycleId?: string, instanceId?: string}} input
+ * @returns {object} the projected lifecycle.
+ */
 export function projectComposedJourneyInstance(state, input) {
   return projectLifecycle(findLifecycle(state, required(input.tenantId, "tenantId"), required(input.lifecycleId ?? input.instanceId, "lifecycleId")));
 }
 
+/**
+ * Read-only tenant portfolio view: all lifecycles, all pending transition
+ * requests, all open escalations, plus a status-count summary.
+ * @param {object} state
+ * @param {{tenantId: string}} input
+ * @returns {object} `{tenantId, lifecycles, transitions, escalations, summary}`.
+ */
 export function projectComposedJourneyPortfolio(state, input) {
   const tenantId = required(input.tenantId, "tenantId");
   const lifecycles = Object.values(state.composedJourneyLifecycles ?? {}).filter((item) => item.tenantId === tenantId).map(projectLifecycle).sort((a, b) => a.lifecycleId.localeCompare(b.lifecycleId));
@@ -363,6 +513,9 @@ export function projectComposedJourneyPortfolio(state, input) {
   return { tenantId, lifecycles, transitions, escalations, summary: { total: lifecycles.length, active: lifecycles.filter((item) => item.status === "active").length, paused: lifecycles.filter((item) => item.status !== "active" && item.status !== "completed").length, completed: lifecycles.filter((item) => item.status === "completed").length } };
 }
 
+// Shared plumbing behind propose/resume: build and persist a sealed,
+// idempotent pending transition request bound to the lifecycle's exact
+// current revision/stage/checksum.
 function createTransitionRequest(state, lifecycle, input, now) {
   const transitionId = required(input.transitionId, "transitionId");
   const idempotencyKey = required(input.idempotencyKey, "idempotencyKey");
@@ -394,6 +547,10 @@ function createTransitionRequest(state, lifecycle, input, now) {
   return { state: { ...state, composedJourneyTransitionRequests: { ...collection, [transitionId]: transition } }, lifecycle: projectLifecycle(lifecycle), transition, idempotent: false };
 }
 
+// Verify a proposed transition's evidence manifest binds the lifecycle's
+// exact current state (source state ref + checksum), supplies every
+// required evidence kind for the stage with no duplicates, and any
+// financial figures are exact-paise strings matching the bound application amount.
 function validateEvidenceManifest(manifest, lifecycle, definition) {
   if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) fail("composed_journey_evidence_missing", "evidenceManifest is required.");
   if (required(manifest.sourceStateRef, "evidenceManifest.sourceStateRef") !== lifecycle.stateRef || hash(manifest.sourceStateChecksumSha256, "evidenceManifest.sourceStateChecksumSha256") !== lifecycle.stateChecksumSha256) fail("composed_journey_stale_evidence", "Evidence must bind the exact current lifecycle state.", 409);
@@ -406,6 +563,9 @@ function validateEvidenceManifest(manifest, lifecycle, definition) {
   return { sourceStateRef: manifest.sourceStateRef, sourceStateChecksumSha256: manifest.sourceStateChecksumSha256, artifacts, financials: manifest.financials ?? {} };
 }
 
+// Validate that every LINEAGE_FIELDS triple (ref/version/checksum) is
+// present and well-formed, plus the access-grant snapshot and, for
+// persistent-specialist journeys, the specialist configuration reference.
 function validateLineage(lineage, journeyType) {
   if (!lineage || typeof lineage !== "object" || Array.isArray(lineage)) fail("composed_journey_lineage_missing", "Exact lifecycle lineage is required.");
   const result = {};
@@ -424,6 +584,7 @@ function validateLineage(lineage, journeyType) {
   return result;
 }
 
+// Fail closed unless the tenant has a current active subscription entitlement for this journey type.
 function assertEntitled(state, tenantId, journeyType, now) {
   const current = Date.parse(now);
   const subscriptions = Object.values(state.tenantProductSubscriptions ?? {});
@@ -431,6 +592,7 @@ function assertEntitled(state, tenantId, journeyType, now) {
   if (!entitled) fail("composed_journey_not_entitled", "The tenant does not have a current active entitlement for this journey.", 403);
 }
 
+// Look up a lifecycle scoped to its tenant and verify its integrity seal before returning it.
 function findLifecycle(state, tenantId, lifecycleId) {
   const lifecycle = state.composedJourneyLifecycles?.[lifecycleId];
   if (!lifecycle || lifecycle.tenantId !== tenantId) fail("composed_journey_not_found", "Lifecycle not found.", 404);
@@ -441,6 +603,9 @@ function assertActive(lifecycle) { if (lifecycle.status !== "active") fail("comp
 function assertAssigned(lifecycle, principalId) { if (!lifecycle.assignedPrincipalIds.includes(principalId)) fail("composed_journey_actor_not_assigned", "The actor is not assigned to this lifecycle.", 403); }
 function assertRevision(lifecycle, revision, stage) { if (Number(revision) !== lifecycle.revision || stage !== lifecycle.currentStage) fail("composed_journey_stale_revision", "The expected lifecycle revision or stage is stale.", 409); }
 
+// Stamp the lifecycle's stateRef (id+revision) and recompute its integrity
+// checksum; called on every mutation so the persisted record is always
+// self-verifiable.
 function sealLifecycle(lifecycle) {
   const next = { ...lifecycle };
   next.stateRef = `composed-journey/${next.lifecycleId}/revision/${next.revision}`;
@@ -448,6 +613,7 @@ function sealLifecycle(lifecycle) {
   next.stateChecksumSha256 = checksum(next);
   return next;
 }
+// Shape the internal lifecycle record into the read-only view returned to callers.
 function projectLifecycle(lifecycle) {
   return {
     lifecycleId: lifecycle.lifecycleId,
@@ -470,7 +636,10 @@ function projectLifecycle(lifecycle) {
     updatedAt: lifecycle.updatedAt
   };
 }
+// Compact transitionHistory entry recorded on the lifecycle when a decided transition is applied.
 function history(transition) { return { transitionId: transition.transitionId, actionType: transition.actionType, sourceStage: transition.sourceStage, targetStage: transition.targetStage, proposedBy: transition.proposedBy, approvedBy: transition.approvedBy, approvalRef: transition.approvalRef, transitionChecksumSha256: transition.transitionChecksumSha256, proposedAt: transition.proposedAt, approvedAt: transition.approvedAt }; }
+// When a lifecycle is paused, any other pending transition proposed against
+// its now-stale state must be invalidated rather than left approvable later.
 function invalidatePendingTransitions(collection, lifecycleId, now, causeType) { return Object.fromEntries(Object.entries(collection).map(([id, request]) => [id, request.lifecycleId === lifecycleId && request.status === "pending" ? { ...request, status: "invalidated", invalidatedAt: now, invalidationCause: causeType } : request])); }
 function required(value, field) { if (typeof value !== "string" || !value.trim()) fail("composed_journey_required", `${field} is required.`); return value.trim(); }
 function positiveVersion(value, field) { if ((!Number.isInteger(value) || value < 1) && !(typeof value === "string" && /^[1-9]\d*(?:\.\d+){0,2}$/.test(value))) fail("composed_journey_version_invalid", `${field} must be a positive version.`); return value; }
@@ -479,5 +648,7 @@ function money(value, field) { if (typeof value !== "string" || !/^(?:0|[1-9]\d*
 function uniqueStrings(values, field) { if (!Array.isArray(values)) fail("composed_journey_required", `${field} is required.`); const result = [...new Set(values.map((value) => required(value, field)))]; if (result.length !== values.length) fail("composed_journey_duplicate_value", `${field} cannot contain duplicates.`); return result.sort(); }
 function checksum(value) { return createHash("sha256").update(stable(value)).digest("hex"); }
 function stable(value) { if (Array.isArray(value)) return `[${value.map(stable).join(",")}]`; if (value && typeof value === "object") return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stable(value[key])}`).join(",")}}`; return JSON.stringify(value); }
+// Re-derive the checksum over everything but the checksum field itself and
+// compare; used by findLifecycle/approve to detect tampering with persisted state.
 function verifySealed(value, checksumField, code) { const expected = value?.[checksumField]; const content = { ...value }; delete content[checksumField]; if (!expected || checksum(content) !== expected) fail(code, "Persisted composed-journey state failed integrity verification.", 409); }
 function fail(code, message, statusCode = 422) { const error = new Error(message); error.code = code; error.statusCode = statusCode; throw error; }

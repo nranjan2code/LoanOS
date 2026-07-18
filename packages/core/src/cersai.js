@@ -6,6 +6,20 @@ import { createHash } from "node:crypto";
 // Interest of India) registration is mandatory under the SARFAESI Act for
 // secured loans. The RE must file the security interest within 30 days of
 // creation and satisfy/release it on full repayment or closure.
+//
+// This module owns the full security-interest lifecycle: draft -> filed
+// (packet built and submitted) -> registered/rejected (CERSAI's response)
+// -> optionally modified -> satisfied (on loan closure). It does not talk
+// to the actual CERSAI API itself — `buildCersaiSubmission` only builds and
+// checksums the canonical submission packet; the caller is responsible for
+// actually transmitting it and for feeding CERSAI's response into
+// `acknowledgeCersaiSubmission`. `enrichSecurityInterest` derives the
+// 30-day filing deadline/overdue flag so a still-draft record's compliance
+// status is always visible without a separate scheduled job.
+// `validateCersaiForDisbursement` is the enforcement point other modules
+// call before allowing a secured-product loan to disburse: it fails closed
+// unless a registered (or modified) security interest already exists for
+// the application.
 
 export const SECURITY_INTEREST_STATUSES = {
   DRAFT: "draft",
@@ -37,6 +51,17 @@ const FILING_DEADLINE_DAYS = 30;
 
 // --- Security interest lifecycle ---
 
+/**
+ * Create a new security interest in `"draft"` status. Fails closed unless
+ * `loanAccountId`, a valid `assetType`/`chargeType`, `assetDescription`, a
+ * positive `chargeAmountInr`, `createdBy`, and (if `context.loanAccounts`
+ * is supplied) an existing loan account are all present.
+ * @param {Record<string, object>} registry - securityInterestId -> record.
+ * @param {object} input - loanAccountId, regulatedEntityId, borrowerId, assetType, assetDescription, chargeType, chargeAmountInr, assetDetails, createdBy.
+ * @param {{loanAccounts?: object}} [context] - for the loan-account existence check.
+ * @param {Date} [now]
+ * @returns {{registry: object, securityInterest: object, event?: object, findings: Array<object>, summary: object}}
+ */
 export function createSecurityInterest(registry = {}, input = {}, context = {}, now = new Date()) {
   const si = normalizeSecurityInterest(input, {}, now);
   const findings = [];
@@ -89,6 +114,17 @@ export function createSecurityInterest(registry = {}, input = {}, context = {}, 
   };
 }
 
+/**
+ * File a `"draft"` security interest: builds its CERSAI submission packet
+ * (`buildCersaiSubmission`) and, if that succeeds, advances the record to
+ * `"filed"`. Fails closed if the record isn't a draft, no actor is given,
+ * or packet building itself fails.
+ * @param {object} si - existing draft security interest record.
+ * @param {object} input - actor, providerSubmissionRef, providerSubmittedAt, +buildCersaiSubmission fields.
+ * @param {object} [context] - passed through to `buildCersaiSubmission`.
+ * @param {Date} [now]
+ * @returns {{securityInterest: object, event: object|null, findings: Array<object>, summary: object}}
+ */
 export function fileSecurityInterest(si, input = {}, context = {}, now = new Date()) {
   const findings = [];
   if (!si) {
@@ -131,6 +167,21 @@ export function fileSecurityInterest(si, input = {}, context = {}, now = new Dat
   return readyResult(updated, event, now);
 }
 
+/**
+ * Build the canonical, checksummed CERSAI security-interest registration
+ * packet. Fails closed unless creditor legal name/registration code/
+ * address, debtor name/identity/address, a stable asset identifier plus
+ * location/state/pincode, the charge-creation date, and the authorising
+ * submitter/reference are all present. Does not submit the packet — that
+ * transmission is the caller's responsibility; this only produces the
+ * exact bytes (`canonicalJson`) and their SHA-256 (`checksumSha256`) that
+ * `acknowledgeCersaiSubmission` later checks the response against.
+ * @param {object} si - the security interest being filed.
+ * @param {{regulatedEntities?: object, borrowerProfiles?: object}} [context] - fallback creditor/debtor lookups.
+ * @param {object} input - creditor, debtor, asset, chargeCreatedAt, authorisedBy, authorisationRef.
+ * @param {Date} [now]
+ * @returns {{packet: object|null, findings: Array<object>, summary: object}}
+ */
 export function buildCersaiSubmission(si, context = {}, input = {}, now = new Date()) {
   const findings = [];
   const creditor = input.creditor ?? context.regulatedEntities?.[si?.regulatedEntityId] ?? context.regulatedEntity ?? null;
@@ -161,6 +212,20 @@ export function buildCersaiSubmission(si, context = {}, input = {}, now = new Da
   return { packet: { profile: CERSAI_SUBMISSION_PROFILE, contentType: "application/json", canonicalJson, checksumSha256: createHash("sha256").update(canonicalJson).digest("hex"), generatedAt: now.toISOString() }, findings, summary };
 }
 
+/**
+ * Apply CERSAI's response to a `"filed"` security interest. Fails closed
+ * unless: the record is actually `"filed"`, the response's checksum
+ * exactly matches the submitted packet's `checksumSha256` (proving the
+ * response corresponds to what was sent, not a stale or mismatched
+ * submission), a payment receipt with a non-negative amount and paid-at
+ * time is present, and — for a `"registered"` outcome — a CERSAI
+ * registration number and checksum-sealed certificate evidence (for
+ * `"rejected"`, an error code and message).
+ * @param {object} si - existing `"filed"` security interest.
+ * @param {object} input - responseRef, receivedBy, outcome, checksumSha256, payment, cersaiRegistrationNumber, certificate, errorCode, errorMessage.
+ * @param {Date} [now]
+ * @returns {{securityInterest: object, event: object|null, findings: Array<object>, summary: object}}
+ */
 export function acknowledgeCersaiSubmission(si, input = {}, now = new Date()) {
   const findings = [];
   if (!si || si.status !== SECURITY_INTEREST_STATUSES.FILED) findings.push(createFinding("error", "SARFAESI", "Only a filed security interest can receive a CERSAI response.", "status"));
@@ -176,6 +241,19 @@ export function acknowledgeCersaiSubmission(si, input = {}, now = new Date()) {
   return readyResult(updated, event, now);
 }
 
+/**
+ * Create a corrected new security interest linked back to a rejected one
+ * (`parentSecurityInterestId`), for re-filing after CERSAI rejection.
+ * Requires independent proposer/approver, source-correction evidence, and
+ * the corrected data; delegates the actual creation to
+ * `createSecurityInterest` with the corrections merged in.
+ * @param {Record<string, object>} registry - securityInterestId -> record.
+ * @param {string} rejectedSecurityInterestId - must reference a `"rejected"` record.
+ * @param {object} input - proposedBy, approvedBy, approvalRef, sourceCorrectionRef, correctedSecurityInterest, securityInterestId.
+ * @param {object} [context] - passed through to `createSecurityInterest`.
+ * @param {Date} [now]
+ * @returns {{registry: object, securityInterest: object|null, findings: Array<object>, summary: object}}
+ */
 export function repairCersaiSecurityInterest(registry = {}, rejectedSecurityInterestId, input = {}, context = {}, now = new Date()) {
   const rejected = registry[rejectedSecurityInterestId]; const findings = [];
   if (!rejected || rejected.status !== SECURITY_INTEREST_STATUSES.REJECTED) findings.push(createFinding("error", "SARFAESI", "A rejected CERSAI security interest is required for repair.", "rejectedSecurityInterestId"));
@@ -185,6 +263,18 @@ export function repairCersaiSecurityInterest(registry = {}, rejectedSecurityInte
   return { ...result, securityInterest: result.securityInterest ? { ...result.securityInterest, parentSecurityInterestId: rejectedSecurityInterestId } : null };
 }
 
+/**
+ * Modify a `"registered"` security interest's charge amount and/or asset
+ * description. Requires an actor, a maker-checker approver distinct from
+ * the actor, and a reason; every modification is appended to
+ * `modificationHistory` so the change trail survives even though the live
+ * record is updated in place.
+ * @param {object} si - existing `"registered"` security interest.
+ * @param {object} input - actor, approvedBy, reason, chargeAmountInr, assetDescription.
+ * @param {object} [context] - unused, kept for call-signature symmetry with other lifecycle functions.
+ * @param {Date} [now]
+ * @returns {{securityInterest: object, event: object|null, findings: Array<object>, summary: object}}
+ */
 export function modifySecurityInterest(si, input = {}, context = {}, now = new Date()) {
   const findings = [];
   if (!si) {
@@ -244,6 +334,19 @@ export function modifySecurityInterest(si, input = {}, context = {}, now = new D
   return readyResult(updated, event, now);
 }
 
+/**
+ * Satisfy (release) a `"registered"`/`"modified"` security interest.
+ * Fails closed if it's already satisfied, isn't in an active status, no
+ * actor is given, or — when the linked loan account is known to the
+ * caller (`context.loanAccounts`) — that account isn't yet `"closed"` or
+ * `"settled"`: a charge cannot be released while the loan it secures is
+ * still open.
+ * @param {object} si - existing `"registered"` or `"modified"` security interest.
+ * @param {object} input - actor.
+ * @param {{loanAccounts?: object}} [context] - for the loan-closure gate.
+ * @param {Date} [now]
+ * @returns {{securityInterest: object, event: object|null, findings: Array<object>, summary: object}}
+ */
 export function satisfySecurityInterest(si, input = {}, context = {}, now = new Date()) {
   const findings = [];
   if (!si) {
@@ -297,6 +400,13 @@ export function satisfySecurityInterest(si, input = {}, context = {}, now = new 
 
 // --- Search for existing charges (prior encumbrance check) ---
 
+/**
+ * Prior-encumbrance check: find not-yet-satisfied security interests
+ * against the same asset description within this tenant's own registry.
+ * @param {string} assetDescription
+ * @param {{securityInterests?: object}} [context]
+ * @returns {{count: number, charges: Array<object>}}
+ */
 export function searchCersaiCharges(assetDescription, context = {}) {
   // In production, this would call the CERSAI API. For now, we search our own
   // registry for matching asset descriptions.
@@ -321,6 +431,17 @@ export function searchCersaiCharges(assetDescription, context = {}) {
 
 // --- Disbursement readiness gate for secured loans ---
 
+/**
+ * Disbursement gate for secured products: if the application's product
+ * policy marks it `securedLoan`, fails closed unless at least one
+ * registered/modified CERSAI security interest already exists for the
+ * application. Products that aren't secured loans pass trivially — this is
+ * the only enforcement point that turns "secured loan" policy into an
+ * actual disbursement block.
+ * @param {object} application - loan application with productId/productCode.
+ * @param {{productPolicies?: object, securityInterests?: object}} [context]
+ * @returns {{findings: Array<object>, summary: object}}
+ */
 export function validateCersaiForDisbursement(application, context = {}) {
   const findings = [];
 
@@ -351,6 +472,15 @@ export function validateCersaiForDisbursement(application, context = {}) {
 
 // --- Enrichment ---
 
+/**
+ * Derive read-only, time-sensitive status on a security interest: while
+ * still `"draft"`, adds the 30-day statutory filing deadline and whether
+ * it's already overdue. Called at the end of every lifecycle function
+ * above so callers always see fresh derived state.
+ * @param {object} si
+ * @param {Date} [now]
+ * @returns {object|null} the record with `filingDeadline`/`filingOverdue` added (when draft), or null if no record given.
+ */
 export function enrichSecurityInterest(si, now = new Date()) {
   if (!si) return null;
   const enriched = { ...si };
@@ -366,6 +496,12 @@ export function enrichSecurityInterest(si, now = new Date()) {
   return enriched;
 }
 
+/**
+ * List security interests, optionally filtered to one loan account.
+ * @param {Record<string, object>} registry - securityInterestId -> record.
+ * @param {string} [loanAccountId]
+ * @returns {Array<object>}
+ */
 export function listSecurityInterests(registry = {}, loanAccountId) {
   const all = Object.values(registry);
   if (!loanAccountId) return all;
@@ -374,6 +510,8 @@ export function listSecurityInterests(registry = {}, loanAccountId) {
 
 // --- Internal helpers ---
 
+// Merge caller input over an existing record (or DRAFT defaults for a new
+// one) into the full security-interest shape every lifecycle function expects.
 function normalizeSecurityInterest(input, existing = {}, now = new Date()) {
   return {
     ...existing,
@@ -401,14 +539,17 @@ function normalizeSecurityInterest(input, existing = {}, now = new Date()) {
   };
 }
 
+// Shared event envelope for every CERSAI lifecycle transition.
 function cersaiEvent(type, data, now) {
   return { eventId: createLoanId("cersaievt"), type, at: now.toISOString(), ...data };
 }
 
+// Shared success-shape wrapper: enrich the record and return an empty findings/summary.
 function readyResult(si, event, now) {
   return { securityInterest: enrichSecurityInterest(si, now), event, findings: [], summary: summarizeFindings([]) };
 }
 
+// Shared fail-closed-shape wrapper: enrich the record (if any) but return no event.
 function blockedResult(si, findings, now) {
   return { securityInterest: si ? enrichSecurityInterest(si, now) : null, event: null, findings, summary: summarizeFindings(findings) };
 }

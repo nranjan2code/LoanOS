@@ -1,3 +1,34 @@
+/**
+ * AI agent marketplace and platform commercialization: the FST-034
+ * lifecycle for tenant-installed scoped platform agents — marketplace
+ * templates (`AI_AGENT_MARKETPLACE_TEMPLATES`, e.g. CAM drafting,
+ * underwriting review, loan fulfilment, borrower support), pricing
+ * contracts, usage budgets/reservations, agent installation and four-role
+ * production activation, execution authorization/completion, usage
+ * metering, and GST-aware invoicing. This module is the commercial/
+ * governance record layer — it does not itself run the agent or evaluate
+ * guardrails; every mutating call that represents an agent doing something
+ * consequential (activation, execution) instead *requires* an already-
+ * rendered decision from the isolated business/control rules engine
+ * (`trustedDecision` — source must be `"isolated_business_engine"` or
+ * `"isolated_control_engine"`, per AGENTS.md's engine-isolation and
+ * `guardrail.*` conventions) and, for model use, a passing
+ * `evaluateModelUse` check against the model-governance kill switch.
+ *
+ * Production activation of an installation requires all four FST-034
+ * approval roles (`APPROVAL_ROLES`: model_owner, model_validator,
+ * human_reviewer, model_risk_manager) from distinct human principals, none
+ * of whom may be the proposer — "AI cannot approve releases" generalized
+ * to agent go-live (AGENTS.md). Every record is content-hashed (`seal()`)
+ * so tampering with persisted state is detectable. Money in pricing,
+ * budgets, usage, and invoices is carried as exact integer-paise strings
+ * and combined via `BigInt`, never floating point (AGENTS.md's "exact
+ * money math", applied here in JS). A usage budget is an opt-in hard
+ * commercial control: its limits are reserved *before* a model call via
+ * `reserveAiAgentUsageBudget`, and actual usage recorded later
+ * (`recordAiAgentUsage`) must not exceed what was reserved — cost is
+ * capped before it's incurred, not discovered after the fact.
+ */
 import { createHash } from "node:crypto";
 import { evaluateModelUse } from "./model-governance.js";
 
@@ -17,10 +48,20 @@ export const AI_AGENT_PRICING_DIMENSIONS = Object.freeze([
   "per_execution_paise", "per_1k_input_tokens_paise", "per_1k_output_tokens_paise"
 ]);
 
+/**
+ * @returns {object} an empty, correctly-shaped platform state (no
+ *   contracts, installations, executions, usage, budgets, invoices, events).
+ */
 export function createAiAgentPlatformState() {
   return { pricingContracts: {}, installations: {}, executions: {}, usageLedger: {}, usageBudgets: {}, budgetReservations: {}, invoices: {}, events: [] };
 }
 
+/**
+ * Coerce a possibly-partial or missing persisted platform state into the
+ * full well-shaped state every function in this module expects.
+ * @param {object|null|undefined} state
+ * @returns {object} normalized state with all required top-level collections.
+ */
 export function normalizeAiAgentPlatformState(state) {
   const empty = createAiAgentPlatformState();
   return state && typeof state === "object" ? {
@@ -31,6 +72,10 @@ export function normalizeAiAgentPlatformState(state) {
   } : empty;
 }
 
+/**
+ * @returns {object} the read-only marketplace catalogue: pricing
+ *   dimensions and every available agent template.
+ */
 export function projectAiAgentMarketplace() {
   return {
     catalogueVersion: 1,
@@ -41,6 +86,16 @@ export function projectAiAgentMarketplace() {
   };
 }
 
+/**
+ * Propose a tenant pricing contract covering one or more marketplace
+ * templates. Fails closed on a duplicate `contractId`, an unknown
+ * template id, a malformed (non-integer-string) pricing value, or
+ * `validUntil` not after `effectiveFrom`.
+ * @param {object} state - platform state.
+ * @param {object} input - contractId, tenantId, templateIds, pricing, effectiveFrom, validUntil, proposedBy.
+ * @param {Date} [now]
+ * @returns {{state: object, record: object}} the new `"pending_approval"` contract.
+ */
 export function proposeAiAgentPricingContract(state, input, now = new Date()) {
   const platform = normalizeAiAgentPlatformState(state);
   required(input, ["contractId", "tenantId", "effectiveFrom", "validUntil", "proposedBy"]);
@@ -53,6 +108,14 @@ export function proposeAiAgentPricingContract(state, input, now = new Date()) {
   return result(platform, "pricingContracts", contract.contractId, contract, "ai_agent.pricing_contract_proposed", now);
 }
 
+/**
+ * Approve a pending pricing contract. Requires an approver independent of
+ * the proposer.
+ * @param {object} state - platform state.
+ * @param {object} input - contractId, tenantId, approvedBy, commercialApprovalRef.
+ * @param {Date} [now]
+ * @returns {{state: object, record: object}} the now-`"active"` contract.
+ */
 export function approveAiAgentPricingContract(state, input, now = new Date()) {
   const platform = normalizeAiAgentPlatformState(state);
   required(input, ["contractId", "tenantId", "approvedBy", "commercialApprovalRef"]);
@@ -63,8 +126,17 @@ export function approveAiAgentPricingContract(state, input, now = new Date()) {
   return result(platform, "pricingContracts", approved.contractId, approved, "ai_agent.pricing_contract_approved", now);
 }
 
-// A budget is an opt-in hard commercial control. Its limits are reserved before a
-// model call, rather than discovered after a provider has already incurred cost.
+/**
+ * Propose a usage budget (executions/tokens/paise ceilings) against an
+ * active pricing contract. A budget is an opt-in hard commercial control:
+ * its limits are reserved before a model call, rather than discovered
+ * after a provider has already incurred cost. Fails closed on a duplicate
+ * `budgetId`, an inactive contract, or `validUntil` not after `effectiveFrom`.
+ * @param {object} state - platform state.
+ * @param {object} input - budgetId, tenantId, contractId, limits, effectiveFrom, validUntil, proposedBy.
+ * @param {Date} [now]
+ * @returns {{state: object, record: object}} the new `"pending_approval"` budget.
+ */
 export function proposeAiAgentUsageBudget(state, input, now = new Date()) {
   const platform = normalizeAiAgentPlatformState(state);
   required(input, ["budgetId", "tenantId", "contractId", "effectiveFrom", "validUntil", "proposedBy", "limits"]);
@@ -78,6 +150,13 @@ export function proposeAiAgentUsageBudget(state, input, now = new Date()) {
   return result(platform, "usageBudgets", budget.budgetId, budget, "ai_agent.usage_budget_proposed", now);
 }
 
+/**
+ * Approve a pending usage budget. Requires an approver independent of the proposer.
+ * @param {object} state - platform state.
+ * @param {object} input - budgetId, tenantId, approvedBy, commercialApprovalRef.
+ * @param {Date} [now]
+ * @returns {{state: object, record: object}} the now-`"active"` budget.
+ */
 export function approveAiAgentUsageBudget(state, input, now = new Date()) {
   const platform = normalizeAiAgentPlatformState(state);
   required(input, ["budgetId", "tenantId", "approvedBy", "commercialApprovalRef"]);
@@ -88,6 +167,18 @@ export function approveAiAgentUsageBudget(state, input, now = new Date()) {
   return result(platform, "usageBudgets", approved.budgetId, approved, "ai_agent.usage_budget_approved", now);
 }
 
+/**
+ * Reserve budget capacity for an anticipated execution before the model
+ * call happens. Prices the expected usage against the contract's rate
+ * card and checks it against the budget's remaining capacity (already-
+ * committed usage plus outstanding reservations) — fails closed
+ * (`enforceBudget`) if any dimension (executions/tokens/paise) would be
+ * exceeded. The reservation expires after 15 minutes if not consumed.
+ * @param {object} state - platform state.
+ * @param {object} input - reservationId, tenantId, installationId, expectedInputTokens, expectedOutputTokens.
+ * @param {Date} [now]
+ * @returns {{state: object, record: object}} the new `"reserved"` reservation.
+ */
 export function reserveAiAgentUsageBudget(state, input, now = new Date()) {
   const platform = normalizeAiAgentPlatformState(state);
   required(input, ["reservationId", "tenantId", "installationId", "expectedInputTokens", "expectedOutputTokens"]);
@@ -104,6 +195,21 @@ export function reserveAiAgentUsageBudget(state, input, now = new Date()) {
   return result(platform, "budgetReservations", reservation.reservationId, reservation, "ai_agent.usage_budget_reserved", now);
 }
 
+/**
+ * Propose installing a marketplace agent template for a tenant, pinned to
+ * a specific model version. Fails closed unless: the template exists, the
+ * tenant's pricing contract is active, current, and actually entitles this
+ * template, `promptHash` is well-formed SHA-256, the pinned model passes
+ * `evaluateModelUse` and its registered version matches exactly, and any
+ * customized `allowedActions` stay within the template's own action scope
+ * (a tenant cannot expand what the agent is allowed to do beyond the
+ * marketplace definition).
+ * @param {object} state - platform state.
+ * @param {object} modelRegistry - model governance registry, for `evaluateModelUse`.
+ * @param {object} input - installationId, tenantId, templateId, contractId, modelId, modelVersion, workloadPrincipalId, humanSponsorPrincipalId, promptRef, promptHash, configurationRef, allowedActions, languages, productTypes, dataScopes, knowledgeSources, proposedBy.
+ * @param {Date} [now]
+ * @returns {{state: object, record: object}} the new `"pending_approval"` installation.
+ */
 export function installTenantAiAgent(state, modelRegistry, input, now = new Date()) {
   const platform = normalizeAiAgentPlatformState(state);
   required(input, ["installationId", "tenantId", "templateId", "contractId", "modelId", "modelVersion", "workloadPrincipalId", "humanSponsorPrincipalId", "promptRef", "promptHash", "configurationRef", "proposedBy"]);
@@ -133,6 +239,22 @@ export function installTenantAiAgent(state, modelRegistry, input, now = new Date
   return result(platform, "installations", installation.installationId, installation, "ai_agent.installation_proposed", now);
 }
 
+/**
+ * Activate a pending installation into production. Requires: all four
+ * FST-034 approval roles already recorded (`validateApprovals`), the full
+ * `REQUIRED_EVIDENCE` set (risk assessment, independent validation,
+ * fairness, explainability, red-team, monitoring plan, incident runbook,
+ * India-residency references), the pinned model still passing
+ * `evaluateModelUse` at its exact registered version, and an affirmative,
+ * traceable `"allow"` decision from the isolated control engine
+ * (`trustedDecision`) — activation cannot proceed on locally-asserted
+ * approval alone.
+ * @param {object} state - platform state.
+ * @param {object} modelRegistry - model governance registry.
+ * @param {object} input - installationId, tenantId, governanceEvidence, controlDecision.
+ * @param {Date} [now]
+ * @returns {{state: object, record: object}} the now-`"active"` installation.
+ */
 export function activateTenantAiAgent(state, modelRegistry, input, now = new Date()) {
   const platform = normalizeAiAgentPlatformState(state);
   required(input, ["installationId", "tenantId", "governanceEvidence", "controlDecision"]);
@@ -148,6 +270,18 @@ export function activateTenantAiAgent(state, modelRegistry, input, now = new Dat
   return result(platform, "installations", activated.installationId, activated, "ai_agent.installation_activated", now);
 }
 
+/**
+ * Record one of the four FST-034 production-approval roles against a
+ * pending installation. Fails closed unless the principal is human, the
+ * role is a recognized FST-034 role, the role hasn't already been
+ * recorded, the approver isn't the proposer, and no other role has
+ * already been approved by this same principal (each of the four roles
+ * needs a distinct human).
+ * @param {object} state - platform state.
+ * @param {object} input - installationId, tenantId, role, principalId, principalType, approvalRef.
+ * @param {Date} [now]
+ * @returns {{state: object, record: object}} the installation with the role recorded.
+ */
 export function recordTenantAiAgentApproval(state, input, now = new Date()) {
   const platform = normalizeAiAgentPlatformState(state);
   required(input, ["installationId", "tenantId", "role", "principalId", "principalType", "approvalRef"]);
@@ -163,6 +297,23 @@ export function recordTenantAiAgentApproval(state, input, now = new Date()) {
   return result(platform, "installations", approved.installationId, approved, "ai_agent.installation_approval_recorded", now);
 }
 
+/**
+ * Authorize one agent execution. Fails closed unless: the installation is
+ * active, its pricing contract is active and current, the requested
+ * `action` is within the installation's allowed actions, a current
+ * matching budget reservation exists (when the contract has an active
+ * budget), `inputHash` is well-formed SHA-256, the pinned model still
+ * passes `evaluateModelUse` at its exact version, a customer-facing
+ * installation carries a disclosure reference, and both the model-
+ * consumption and action-guardrail decisions are affirmative, traceable,
+ * isolated-engine decisions (`trustedDecision`) — an execution cannot be
+ * authorized on the agent's own say-so.
+ * @param {object} state - platform state.
+ * @param {object} modelRegistry - model governance registry.
+ * @param {object} input - executionId, tenantId, installationId, action, purpose, inputRef, inputHash, modelConsumptionDecision, actionGuardrailDecision, usageReservationId, humanReviewRef, customerDisclosureRef.
+ * @param {Date} [now]
+ * @returns {{state: object, record: object}} the new `"authorized"` execution.
+ */
 export function authorizeAiAgentExecution(state, modelRegistry, input, now = new Date()) {
   const platform = normalizeAiAgentPlatformState(state);
   required(input, ["executionId", "tenantId", "installationId", "action", "purpose", "inputRef", "inputHash", "modelConsumptionDecision", "actionGuardrailDecision"]);
@@ -191,6 +342,16 @@ export function authorizeAiAgentExecution(state, modelRegistry, input, now = new
   return result(platform, "executions", execution.executionId, execution, "ai_agent.execution_authorized", now);
 }
 
+/**
+ * Complete an authorized execution with its outcome and output evidence.
+ * Fails closed unless the execution is currently `"authorized"`,
+ * `outputHash` is well-formed SHA-256, and the outcome is one of the
+ * recognized values (`proposal_created`/`human_handoff`/`no_action`/`failed`).
+ * @param {object} state - platform state.
+ * @param {object} input - executionId, tenantId, outputRef, outputHash, outcome, citations.
+ * @param {Date} [now]
+ * @returns {{state: object, record: object}} the now-`"completed"` or `"failed"` execution.
+ */
 export function completeAiAgentExecution(state, input, now = new Date()) {
   const platform = normalizeAiAgentPlatformState(state);
   required(input, ["executionId", "tenantId", "outputRef", "outputHash", "outcome"]);
@@ -202,6 +363,19 @@ export function completeAiAgentExecution(state, input, now = new Date()) {
   return result(platform, "executions", completed.executionId, completed, "ai_agent.execution_completed", now);
 }
 
+/**
+ * Record actual metered usage for a finalized execution and price it
+ * against the contract's rate card. Fails closed on a duplicate usage id,
+ * an execution not yet in a final state, an execution that already has a
+ * usage record, or — when the execution had a budget reservation — actual
+ * usage exceeding what was reserved (`ai_agent_budget_reservation_exceeded`,
+ * since a reservation is deliberately conservative and must not be
+ * retroactively raised). Consumes the matching reservation if present.
+ * @param {object} state - platform state.
+ * @param {object} input - usageId, executionId, tenantId, inputTokens, outputTokens, toolCalls.
+ * @param {Date} [now]
+ * @returns {{state: object, record: object}} the new usage-ledger entry.
+ */
 export function recordAiAgentUsage(state, input, now = new Date()) {
   const platform = normalizeAiAgentPlatformState(state);
   required(input, ["usageId", "executionId", "tenantId"]);
@@ -227,6 +401,18 @@ export function recordAiAgentUsage(state, input, now = new Date()) {
   return result(next, "usageLedger", usage.usageId, usage, "ai_agent.usage_recorded", now);
 }
 
+/**
+ * Draft an invoice for a contract's usage over a period: sums the
+ * period's usage-ledger entries, applies the contract's included-quota/
+ * overage rate card (`invoiceCharges`), and computes GST (CGST+SGST for
+ * intra-state, IGST for inter-state) via `invoiceTax`. Fails closed on a
+ * duplicate invoice id, an invalid period, or an invoice already existing
+ * for this contract+period.
+ * @param {object} state - platform state.
+ * @param {object} input - invoiceId, tenantId, contractId, periodFrom, periodTo, proposedBy, tax.
+ * @param {Date} [now]
+ * @returns {{state: object, record: object}} the new `"pending_approval"` invoice.
+ */
 export function proposeAiAgentInvoice(state, input, now = new Date()) {
   const platform = normalizeAiAgentPlatformState(state);
   required(input, ["invoiceId", "tenantId", "contractId", "periodFrom", "periodTo", "proposedBy", "tax"]);
@@ -246,6 +432,13 @@ export function proposeAiAgentInvoice(state, input, now = new Date()) {
   return result(platform, "invoices", invoice.invoiceId, invoice, "ai_agent.invoice_proposed", now);
 }
 
+/**
+ * Approve a pending invoice. Requires an approver independent of the proposer.
+ * @param {object} state - platform state.
+ * @param {object} input - invoiceId, tenantId, approvedBy, commercialApprovalRef.
+ * @param {Date} [now]
+ * @returns {{state: object, record: object}} the now-`"approved"` invoice.
+ */
 export function approveAiAgentInvoice(state, input, now = new Date()) {
   const platform = normalizeAiAgentPlatformState(state);
   required(input, ["invoiceId", "tenantId", "approvedBy", "commercialApprovalRef"]);
@@ -256,6 +449,15 @@ export function approveAiAgentInvoice(state, input, now = new Date()) {
   return result(platform, "invoices", approved.invoiceId, approved, "ai_agent.invoice_approved", now);
 }
 
+/**
+ * Suspend an agent installation (e.g. incident-driven). Unlike activation,
+ * this is a unilateral safety action — no four-eyes requirement, since
+ * suspending is the conservative direction.
+ * @param {object} state - platform state.
+ * @param {object} input - installationId, tenantId, reason, actor, incidentRef.
+ * @param {Date} [now]
+ * @returns {{state: object, record: object}} the now-`"suspended"` installation.
+ */
 export function suspendTenantAiAgent(state, input, now = new Date()) {
   const platform = normalizeAiAgentPlatformState(state);
   required(input, ["installationId", "tenantId", "reason", "actor", "incidentRef"]);
@@ -264,6 +466,18 @@ export function suspendTenantAiAgent(state, input, now = new Date()) {
   return result(platform, "installations", suspended.installationId, suspended, "ai_agent.installation_suspended", now);
 }
 
+/**
+ * Build a tenant governance report over an optional period: installation
+ * counts by status, execution counts by outcome, aggregate usage/spend,
+ * and a `lineage.traceComplete` flag confirming every execution in the
+ * window carries full evidentiary linkage (record/input hashes plus
+ * traceable guardrail decisions) — the read-only artifact a regulator or
+ * internal audit would review.
+ * @param {object} state - platform state.
+ * @param {string} tenantId
+ * @param {{from?: string, to?: string}} [period]
+ * @returns {object} sealed (content-hashed) governance report.
+ */
 export function buildAiAgentGovernanceReport(state, tenantId, { from, to } = {}) {
   const platform = normalizeAiAgentPlatformState(state);
   const start = from ? Date.parse(from) : Number.NEGATIVE_INFINITY;

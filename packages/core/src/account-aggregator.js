@@ -55,6 +55,17 @@ const VALID_FETCH_TYPES = new Set(Object.values(AA_FETCH_TYPES));
 const VALID_MODES = new Set(Object.values(AA_CONSENT_MODES));
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
+/**
+ * Validate an AA consent artefact against the hard rules in the file
+ * header: existing borrower, purpose code+text, at least one recognized FI
+ * type, a valid fetch type (periodic requiring a positive
+ * `frequencyPerDay`), India-resident data, a future consent expiry after
+ * consent start, and a positive `dataLifeDays` retention period. Pure
+ * validation — never mutates the consent.
+ * @param {object} consent - candidate or existing consent record.
+ * @param {{borrowerProfiles?: object}} [context] - for the borrower-existence check.
+ * @returns {{findings: Array<object>, summary: object}}
+ */
 export function validateAccountAggregatorConsent(consent, context = {}) {
   const { borrowerProfiles = {} } = context;
   const findings = [];
@@ -109,6 +120,14 @@ export function validateAccountAggregatorConsent(consent, context = {}) {
   return { findings, summary: summarizeFindings(findings) };
 }
 
+/**
+ * Merge caller input over an existing consent (or defaults, for a new
+ * one). Pure data shaping — pair with `validateAccountAggregatorConsent`.
+ * @param {object} input - partial consent fields to apply.
+ * @param {object} [existing] - the current stored consent, if any.
+ * @param {Date} [now]
+ * @returns {object} the merged, normalized consent.
+ */
 export function normalizeAccountAggregatorConsent(input, existing = {}, now = new Date()) {
   return {
     consentId: input.consentId ?? existing.consentId,
@@ -136,6 +155,15 @@ export function normalizeAccountAggregatorConsent(input, existing = {}, now = ne
   };
 }
 
+/**
+ * Normalize, validate, and (if valid) persist a new AA consent request in
+ * `"requested"` status.
+ * @param {Record<string, object>} registry - consentId -> consent record.
+ * @param {object} input - see `normalizeAccountAggregatorConsent`.
+ * @param {{borrowerProfiles?: object}} [context]
+ * @param {Date} [now]
+ * @returns {{registry: object, consent: object, findings: Array<object>, summary: object}}
+ */
 export function createAccountAggregatorConsent(registry, input, context = {}, now = new Date()) {
   const consent = normalizeAccountAggregatorConsent(input, {}, now);
   const validation = validateAccountAggregatorConsent(consent, context);
@@ -146,7 +174,16 @@ export function createAccountAggregatorConsent(registry, input, context = {}, no
   return { registry: nextRegistry, consent, findings: validation.findings, summary: validation.summary };
 }
 
-// Borrower approves the consent at the AA — requested → active.
+/**
+ * Borrower approves the consent at the AA — requested -> active. Fails
+ * closed unless the consent is currently `"requested"` and the AA's own
+ * `aaConsentHandle` is supplied (proof the approval actually happened at
+ * the AA, not just locally).
+ * @param {object} consent - existing `"requested"` consent.
+ * @param {object} input - aaConsentHandle, approvedAt.
+ * @param {Date} [now]
+ * @returns {{consent: object, findings: Array<object>, summary: object}}
+ */
 export function approveAccountAggregatorConsent(consent, input = {}, now = new Date()) {
   const findings = [];
   if (!consent) {
@@ -173,6 +210,15 @@ export function approveAccountAggregatorConsent(consent, input = {}, now = new D
   return { consent: next, findings, summary };
 }
 
+/**
+ * Revoke a consent (borrower- or system-initiated). Fails closed if it's
+ * already revoked or expired — revocation is a one-way, idempotent-at-the-
+ * terminal-state transition.
+ * @param {object} consent - existing consent, not already revoked/expired.
+ * @param {object} input - reason.
+ * @param {Date} [now]
+ * @returns {{consent: object, findings: Array<object>, summary: object}}
+ */
 export function revokeAccountAggregatorConsent(consent, input = {}, now = new Date()) {
   const findings = [];
   if (!consent) {
@@ -196,6 +242,9 @@ export function revokeAccountAggregatorConsent(consent, input = {}, now = new Da
   return { consent: next, findings, summary };
 }
 
+// Derive the consent's status "as of" a point in time — an ACTIVE consent
+// whose expiry has passed is treated as EXPIRED without needing a separate
+// background job to flip the stored status.
 function effectiveConsentStatus(consent, asOf) {
   if (consent.status !== AA_CONSENT_STATUSES.ACTIVE) return consent.status;
   const expiry = consent.consentExpiry ? new Date(consent.consentExpiry) : null;
@@ -203,9 +252,17 @@ function effectiveConsentStatus(consent, asOf) {
   return AA_CONSENT_STATUSES.ACTIVE;
 }
 
-// Fetch FI data under an active consent. Enforces validity, one-time single use,
-// and periodic per-day frequency. Returns a masked/hashed evidence record — the
-// live FIP pull is a mocked integration boundary.
+/**
+ * Fetch FI data under an active consent. Enforces validity (via
+ * `effectiveConsentStatus`), one-time single use, and periodic per-day
+ * frequency (fails closed on any violation). Returns a masked/hashed
+ * evidence record — the live FIP pull is a mocked integration boundary;
+ * the raw payload is never persisted, only its SHA-256 and record count.
+ * @param {object} consent - existing consent to fetch under.
+ * @param {object} input - asOf, nonce, providerEvidence, fetchId, recordCount, provider.
+ * @param {Date} [now]
+ * @returns {{consent: object, fetch?: object, findings: Array<object>, summary: object}}
+ */
 export function fetchAccountAggregatorData(consent, input = {}, now = new Date()) {
   const findings = [];
   if (!consent) {
@@ -275,13 +332,19 @@ export const AA_OBLIGATION_CATEGORIES = new Set([
   "insurance_premium"
 ]);
 
-// Turn consented AA financial-information data into verified income and
-// obligation facts for underwriting (REV-31). Operates on the transient FIP
-// payload — the raw data is never persisted here — and stamps every derived
-// fact with its provenance (source, consent/fetch/hash lineage, method, and the
-// observation window) so the decision path can carry it as evidence. Income is
-// the monthly average of categorised income credits; obligations the monthly
-// average of categorised obligation debits, over the observation window.
+/**
+ * Turn consented AA financial-information data into verified income and
+ * obligation facts for underwriting (REV-31). Operates on the transient FIP
+ * payload — the raw data is never persisted here — and stamps every derived
+ * fact with its provenance (source, consent/fetch/hash lineage, method, and the
+ * observation window) so the decision path can carry it as evidence. Income is
+ * the monthly average of categorised income credits; obligations the monthly
+ * average of categorised obligation debits, over the observation window.
+ * @param {{accounts?: Array<object>, observationMonths?: number}} financialData - transient FIP payload; not persisted.
+ * @param {{consentId?: string, fetchId?: string, dataHash?: string}} [context] - provenance to stamp on the result.
+ * @param {Date} [now]
+ * @returns {{analytics: object|null, findings: Array<object>, summary: object}}
+ */
 export function deriveAaAnalytics(financialData = {}, context = {}, now = new Date()) {
   const findings = [];
   const accounts = Array.isArray(financialData.accounts) ? financialData.accounts : [];

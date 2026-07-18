@@ -1,3 +1,27 @@
+/**
+ * Collections and legal recovery: the post-delinquency lifecycle for a
+ * loan account — fair-practice-constrained collection contacts, promise-
+ * to-pay tracking, and the statutory legal-recovery tracks (SARFAESI,
+ * Section 138 cheque-bounce, Lok Adalat, arbitration, DRT, civil suit,
+ * insolvency). This module does not own the loan account's ledger or
+ * delinquency computation itself (`loan-account.js` does — this module
+ * calls `computeDelinquency`/`classifyLoanAsset`/`summarizeLoanAccount` and
+ * layers the collections/legal workflow on top).
+ *
+ * Fair-practice controls are enforced directly here, not left to the
+ * caller: a collection contact must reference an active, *noticed*
+ * recovery assignment, must be made by the assigned agent (not anyone
+ * else), and (per RBI-FPC-PENAL) is only permitted between 08:00-19:00 IST
+ * — computed by shifting the UTC timestamp by 330 minutes, since the
+ * platform stores everything in UTC. Legal-track initiation and events
+ * enforce their own statutory preconditions and clocks: SARFAESI requires
+ * NPA classification and a registered security interest, and enforcement
+ * cannot be authorized before the 60-day section 13(2) demand period
+ * expires; Section 138 requires cheque + bank-return-memo evidence, a
+ * 30-day notice-issue deadline from the memo date, and a 15-day payment
+ * period before a complaint can be filed. All of these are fail-closed
+ * findings (`createFinding`/`summarizeFindings`), never silently skipped.
+ */
 import { createFinding, summarizeFindings } from "./compliance-controls.js";
 import { classifyLoanAsset, computeDelinquency, summarizeLoanAccount } from "./loan-account.js";
 import { createLoanId } from "./loan-policy.js";
@@ -9,6 +33,19 @@ export const LEGAL_RECOVERY_TRACKS = new Set(["sarfaesi", "section_138", "lok_ad
 const LEGAL_EVENT_TYPES = new Set(["representation_received", "representation_decided", "filed", "hearing_scheduled", "order_recorded", "enforcement_authorized", "settlement_recorded", "withdrawn", "closed"]);
 const TERMINAL_CASE_STATUSES = new Set(["withdrawn", "closed"]);
 
+/**
+ * Record a collection contact (call/IVR/field visit) against an active
+ * loan account. Fails closed unless: the account is active, there's an
+ * active recovery assignment for `assignmentId` that has already had a
+ * notice sent (`noticeSentAt`/`noticeDeliveryRef`), the contact was made by
+ * the assigned agent, the contact time falls within the 08:00-19:00 IST
+ * fair-practice window, and — for field visits — a valid lat/long plus geo
+ * evidence is supplied.
+ * @param {object} account - loan account with `recoveryAssignments`/`collectionContacts`.
+ * @param {object} input - contactId, assignmentId, channel, disposition, contactedAt, actor, evidenceRef, +lat/long/geoEvidenceRef for field_visit.
+ * @param {Date} [now]
+ * @returns {{loanAccount: object, contact: object|null, findings: Array<object>, summary: object}}
+ */
 export function recordCollectionContact(account, input = {}, now = new Date()) {
   const findings = []; const contactedAt = input.contactedAt ? new Date(input.contactedAt) : now;
   const assignment = (account?.recoveryAssignments ?? []).find((item) => item.assignmentId === input.assignmentId && item.status === "active");
@@ -27,6 +64,18 @@ export function recordCollectionContact(account, input = {}, now = new Date()) {
   return { loanAccount: { ...account, collectionContacts: [...(account.collectionContacts ?? []), contact], servicingEvents: [...(account.servicingEvents ?? []), { type: "loan_account.collection_contact.recorded", contactId: contact.contactId, channel: contact.channel, at: contact.contactedAt, actor: contact.actor }], updatedAt: now.toISOString() }, contact, findings, summary };
 }
 
+/**
+ * Record a borrower's promise-to-pay against a delinquent account. Fails
+ * closed unless the account is actually delinquent, the promised amount is
+ * positive, paise-exact, and within total outstanding dues, the promised
+ * date is on or after capture, and the promise references an already-
+ * evidenced collection contact (a promise cannot be recorded without a
+ * prior documented contact that elicited it).
+ * @param {object} account - loan account with `collectionContacts`/`promisesToPay`.
+ * @param {object} input - promiseId, contactId, amount, promisedDate, capturedAt, actor, notes.
+ * @param {Date} [now]
+ * @returns {{loanAccount: object, promise: object|null, findings: Array<object>, summary: object}} `promise` is enriched with kept/broken/pending status via `evaluatePromisesToPay`.
+ */
 export function createPromiseToPay(account, input = {}, now = new Date()) {
   const findings = []; const capturedAt = input.capturedAt ? new Date(input.capturedAt) : now; const promisedDate = new Date(`${input.promisedDate}T23:59:59.999Z`); const balance = account && !Number.isNaN(capturedAt.getTime()) ? summarizeLoanAccount(account, capturedAt) : null;
   if (!account || account.status !== "active" || !balance || computeDelinquency(account, capturedAt).daysPastDue <= 0) findings.push(createFinding("error", "RBI-DL-2025", "Promise-to-pay requires an active delinquent account.", "loanAccount"));
@@ -40,11 +89,39 @@ export function createPromiseToPay(account, input = {}, now = new Date()) {
   return { loanAccount: { ...account, promisesToPay: [...(account.promisesToPay ?? []), promise], servicingEvents: [...(account.servicingEvents ?? []), { type: "loan_account.promise_to_pay.created", promiseId: promise.promiseId, at: promise.capturedAt, actor: promise.actor }], updatedAt: now.toISOString() }, promise: enrichPromiseToPay(account, promise, now), findings, summary };
 }
 
+/**
+ * Evaluate every promise-to-pay on an account against the account's actual
+ * payment ledger as of `asOf`: allocates ledger payments (oldest promise
+ * first, within each promise's capture-to-deadline window) to determine
+ * whether each promise was `"kept"` (fully covered), `"broken"` (deadline
+ * passed, not covered), or still `"pending"`. Each ledger payment's
+ * remaining paise is tracked across promises so the same rupee isn't
+ * double-counted toward two promises.
+ * @param {object} account - loan account with `ledger`/`promisesToPay`.
+ * @param {Date} [asOf]
+ * @returns {Array<object>} promises annotated with status/amountReceived/shortfallAmount.
+ */
 export function evaluatePromisesToPay(account, asOf = new Date()) {
   const payments = (account?.ledger ?? []).filter((event) => ["payment", "cash_recovery_payment"].includes(event.type) && new Date(event.eventDate).getTime() <= asOf.getTime()).map((event) => ({ ...event, remainingPaise: Math.round(event.amount * 100) })).sort((a, b) => a.eventDate.localeCompare(b.eventDate));
   return [...(account?.promisesToPay ?? [])].sort((a, b) => a.promisedDate.localeCompare(b.promisedDate)).map((promise) => { const captured = new Date(promise.capturedAt).getTime(); const deadline = new Date(`${promise.promisedDate}T23:59:59.999Z`).getTime(); let receivedPaise = 0; for (const payment of payments) { const time = new Date(payment.eventDate).getTime(); if (time < captured || time > deadline || payment.remainingPaise <= 0) continue; const allocated = Math.min(payment.remainingPaise, Math.round(promise.amount * 100) - receivedPaise); receivedPaise += allocated; payment.remainingPaise -= allocated; if (receivedPaise >= Math.round(promise.amount * 100)) break; } const status = receivedPaise >= Math.round(promise.amount * 100) ? "kept" : asOf.getTime() > deadline ? "broken" : "pending"; return { ...promise, status, amountReceived: receivedPaise / 100, shortfallAmount: roundMoney(Math.max(0, promise.amount - receivedPaise / 100)), evaluatedAt: asOf.toISOString() }; });
 }
 
+/**
+ * Open a legal-recovery case for a delinquent or written-off loan on one of
+ * `LEGAL_RECOVERY_TRACKS`. Fails closed unless: the account is active or
+ * written-off with retained dues, the case has independent proposer/
+ * approver, `caseId` is unique, and the chosen track's own statutory
+ * preconditions hold — SARFAESI requires NPA classification plus a
+ * registered/modified security interest; Section 138 requires cheque
+ * number/amount and a bank-return memo dated on or before case opening;
+ * any other track requires a forum and jurisdiction.
+ * @param {Record<string, object>} registry - caseId -> legal case record.
+ * @param {object} account - the loan account the case concerns.
+ * @param {Record<string, object>} securityInterests - securityInterestId -> record, for SARFAESI eligibility.
+ * @param {object} input - caseId, track, reason, proposedBy, approvedBy, approvalRef, openedAt, +track-specific fields (chequeNumber/chequeAmount/bankReturnMemoRef/bankReturnMemoDate for section_138; forum/jurisdiction otherwise).
+ * @param {Date} [now]
+ * @returns {{registry: object, legalCase: object|null, findings: Array<object>, summary: object}}
+ */
 export function createLegalRecoveryCase(registry = {}, account, securityInterests = {}, input = {}, now = new Date()) {
   const findings = []; const openedAt = input.openedAt ? new Date(input.openedAt) : now; const track = input.track; const classification = account && !Number.isNaN(openedAt.getTime()) ? classifyLoanAsset(account, openedAt) : null;
   if (!account || !["active", "written_off"].includes(account.status)) findings.push(createFinding("error", "RBI-DL-2025", "Legal recovery requires an active or written-off loan with retained dues.", "loanAccount"));
@@ -64,6 +141,22 @@ export function createLegalRecoveryCase(registry = {}, account, securityInterest
   return { registry: { ...registry, [legalCase.caseId]: legalCase }, legalCase: enrichLegalRecoveryCase(legalCase, now), findings, summary };
 }
 
+/**
+ * Issue the statutory legal notice for an open case (SARFAESI section
+ * 13(2) demand, Section 138 statutory demand, or a generic legal notice for
+ * other tracks), starting that track's statutory response clock (60 days
+ * for SARFAESI from issue, 15 days for Section 138 from delivery). Fails
+ * closed unless the case is open (not withdrawn/closed), notice evidence
+ * and independent approval are present, delivery is on or after issuance,
+ * `noticeId` is unique, and — for Section 138 — issuance happens within the
+ * 30-day deadline from the bank-return memo date. The notice document is
+ * hashed (`checksumSha256`) at issuance to fix its content for later
+ * dispute resolution.
+ * @param {object} legalCase - existing open legal case record.
+ * @param {object} input - noticeId, documentRef, deliveryRef, issuedBy, approvedBy, issuedAt, deliveredAt, +demandAmount for sarfaesi/section_138, +responseDays for other tracks.
+ * @param {Date} [now]
+ * @returns {{legalCase: object, notice: object|null, findings: Array<object>, summary: object}}
+ */
 export function issueLegalRecoveryNotice(legalCase, input = {}, now = new Date()) {
   const findings = []; const issuedAt = input.issuedAt ? new Date(input.issuedAt) : now; const deliveredAt = input.deliveredAt ? new Date(input.deliveredAt) : null;
   if (!legalCase || TERMINAL_CASE_STATUSES.has(legalCase?.status)) findings.push(createFinding("error", "RBI-IT-GRC", "An open legal recovery case is required.", "caseId"));
@@ -80,6 +173,21 @@ export function issueLegalRecoveryNotice(legalCase, input = {}, now = new Date()
   return { legalCase: enrichLegalRecoveryCase(updated, now), notice, findings, summary };
 }
 
+/**
+ * Record a case-lifecycle event (filing, hearing, order, settlement,
+ * enforcement authorization, withdrawal, closure) against an open legal
+ * case. Fails closed unless: the case is open, the event type/id/actor/
+ * evidence/timestamp are valid and `eventId` is unique, an
+ * `"enforcement_authorized"` event is only for a SARFAESI track past its
+ * 60-day demand deadline with independent approval, a `"hearing_scheduled"`
+ * event carries a valid `nextHearingDate`, a `"filed"` event carries a
+ * `courtCaseNumber` and — for Section 138 — happens only after the 15-day
+ * payment period expires.
+ * @param {object} legalCase - existing open legal case record.
+ * @param {object} input - eventId, eventType, actor, evidenceRef, occurredAt, +approvedBy for enforcement_authorized, +nextHearingDate/courtCaseNumber/amount as applicable.
+ * @param {Date} [now]
+ * @returns {{legalCase: object, event: object|null, findings: Array<object>, summary: object}}
+ */
 export function recordLegalRecoveryEvent(legalCase, input = {}, now = new Date()) {
   const findings = []; const occurredAt = input.occurredAt ? new Date(input.occurredAt) : now; const latestNotice = legalCase?.notices?.at(-1); const eventType = input.eventType;
   if (!legalCase || TERMINAL_CASE_STATUSES.has(legalCase?.status)) findings.push(createFinding("error", "RBI-IT-GRC", "An open legal recovery case is required.", "caseId"));
@@ -96,11 +204,25 @@ export function recordLegalRecoveryEvent(legalCase, input = {}, now = new Date()
   return { legalCase: enrichLegalRecoveryCase(updated, now), event, findings, summary };
 }
 
+/**
+ * Derive read-only, time-sensitive status on top of a legal case: the
+ * statutory response clock's days-remaining/expired state (from the latest
+ * notice), and whether the next scheduled hearing date has passed without
+ * a recorded outcome. Called after every mutation above so callers always
+ * see a case with up-to-date derived state rather than having to
+ * recompute it themselves.
+ * @param {object} legalCase
+ * @param {Date} [asOf]
+ * @returns {object|null} the case with `statutoryClock`/`hearingOverdue` added, or null if no case was given.
+ */
 export function enrichLegalRecoveryCase(legalCase, asOf = new Date()) {
   if (!legalCase) return null; const notice = legalCase.notices?.at(-1) ?? null; const deadline = notice?.statutoryDeadline ? new Date(notice.statutoryDeadline) : null; const remaining = deadline ? Math.ceil((deadline.getTime() - asOf.getTime()) / 86400000) : null;
   return { ...legalCase, statutoryClock: deadline ? { deadline: deadline.toISOString(), daysRemaining: Math.max(0, remaining), expired: asOf.getTime() >= deadline.getTime() } : null, hearingOverdue: legalCase.nextHearingDate ? asOf.getTime() > new Date(`${legalCase.nextHearingDate}T23:59:59.999Z`).getTime() : false };
 }
 
+// Reuse the full evaluatePromisesToPay logic for a single just-created
+// promise, so its initial kept/broken/pending status is computed the same
+// way it would be on any later evaluation.
 function enrichPromiseToPay(account, promise, asOf) { return evaluatePromisesToPay({ ...account, promisesToPay: [promise] }, asOf)[0]; }
 function addDays(date, days) { const result = new Date(date); result.setUTCDate(result.getUTCDate() + days); return result; }
 function roundMoney(value) { return Math.round((Number(value) + Number.EPSILON) * 100) / 100; }
