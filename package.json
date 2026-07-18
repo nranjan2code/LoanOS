@@ -15,7 +15,8 @@
     "graph:check": "node scripts/validate-knowledge-graph.mjs",
     "currency:check": "node scripts/check-currency.mjs",
     "corpus:check": "node rules/tools/gen-eligibility-corpus.mjs && git diff --exit-code rules/fixtures/eligibility-corpus.json",
-    "knowledge:check": "npm run docs:check && npm run trace:validate && npm run graph:check && npm run currency:check",
+    "depth:check": "node scripts/audit-product-journey-depth.mjs",
+    "knowledge:check": "npm run docs:check && npm run trace:validate && npm run graph:check && npm run depth:check && npm run currency:check",
     "dashboard": "node scripts/sync-capability-trace.mjs && node scripts/validate-capability-evidence.mjs && node scripts/build-dashboard.mjs && node scripts/validate-dashboard.mjs",
     "dashboard:check": "node scripts/validate-dashboard.mjs",
     "dashboard:watch": "node scripts/watch-dashboard.mjs",
@@ -35,7 +36,8 @@
     "probe": "node scripts/run-resilience-probe.mjs",
     "worker:identity": "node scripts/run-identity-operations-worker.mjs",
     "dev:api": "node apps/api/src/server.js",
-    "start": "node apps/api/src/server.js"
+    "start": "node apps/api/src/server.js",
+    "prepare": "git config core.hooksPath tools/git-hooks"
   },
   "engines": {
     "node": ">=20"

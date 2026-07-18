@@ -18,8 +18,8 @@ their respective architecture and operations documents.
 | 0 — Sources of truth | Implemented | Requirements, architecture, ADRs, compliance register, code, tests and the GTM claim register are maintained as distinct authoritative sources. | Source currency still depends on authors following the documentation governance rules for each change. |
 | 1 — Stable identifiers | Implemented | The repository defines capability, engine, ADR, claim, epic, journey and integration identifiers. | New schemes must be added to the identifier registry before they become cross-document references. |
 | 2 — Cross-link graph | Implemented | The graph currently resolves 463 capability IDs, 43 engine IDs, 8 ADRs, 103 claims and 328 ID-shaped capability dependencies with no warnings or errors. | Only the edge families described in the identifier registry are enforced; broader semantic consistency is not inferred automatically. |
-| 3 — Machine enforcement | Mostly implemented | Documentation reachability, capability evidence, identifier resolution, dashboard integrity, public content and the eligibility corpus have automated gates. Evidence floors and documentation companion rules are machine-readable. | Documentation currency is intentionally advisory. There is no single executable definition-of-done matrix covering every change class. |
-| 4 — Agent execution | Missing | Domain workers and governed digital-worker architecture exist, including identity, guardrail and human-approval boundaries. | There is no repository-native project skill catalogue, hook system or general workflow router that turns the lower layers into repeatable coding-agent execution. |
+| 3 — Machine enforcement | Mostly implemented | Documentation reachability, capability evidence, identifier resolution, dashboard integrity, journey platform depth, public content and the eligibility corpus have automated gates, in CI and in a pre-commit hook (`tools/git-hooks/pre-commit`, activated by the npm `prepare` script). Evidence floors and documentation companion rules are machine-readable; the currency matrix carries ten rules covering every governance change class. | Documentation currency remains intentionally advisory (`currency:check --strict` exists but is not yet applied to any class). A single machine-readable definition-of-done matrix is still future work. |
+| 4 — Agent execution | Partial | A committed project-skill catalogue (`.agents/skills/`, mirrored to `.claude/skills` by symlink) encodes nine governed workflows — definition of done, capability, lending policy, ADR, route extraction, Guide/Academy content, compliance control, GTM claim and AWS showcase — and the pre-commit gate enforces the blocking knowledge gates on every commit regardless of which human or agent commits. | There is no deterministic workflow router, permission/evidence contract or broader hook system; skill invocation still depends on the executing agent honoring the catalogue (`AGENTS.md` Project skills section). |
 | 5 — Human skills | Partial | BA and Technical Academies exist, and canonical role groups map to Academy learning paths and capability planes. | Individual role-to-module requirements, assessed completion, assignment evidence, expiry and certification enforcement remain future work. |
 
 ## Verification evidence
@@ -27,10 +27,11 @@ their respective architecture and operations documents.
 The audit used the repository's combined knowledge check:
 
 ```text
-documentation integrity · markdown=127 · reachable=127 · errors=0
+documentation integrity · markdown=129 · reachable=129 · errors=0
 capability evidence · linked=463/463 · implemented-verified=93/93 · warnings=0 · errors=0
 knowledge graph · capabilities=463 · engine-ids=43 · adrs=8 · claims=103 · id-deps=328 · warnings=0 · errors=0
-documentation currency · advisories=0
+product journey platform-depth audit · journeys=21 · controlled=3 · configurable=18 · production-ready=0
+documentation currency · changed=283 · rules=10 · advisories=0
 ```
 
 Run the same checks with:
@@ -46,6 +47,9 @@ The principal implementation anchors are:
 - [capability evidence policy](../../product/capability-evidence-policy.json), which carries monotonic evidence floors;
 - [documentation governance](../../documentation-governance.md) and its [machine-readable rules](../../documentation-governance-rules.json);
 - [CI workflow](../../../.github/workflows/ci.yml), which runs the integrity gates;
+- the pre-commit gate `tools/git-hooks/pre-commit` and the committed
+  project-skill catalogue `.agents/skills/`, which enforce the same gates per
+  commit and encode the repeatable agent workflows;
 - [Guide and Academy architecture](../help-centre-and-academy.md); and
 - [tenant role and staffing design](../tenant-role-staffing-and-feature-gating.md), including the role-to-Academy mapping.
 
@@ -64,13 +68,13 @@ revalidated against committed `HEAD` before being used as release evidence.
 
 ## Closure sequence
 
-1. Commit and review the graph, governance and role-mapping changes so Layers 2,
-   3 and 5 are no longer working-tree-only evidence.
-2. Define a machine-readable definition-of-done matrix and decide which currency
-   advisories should become blocking CI failures.
-3. Design Layer 4 as a bounded repository execution contract: project skills,
-   deterministic routing, hooks, permissions, evidence and human approval points.
-4. Extend Layer 5 from broad learning paths to module-level requirements,
+1. Decide which currency advisories should graduate from advisory to blocking
+   (`currency:check --strict` per class), and fold the remaining change classes
+   into a machine-readable definition-of-done matrix.
+2. Extend Layer 4 from the skill catalogue and pre-commit gate to a bounded
+   execution contract: deterministic routing, permissions, evidence capture and
+   human approval points.
+3. Extend Layer 5 from broad learning paths to module-level requirements,
    assessments, completion evidence, expiry and role-assignment enforcement.
 
 Any Layer 4 design must preserve the existing fail-closed, tenant-isolated and

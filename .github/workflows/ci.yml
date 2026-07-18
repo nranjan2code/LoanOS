@@ -49,6 +49,8 @@ jobs:
         run: npm run trace:validate
       - name: Knowledge-graph integrity gate
         run: npm run graph:check
+      - name: Product-journey depth audit gate
+        run: npm run depth:check
       - name: Dashboard source and artifact integrity gate
         run: npm run dashboard:check
       - name: Public-site content gate

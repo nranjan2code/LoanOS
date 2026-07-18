@@ -39,6 +39,41 @@
       "when": ["package.json", ".github/workflows/ci.yml", "loanos.sh"],
       "expect": ["AGENTS.md"],
       "message": "Commands, CI or orchestration changed — update the Commands / rules section of AGENTS.md if the change is agent-facing."
+    },
+    {
+      "id": "guide-academy-companion",
+      "label": "User-visible workflow or error",
+      "when": ["apps/web/**", "apps/tenant/**", "apps/customer/**", "apps/administration/**", "apps/dashboard/**"],
+      "expect": ["apps/help/**"],
+      "message": "A user-visible surface changed — update the matching Guide/Academy article and its verification date (see the update-guide-academy skill), or record why no article applies."
+    },
+    {
+      "id": "compliance-control-docs",
+      "label": "Compliance/control interpretation",
+      "when": ["packages/core/src/compliance/**"],
+      "expect": ["docs/compliance/**"],
+      "message": "Compliance control code changed — review the regulatory register, build checklist and admission control map (see the compliance-control-change skill)."
+    },
+    {
+      "id": "public-claims-register",
+      "label": "Public capability claim",
+      "when": ["docs/product/product-journey-support-matrix.md", "docs/product/what-we-are-building.md"],
+      "expect": ["docs/gtm/strategy/claims-and-backlog-sync.md"],
+      "message": "The externally-visible capability surface changed — sweep the GTM claim register for affected claim statuses (see the update-gtm-claim skill) and run `npm run web:content:check`."
+    },
+    {
+      "id": "architecture-boundary-docs",
+      "label": "Architecture or service boundary (Node control plane)",
+      "when": ["apps/api/src/server.js", "apps/api/src/routes/**", "packages/core/src/index.js"],
+      "expect": ["docs/architecture/current-implementation.md"],
+      "message": "The API composition seam or the @loanos/core barrel changed — confirm current-implementation.md still maps where each control lives."
+    },
+    {
+      "id": "adr-index",
+      "label": "Irreversible technical decision",
+      "when": ["docs/decisions/**"],
+      "expect": ["docs/decisions/README.md", "docs/README.md"],
+      "message": "A decision record changed — update docs/decisions/README.md and the ADR enumeration in docs/README.md (see the record-adr skill)."
     }
   ]
 }

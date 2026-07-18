@@ -1,0 +1,23 @@
+#!/bin/sh
+# LoanOS pre-commit gate — the executable slice of the definition of done.
+#
+# Every commit (human or AI agent, any tool) must leave the knowledge graph
+# consistent: docs reachable, capability evidence resolving, identifier
+# citations intact, derived dashboard artifacts in sync, and the journey-depth
+# audit valid. CI runs the same gates on push; running them here means a broken
+# graph never reaches the trunk in the first place.
+#
+# Installed via `git config core.hooksPath tools/git-hooks` (the npm `prepare`
+# script does this on npm ci/install). Genuine emergencies can bypass with
+# `git commit --no-verify`, but CI will still fail — fix forward instead.
+set -e
+
+echo "pre-commit · running knowledge gates (docs / evidence / graph / dashboard / depth)"
+npm run --silent docs:check
+npm run --silent trace:validate
+npm run --silent graph:check
+npm run --silent dashboard:check
+npm run --silent depth:check
+
+# Advisory only, never blocks: did the companion docs for this change move?
+npm run --silent currency:check -- --staged || true

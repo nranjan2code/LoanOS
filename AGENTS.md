@@ -59,8 +59,9 @@ They meet at two deliberately isolated gateways: `apps/api/src/rules-engine.js` 
 npm test                                   # Node suite (148+ tests)
 npm run dev:api                            # local API (file store)
 ./loanos.sh build|start|stop|clean         # orchestration
-npm run knowledge:check                    # docs + evidence + cross-link graph + currency, in one pass
+npm run knowledge:check                    # docs + evidence + cross-link graph + journey depth + currency, in one pass
 npm run graph:check                        # identifier cross-links resolve (see docs/identifier-registry.md)
+npm run depth:check                        # journey platform-depth audit vs canonical catalogues + evidence refs
 npm run currency:check -- --staged         # advisory: did companion docs move with this change?
 npm run corpus:check                       # fail if the JS↔Rust eligibility corpus drifted
 npm run demo:audit                         # validate canonical synthetic showcase profile
@@ -75,6 +76,24 @@ node rules/tools/gen-eligibility-corpus.mjs  # regen differential corpus after J
 ```
 
 CI (`.github/workflows/ci.yml`): Node tests (file + Postgres drivers) and the Rust lane (fmt, clippy with float-deny, tests, cargo-audit). All must pass.
+
+A pre-commit hook (`tools/git-hooks/pre-commit`, activated by the npm `prepare` script via `git config core.hooksPath tools/git-hooks`) runs the blocking knowledge gates — docs, evidence, graph, dashboard, journey depth — on every commit and prints companion-doc currency advisories for the staged change. `--no-verify` exists for genuine emergencies only; CI still fails on the same gates.
+
+## Project skills
+
+`.agents/skills/` is the canonical, committed skill catalogue; `.claude/skills` is a symlink to it so Claude Code loads the same files. Each skill encodes one governed workflow with its gates — invoke the matching skill instead of improvising the steps:
+
+| Skill | Use when |
+| --- | --- |
+| `definition-of-done` | Wrapping up any change, before committing. |
+| `add-capability` | Adding a capability or changing maturity/status in the catalogue. |
+| `change-lending-policy` | Changing JS lending eligibility or engine-mirrored decision logic. |
+| `record-adr` | Making an irreversible architecture decision. |
+| `extract-api-route` | Adding domain HTTP behavior or extracting a `server.js` handler. |
+| `update-guide-academy` | Changing Guide/Academy learning content. |
+| `compliance-control-change` | Changing a compliance control or its interpretation. |
+| `update-gtm-claim` | Changing an externally-visible claim, or a maturity change that affects one. |
+| `aws-showcase-change` | Changing `deploy/aws/` or the showcase release surface. |
 
 ## Conventions
 

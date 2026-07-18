@@ -50,8 +50,11 @@ Thumbs.db
 *.sln
 *.sw?
 
-# Agent and temporary files
-.claude/
+# Agent and temporary files. Skills are governed source (canonical copy in
+# .agents/skills/, mirrored into .claude/skills as a symlink), so they are
+# committed; local agent settings and launch config stay machine-specific.
+.claude/*
+!.claude/skills
 .gemini/
 tmp/
 temp/
