@@ -1,0 +1,6 @@
+.field input[type="checkbox"] {
+  width: var(--space-5);
+  height: var(--space-5);
+  padding: 0;
+  accent-color: var(--brand);
+}

@@ -290,14 +290,16 @@ test("Postgres persists specialist journey cases under tenant RLS without cross-
   await postgresStore.resetPoolForTests(rewriteRole(DATABASE_URL_TEST, "loanos_control_plane"));
   t.after(() => postgresStore.resetPoolForTests(DATABASE_URL_TEST));
   const H = "a".repeat(64), tenantId = "tnt_specialist_a";
-  let state = await postgresStore.loadTenantDataOnly("ignored", tenantId);
-  let result = proposeSpecialistJourneyConfiguration(state, { tenantId, requestId: "request-home", configurationId: "config-home", journeyType: "home_loan", productTemplateRef: "builtin:home_loan", productTemplateVersion: "1.0.0", productTemplateChecksumSha256: H, schemaVersion: "1.0.0", policyVersionRef: "policy/v1", workflowVersionRef: "workflow/v1", accountingPolicyRef: "accounting/v1", assignedRoleIds: ["credit_operations_officer", "credit_approver"], kernelConfiguration: { minimumAmountPaise: "100", maximumAmountPaise: "1000000", maximumLtvPercent: "75.0000", eligibilityPolicyRef: "eligibility/v1", kycControlRef: "kyc/v1", agreementTemplateRef: "agreement/v1", servicingPolicyRef: "servicing/v1", collateralPolicyRef: "collateral/v1" }, idempotencyKey: "configuration/home", proposedBy: "maker" });
-  result = approveSpecialistJourneyConfiguration(result.state, { tenantId, requestId: "request-home", approvedBy: "checker", approvalRef: "approval/home" });
-  const opened = openSpecialistJourneyCase(result.state, { tenantId, caseId: "case-home", configurationId: "config-home", expectedConfigurationVersion: 1, subjectRef: "borrower/1", sourceApplicationRef: "application/1", assignedPrincipalIds: ["operator"], idempotencyKey: "case/home", openedBy: "operator" });
-  await postgresStore.saveTenantDataOnly("ignored", tenantId, opened.state);
-  state = await postgresStore.loadTenantDataOnly("ignored", tenantId);
+  await postgresStore.withStateLock("ignored", tenantId, async () => {
+    const state = await postgresStore.loadTenantDataOnly("ignored", tenantId);
+    let result = proposeSpecialistJourneyConfiguration(state, { tenantId, requestId: "request-home", configurationId: "config-home", journeyType: "home_loan", productTemplateRef: "builtin:home_loan", productTemplateVersion: "1.0.0", productTemplateChecksumSha256: H, schemaVersion: "1.0.0", policyVersionRef: "policy/v1", workflowVersionRef: "workflow/v1", accountingPolicyRef: "accounting/v1", assignedRoleIds: ["credit_operations_officer", "credit_approver"], kernelConfiguration: { minimumAmountPaise: "100", maximumAmountPaise: "1000000", maximumLtvPercent: "75.0000", eligibilityPolicyRef: "eligibility/v1", kycControlRef: "kyc/v1", agreementTemplateRef: "agreement/v1", servicingPolicyRef: "servicing/v1", collateralPolicyRef: "collateral/v1" }, idempotencyKey: "configuration/home", proposedBy: "maker" });
+    result = approveSpecialistJourneyConfiguration(result.state, { tenantId, requestId: "request-home", approvedBy: "checker", approvalRef: "approval/home" });
+    const opened = openSpecialistJourneyCase(result.state, { tenantId, caseId: "case-home", configurationId: "config-home", expectedConfigurationVersion: 1, subjectRef: "borrower/1", sourceApplicationRef: "application/1", assignedPrincipalIds: ["operator"], idempotencyKey: "case/home", openedBy: "operator" });
+    await postgresStore.saveTenantDataOnly("ignored", tenantId, opened.state);
+  });
+  const state = await postgresStore.withStateLock("ignored", tenantId, () => postgresStore.loadTenantDataOnly("ignored", tenantId));
   assert.equal(state.specialistJourneyCases[`${tenantId}:case-home`].status, "active");
-  const other = await postgresStore.loadTenantDataOnly("ignored", "tnt_specialist_b");
+  const other = await postgresStore.withStateLock("ignored", "tnt_specialist_b", () => postgresStore.loadTenantDataOnly("ignored", "tnt_specialist_b"));
   assert.equal(other.specialistJourneyCases?.[`${tenantId}:case-home`], undefined);
 });
 
@@ -317,25 +319,27 @@ test("Postgres persists composed journey lifecycles under tenant RLS without cro
   const { PRODUCT_TEMPLATE_CATALOGUE } = await import("@loanos/core/platform/product-template-catalogue.js");
   await postgresStore.resetPoolForTests(rewriteRole(DATABASE_URL_TEST, "loanos_control_plane"));
   t.after(() => postgresStore.resetPoolForTests(DATABASE_URL_TEST));
-  const tenantId = "tnt_composed_a", H = "a".repeat(64), template = PRODUCT_TEMPLATE_CATALOGUE.personal_loan, schema = JOURNEY_WORKSPACE_SCHEMAS.term_lending;
-  let state = await postgresStore.loadTenantDataOnly("ignored", tenantId);
-  state.tenantProductSubscriptions = { "subscription-composed": { subscriptionId: "subscription-composed", tenantId, productTypes: ["personal_loan"], effectiveFrom: "2026-01-01T00:00:00.000Z", validUntil: "2030-01-01T00:00:00.000Z", status: "active" } };
-  const created = createComposedJourneyInstance(state, {
-    tenantId, lifecycleId: "lifecycle-postgres-1", journeyType: "personal_loan", subjectRef: "subject/synthetic-1", applicationRef: "application/synthetic-1", requestedAmountPaise: "10000", assignedPrincipalIds: ["maker", "checker"], idempotencyKey: "composed/postgres/1", createdBy: "maker",
-    lineage: {
-      productTemplateRef: template.templateId, productTemplateVersion: template.version, productTemplateChecksumSha256: template.templateChecksumSha256,
-      workspaceSchemaId: schema.schemaId, workspaceSchemaVersion: schema.schemaVersion, workspaceSchemaChecksumSha256: schema.schemaChecksumSha256,
-      policyBundleRef: "policy/personal/v1", policyBundleVersion: 1, policyBundleChecksumSha256: H,
-      workflowRef: "workflow/personal/v1", workflowVersion: 1, workflowChecksumSha256: H,
-      accountingPolicyRef: "accounting/personal/v1", accountingPolicyVersion: 1, accountingPolicyChecksumSha256: H,
-      tenantConfigurationRef: "tenant-config/v1", tenantConfigurationVersion: 1, tenantConfigurationChecksumSha256: H,
-      accessGrantSnapshotRef: "access/snapshot-1", accessGrantSnapshotChecksumSha256: H
-    }
-  }, "2026-07-15T06:30:00.000Z");
-  await postgresStore.saveTenantDataOnly("ignored", tenantId, created.state);
-  state = await postgresStore.loadTenantDataOnly("ignored", tenantId);
+  const tenantId = "tnt_composed_a", H = "a".repeat(64), template = PRODUCT_TEMPLATE_CATALOGUE.personal_loan, schema = JOURNEY_WORKSPACE_SCHEMAS.personal_loan;
+  await postgresStore.withStateLock("ignored", tenantId, async () => {
+    const state = await postgresStore.loadTenantDataOnly("ignored", tenantId);
+    state.tenantProductSubscriptions = { "subscription-composed": { subscriptionId: "subscription-composed", tenantId, productTypes: ["personal_loan"], effectiveFrom: "2026-01-01T00:00:00.000Z", validUntil: "2030-01-01T00:00:00.000Z", status: "active" } };
+    const created = createComposedJourneyInstance(state, {
+      tenantId, lifecycleId: "lifecycle-postgres-1", journeyType: "personal_loan", subjectRef: "subject/synthetic-1", applicationRef: "application/synthetic-1", requestedAmountPaise: "10000", assignedPrincipalIds: ["maker", "checker"], idempotencyKey: "composed/postgres/1", createdBy: "maker",
+      lineage: {
+        productTemplateRef: template.templateId, productTemplateVersion: template.version, productTemplateChecksumSha256: template.templateChecksumSha256,
+        workspaceSchemaId: schema.schemaId, workspaceSchemaVersion: schema.schemaVersion, workspaceSchemaChecksumSha256: schema.schemaChecksumSha256,
+        policyBundleRef: "policy/personal/v1", policyBundleVersion: 1, policyBundleChecksumSha256: H,
+        workflowRef: "workflow/personal/v1", workflowVersion: 1, workflowChecksumSha256: H,
+        accountingPolicyRef: "accounting/personal/v1", accountingPolicyVersion: 1, accountingPolicyChecksumSha256: H,
+        tenantConfigurationRef: "tenant-config/v1", tenantConfigurationVersion: 1, tenantConfigurationChecksumSha256: H,
+        accessGrantSnapshotRef: "access/snapshot-1", accessGrantSnapshotChecksumSha256: H
+      }
+    }, "2026-07-15T06:30:00.000Z");
+    await postgresStore.saveTenantDataOnly("ignored", tenantId, created.state);
+  });
+  const state = await postgresStore.withStateLock("ignored", tenantId, () => postgresStore.loadTenantDataOnly("ignored", tenantId));
   assert.equal(state.composedJourneyLifecycles["lifecycle-postgres-1"].currentStage, "application_capture");
-  const other = await postgresStore.loadTenantDataOnly("ignored", "tnt_composed_b");
+  const other = await postgresStore.withStateLock("ignored", "tnt_composed_b", () => postgresStore.loadTenantDataOnly("ignored", "tnt_composed_b"));
   assert.equal(other.composedJourneyLifecycles?.["lifecycle-postgres-1"], undefined);
 });
 

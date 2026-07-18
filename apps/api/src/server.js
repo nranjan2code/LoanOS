@@ -39,6 +39,7 @@ import { routePaymentOperations } from "./routes/payment-operations.js";
 import { routeComplaints } from "./routes/complaints.js";
 import { routeIncidents } from "./routes/incidents.js";
 import { routeFraudCases } from "./routes/fraud-cases.js";
+import { routeDataRetentionErasure } from "./routes/data-retention-erasure.js";
 import { enforceUniversalMutationStaffing } from "./mutation-staffing-policy.js";
 import { validateControlEngineFleetConfiguration } from "./control-rules-engine.js";
 import { exchangeOidcAuthorizationCode, loadFederationAuthorizationEndpoint, validateFederatedLogin } from "./federation-runtime.js";
@@ -124,24 +125,16 @@ import {
   createCicResubmission,
   createCicSubmissionBatch,
   createCkycrrSubmission,
-  createErasureRequest,
   createIncident,
   DECLINE_REASON_CODES,
-  enrichErasureRequest,
   forecloseLoanAccount,
   enrichComplaint,
   enrichIncident,
   enrichCicCorrection,
   enrichLegalRecoveryCase,
   evaluatePromisesToPay,
-  fulfillErasureRequest,
   generateGovernancePack,
-  redactBorrowerProfile,
-  redactBorrowerKycRecords,
-  redactBorrowerBeneficialOwners,
-  executeAutoRetentionCleanup,
   recordIncidentNotification,
-  rejectErasureRequest,
   escalateComplaintToRbiCms,
   evaluateKycStatus,
   evaluatePlatformCanary,
@@ -1633,150 +1626,7 @@ async function route(req, res, dataDir, platformAdminKey, observability, allowDi
   if (await routeComplaints({ method, path, url, req, res, store, readJson, sendJson, appendEvent, authContext, resolveSessionActorId })) return;
   if (await routeIncidents({ method, path, url, req, res, store, readJson, sendJson, appendEvent })) return;
   if (await routeFraudCases({ method, path, url, req, res, store, readJson, sendJson, appendEvent })) return;
-
-  // --- DPDP data-retention and erasure (right-to-be-forgotten) workflow ---
-  if (method === "GET" && path === "/erasure-requests") {
-    const state = await store.load();
-    const asOf = url.searchParams.get("asOf") ? new Date(url.searchParams.get("asOf")) : new Date();
-    const requests = Object.values(state.erasureRequests)
-      .map((request) => enrichErasureRequest(request, state, asOf))
-      .filter((request) => !url.searchParams.get("status") || request.status === url.searchParams.get("status"))
-      .filter(
-        (request) =>
-          !url.searchParams.get("borrowerId") || request.borrowerId === url.searchParams.get("borrowerId")
-      );
-    sendJson(res, 200, { count: requests.length, erasureRequests: requests });
-    return;
-  }
-
-  if (method === "POST" && path === "/erasure-requests") {
-    const submittedBody = await readJson(req);
-    const body = authContext?.principalType === "borrower"
-      ? { ...submittedBody, borrowerId: authContext.userId, requestedBy: authContext.userId }
-      : submittedBody;
-    const state = await store.load();
-    const result = createErasureRequest(state.erasureRequests, body, state);
-    if (result.summary.status === "blocked") {
-      sendJson(res, 422, {
-        error: { code: "erasure_request_invalid", message: "Erasure request is invalid." },
-        findings: result.findings
-      });
-      return;
-    }
-    const nextState = appendEvent(
-      { ...state, erasureRequests: result.registry },
-      {
-        type: "data_erasure.requested",
-        erasureRequestId: result.request.erasureRequestId,
-        borrowerId: result.request.borrowerId,
-        actor: body.requestedBy ?? null
-      }
-    );
-    await store.save(nextState);
-    sendJson(res, 201, { erasureRequest: result.request, event: result.event });
-    return;
-  }
-
-  const erasureMatch = path.match(/^\/erasure-requests\/([^/]+)$/);
-  if (method === "GET" && erasureMatch) {
-    const state = await store.load();
-    const request = state.erasureRequests[decodeURIComponent(erasureMatch[1])];
-    if (!request) {
-      sendJson(res, 404, { error: { code: "not_found", message: "Erasure request not found." } });
-      return;
-    }
-    const asOf = url.searchParams.get("asOf") ? new Date(url.searchParams.get("asOf")) : new Date();
-    sendJson(res, 200, enrichErasureRequest(request, state, asOf));
-    return;
-  }
-
-  const erasureActionMatch = path.match(/^\/erasure-requests\/([^/]+)\/(fulfillment|rejection)$/);
-  if (method === "POST" && erasureActionMatch) {
-    const body = await readJson(req);
-    const state = await store.load();
-    const requestId = decodeURIComponent(erasureActionMatch[1]);
-    const action = erasureActionMatch[2];
-    const request = state.erasureRequests[requestId];
-    if (!request) {
-      sendJson(res, 404, { error: { code: "not_found", message: "Erasure request not found." } });
-      return;
-    }
-    // An injectable clock (asOf) lets retention windows be evaluated at a given
-    // date, consistent with the read endpoints.
-    const now = body.asOf ? new Date(body.asOf) : new Date();
-    const result =
-      action === "fulfillment"
-        ? fulfillErasureRequest(request, body, state, now)
-        : rejectErasureRequest(request, body, state, now);
-    if (result.summary.status === "blocked") {
-      sendJson(res, 422, {
-        error: { code: "erasure_action_blocked", message: "Erasure action is blocked by retention or workflow findings." },
-        findings: result.findings
-      });
-      return;
-    }
-    const stored = result.request;
-    // On fulfilment the borrower's personal data is irreversibly redacted in
-    // place; the erasure request and its audit trail are retained as evidence.
-    const borrowerProfiles =
-      action === "fulfillment" && state.borrowerProfiles[stored.borrowerId]
-        ? {
-            ...state.borrowerProfiles,
-            [stored.borrowerId]: redactBorrowerProfile(state.borrowerProfiles[stored.borrowerId])
-          }
-        : state.borrowerProfiles;
-    const kycRecords =
-      action === "fulfillment"
-        ? redactBorrowerKycRecords(state.kycRecords, stored.borrowerId, now)
-        : state.kycRecords;
-    const beneficialOwners =
-      action === "fulfillment"
-        ? redactBorrowerBeneficialOwners(state.beneficialOwners, stored.borrowerId, now)
-        : state.beneficialOwners;
-    const nextState = appendEvent(
-      {
-        ...state,
-        borrowerProfiles,
-        kycRecords,
-        beneficialOwners,
-        erasureRequests: { ...state.erasureRequests, [stored.erasureRequestId]: stored }
-      },
-      {
-        type: result.event.type,
-        erasureRequestId: stored.erasureRequestId,
-        borrowerId: stored.borrowerId,
-        actor: body.actor ?? null
-      }
-    );
-    await store.save(nextState);
-    sendJson(res, 200, { erasureRequest: stored, event: result.event });
-    return;
-  }
-
-  if (method === "POST" && path === "/data-retention/cleanup") {
-    const state = await store.load();
-    const now = url.searchParams.get("asOf") ? new Date(url.searchParams.get("asOf")) : new Date();
-    const result = executeAutoRetentionCleanup(state, now);
-
-    const nextState = {
-      ...state,
-      borrowerProfiles: result.borrowerProfiles,
-      kycRecords: result.kycRecords,
-      beneficialOwners: result.beneficialOwners
-    };
-
-    let finalState = nextState;
-    for (const event of result.events) {
-      finalState = appendEvent(finalState, event);
-    }
-
-    await store.save(finalState);
-    sendJson(res, 200, {
-      cleanedBorrowerIds: result.cleanedBorrowerIds,
-      eventCount: result.events.length
-    });
-    return;
-  }
+  if (await routeDataRetentionErasure({ method, path, url, req, res, store, readJson, sendJson, appendEvent, authContext })) return;
 
   // --- Third-party data-sharing disclosure ledger (DPDP record of processing) ---
   if (method === "GET" && path === "/data-disclosures") {

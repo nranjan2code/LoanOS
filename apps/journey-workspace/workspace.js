@@ -1,3 +1,5 @@
+import { inputControlType, inputPattern, readWorkspaceInputValue, restoreWorkspaceInputValue } from "./workspace-inputs.js";
+
 const ui = Object.fromEntries([
   "catalogue", "workspace", "status", "journey-form", "form-sections", "document-list", "action-list", "workspace-title", "schema-meta", "language", "staff-channel", "staff-channel-label", "offline", "form-status", "back", "brand-name", "brand-mark", "draft-region", "draft-list", "refresh-drafts", "timeline-content", "action-guidance", "administration", "administration-link", "page-title", "channel-label"
 ].map((id) => [id.replaceAll("-", "_"), document.querySelector(`#${id}`)]));
@@ -151,6 +153,7 @@ async function openJourney(journeyType, draft) {
     ui.catalogue.hidden = true;
     ui.draft_region.hidden = true;
     ui.workspace.hidden = false;
+    ui.workspace_title.focus();
     state("");
     activity("workspace_opened", journeyType);
   } catch (error) {
@@ -174,7 +177,6 @@ function renderSchema(schema, draft) {
   renderActions(schema.actions, draft?.status);
   ui.timeline_content.textContent = draft ? `Draft ${draft.draftId} is ${draft.status}. No governed case lifecycle is linked by the current API.` : "No governed case lifecycle is linked to this new draft.";
   ui.form_status.textContent = draft?.status === "draft" ? "Resumed from the server. Masked values must be entered again before submission." : "";
-  ui.workspace_title.focus();
 }
 
 function renderField(item, prior) {
@@ -187,10 +189,12 @@ function renderField(item, prior) {
   input.required = item.required;
   input.autocomplete = item.autocomplete ?? "off";
   input.inputMode = ["money_string", "decimal_string", "integer"].includes(item.type) ? "decimal" : item.type === "tel" ? "tel" : "text";
-  input.type = item.type === "date" ? "date" : item.type === "tel" ? "tel" : "text";
+  input.type = inputControlType(item.type);
+  const pattern = inputPattern(item.type);
+  if (pattern) input.pattern = pattern;
   input.dataset.type = item.type;
   input.setAttribute("aria-describedby", `help-${safeToken(item.fieldId)}`);
-  if (prior != null && !String(prior).includes("•")) input.value = String(prior);
+  restoreWorkspaceInputValue(input, prior);
   const help = element("small", "", `${item.dataClass} · ${item.exposure} response`);
   help.id = `help-${safeToken(item.fieldId)}`;
   field.append(caption, input, help);
@@ -238,8 +242,13 @@ async function executeAction(action) {
   if (submit && !ui.journey_form.reportValidity()) return;
   const values = {};
   for (const input of ui.journey_form.querySelectorAll("[data-type]")) {
-    if (!input.value) continue;
-    values[input.name] = input.dataset.type === "integer" ? Number(input.value) : input.value;
+    const value = readWorkspaceInputValue(input);
+    if (input.dataset.type !== "boolean" && input.value && value === undefined) {
+      ui.form_status.textContent = `${input.name.replaceAll("_", " ")} has an invalid value.`;
+      input.focus();
+      return;
+    }
+    if (value !== undefined) values[input.name] = value;
   }
   const idempotencyKey = crypto.randomUUID();
   ui.form_status.textContent = submit ? "Submitting securely…" : "Saving secure draft…";

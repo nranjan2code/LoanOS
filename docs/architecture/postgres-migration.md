@@ -160,6 +160,10 @@ provisioned locally, via `tests/postgres-store.test.js`:
   `loanos_control_plane` (what the application actually authenticates as)
   and switching to `loanos_app` via `SET ROLE`, exactly mirroring
   `withTenantRole()`.
+- Tenant-scoped sandbox/offboarding deletion runs through that same forced-RLS
+  role and can remove only `app.current_tenant_id`; a two-tenant regression
+  proves the other envelope survives. The control-plane role retains its
+  separate whole-state cleanup authority.
 - `loanos_control_plane` genuinely bypasses RLS directly (no role switch),
   proving the whole-state control-plane operations that need cross-tenant
   visibility actually get it.

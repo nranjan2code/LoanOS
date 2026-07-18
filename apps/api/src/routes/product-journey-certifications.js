@@ -1,12 +1,17 @@
 import { createHash } from "node:crypto";
 import {
   PRODUCT_JOURNEY_TYPES,
+  approveProductJourneyProductionArtifact,
   assessTenantJourneyActivation,
   certifyProductJourneySupport,
+  projectProductJourneyProductionEvidenceBlockers,
   projectProductJourneySupport,
   registerProductJourneyProductionEvidence,
+  resolveProductJourneyProductionArtifacts,
   resolveProductJourneyProductionEvidence,
-  suspendProductJourneySupport
+  suspendProductJourneyProductionArtifact,
+  suspendProductJourneySupport,
+  validateProductJourneyProductionArtifactInput
 } from "@loanos/core";
 
 const PREFIX = "/admin/product-journey-certifications";
@@ -26,6 +31,9 @@ export async function routeProductJourneyCertifications(context) {
     const certifications = state.productJourneySupportCertifications ?? {};
     const evidenceProposals = state.productJourneyProductionEvidenceProposals ?? {};
     const evidenceRegistries = state.productJourneyProductionEvidenceRegistries ?? {};
+    const artifactProposals = state.productJourneyProductionArtifactProposals ?? {};
+    const artifacts = state.productJourneyProductionArtifacts ?? {};
+    const artifactSuspensionProposals = state.productJourneyProductionArtifactSuspensionProposals ?? {};
     if (method === "GET" && path === PREFIX) {
       sendJson(res, 200, {
         catalogue: PRODUCT_JOURNEY_TYPES,
@@ -34,12 +42,75 @@ export async function routeProductJourneyCertifications(context) {
         suspensionProposals: Object.values(suspensionProposals).filter((item) => item.tenantId === tenant.tenantId),
         evidenceProposals: Object.values(evidenceProposals).filter((item) => item.tenantId === tenant.tenantId),
         evidenceRegistries: Object.fromEntries(Object.entries(evidenceRegistries).map(([type, registry]) => [type, Object.values(registry).filter((item) => item.tenantId === tenant.tenantId)])),
+        artifactProposals: Object.values(artifactProposals).filter((item) => item.tenantId === tenant.tenantId),
+        artifacts: Object.values(artifacts).filter((item) => item.tenantId === tenant.tenantId),
+        artifactSuspensionProposals: Object.values(artifactSuspensionProposals).filter((item) => item.tenantId === tenant.tenantId),
         certifications: Object.values(certifications).filter((item) => item.tenantId === tenant.tenantId)
       }); return true;
     }
+    if (method === "POST" && path === `${PREFIX}/artifact-proposals`) {
+      const body = await readJson(req);
+      rejectRawArtifactContent(body);
+      const proposalId = required(body.proposalId, "proposalId");
+      const artifactInput = validateProductJourneyProductionArtifactInput(sanitizeArtifactInput(body, tenant.tenantId));
+      const immutable = { tenantId: tenant.tenantId, proposalId, artifactInput, proposedBy: actor };
+      const proposalChecksumSha256 = hash(immutable); const key = `${tenant.tenantId}:${proposalId}`; const prior = artifactProposals[key];
+      if (prior) { if (prior.proposalChecksumSha256 !== proposalChecksumSha256) throw coded("journey_production_artifact_proposal_conflict", "proposalId is already bound to different artifact metadata."); sendJson(res, 200, { proposal: prior, idempotent: true }); return true; }
+      const proposal = { ...immutable, proposalChecksumSha256, status: "pending", proposedAt: new Date().toISOString() };
+      await store.save(appendEvent({ ...state, productJourneyProductionArtifactProposals: { ...artifactProposals, [key]: proposal } }, { type: "product_journey.production_artifact_proposed", actor, proposalId, artifactId: artifactInput.artifactId, artifactType: artifactInput.artifactType, proposalChecksumSha256 }));
+      sendJson(res, 201, { proposal, idempotent: false }); return true;
+    }
+    const artifactProposalId = match(path, `${PREFIX}/artifact-proposals/`, "/review");
+    if (method === "POST" && artifactProposalId) {
+      const body = await readJson(req); const key = `${tenant.tenantId}:${artifactProposalId}`; const proposal = artifactProposals[key];
+      if (!proposal || proposal.status !== "pending") throw coded("journey_production_artifact_proposal_missing", "A pending same-tenant artifact proposal is required.");
+      if (proposal.proposedBy === actor) throw coded("journey_production_artifact_review_independence", "Artifact proposer cannot review the proposal.");
+      const outcome = required(body.outcome, "outcome");
+      if (!new Set(["accepted", "rejected"]).has(outcome)) throw coded("journey_production_artifact_review_invalid", "Review outcome must be accepted or rejected.");
+      if (outcome === "rejected") {
+        const decided = { ...proposal, status: "rejected", reviewedBy: actor, reviewEvidenceRef: required(body.reviewEvidenceRef, "reviewEvidenceRef"), rejectionReason: required(body.rejectionReason, "rejectionReason"), reviewedAt: new Date().toISOString() };
+        await store.save(appendEvent({ ...state, productJourneyProductionArtifactProposals: { ...artifactProposals, [key]: decided } }, { type: "product_journey.production_artifact_rejected", actor, proposalId: artifactProposalId, artifactId: proposal.artifactInput.artifactId, rejectionReason: decided.rejectionReason }));
+        sendJson(res, 200, { proposal: decided }); return true;
+      }
+      const result = approveProductJourneyProductionArtifact(artifacts, { artifact: proposal.artifactInput, proposedBy: proposal.proposedBy, approvedBy: actor, approvalRef: required(body.approvalRef, "approvalRef"), reviewEvidenceRef: required(body.reviewEvidenceRef, "reviewEvidenceRef"), reviewChecklist: body.reviewChecklist });
+      const decided = { ...proposal, status: "approved", reviewedBy: actor, approvalRef: body.approvalRef, reviewEvidenceRef: body.reviewEvidenceRef, reviewedAt: new Date().toISOString(), artifactChecksumSha256: result.artifact.artifactChecksumSha256 };
+      await store.save(appendEvent({ ...state, productJourneyProductionArtifactProposals: { ...artifactProposals, [key]: decided }, productJourneyProductionArtifacts: result.registry }, { type: "product_journey.production_artifact_approved", actor, proposalId: artifactProposalId, artifactId: result.artifact.artifactId, artifactChecksumSha256: result.artifact.artifactChecksumSha256 }));
+      sendJson(res, 200, { proposal: decided, artifact: result.artifact }); return true;
+    }
+    const artifactIdForSuspension = match(path, `${PREFIX}/artifacts/`, "/suspension-proposals");
+    if (method === "POST" && artifactIdForSuspension) {
+      const body = await readJson(req); const artifact = artifacts[artifactIdForSuspension];
+      if (!artifact || artifact.tenantId !== tenant.tenantId || artifact.status !== "active") throw coded("journey_production_artifact_missing", "An active same-tenant artifact is required.");
+      const proposalId = required(body.proposalId, "proposalId"); const immutable = { tenantId: tenant.tenantId, proposalId, artifactId: artifactIdForSuspension, reason: required(body.reason, "reason"), incidentRef: required(body.incidentRef, "incidentRef"), proposedBy: actor, artifactChecksumSha256: artifact.artifactChecksumSha256 };
+      const proposalChecksumSha256 = hash(immutable); const key = `${tenant.tenantId}:${proposalId}`; const prior = artifactSuspensionProposals[key];
+      if (prior) { if (prior.proposalChecksumSha256 !== proposalChecksumSha256) throw coded("journey_production_artifact_suspension_conflict", "proposalId is already bound to different suspension metadata."); sendJson(res, 200, { proposal: prior, idempotent: true }); return true; }
+      const proposal = { ...immutable, proposalChecksumSha256, status: "pending", proposedAt: new Date().toISOString() };
+      await store.save(appendEvent({ ...state, productJourneyProductionArtifactSuspensionProposals: { ...artifactSuspensionProposals, [key]: proposal } }, { type: "product_journey.production_artifact_suspension_proposed", actor, proposalId, artifactId: artifactIdForSuspension, proposalChecksumSha256 }));
+      sendJson(res, 201, { proposal, idempotent: false }); return true;
+    }
+    const artifactSuspensionProposalId = match(path, `${PREFIX}/artifact-suspension-proposals/`, "/approval");
+    if (method === "POST" && artifactSuspensionProposalId) {
+      const body = await readJson(req); const key = `${tenant.tenantId}:${artifactSuspensionProposalId}`; const proposal = artifactSuspensionProposals[key];
+      if (!proposal || proposal.status !== "pending") throw coded("journey_production_artifact_suspension_missing", "A pending same-tenant artifact suspension proposal is required.");
+      if (proposal.proposedBy === actor) throw coded("journey_production_artifact_suspension_four_eyes", "Artifact suspension proposer cannot approve it.");
+      const current = artifacts[proposal.artifactId];
+      if (!current || current.artifactChecksumSha256 !== proposal.artifactChecksumSha256) throw coded("journey_production_artifact_not_current", "Artifact changed after suspension proposal.");
+      const result = suspendProductJourneyProductionArtifact(artifacts, { artifactId: proposal.artifactId, reason: proposal.reason, incidentRef: proposal.incidentRef, proposedBy: proposal.proposedBy, approvedBy: actor, approvalRef: required(body.approvalRef, "approvalRef") });
+      const decided = { ...proposal, status: "approved", approvedBy: actor, approvalRef: body.approvalRef, approvedAt: new Date().toISOString() };
+      await store.save(appendEvent({ ...state, productJourneyProductionArtifactSuspensionProposals: { ...artifactSuspensionProposals, [key]: decided }, productJourneyProductionArtifacts: result.registry }, { type: "product_journey.production_artifact_suspended", actor, proposalId: artifactSuspensionProposalId, artifactId: proposal.artifactId, incidentRef: proposal.incidentRef }));
+      sendJson(res, 200, { proposal: decided, artifact: result.artifact }); return true;
+    }
+    if (method === "POST" && path === `${PREFIX}/evidence-blockers`) {
+      const body = await readJson(req);
+      const blockers = projectProductJourneyProductionEvidenceBlockers(artifacts, evidenceRegistries, { ...body, tenantId: tenant.tenantId });
+      sendJson(res, blockers.status === "ready_for_certification_proposal" ? 200 : 422, { blockers }); return true;
+    }
     if (method === "POST" && path === `${PREFIX}/evidence-proposals`) {
       const body = await readJson(req); const proposalId = required(body.proposalId, "proposalId");
-      const recordInput = sanitizeEvidenceInput(body, tenant.tenantId);
+      if (body.evidence || body.externalDependencies || body.productionEvidence || body.rawEvidence) throw coded("journey_production_request_body_evidence_rejected", "Raw evidence claims are forbidden; reference independently reviewed artifact records.");
+      const requested = sanitizeEvidenceInput(body, tenant.tenantId);
+      const resolvedArtifacts = resolveProductJourneyProductionArtifacts(artifacts, requested);
+      const recordInput = { ...requested, ...resolvedArtifacts };
       registerProductJourneyProductionEvidence({}, { ...recordInput, proposedBy: actor, approvedBy: "validation-only-independent-checker", approvalRef: "validation-only" });
       const immutable = { tenantId: tenant.tenantId, proposalId, recordInput, proposedBy: actor }; const proposalChecksumSha256 = hash(immutable); const key = `${tenant.tenantId}:${proposalId}`; const prior = evidenceProposals[key];
       if (prior) { if (prior.proposalChecksumSha256 !== proposalChecksumSha256) throw coded("journey_production_evidence_proposal_conflict", "proposalId is already bound to different evidence."); sendJson(res, 200, { proposal: prior, idempotent: true }); return true; }
@@ -52,7 +123,10 @@ export async function routeProductJourneyCertifications(context) {
       const body = await readJson(req); const key = `${tenant.tenantId}:${evidenceProposalId}`; const proposal = evidenceProposals[key];
       if (!proposal || proposal.status !== "pending") throw coded("journey_production_evidence_proposal_missing", "A pending same-tenant evidence proposal is required.");
       if (proposal.proposedBy === actor) throw coded("journey_certification_four_eyes", "The evidence proposer cannot approve it.");
-      const result = registerProductJourneyProductionEvidence(evidenceRegistries, { ...proposal.recordInput, proposedBy: proposal.proposedBy, approvedBy: actor, approvalRef: required(body.approvalRef, "approvalRef") });
+      const currentArtifacts = resolveProductJourneyProductionArtifacts(artifacts, proposal.recordInput);
+      const currentRecordInput = { ...proposal.recordInput, ...currentArtifacts };
+      if (hash(currentRecordInput) !== hash(proposal.recordInput)) throw coded("journey_production_artifact_not_current", "Source artifacts changed after evidence proposal.");
+      const result = registerProductJourneyProductionEvidence(evidenceRegistries, { ...currentRecordInput, proposedBy: proposal.proposedBy, approvedBy: actor, approvalRef: required(body.approvalRef, "approvalRef") });
       const decided = { ...proposal, status: "approved", approvedBy: actor, approvalRef: body.approvalRef, approvedAt: new Date().toISOString(), recordChecksumSha256: result.record.checksumSha256 };
       await store.save(appendEvent({ ...state, productJourneyProductionEvidenceProposals: { ...evidenceProposals, [key]: decided }, productJourneyProductionEvidenceRegistries: result.registries }, { type: "product_journey.production_evidence_approved", actor, proposalId: evidenceProposalId, registryType: result.record.registryType, evidenceId: result.record.evidenceId, recordChecksumSha256: result.record.checksumSha256 }));
       sendJson(res, 200, { proposal: decided, record: result.record }); return true;
@@ -62,7 +136,7 @@ export async function routeProductJourneyCertifications(context) {
       const proposalId = required(body.proposalId, "proposalId");
       const certificationInput = sanitizeCertificationInput(body, tenant.tenantId);
       if (body.productionEvidence || body.externalDependencies) throw coded("journey_production_request_body_evidence_rejected", "Production evidence and provider dependencies must be resolved from checker-approved registries.");
-      const resolved = certificationInput.supportLevel === "production_ready" ? resolveProductJourneyProductionEvidence(evidenceRegistries, certificationInput) : null;
+      const resolved = certificationInput.supportLevel === "production_ready" ? resolveProductJourneyProductionEvidence(evidenceRegistries, { ...certificationInput, productionArtifacts: artifacts }) : null;
       const validationInput = resolved ? withResolvedProductionEvidence(certificationInput, resolved) : certificationInput;
       certifyProductJourneySupport({}, { ...validationInput, proposedBy: actor, approvedBy: "validation-only-independent-checker", approvalRef: "validation-only" });
       const productionAssessment = resolved?.assessment ?? null;
@@ -85,7 +159,7 @@ export async function routeProductJourneyCertifications(context) {
       const proposal = proposals[key];
       if (!proposal || proposal.status !== "pending") throw coded("journey_certification_proposal_missing", "A pending same-tenant proposal is required.");
       if (proposal.proposedBy === actor) throw coded("journey_certification_four_eyes", "The proposer cannot approve the certification.");
-      const resolved = proposal.certificationInput.supportLevel === "production_ready" ? resolveProductJourneyProductionEvidence(evidenceRegistries, proposal.certificationInput) : null;
+      const resolved = proposal.certificationInput.supportLevel === "production_ready" ? resolveProductJourneyProductionEvidence(evidenceRegistries, { ...proposal.certificationInput, productionArtifacts: artifacts }) : null;
       if (resolved && resolved.assessment.evidenceChecksumSha256 !== proposal.productionAssessmentChecksumSha256) throw coded("journey_production_evidence_changed", "Trusted production evidence changed after proposal; submit a new certification proposal.");
       const approvalInput = resolved ? withResolvedProductionEvidence(proposal.certificationInput, resolved) : proposal.certificationInput;
       const result = certifyProductJourneySupport(certifications, { ...approvalInput, proposedBy: proposal.proposedBy, approvedBy: actor, approvalRef: required(body.approvalRef, "approvalRef") });
@@ -119,7 +193,7 @@ export async function routeProductJourneyCertifications(context) {
     if (method === "POST" && path === `${PREFIX}/activation-assessments`) {
       const body = await readJson(req);
       const certification = certifications[`${tenant.tenantId}:${body.journeyType}`];
-      const resolved = body.liveMode && certification?.supportLevel === "production_ready" ? resolveProductJourneyProductionEvidence(evidenceRegistries, { tenantId: tenant.tenantId, journeyType: body.journeyType, templateVersion: certification.templateVersion, configurationVersion: certification.configurationVersion, productionRegistryRefs: certification.productionRegistryRefs }) : null;
+      const resolved = body.liveMode && certification?.supportLevel === "production_ready" ? resolveProductJourneyProductionEvidence(evidenceRegistries, { tenantId: tenant.tenantId, journeyType: body.journeyType, templateVersion: certification.templateVersion, configurationVersion: certification.configurationVersion, productionRegistryRefs: certification.productionRegistryRefs, productionArtifacts: artifacts }) : null;
       const trusted = resolved ? { ...resolved.activationBindings, templateVersion: certification.templateVersion, configurationVersion: certification.configurationVersion, currentProductionEvidence: resolved.productionEvidence, currentExternalDependencies: resolved.externalDependencies, providerReadinessRef: resolved.providerReadinessRef, deploymentReadinessRef: resolved.deploymentReadinessRef, institutionReadinessRef: resolved.institutionReadinessRef } : {};
       const assessment = assessTenantJourneyActivation(certifications, { ...body, ...trusted, tenantId: tenant.tenantId });
       sendJson(res, assessment.status === "ready" ? 200 : 422, { assessment }); return true;
@@ -134,7 +208,9 @@ function sanitizeCertificationInput(body, tenantId) {
   const { proposedBy: _proposedBy, approvedBy: _approvedBy, approvalRef: _approvalRef, proposalId: _proposalId, productionEvidence: _productionEvidence, externalDependencies: _externalDependencies, ...input } = body;
   return { ...input, tenantId };
 }
-function sanitizeEvidenceInput(body, tenantId) { const { proposedBy: _proposedBy, approvedBy: _approvedBy, approvalRef: _approvalRef, proposalId: _proposalId, ...input } = body; return { ...input, tenantId }; }
+function sanitizeEvidenceInput(body, tenantId) { return { tenantId, registryType: body.registryType, evidenceId: body.evidenceId, journeyType: body.journeyType, templateVersion: body.templateVersion, configurationVersion: body.configurationVersion, artifactRefs: body.artifactRefs, activationBindings: body.activationBindings, validUntil: body.validUntil }; }
+function sanitizeArtifactInput(body, tenantId) { const { proposedBy: _proposedBy, approvedBy: _approvedBy, approvalRef: _approvalRef, proposalId: _proposalId, outcome: _outcome, reviewChecklist: _reviewChecklist, reviewEvidenceRef: _reviewEvidenceRef, ...input } = body; return { ...input, tenantId }; }
+function rejectRawArtifactContent(body) { for (const field of ["content", "payload", "rawEvidence", "artifactPayload", "productionEvidence"]) if (body[field] !== undefined) throw coded("journey_production_artifact_payload_rejected", "Artifact payloads are not accepted; register external metadata and checksum only."); }
 function withResolvedProductionEvidence(input, resolved) { return { ...input, productionEvidence: resolved.productionEvidence, externalDependencies: resolved.externalDependencies, productionRegistryRefs: resolved.productionRegistryRefs, productionReadinessRef: `trusted-registry-assessment/${resolved.assessment.evidenceChecksumSha256}` }; }
 function projectProposal({ certificationInput, ...proposal }) { return { ...proposal, journeyType: certificationInput.journeyType, templateVersion: certificationInput.templateVersion, supportLevel: certificationInput.supportLevel, validUntil: certificationInput.validUntil }; }
 function required(value, field) { if (typeof value !== "string" || !value.trim()) throw coded("journey_certification_invalid", `${field} is required.`); return value.trim(); }

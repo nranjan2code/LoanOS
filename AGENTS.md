@@ -65,6 +65,8 @@ npm run knowledge:check                    # docs + evidence + cross-link graph 
 npm run graph:check                        # identifier cross-links resolve (see docs/identifier-registry.md)
 npm run depth:check                        # journey platform-depth audit vs canonical catalogues + evidence refs
 npm run currency:check -- --staged         # advisory: did companion docs move with this change?
+npm run test:journey-postgres              # mandatory selected-environment JD-05 21x17 PostgreSQL/RLS corpus (requires DATABASE_URL_TEST)
+npm run jd05:browser                       # loopback synthetic JD-05 interactive browser harness; open printed URL
 npm run corpus:check                       # fail if the JS↔Rust eligibility corpus drifted
 npm run demo:audit                         # validate canonical synthetic showcase profile
 ./deploy/aws/package-demo.sh --help        # inspect selective server/browser packaging options

@@ -1,8 +1,8 @@
 {
   "schemaVersion": 2,
-  "generated": "2026-07-18T07:45:06.043Z",
-  "sourceDigest": "1c6fe451ffe239e9",
-  "snapshotId": "93cae82ffb46aa5c",
+  "generated": "2026-07-18T12:33:20.953Z",
+  "sourceDigest": "d327c1de1e7dbd1b",
+  "snapshotId": "b91bc21765079800",
   "sources": {
     "catalogue": "docs/product/complete-system-capability-catalog.md",
     "trace": "docs/product/capability-trace.json",
@@ -12,70 +12,70 @@
   },
   "git": {
     "branch": "main",
-    "sha": "3e38e32aecce",
-    "count": 225,
+    "sha": "5b96f2e41a48",
+    "count": 229,
     "dirty": true,
-    "changeCount": 52,
+    "changeCount": 41,
     "commits": [
+      {
+        "hash": "5b96f2e",
+        "subject": "feat(platform): implement journey certifications, payment operations, fraud cases, and workspace administration updates",
+        "when": "4 hours ago"
+      },
+      {
+        "hash": "711caa5",
+        "subject": "docs(architecture): canonical testing strategy and design system standards",
+        "when": "4 hours ago"
+      },
+      {
+        "hash": "1dca57c",
+        "subject": "feat(governance): add task-type entry skills and scenario routing",
+        "when": "5 hours ago"
+      },
+      {
+        "hash": "e1a3258",
+        "subject": "feat(governance): make the agent-execution layer executable",
+        "when": "5 hours ago"
+      },
       {
         "hash": "3e38e32",
         "subject": "feat(platform): complete operational UI and status surfaces",
-        "when": "3 hours ago"
+        "when": "8 hours ago"
       },
       {
         "hash": "daec00d",
         "subject": "feat(workspaces): ship role-specific operational desks",
-        "when": "4 hours ago"
+        "when": "9 hours ago"
       },
       {
         "hash": "207bfea",
         "subject": "refactor(api): extract route modules and add documentation governance",
-        "when": "6 hours ago"
+        "when": "11 hours ago"
       },
       {
         "hash": "edb1a8b",
         "subject": "docs: deep documentation pass for the @loanos/core package boundary",
-        "when": "7 hours ago"
+        "when": "12 hours ago"
       },
       {
         "hash": "4a9ef90",
         "subject": "refactor(core): group domain kernel into @loanos/core package domains",
-        "when": "7 hours ago"
+        "when": "12 hours ago"
       },
       {
         "hash": "8b1c3bd",
         "subject": "docs(core): add JSDoc/rustdoc documentation pass for humans and AI agents",
-        "when": "8 hours ago"
+        "when": "13 hours ago"
       },
       {
         "hash": "bce5d2f",
         "subject": "feat(academy): implement technical academy and update compliance controls",
-        "when": "14 hours ago"
+        "when": "19 hours ago"
       },
       {
         "hash": "3aa511b",
         "subject": "fix(aws): return successful status without domains",
-        "when": "17 hours ago"
-      },
-      {
-        "hash": "f98d662",
-        "subject": "fix(aws): support committed release on macOS bash",
-        "when": "18 hours ago"
-      },
-      {
-        "hash": "5ed96b1",
-        "subject": "feat: implement Banker Academy curriculum, build scripts, and updates to help centre",
-        "when": "19 hours ago"
-      },
-      {
-        "hash": "ac6bb2c",
-        "subject": "feat(help): add complete technical academy",
-        "when": "19 hours ago"
-      },
-      {
-        "hash": "c1196e1",
-        "subject": "feat(deploy): update AWS showcase deployment, demo script, and architecture documentation",
-        "when": "2 days ago"
+        "when": "22 hours ago"
       }
     ]
   },
@@ -839,6 +839,16 @@
               "type": "test",
               "ref": "tests/product-platform-administration.test.js",
               "note": "Configuration version, blocker, history and evidence-reference behavior is executable."
+            },
+            {
+              "type": "code",
+              "ref": "packages/core/src/journeys/product-journey-production-evidence-intake.js",
+              "note": "Exact tenant/journey/template/configuration artifact metadata, source, custody, witness, review, expiry and suspension gate production evidence assembly."
+            },
+            {
+              "type": "test",
+              "ref": "tests/product-journey-production-evidence-intake.test.js",
+              "note": "Adverse-first coverage proves incomplete, non-independent, expired and suspended artifacts cannot enter production certification."
             }
           ],
           "owner": "Platform Engineering & Security",
@@ -13331,6 +13341,16 @@
               "type": "test",
               "ref": "tests/product-journey-certification.test.js",
               "note": "Exact-version, registry status and evidence-currentness failures block live journey activation."
+            },
+            {
+              "type": "code",
+              "ref": "apps/api/src/routes/product-journey-certifications.js",
+              "note": "Authenticated artifact metadata intake rejects payloads, requires independent review and projects production blockers without asserting external evidence exists."
+            },
+            {
+              "type": "test",
+              "ref": "tests/product-journey-certification-api.test.js",
+              "note": "Real API composition covers payload rejection, artifact-reference-only bundles, independent review, suspension and live fail-closed revalidation."
             }
           ],
           "owner": "Site Reliability Engineering",
@@ -14682,7 +14702,22 @@
             {
               "type": "test",
               "ref": "tests/product-journey-generated-conformance-postgres.test.js",
-              "note": "Environment-gated PostgreSQL lane persists 21 by 17 evidence records and verifies tenant RLS isolation."
+              "note": "Mandatory selected-environment PostgreSQL command persists 21 by 17 evidence records and verifies tenant RLS isolation without a silent skip."
+            },
+            {
+              "type": "code",
+              "ref": "scripts/run-jd05-browser-conformance.mjs",
+              "note": "Loopback-only disposable synthetic browser runner records non-production evidence and rejects live or production-ready claims."
+            },
+            {
+              "type": "test",
+              "ref": "tests/journey-workspace-browser-harness.test.js",
+              "note": "Fail-closed harness boundary coverage plus the browser-executable all-21 adverse, save/resume/submit and recovery flow."
+            },
+            {
+              "type": "doc",
+              "ref": "docs/evidence/jd05-interactive-browser-2026-07-18.json",
+              "note": "Sanitized checksum-sealed receipt from the passed 12-step in-app browser run; explicitly synthetic and non-production."
             }
           ],
           "owner": "Customer Experience & Implementation",
@@ -19784,7 +19819,22 @@
         {
           "type": "test",
           "ref": "tests/product-journey-generated-conformance-postgres.test.js",
-          "note": "Environment-gated PostgreSQL lane persists 21 by 17 evidence records and verifies tenant RLS isolation."
+          "note": "Mandatory selected-environment PostgreSQL command persists 21 by 17 evidence records and verifies tenant RLS isolation without a silent skip."
+        },
+        {
+          "type": "code",
+          "ref": "scripts/run-jd05-browser-conformance.mjs",
+          "note": "Loopback-only disposable synthetic browser runner records non-production evidence and rejects live or production-ready claims."
+        },
+        {
+          "type": "test",
+          "ref": "tests/journey-workspace-browser-harness.test.js",
+          "note": "Fail-closed harness boundary coverage plus the browser-executable all-21 adverse, save/resume/submit and recovery flow."
+        },
+        {
+          "type": "doc",
+          "ref": "docs/evidence/jd05-interactive-browser-2026-07-18.json",
+          "note": "Sanitized checksum-sealed receipt from the passed 12-step in-app browser run; explicitly synthetic and non-production."
         }
       ]
     },
@@ -21213,6 +21263,16 @@
           "type": "test",
           "ref": "tests/product-journey-certification.test.js",
           "note": "Exact-version, registry status and evidence-currentness failures block live journey activation."
+        },
+        {
+          "type": "code",
+          "ref": "apps/api/src/routes/product-journey-certifications.js",
+          "note": "Authenticated artifact metadata intake rejects payloads, requires independent review and projects production blockers without asserting external evidence exists."
+        },
+        {
+          "type": "test",
+          "ref": "tests/product-journey-certification-api.test.js",
+          "note": "Real API composition covers payload rejection, artifact-reference-only bundles, independent review, suspension and live fail-closed revalidation."
         }
       ]
     },
@@ -22249,6 +22309,16 @@
           "type": "test",
           "ref": "tests/product-platform-administration.test.js",
           "note": "Configuration version, blocker, history and evidence-reference behavior is executable."
+        },
+        {
+          "type": "code",
+          "ref": "packages/core/src/journeys/product-journey-production-evidence-intake.js",
+          "note": "Exact tenant/journey/template/configuration artifact metadata, source, custody, witness, review, expiry and suspension gate production evidence assembly."
+        },
+        {
+          "type": "test",
+          "ref": "tests/product-journey-production-evidence-intake.test.js",
+          "note": "Adverse-first coverage proves incomplete, non-independent, expired and suspended artifacts cannot enter production certification."
         }
       ]
     },
@@ -25630,13 +25700,13 @@
     }
   ],
   "tests": {
-    "pass": 730,
+    "pass": 739,
     "fail": 0,
-    "skipped": 11,
+    "skipped": 12,
     "cancelled": 0,
     "todo": 0,
-    "total": 741,
-    "durationMs": 24817.585417,
+    "total": 751,
+    "durationMs": 23040.078333,
     "ran": true,
     "source": "provided-log",
     "error": ""

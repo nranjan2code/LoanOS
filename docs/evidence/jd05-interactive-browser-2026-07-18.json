@@ -1,0 +1,32 @@
+{
+  "evidenceType": "interactive_browser",
+  "executionMode": "non_production",
+  "commerciallyLive": false,
+  "productionReady": false,
+  "tenantData": "synthetic_only",
+  "journeyCount": 21,
+  "allPassed": true,
+  "blocker": null,
+  "steps": [
+    { "stepId": "unauthenticated_restriction", "outcome": "passed", "observation": "Workspace data stays unavailable without an interactive session." },
+    { "stepId": "authenticated_session", "outcome": "passed", "observation": "Disposable MFA-backed human session established." },
+    { "stepId": "no_cache_contract", "outcome": "passed", "observation": "Authenticated business projection returns Cache-Control: no-store." },
+    { "stepId": "canonical_21_interaction", "outcome": "passed", "observation": "Opened, focused and returned from every canonical journey card." },
+    { "stepId": "required_fact_denial", "outcome": "passed", "observation": "Required-field omission was blocked before any mutation." },
+    { "stepId": "malformed_numeric_denial", "outcome": "passed", "observation": "Malformed exact numeric input was rejected in the interactive surface." },
+    { "stepId": "server_draft_happy_path", "outcome": "passed", "observation": "Browser action persisted a synthetic, actor-bound server draft." },
+    { "stepId": "draft_resume_recovery", "outcome": "passed", "observation": "Returned through the UI and resumed the server-held draft." },
+    { "stepId": "typed_submit_happy_path", "outcome": "passed", "observation": "Typed boolean, integer, decimal, money, date and reference facts submitted through the browser." },
+    { "stepId": "service_failure_visible", "outcome": "passed", "observation": "Injected draft-service failure remained restrictive and visible." },
+    { "stepId": "service_recovery", "outcome": "passed", "observation": "Refresh recovered server state without browser persistence or optimistic reconstruction." },
+    { "stepId": "accessibility_and_language", "outcome": "passed", "observation": "Keyboard focus, live status, skip navigation and Hindi projection remained available." }
+  ],
+  "residualLimitations": [
+    "No selected-environment PostgreSQL/RLS execution",
+    "No certified live provider or deployment interaction",
+    "No mobile device or assistive-technology certification",
+    "No performance, visual-regression or production-operating-effectiveness evidence"
+  ],
+  "recordedAt": "2026-07-18T11:58:30.501Z",
+  "evidenceChecksumSha256": "cf51611f02a752796320fe04b2442535f0b049e7950a82884cb06a4baba832b8"
+}

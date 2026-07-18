@@ -15,7 +15,22 @@ import { PRODUCT_TEMPLATE_CATALOGUE } from "@loanos/core/platform/product-templa
 import { createProductJourneyDownstreamConformanceExecutor } from "@loanos/core/journeys/product-journey-generated-conformance.js";
 
 const DATABASE_URL_TEST = process.env.DATABASE_URL_TEST;
-const skip = !DATABASE_URL_TEST && "DATABASE_URL_TEST is not set — PostgreSQL/RLS JD-05 lane requires a disposable database.";
+const REQUIRE_SELECTED_POSTGRES = process.env.LOANOS_REQUIRE_JD05_POSTGRES === "1";
+const skip = !REQUIRE_SELECTED_POSTGRES
+  ? "JD-05 PostgreSQL/RLS corpus runs only through the explicit selected-environment command."
+  : !DATABASE_URL_TEST && "DATABASE_URL_TEST is not set — PostgreSQL/RLS JD-05 lane requires a disposable database.";
+
+test("selected JD-05 PostgreSQL execution cannot silently skip and remains explicit in CI", async () => {
+  const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
+  const workflow = await readFile(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
+  assert.match(packageJson.scripts["test:journey-postgres"] ?? "", /LOANOS_REQUIRE_JD05_POSTGRES=1/);
+  assert.match(packageJson.scripts["test:journey-postgres"] ?? "", /product-journey-generated-conformance-postgres\.test\.js/);
+  assert.match(workflow, /npm run test:journey-postgres/);
+});
+
+test("selected JD-05 PostgreSQL execution requires an explicit disposable database", { skip: !REQUIRE_SELECTED_POSTGRES }, () => {
+  assert.ok(DATABASE_URL_TEST, "DATABASE_URL_TEST is required when LOANOS_REQUIRE_JD05_POSTGRES=1");
+});
 
 test("generated PostgreSQL lane persists and recovers all 21 journeys under RLS", { skip }, async () => {
   const pg = await import("pg");

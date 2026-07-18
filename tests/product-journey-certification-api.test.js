@@ -36,17 +36,43 @@ test("journey support certification API requires authenticated maker-checker and
   assert.equal((await response.json()).error.code, "journey_production_request_body_evidence_rejected");
 
   const productionJourney = "msme_term_loan";
-  const evidenceItem = (domain) => ({ domain, tenantId: tenant.tenantId, journeyType: productionJourney, templateVersion: "1", configurationVersion: "4", status: "passed", evidenceRef: `evidence/${domain}`, evidenceChecksumSha256: "a".repeat(64), observedAt: "2026-07-14T00:00:00.000Z", validUntil: "2027-01-01T00:00:00.000Z", producedBy: `producer/${domain}`, approvedBy: `approver/${domain}` });
+  const scope = { journeyType: productionJourney, templateVersion: "1", configurationVersion: "4" };
+  const reviewChecklist = { sourceMatched: true, checksumMatched: true, custodyConfirmed: true, scopeConfirmed: true, witnessConfirmed: true };
+  const registerArtifact = async (artifact) => {
+    const proposalId = `artifact-proposal-${artifact.artifactId}`;
+    let artifactResponse = await request(`${prefix}/artifact-proposals`, cookies.maker, { proposalId, ...scope, ...artifact });
+    assert.equal(artifactResponse.status, 201, await artifactResponse.clone().text());
+    artifactResponse = await request(`${prefix}/artifact-proposals/${proposalId}/review`, cookies.checker, { outcome: "accepted", approvalRef: `approval/${artifact.artifactId}`, reviewEvidenceRef: `review/${artifact.artifactId}`, reviewChecklist });
+    assert.equal(artifactResponse.status, 200, await artifactResponse.clone().text());
+  };
+  const domainArtifact = (domain) => ({ artifactId: `domain-${domain}`, artifactType: "evidence_domain", domain, evidenceStatus: "passed", externalArtifact: { reference: `external/${domain}`, checksumSha256: "a".repeat(64), mediaType: "application/pdf" }, source: { system: "external-assurance-system", recordRef: `record/${domain}`, sourceOwnerRef: `source-owner/${domain}`, retrievedAt: "2026-07-14T01:00:00.000Z" }, custody: { custodianRef: "records/1", repositoryRef: `worm/${domain}`, storageCountry: "IN", immutable: true }, witness: { witnessedBy: `witness/${domain}`, witnessRef: `witness-ref/${domain}`, witnessedAt: "2026-07-14T02:00:00.000Z" }, producedBy: `producer/${domain}`, observedAt: "2026-07-14T00:00:00.000Z", validUntil: "2027-01-01T00:00:00.000Z" });
+  response = await request(`${prefix}/artifact-proposals`, cookies.maker, { proposalId: "raw-artifact", ...scope, ...domainArtifact("provider_certification"), payload: { fabricated: true } });
+  assert.equal(response.status, 422);
+  assert.equal((await response.json()).error.code, "journey_production_artifact_payload_rejected");
+  await registerArtifact(domainArtifact("provider_certification"));
+  response = await request(`${prefix}/artifact-proposals/artifact-proposal-domain-provider_certification/review`, cookies.maker, { outcome: "accepted", approvalRef: "approval/self", reviewEvidenceRef: "review/self", reviewChecklist });
+  assert.equal(response.status, 422);
+  for (const domain of [...JOURNEY_PRODUCTION_EVIDENCE_DOMAIN_GROUPS.deployment, ...JOURNEY_PRODUCTION_EVIDENCE_DOMAIN_GROUPS.institution]) await registerArtifact(domainArtifact(domain));
+  for (const providerFamily of PRODUCT_TEMPLATE_CATALOGUE[productionJourney].integrationsProviders) {
+    await registerArtifact({ ...domainArtifact(`provider-${providerFamily}`), artifactId: `provider-${providerFamily}`, artifactType: "provider_dependency", domain: undefined, evidenceStatus: undefined, providerFamily, providerLineage: { dataResidencyCountry: "IN", certificationRef: `cert/${providerFamily}`, mappingRef: `mapping/${providerFamily}`, reconciliationRef: `reconciliation/${providerFamily}` } });
+  }
+  response = await request(`${prefix}/evidence-proposals`, cookies.maker, { proposalId: "raw-bundle", registryType: "provider", evidenceId: "raw-bundle", ...scope, evidence: [] });
+  assert.equal(response.status, 422);
+  assert.equal((await response.json()).error.code, "journey_production_request_body_evidence_rejected");
   for (const registryType of ["provider", "deployment", "institution"]) {
     const evidenceId = `${registryType}-evidence-1`;
-    const evidenceBody = { proposalId: `${registryType}-proposal-1`, registryType, evidenceId, journeyType: productionJourney, templateVersion: "1", configurationVersion: "4", evidence: JOURNEY_PRODUCTION_EVIDENCE_DOMAIN_GROUPS[registryType].map(evidenceItem), validUntil: "2027-01-01T00:00:00.000Z" };
-    if (registryType === "provider") evidenceBody.externalDependencies = PRODUCT_TEMPLATE_CATALOGUE[productionJourney].integrationsProviders.map((providerFamily) => ({ tenantId: tenant.tenantId, journeyType: productionJourney, templateVersion: "1", configurationVersion: "4", providerFamily, status: "certified", dataResidencyCountry: "IN", certificationRef: `cert/${providerFamily}`, mappingRef: `mapping/${providerFamily}`, reconciliationRef: `reconciliation/${providerFamily}`, evidenceChecksumSha256: "b".repeat(64), validUntil: "2027-01-01T00:00:00.000Z" }));
+    const artifactRefs = JOURNEY_PRODUCTION_EVIDENCE_DOMAIN_GROUPS[registryType].map((domain) => `domain-${domain}`);
+    if (registryType === "provider") artifactRefs.push(...PRODUCT_TEMPLATE_CATALOGUE[productionJourney].integrationsProviders.map((providerFamily) => `provider-${providerFamily}`));
+    const evidenceBody = { proposalId: `${registryType}-proposal-1`, registryType, evidenceId, ...scope, artifactRefs, validUntil: "2027-01-01T00:00:00.000Z" };
     if (registryType === "institution") evidenceBody.activationBindings = { tenantJourneyConfigRef: "journey/config/4", regulatedEntityRef: "regulated-entity/1", productPolicyRef: "policy/1", operationsOwnerRef: "operations/1", tenantUatRef: "uat/1" };
     response = await request(`${prefix}/evidence-proposals`, cookies.maker, evidenceBody);
     assert.equal(response.status, 201, await response.clone().text());
     response = await request(`${prefix}/evidence-proposals/${evidenceBody.proposalId}/approval`, cookies.checker, { approvalRef: `approval/${registryType}` });
     assert.equal(response.status, 200, await response.clone().text());
   }
+  response = await request(`${prefix}/evidence-blockers`, cookies.checker, scope);
+  assert.equal(response.status, 200, await response.clone().text());
+  assert.equal((await response.json()).blockers.status, "ready_for_certification_proposal");
   const productionRequest = { proposalId: "production-proposal-1", certificationId: "production-cert-1", journeyType: productionJourney, supportLevel: "production_ready", templateVersion: "1", configurationVersion: "4", productionRegistryRefs: { providerEvidenceId: "provider-evidence-1", deploymentEvidenceId: "deployment-evidence-1", institutionEvidenceId: "institution-evidence-1" }, evidence: { configurationSchemaRef: "schema/1", domainTestRef: "domain/1", policyBindingRef: "policy/1", endToEndTestRef: "e2e/1", accountingControlRef: "accounting/1", complianceControlRef: "compliance/1", operationalRunRef: "operations/1", securityAssessmentRef: "security/1", drExerciseRef: "dr/1" }, validUntil: "2027-01-01T00:00:00.000Z" };
   response = await request(`${prefix}/proposals`, cookies.maker, productionRequest);
   assert.equal(response.status, 201, await response.clone().text());
@@ -96,4 +122,12 @@ test("journey support certification API requires authenticated maker-checker and
   assert.equal(projection.support.counts.production_ready, 1);
   assert.equal(projection.proposals[0].status, "approved");
   assert.equal(projection.suspensionProposals[0].status, "approved");
+
+  response = await request(`${prefix}/artifacts/domain-provider_certification/suspension-proposals`, cookies.maker, { proposalId: "artifact-suspension-1", reason: "external source withdrew certification", incidentRef: "incident/provider-certification" });
+  assert.equal(response.status, 201, await response.clone().text());
+  response = await request(`${prefix}/artifact-suspension-proposals/artifact-suspension-1/approval`, cookies.checker, { approvalRef: "approval/artifact-suspension" });
+  assert.equal(response.status, 200, await response.clone().text());
+  response = await request(`${prefix}/activation-assessments`, cookies.checker, { journeyType: productionJourney, liveMode: true });
+  assert.equal(response.status, 422);
+  assert.equal((await response.json()).error.code, "journey_production_artifact_not_current");
 });

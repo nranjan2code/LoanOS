@@ -118,4 +118,5 @@ jobs:
           node-version: "20"
           cache: "npm"
       - run: npm ci
+      - run: npm run test:journey-postgres
       - run: npm test

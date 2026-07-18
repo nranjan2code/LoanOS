@@ -128,10 +128,10 @@ CREATE POLICY tenant_isolation ON tenant_data
   USING (tenant_id = current_setting('app.current_tenant_id', true))
   WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true));
 
-GRANT SELECT, INSERT, UPDATE ON tenant_data TO loanos_app;
--- Whole-state control-plane synchronization removes rows for tenants that
--- were explicitly offboarded. Keep this privilege off the RLS hot-path role;
--- only the cross-tenant control-plane role may perform that cleanup.
+-- Tenant-scoped sandbox/offboarding cleanup uses the same forced-RLS context
+-- as reads and writes, so DELETE can affect only app.current_tenant_id. The
+-- control-plane role retains DELETE for whole-state synchronization.
+GRANT SELECT, INSERT, UPDATE, DELETE ON tenant_data TO loanos_app;
 GRANT DELETE ON tenant_data TO loanos_control_plane;
 GRANT SELECT, INSERT, UPDATE, DELETE ON tenants TO loanos_app;
 

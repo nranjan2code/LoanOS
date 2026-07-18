@@ -5558,7 +5558,22 @@
       {
         "type": "test",
         "ref": "tests/product-journey-generated-conformance-postgres.test.js",
-        "note": "Environment-gated PostgreSQL lane persists 21 by 17 evidence records and verifies tenant RLS isolation."
+        "note": "Mandatory selected-environment PostgreSQL command persists 21 by 17 evidence records and verifies tenant RLS isolation without a silent skip."
+      },
+      {
+        "type": "code",
+        "ref": "scripts/run-jd05-browser-conformance.mjs",
+        "note": "Loopback-only disposable synthetic browser runner records non-production evidence and rejects live or production-ready claims."
+      },
+      {
+        "type": "test",
+        "ref": "tests/journey-workspace-browser-harness.test.js",
+        "note": "Fail-closed harness boundary coverage plus the browser-executable all-21 adverse, save/resume/submit and recovery flow."
+      },
+      {
+        "type": "doc",
+        "ref": "docs/evidence/jd05-interactive-browser-2026-07-18.json",
+        "note": "Sanitized checksum-sealed receipt from the passed 12-step in-app browser run; explicitly synthetic and non-production."
       }
     ],
     "acceptance": "The cited implementation and tests demonstrate a controlled first slice of uat packs by product, role, exception, and regulatory control.",
@@ -7728,6 +7743,16 @@
         "type": "test",
         "ref": "tests/product-journey-certification.test.js",
         "note": "Exact-version, registry status and evidence-currentness failures block live journey activation."
+      },
+      {
+        "type": "code",
+        "ref": "apps/api/src/routes/product-journey-certifications.js",
+        "note": "Authenticated artifact metadata intake rejects payloads, requires independent review and projects production blockers without asserting external evidence exists."
+      },
+      {
+        "type": "test",
+        "ref": "tests/product-journey-certification-api.test.js",
+        "note": "Real API composition covers payload rejection, artifact-reference-only bundles, independent review, suspension and live fail-closed revalidation."
       }
     ],
     "acceptance": "Repository evidence must demonstrate the current controlled slice of production deployment topology and india hosting; production acceptance additionally requires closure of the stated remaining gap.",
@@ -9206,6 +9231,16 @@
         "type": "test",
         "ref": "tests/product-platform-administration.test.js",
         "note": "Configuration version, blocker, history and evidence-reference behavior is executable."
+      },
+      {
+        "type": "code",
+        "ref": "packages/core/src/journeys/product-journey-production-evidence-intake.js",
+        "note": "Exact tenant/journey/template/configuration artifact metadata, source, custody, witness, review, expiry and suspension gate production evidence assembly."
+      },
+      {
+        "type": "test",
+        "ref": "tests/product-journey-production-evidence-intake.test.js",
+        "note": "Adverse-first coverage proves incomplete, non-independent, expired and suspended artifacts cannot enter production certification."
       }
     ],
     "acceptance": "The cited implementation and tests demonstrate a controlled first slice of tenant configuration promotion across dev/test/uat/production.",
