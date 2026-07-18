@@ -81,11 +81,22 @@ A pre-commit hook (`tools/git-hooks/pre-commit`, activated by the npm `prepare` 
 
 ## Project skills
 
-`.agents/skills/` is the canonical, committed skill catalogue; `.claude/skills` is a symlink to it so Claude Code loads the same files. Each skill encodes one governed workflow with its gates — invoke the matching skill instead of improvising the steps:
+`.agents/skills/` is the canonical, committed skill catalogue; `.claude/skills` is a symlink to it so Claude Code loads the same files. Each skill encodes one governed workflow with its gates — invoke the matching skill instead of improvising the steps.
+
+**Enter by task type.** The entry skill routes into the change-class workflows the work needs:
+
+| You are about to… | Enter with | Typically chains into |
+| --- | --- | --- |
+| Fix a defect | `fix-bug` | the change-class skill for the code touched, plus the evidence/claims honesty sweep |
+| Build a feature, story or enhancement | `start-feature` | `add-capability`, then the change-class skills the slice traverses |
+| Open, update or close an epic, bundle or review finding | `groom-backlog` | `add-capability` when maturity moves |
+| Advance a journey's recorded platform depth | `update-journey-depth` | `groom-backlog`, `update-gtm-claim` |
+| Wrap up any change, before committing | `definition-of-done` | — |
+
+**Change-class workflows** (what part of the repo you touch):
 
 | Skill | Use when |
 | --- | --- |
-| `definition-of-done` | Wrapping up any change, before committing. |
 | `add-capability` | Adding a capability or changing maturity/status in the catalogue. |
 | `change-lending-policy` | Changing JS lending eligibility or engine-mirrored decision logic. |
 | `record-adr` | Making an irreversible architecture decision. |
