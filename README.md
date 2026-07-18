@@ -26,6 +26,7 @@ Lending policy and AI guardrails are evaluated by a pure-Rust decision engine in
 ## Current Executable Slice
 
 ```bash
+npm install   # links the @loanos/core workspace and installs the Postgres driver
 npm test
 npm run dev:api
 ```

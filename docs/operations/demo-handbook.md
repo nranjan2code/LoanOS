@@ -66,6 +66,7 @@ Run from the repository root:
 
 ```bash
 git status --short
+npm ci
 npm test
 (cd rules && cargo test --workspace)
 (cd rules && cargo clippy --workspace --all-targets -- -D warnings)

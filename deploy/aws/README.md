@@ -90,6 +90,7 @@ development-only escape hatch; it must not be presented as an approved release.
 5. Validate the intended commit:
 
    ```bash
+   npm ci
    npm test
    (cd rules && cargo test --workspace)
    (cd rules && cargo clippy --workspace --all-targets -- -D warnings)
