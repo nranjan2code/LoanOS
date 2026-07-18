@@ -19,6 +19,10 @@ import { routeSpecialistJourneys } from "./routes/specialist-journeys.js";
 import { routeJourneyWorkspaces } from "./routes/journey-workspaces.js";
 import { routeOperationalWorkspaces } from "./routes/operational-workspaces.js";
 import { routeWorkflowTasks } from "./routes/workflow-tasks.js";
+import { routeLoanApplicationIntake } from "./routes/loan-application-intake.js";
+import { routeLoanApplicationUnderwriting } from "./routes/loan-application-underwriting.js";
+import { routeLoanApplicationContracting } from "./routes/loan-application-contracting.js";
+import { routeLoanOriginationChannels } from "./routes/loan-origination-channels.js";
 import { routeComposedJourneys } from "./routes/composed-journeys.js";
 import { routeProductPlatformAdministration } from "./routes/product-platform-administration.js";
 import { routeBrandGovernance } from "./routes/brand-governance.js";
@@ -65,11 +69,6 @@ const __dirname = dirname(__filename);
 import {
   accrueInterest,
   accrueRevolvingInterest,
-  acceptKfs,
-  attachKfs,
-  attachSanctionValidity,
-  applyDecisionApproval,
-  applyKfsWorkflow,
   assignComplaint,
   assignRecoveryAgent,
   assignSupportCase,
@@ -79,7 +78,6 @@ import {
   assessTenantActivation,
   assessVendorSla,
   buildAiDisclosure,
-  buildKeyFactStatement,
   buildLoanJournalEntries,
   buildFinanceJournalEntries,
   buildGstReturnData,
@@ -98,13 +96,10 @@ import {
   acknowledgeCicBatch,
   classifyLoanAsset,
   clearGlobalKillSwitch,
-  completeWorkflowTask,
   completeVendorReview,
-  createLoanAccountFromApplication,
   createAssuranceIssue,
   createAssurancePlan,
   createAuditEngagement,
-  createUnderwritingCondition,
   createConfigurationBaseline,
   createControlCertification,
   createDetectionRule,
@@ -131,7 +126,6 @@ import {
   createIncident,
   classifyFraudCase,
   DECLINE_REASON_CODES,
-  deriveWorkflowTasks,
   enrichErasureRequest,
   forecloseLoanAccount,
   enrichComplaint,
@@ -152,18 +146,12 @@ import {
   recordIncidentNotification,
   rejectErasureRequest,
   escalateComplaintToRbiCms,
-  evaluateEligibility,
   evaluateKycStatus,
-  evaluateLoanApplication,
-  evaluateOriginationReadiness,
   evaluatePlatformCanary,
   generateDlaCimsExport,
   generateClosureCertificate,
-  generateDocumentPacket,
   generateCicSnapshot,
   generateLoanStatement,
-  initializeApplicationWorkflow,
-  initializeOriginationJourney,
   listBorrowerBeneficialOwners,
   listBorrowerConsents,
   listBorrowerKycRecords,
@@ -173,11 +161,6 @@ import {
   listRegulatoryControls,
   registerModel,
   recordDriftObservation,
-  recordHumanReview,
-  recordDocumentPacketDelivered,
-  recordDocumentPacketDelivery,
-  recordDocumentPacketGenerated,
-  recordApplicationDocument,
   recordControlTest,
   recordPostIncidentReview,
   recordCkycrrResponse,
@@ -190,14 +173,10 @@ import {
   resolveCicCorrectionRequest,
   resolveCkycrrProbableMatch,
   selectProductPolicyVersion,
-  resolveBorrowerApplicationReferences,
-  resolveLoanApplicationReferences,
-  reviewApplicationDocument,
   summarizeFindings,
   submitCicBatch,
   submitCkycrrSubmission,
   validateCkycrrDownload,
-  markDisbursed,
   postCashRecoveryToLoanAccount,
   postPaymentToLoanAccount,
   issueLegalRecoveryNotice,
@@ -207,7 +186,6 @@ import {
   resolveSuspenseReceipt,
   writeOffSuspenseReceipt,
   prepayLoanAccount,
-  proposeDecision,
   projectControlAssurance,
   projectPlatformDelivery,
   projectSecurityAssurance,
@@ -227,7 +205,6 @@ import {
   restructureLoanAccount,
   resetFloatingRate,
   settleLoanAccount,
-  satisfyUnderwritingCondition,
   writeOffLoanAccount,
   quoteForeclosure,
   reverseLoanAccountEvent,
@@ -272,29 +249,14 @@ import {
   revokeAccountAggregatorConsent,
   upsertRegulatedEntity,
   registerSbom,
-  validateDisbursement,
   searchCkyc,
   downloadCkycRecord,
   uploadCkycRecord,
   validateCashRecoveryApprovalAccess,
-  validateDecisionApprovalAccess,
-  validateDecisionProposalAccess,
-  validateDocumentPacketAccess,
-  validateDocumentPacketBeforeDisbursement,
   validateGrievanceOfficerAccess,
-  validateHumanReviewAccess,
-  validateKfs,
-  validateKfsBeforeDecision,
-  validateManualUnderwritingAccess,
-  validateOriginationBeforeDecision,
-  validateOriginationBeforeDisbursement,
   validateRecoveryAssignmentAccess,
   waiveLoanAccountCharge,
-  validateMarketplaceNeutrality,
-  rankMarketplaceOffers,
   ExternalServiceManager,
-  signDocumentPacket,
-  vaultDocumentPacket,
   createSecurityInterest,
   acknowledgeCersaiSubmission,
   enrichSecurityInterest,
@@ -304,7 +266,6 @@ import {
   repairCersaiSecurityInterest,
   satisfySecurityInterest,
   searchCersaiCharges,
-  validateCersaiForDisbursement,
   createAccessRequest,
   fulfillAccessRequest,
   enrichAccessRequest,
@@ -326,7 +287,6 @@ import {
   sealAuditChain,
   stampAuditEvents
 } from "@loanos/core";
-import { assessEligibilityGated } from "./rules-engine.js";
 import { getActiveMasterKey, getMasterKeyById, getMasterKeyRing } from "./encryption.js";
 import {
   buildRecoveryExercise,
@@ -778,6 +738,7 @@ async function route(req, res, dataDir, platformAdminKey, observability, allowDi
   //   /t/{tenantId}/staff/       → Tenant staff workspace (apps/dashboard/)
   //   /t/{tenantId}/portal/      → White-labeled borrower portal (apps/customer/)
   //   /t/{tenantId}/partners/    → Branch and authorised-partner workspace (apps/partner/)
+  //   /status/                   → Repository-backed capability and build status (docs/dashboard.*)
   //   /help/                     → LoanOS Guide & Academy (apps/help/)
   //   /shared/                   → Shared design tokens (apps/shared/)
   // ──────────────────────────────────────────────────────────────────────
@@ -808,6 +769,19 @@ async function route(req, res, dataDir, platformAdminKey, observability, allowDi
   }
   if (method === "GET" && path.startsWith("/help/")) {
     return serveStaticFile(res, appsRoot, "help", path, "/help/");
+  }
+
+  // This is repository evidence, not a production uptime or tenant-readiness
+  // claim. Keep the mount exact so no other documentation becomes public.
+  if (method === "GET" && ["/status", "/status/", "/status/dashboard.html"].includes(path)) {
+    return serveStaticFile(res, join(appsRoot, ".."), "docs", "/dashboard.html", "/");
+  }
+  if (method === "GET" && path === "/status/dashboard-data.json") {
+    return serveStaticFile(res, join(appsRoot, ".."), "docs", "/dashboard-data.json", "/");
+  }
+  if (method === "GET" && path.startsWith("/status/")) {
+    sendJson(res, 404, { error: { code: "not_found", message: "Status artifact not found." } });
+    return;
   }
 
   // --- Platform SaaS website at / ---
@@ -1335,6 +1309,10 @@ async function route(req, res, dataDir, platformAdminKey, observability, allowDi
   if (await routeJourneyWorkspaces({ method, path, req, res, tenant, store, readJson, sendJson, appendEvent, authContext, authActor })) return;
   if (await routeOperationalWorkspaces({ method, path, req, res, tenant, store, readJson, sendJson, appendEvent, authContext, authActor })) return;
   if (await routeWorkflowTasks({ method, path, url, req, res, tenant, store, readJson, sendJson, appendEvent, authContext, resolveSessionActorId })) return;
+  if (await routeLoanApplicationIntake({ method, path, req, res, tenant, store, readJson, sendJson, appendEvent, authContext, resolveSessionActorId })) return;
+  if (await routeLoanApplicationUnderwriting({ method, path, req, res, tenant, store, readJson, sendJson, appendEvent, authContext, resolveSessionActorId })) return;
+  if (await routeLoanApplicationContracting({ method, path, req, res, tenant, store, readJson, sendJson, appendEvent, authContext, resolveSessionActorId })) return;
+  if (await routeLoanOriginationChannels({ method, path, req, res, store, readJson, sendJson, appendEvent, authContext })) return;
   if (await routeComposedJourneys({ method, path, req, res, tenant, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
   if (await routeProductPlatformAdministration({ method, path, req, res, tenant, store, stateRef, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
   if (await routeBrandGovernance({ method, path, req, res, tenant, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
@@ -4244,1022 +4222,6 @@ async function route(req, res, dataDir, platformAdminKey, observability, allowDi
     }
   }
 
-  if (method === "GET" && path === "/borrower/application-options") {
-    const state = await store.load();
-    const products = Object.values(state.productPolicies ?? {})
-      .filter((product) => product.status === "active" && (product.facilityType ?? "term_loan") === "term_loan")
-      .map((product) => ({
-        productId: product.productId,
-        regulatedEntityId: product.regulatedEntityId,
-        productCode: product.productCode,
-        productName: product.productName,
-        productType: product.productType,
-        minAmount: product.minAmount,
-        maxAmount: product.maxAmount,
-        minTenorMonths: product.minTenorMonths,
-        maxTenorMonths: product.maxTenorMonths,
-        annualInterestRateBps: product.annualInterestRateBps,
-        repaymentFrequency: product.repaymentFrequency ?? "monthly",
-        sanctionValidityDays: product.sanctionValidityDays ?? 30,
-        documentRequirements: product.documentRequirements ?? null
-      }));
-    sendJson(res, 200, { products });
-    return;
-  }
-
-  if (method === "POST" && ["/loans/applications", "/borrower/applications"].includes(path)) {
-    const requestBody = await readJson(req);
-    const selfService = path === "/borrower/applications";
-    if (selfService && authContext?.principalType !== "borrower") {
-      sendJson(res, 403, { error: { code: "borrower_session_required", message: "A borrower session is required for digital application capture." } });
-      return;
-    }
-    const body = selfService
-      ? {
-          regulatedEntityId: requestBody.regulatedEntityId,
-          productId: requestBody.productId,
-          borrowerId: authContext.userId,
-          requestedAmount: requestBody.requestedAmount,
-          requestedTenorMonths: requestBody.requestedTenorMonths,
-          purpose: requestBody.purpose,
-          disbursement: {
-            destinationAccount: {
-              country: "IN",
-              ownerRole: "borrower",
-              ifsc: requestBody.destinationAccount?.ifsc,
-              accountNumberLast4: requestBody.destinationAccount?.accountNumberLast4
-            }
-          },
-          repayment: { recoveryMechanism: requestBody.repaymentMechanism ?? "nach" }
-        }
-      : requestBody;
-    const state = await store.load();
-    const borrower = state.borrowerProfiles?.[body.borrowerId];
-    const pan = borrower?.pan || "ABCDE1234F";
-    const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox, providerCertifications: state.providerCertifications });
-    let bureauReport = null;
-    try {
-      bureauReport = await manager.queryCreditBureau(pan);
-    } catch (err) {
-      if (err.message.includes("data residency") || err.message.includes("residency")) {
-        sendJson(res, 422, {
-          error: {
-            code: "credit_bureau_query_failed",
-            message: err.message
-          }
-        });
-        return;
-      }
-      // Ignore other query errors (thin-file behavior)
-    }
-    const application = {
-      ...body,
-      applicationId: body.applicationId ?? createLoanId("app"),
-      status: "application_received",
-      createdAt: new Date().toISOString(),
-      bureauReport
-    };
-    const borrowerResolution = resolveBorrowerApplicationReferences(application, {
-      borrowerProfiles: state.borrowerProfiles,
-      consentRecords: state.consentRecords,
-      kycRecords: state.kycRecords,
-      beneficialOwners: state.beneficialOwners
-    });
-    const resolution = resolveLoanApplicationReferences(borrowerResolution.application, {
-      regulatedEntities: state.regulatedEntities,
-      productPolicies: state.productPolicies
-    });
-    const evaluation = evaluateLoanApplication(resolution.application, {
-      modelRegistry: state.modelRegistry
-    });
-    const combined = combineComplianceResults(borrowerResolution, resolution, evaluation);
-    let stored = initializeApplicationWorkflow({
-      ...resolution.application,
-      compliance: combined
-    }, combined);
-    if (selfService) {
-      const journey = initializeOriginationJourney(stored, {
-        channel: "borrower_self_service",
-        source: requestBody.source ?? "direct",
-        campaignRef: requestBody.campaignRef,
-        referralRef: requestBody.referralRef,
-        preferredLanguage: requestBody.preferredLanguage,
-        languageUnderstood: requestBody.languageUnderstood,
-        languageConfirmationRef: requestBody.languageConfirmationRef,
-        informationAccurate: requestBody.informationAccurate,
-        applicationDeclarationRef: requestBody.applicationDeclarationRef
-      });
-      if (journey.summary.status === "blocked") {
-        sendJson(res, 422, { error: { code: "digital_application_blocked", message: "Digital application declaration or journey configuration is incomplete." }, findings: journey.findings });
-        return;
-      }
-      stored = journey.application;
-    }
-    const nextState = appendEvent(
-      {
-        ...state,
-        loanApplications: {
-          ...state.loanApplications,
-          [stored.applicationId]: stored
-        }
-      },
-      {
-        type: "loan.application.created",
-        applicationId: stored.applicationId,
-        status: stored.status,
-        channel: stored.origination?.channel ?? "operations"
-      }
-    );
-    await store.save(nextState);
-    sendJson(res, combined.summary.status === "blocked" ? 422 : 201, stored);
-    return;
-  }
-
-  if (method === "GET" && path === "/loans/applications") {
-    const state = await store.load();
-    sendJson(res, 200, {
-      applications: Object.values(state.loanApplications || {}).filter(
-        (application) => authContext?.principalType !== "borrower" || borrowerIdForApplication(application) === authContext.userId
-      )
-    });
-    return;
-  }
-
-  if (method === "POST" && path === "/loans/marketplace-offers") {
-    const body = await readJson(req);
-    const state = await store.load();
-
-    const activePartnerLenderIds = Object.values(state.lendingServiceProviders ?? {})
-      .filter((lsp) => lsp.lspId === body.lspId && lsp.status === "active")
-      .map((lsp) => lsp.regulatedEntityId);
-
-    const validation = validateMarketplaceNeutrality(body, activePartnerLenderIds);
-    const offers = rankMarketplaceOffers(body.offers ?? [], body.rankingCriteria ?? "lowest_apr");
-
-    const record = {
-      marketplaceOfferId: body.marketplaceOfferId ?? createLoanId("mko"),
-      lspId: body.lspId,
-      dlaId: body.dlaId,
-      offers,
-      rankingCriteria: body.rankingCriteria,
-      disclosureRef: body.disclosureRef,
-      partnerLendersDisclosureRef: body.partnerLendersDisclosureRef,
-      darkPatternCheck: body.darkPatternCheck,
-      compliance: validation,
-      createdAt: new Date().toISOString()
-    };
-
-    const nextState = appendEvent(
-      {
-        ...state,
-        marketplaceOffers: {
-          ...(state.marketplaceOffers ?? {}),
-          [record.marketplaceOfferId]: record
-        }
-      },
-      {
-        type: "marketplace.offers.evaluated",
-        marketplaceOfferId: record.marketplaceOfferId,
-        status: validation.summary.status
-      }
-    );
-
-    await store.save(nextState);
-    sendJson(res, validation.summary.status === "blocked" ? 422 : 201, record);
-    return;
-  }
-
-  const marketplaceOffersMatch = path.match(/^\/loans\/marketplace-offers\/([^/]+)$/);
-  if (method === "GET" && marketplaceOffersMatch) {
-    const state = await store.load();
-    const record = state.marketplaceOffers?.[marketplaceOffersMatch[1]];
-    if (!record) {
-      sendJson(res, 404, { error: { code: "not_found", message: "Marketplace offers not found." } });
-      return;
-    }
-    sendJson(res, 200, record);
-    return;
-  }
-
-  const applicationMatch = path.match(/^\/loans\/applications\/([^/]+)$/);
-  if (method === "GET" && applicationMatch) {
-    const state = await store.load();
-    const application = state.loanApplications[applicationMatch[1]];
-    if (!application) {
-      sendJson(res, 404, { error: { code: "not_found", message: "Loan application not found." } });
-      return;
-    }
-    sendJson(res, 200, application);
-    return;
-  }
-
-  const originationReadinessMatch = path.match(/^\/loans\/applications\/([^/]+)\/origination-readiness$/);
-  if (method === "GET" && originationReadinessMatch) {
-    const state = await store.load();
-    const application = state.loanApplications[decodeURIComponent(originationReadinessMatch[1])];
-    if (!application) {
-      sendJson(res, 404, { error: { code: "not_found", message: "Loan application not found." } });
-      return;
-    }
-    sendJson(res, 200, evaluateOriginationReadiness(application));
-    return;
-  }
-
-  const applicationDocumentsMatch = path.match(/^\/loans\/applications\/([^/]+)\/documents$/);
-  if (method === "POST" && applicationDocumentsMatch) {
-    const body = await readJson(req);
-    const state = await store.load();
-    const application = state.loanApplications[decodeURIComponent(applicationDocumentsMatch[1])];
-    if (!application) {
-      sendJson(res, 404, { error: { code: "not_found", message: "Loan application not found." } });
-      return;
-    }
-    const actorId = authContext?.principalType === "borrower"
-      ? authContext.userId
-      : resolveSessionActorId(authContext, body.uploadedBy ?? body.actor);
-    const result = recordApplicationDocument(application, body, {
-      actorId,
-      actorType: authContext?.principalType === "borrower" ? "borrower" : "staff"
-    });
-    if (result.document) {
-      await store.save(appendEvent(
-        { ...state, loanApplications: { ...state.loanApplications, [application.applicationId]: result.application } },
-        {
-          type: result.document.status === "quarantined" ? "loan.application_document.quarantined" : "loan.application_document.uploaded",
-          applicationId: application.applicationId,
-          documentId: result.document.documentId,
-          documentType: result.document.type,
-          actor: actorId
-        }
-      ));
-    }
-    if (result.summary.status === "blocked") {
-      sendJson(res, 422, { error: { code: "application_document_blocked", message: "Application document was rejected or quarantined." }, document: result.document, findings: result.findings });
-      return;
-    }
-    sendJson(res, 201, result.document);
-    return;
-  }
-
-  const applicationDocumentReviewMatch = path.match(/^\/loans\/applications\/([^/]+)\/documents\/([^/]+)\/review$/);
-  if (method === "POST" && applicationDocumentReviewMatch) {
-    const body = await readJson(req);
-    const state = await store.load();
-    const application = state.loanApplications[decodeURIComponent(applicationDocumentReviewMatch[1])];
-    if (!application) {
-      sendJson(res, 404, { error: { code: "not_found", message: "Loan application not found." } });
-      return;
-    }
-    body.reviewedBy = resolveSessionActorId(authContext, body.reviewedBy);
-    const accessFindings = [
-      ...validateDocumentPacketAccess(state.users, body.reviewedBy, "reviewedBy"),
-      ...(body.outcome === "waived" ? validateDocumentPacketAccess(state.users, body.approvedBy, "approvedBy") : [])
-    ];
-    if (summarizeFindings(accessFindings).status === "blocked") {
-      sendJson(res, 422, { error: { code: "document_review_access_blocked", message: "Document review is blocked by actor policy." }, findings: accessFindings });
-      return;
-    }
-    const result = reviewApplicationDocument(application, decodeURIComponent(applicationDocumentReviewMatch[2]), body);
-    if (result.summary.status === "blocked") {
-      sendJson(res, 422, { error: { code: "application_document_review_blocked", message: "Application document review is invalid." }, findings: result.findings });
-      return;
-    }
-    await store.save(appendEvent(
-      { ...state, loanApplications: { ...state.loanApplications, [application.applicationId]: result.application } },
-      { type: "loan.application_document.reviewed", applicationId: application.applicationId, documentId: result.document.documentId, outcome: result.review.outcome, actor: body.reviewedBy }
-    ));
-    sendJson(res, 200, result.document);
-    return;
-  }
-
-  const applicationConditionsMatch = path.match(/^\/loans\/applications\/([^/]+)\/conditions$/);
-  if (method === "POST" && applicationConditionsMatch) {
-    const body = await readJson(req);
-    const state = await store.load();
-    const application = state.loanApplications[decodeURIComponent(applicationConditionsMatch[1])];
-    if (!application) {
-      sendJson(res, 404, { error: { code: "not_found", message: "Loan application not found." } });
-      return;
-    }
-    body.createdBy = resolveSessionActorId(authContext, body.createdBy);
-    const accessFindings = [
-      ...validateDocumentPacketAccess(state.users, body.createdBy, "createdBy"),
-      ...validateDocumentPacketAccess(state.users, body.approvedBy, "approvedBy")
-    ];
-    if (summarizeFindings(accessFindings).status === "blocked") {
-      sendJson(res, 422, { error: { code: "condition_access_blocked", message: "Condition creation is blocked by actor policy." }, findings: accessFindings });
-      return;
-    }
-    const result = createUnderwritingCondition(application, body);
-    if (result.summary.status === "blocked") {
-      sendJson(res, 422, { error: { code: "condition_blocked", message: "Underwriting condition is invalid." }, findings: result.findings });
-      return;
-    }
-    await store.save(appendEvent(
-      { ...state, loanApplications: { ...state.loanApplications, [application.applicationId]: result.application } },
-      { type: "loan.underwriting_condition.created", applicationId: application.applicationId, conditionId: result.condition.conditionId, conditionType: result.condition.type, actor: body.createdBy }
-    ));
-    sendJson(res, 201, result.condition);
-    return;
-  }
-
-  const applicationConditionSatisfactionMatch = path.match(/^\/loans\/applications\/([^/]+)\/conditions\/([^/]+)\/satisfaction$/);
-  if (method === "POST" && applicationConditionSatisfactionMatch) {
-    const body = await readJson(req);
-    const state = await store.load();
-    const application = state.loanApplications[decodeURIComponent(applicationConditionSatisfactionMatch[1])];
-    if (!application) {
-      sendJson(res, 404, { error: { code: "not_found", message: "Loan application not found." } });
-      return;
-    }
-    body.satisfiedBy = resolveSessionActorId(authContext, body.satisfiedBy);
-    const accessFindings = [
-      ...validateDocumentPacketAccess(state.users, body.satisfiedBy, "satisfiedBy"),
-      ...validateDocumentPacketAccess(state.users, body.verifiedBy, "verifiedBy")
-    ];
-    if (summarizeFindings(accessFindings).status === "blocked") {
-      sendJson(res, 422, { error: { code: "condition_access_blocked", message: "Condition satisfaction is blocked by actor policy." }, findings: accessFindings });
-      return;
-    }
-    const result = satisfyUnderwritingCondition(application, decodeURIComponent(applicationConditionSatisfactionMatch[2]), body);
-    if (result.summary.status === "blocked") {
-      sendJson(res, 422, { error: { code: "condition_satisfaction_blocked", message: "Condition satisfaction is invalid." }, findings: result.findings });
-      return;
-    }
-    await store.save(appendEvent(
-      { ...state, loanApplications: { ...state.loanApplications, [application.applicationId]: result.application } },
-      { type: "loan.underwriting_condition.satisfied", applicationId: application.applicationId, conditionId: result.condition.conditionId, actor: body.satisfiedBy, verifiedBy: body.verifiedBy }
-    ));
-    sendJson(res, 200, result.condition);
-    return;
-  }
-
-  const eligibilityMatch = path.match(/^\/loans\/applications\/([^/]+)\/eligibility$/);
-  if (method === "GET" && eligibilityMatch) {
-    const state = await store.load();
-    const application = state.loanApplications[eligibilityMatch[1]];
-    if (!application) {
-      sendJson(res, 404, { error: { code: "not_found", message: "Loan application not found." } });
-      return;
-    }
-    sendJson(res, 200, application.eligibility ?? null);
-    return;
-  }
-  if (method === "POST" && eligibilityMatch) {
-    const state = await store.load();
-    const application = state.loanApplications[eligibilityMatch[1]];
-    if (!application) {
-      sendJson(res, 404, { error: { code: "not_found", message: "Loan application not found." } });
-      return;
-    }
-    const borrower = state.borrowerProfiles?.[application.borrowerId];
-    const pan = borrower?.pan || "ABCDE1234F";
-    const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox, providerCertifications: state.providerCertifications });
-    let bureauReport = null;
-    try {
-      bureauReport = await manager.queryCreditBureau(pan);
-    } catch (err) {
-      if (err.message.includes("data residency") || err.message.includes("residency")) {
-        sendJson(res, 422, {
-          error: {
-            code: "credit_bureau_query_failed",
-            message: err.message
-          }
-        });
-        return;
-      }
-      // Allow query failures to fall back to a null report (thin-file behavior)
-    }
-    const appWithBureau = {
-      ...application,
-      bureauReport
-    };
-    const eligibility = await assessEligibilityGated({
-      evaluateJs: evaluateEligibility,
-      application: appWithBureau,
-      tenantId: tenant.tenantId,
-      stage: "eligibility"
-    });
-    const stored = {
-      ...appWithBureau,
-      eligibility: eligibility.assessment
-    };
-    const nextState = appendEvent(
-      {
-        ...state,
-        loanApplications: {
-          ...state.loanApplications,
-          [stored.applicationId]: stored
-        }
-      },
-      {
-        type: "loan.eligibility.assessed",
-        applicationId: stored.applicationId,
-        decision: eligibility.assessment.decision
-      }
-    );
-    await store.save(nextState);
-    sendJson(res, 200, eligibility);
-    return;
-  }
-
-  const kfsMatch = path.match(/^\/loans\/applications\/([^/]+)\/kfs$/);
-  if (method === "POST" && kfsMatch) {
-    const body = await readJson(req);
-    const forbiddenTermFields = ["terms", "principalAmount", "tenorMonths", "annualInterestRateBps", "aprBps", "charges", "acceptance"];
-    if (forbiddenTermFields.some((field) => body[field] !== undefined)) {
-      sendJson(res, 422, {
-        error: {
-          code: "kfs_terms_server_managed",
-          message: "KFS pricing, loan terms, delivery, and acceptance are server-managed and cannot be supplied by the client."
-        }
-      });
-      return;
-    }
-    const state = await store.load();
-    const application = state.loanApplications[kfsMatch[1]];
-    if (!application) {
-      sendJson(res, 404, { error: { code: "not_found", message: "Loan application not found." } });
-      return;
-    }
-    const kfs = buildKeyFactStatement(application, {
-      principalAmount: application.product?.requestedAmount,
-      tenorMonths: application.product?.requestedTenorMonths ?? application.product?.defaultTenorMonths,
-      annualInterestRateBps: application.product?.annualInterestRateBps,
-      charges: application.product?.charges,
-      contingentCharges: application.product?.contingentCharges,
-      penalCharges: application.product?.penalCharges,
-      repaymentFrequency: application.product?.repaymentFrequency,
-      coolingOffDays: application.product?.coolingOffDays,
-      recoveryMechanism: application.product?.recoveryMechanism,
-      grievanceOfficer: application.tenant?.grievanceOfficer,
-      privacyPolicyUrl: application.tenant?.privacyPolicyUrl,
-      language: application.preferredLanguage ?? application.origination?.preferredLanguage ?? "en",
-      languageName: application.origination?.languageName ?? "English"
-    });
-    const kfsValidation = validateKfs(kfs);
-    if (kfsValidation.summary.status === "blocked") {
-      sendJson(res, 422, { error: { code: "kfs_generation_blocked", message: "KFS generation failed validation." }, findings: kfsValidation.findings });
-      return;
-    }
-    const recipient = application.borrower?.contact?.email ?? application.borrower?.email;
-    const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox, providerCertifications: state.providerCertifications });
-    if (process.env.NODE_ENV === "production" && manager.config.emailProvider !== "real") {
-      sendJson(res, 503, { error: { code: "kfs_delivery_provider_unavailable", message: "A production email provider is required before KFS issuance." } });
-      return;
-    }
-    let delivery;
-    try {
-      delivery = await manager.sendEmail(
-        recipient,
-        `Key Fact Statement ${kfs.proposalNumber}`,
-        `Your Key Fact Statement proposal ${kfs.proposalNumber} is available until ${kfs.validUntil}. Sign in to review and accept it.`
-      );
-    } catch (error) {
-      sendJson(res, 503, { error: { code: "kfs_delivery_failed", message: "The KFS could not be delivered to the verified borrower email." } });
-      return;
-    }
-    const updated = {
-      ...attachKfs(application, kfs),
-      kfs: { ...kfs, deliveryChannel: delivery.channel, deliveryRef: delivery.ref, acceptedAt: null, acceptedBy: null }
-    };
-    const evaluation = evaluateLoanApplication(updated, {
-      modelRegistry: state.modelRegistry
-    });
-    const eligibility = await assessEligibilityGated({
-      evaluateJs: evaluateEligibility,
-      application: updated,
-      tenantId: tenant.tenantId,
-      stage: "kfs"
-    });
-    const withCompliance = {
-      ...updated,
-      compliance: evaluation,
-      eligibility: eligibility.assessment
-    };
-    const stored = applyKfsWorkflow(withCompliance, evaluation);
-    const nextState = appendEvent(
-      {
-        ...state,
-        loanApplications: {
-          ...state.loanApplications,
-          [stored.applicationId]: stored
-        }
-      },
-      {
-        type: "loan.kfs.generated",
-        applicationId: stored.applicationId,
-        kfsId: kfs.kfsId
-      }
-    );
-    await store.save(nextState);
-    sendJson(res, 201, stored);
-    return;
-  }
-
-  const kfsAcceptMatch = path.match(/^\/loans\/applications\/([^/]+)\/kfs\/accept$/);
-  if (method === "POST" && kfsAcceptMatch) {
-    if (authContext?.principalType !== "borrower") {
-      sendJson(res, 403, { error: { code: "borrower_acceptance_required", message: "Only the authenticated borrower may accept a KFS." } });
-      return;
-    }
-    const body = await readJson(req);
-    const state = await store.load();
-    const application = state.loanApplications[decodeURIComponent(kfsAcceptMatch[1])];
-    if (!application || borrowerIdForApplication(application) !== authContext.userId) {
-      sendJson(res, 404, { error: { code: "not_found", message: "Loan application not found." } });
-      return;
-    }
-    const result = acceptKfs(application, {
-      acceptedBy: authContext.userId,
-      acceptanceChannel: "borrower_portal",
-      acceptanceEvidenceRef: `session:${authContext.sessionId}:proposal:${application.kfs?.proposalNumber}`,
-      understoodLanguage: body.understoodLanguage ?? application.kfs?.language ?? "en",
-      languageConfirmationRef: body.languageConfirmationRef ?? application.origination?.languageConfirmationRef ?? null
-    });
-    if (result.summary.status === "blocked") {
-      sendJson(res, 422, { error: { code: "kfs_acceptance_blocked", message: "KFS acceptance is blocked." }, findings: result.findings });
-      return;
-    }
-    const evaluation = evaluateLoanApplication(result.application, { modelRegistry: state.modelRegistry });
-    const eligibility = await assessEligibilityGated({
-      evaluateJs: evaluateEligibility,
-      application: result.application,
-      tenantId: tenant.tenantId,
-      stage: "kfs_acceptance"
-    });
-    const stored = applyKfsWorkflow({ ...result.application, compliance: evaluation, eligibility: eligibility.assessment }, evaluation);
-    await store.save(appendEvent(
-      { ...state, loanApplications: { ...state.loanApplications, [stored.applicationId]: stored } },
-      { type: "loan.kfs.accepted", applicationId: stored.applicationId, kfsId: stored.kfs.kfsId, proposalNumber: stored.kfs.proposalNumber }
-    ));
-    sendJson(res, 200, stored);
-    return;
-  }
-
-  const decisionMatch = path.match(/^\/loans\/applications\/([^/]+)\/decision$/);
-  if (method === "POST" && decisionMatch) {
-    const body = await readJson(req);
-    const state = await store.load();
-    const application = state.loanApplications[decisionMatch[1]];
-    if (!application) {
-      sendJson(res, 404, { error: { code: "not_found", message: "Loan application not found." } });
-      return;
-    }
-
-    const resolvedProposer = resolveSessionActorId(authContext, body.proposedBy ?? body.decidedBy);
-    body.proposedBy = resolvedProposer;
-    body.decidedBy = resolvedProposer;
-    if (body.manualUnderwriting?.underwriterId !== undefined) {
-      body.manualUnderwriting = {
-        ...body.manualUnderwriting,
-        underwriterId: resolveSessionActorId(authContext, body.manualUnderwriting.underwriterId)
-      };
-    }
-    const eligibility = await assessEligibilityGated({
-      evaluateJs: evaluateEligibility,
-      application: { ...application, aiDecision: body.aiDecision ?? application.aiDecision },
-      tenantId: tenant.tenantId,
-      stage: "decision"
-    });
-    const decisionApplication = {
-      ...application,
-      aiDecision: body.aiDecision ?? application.aiDecision,
-      eligibility: eligibility.assessment
-    };
-    const preDecision = evaluateLoanApplication(decisionApplication, {
-      modelRegistry: state.modelRegistry
-    });
-    // A refer-band approval carries a manual underwriting override; the named
-    // underwriter must be a registered, active credit officer. Presence and
-    // shape of the override are enforced separately by proposeDecision.
-    const requiresUnderwriterAccessCheck =
-      eligibility.assessment.decision === "refer" &&
-      body.status === "approved" &&
-      Boolean(body.manualUnderwriting?.underwriterId);
-    const accessFindings = [
-      ...validateDecisionProposalAccess(state.users, body),
-      ...(requiresUnderwriterAccessCheck ? validateManualUnderwritingAccess(state.users, body) : [])
-    ];
-    const accessSummary = summarizeFindings(accessFindings);
-    if (accessSummary.status === "blocked") {
-      sendJson(res, 422, {
-        error: {
-          code: "decision_access_blocked",
-          message: "Decision proposal is blocked by actor role policy."
-        },
-        findings: accessFindings
-      });
-      return;
-    }
-    const activeTasks = deriveWorkflowTasks(state);
-    const kfsCheck = validateKfsBeforeDecision(application);
-    const originationCheck = body.status === "approved"
-      ? validateOriginationBeforeDecision(decisionApplication)
-      : { findings: [] };
-    // An ineligible borrower cannot be approved; declines still proceed with the
-    // assessment stored as evidence.
-    const eligibilityFindings = body.status === "approved" ? eligibility.findings : [];
-    const findings = [...preDecision.findings, ...kfsCheck.findings, ...eligibilityFindings, ...originationCheck.findings];
-    const proposal = proposeDecision(decisionApplication, body, findings, { modelRegistry: state.modelRegistry, activeTasks });
-    if (proposal.summary.status === "blocked" && !proposal.requiresHumanReview) {
-      sendJson(res, 422, {
-        error: {
-          code: "decision_blocked",
-          message: "Decision is blocked by compliance findings."
-        },
-        findings: proposal.findings
-      });
-      return;
-    }
-
-    const stored = proposal.application;
-    let nextWorkflowTasks = state.workflowTasks;
-    const task = activeTasks.find((t) => t.entity.type === "loan_application" && t.entity.id === application.applicationId && t.type === "application.manual_underwriting");
-    if (task) {
-      const completeRes = completeWorkflowTask(
-        state.workflowTasks,
-        task.taskId,
-        { actor: body.proposedBy || body.decidedBy },
-        activeTasks
-      );
-      if (completeRes.summary.status !== "blocked") {
-        nextWorkflowTasks = completeRes.workflowTasks;
-      }
-    }
-
-    const nextState = appendEvent(
-      {
-        ...state,
-        loanApplications: {
-          ...state.loanApplications,
-          [stored.applicationId]: stored
-        },
-        workflowTasks: nextWorkflowTasks
-      },
-      {
-        type: proposal.requiresHumanReview ? "loan.human_review.required" : "loan.decision.proposed",
-        applicationId: stored.applicationId,
-        status: stored.status,
-        proposalId: proposal.proposal?.proposalId ?? null
-      }
-    );
-    await store.save(nextState);
-    sendJson(res, 202, stored);
-    return;
-  }
-
-  const humanReviewMatch = path.match(/^\/loans\/applications\/([^/]+)\/human-reviews$/);
-  if (method === "POST" && humanReviewMatch) {
-    const body = await readJson(req);
-    const state = await store.load();
-    const application = state.loanApplications[humanReviewMatch[1]];
-    if (!application) {
-      sendJson(res, 404, { error: { code: "not_found", message: "Loan application not found." } });
-      return;
-    }
-
-    body.reviewedBy = resolveSessionActorId(authContext, body.reviewedBy);
-    const accessFindings = validateHumanReviewAccess(state.users, body);
-    const accessSummary = summarizeFindings(accessFindings);
-    if (accessSummary.status === "blocked") {
-      sendJson(res, 422, {
-        error: {
-          code: "human_review_access_blocked",
-          message: "Human review is blocked by actor role policy."
-        },
-        findings: accessFindings
-      });
-      return;
-    }
-
-    const result = recordHumanReview(application, body);
-    if (result.summary.status === "blocked") {
-      sendJson(res, 422, {
-        error: {
-          code: "human_review_blocked",
-          message: "Human review could not be recorded."
-        },
-        findings: result.findings
-      });
-      return;
-    }
-
-    const stored = result.application;
-    const nextState = appendEvent(
-      {
-        ...state,
-        loanApplications: {
-          ...state.loanApplications,
-          [stored.applicationId]: stored
-        }
-      },
-      {
-        type: "loan.human_review.recorded",
-        applicationId: stored.applicationId,
-        reviewId: result.humanReview.reviewId,
-        outcome: result.humanReview.outcome
-      }
-    );
-    await store.save(nextState);
-    sendJson(res, 200, stored);
-    return;
-  }
-
-  const approvalMatch = path.match(/^\/loans\/applications\/([^/]+)\/approvals$/);
-  if (method === "POST" && approvalMatch) {
-    const body = await readJson(req);
-    const state = await store.load();
-    const application = state.loanApplications[approvalMatch[1]];
-    if (!application) {
-      sendJson(res, 404, { error: { code: "not_found", message: "Loan application not found." } });
-      return;
-    }
-
-    body.approvedBy = resolveSessionActorId(authContext, body.approvedBy);
-    const accessFindings = validateDecisionApprovalAccess(state.users, body);
-    const accessSummary = summarizeFindings(accessFindings);
-    if (accessSummary.status === "blocked") {
-      sendJson(res, 422, {
-        error: {
-          code: "approval_access_blocked",
-          message: "Decision approval is blocked by actor role policy."
-        },
-        findings: accessFindings
-      });
-      return;
-    }
-
-    const result = applyDecisionApproval(application, body);
-    if (result.summary.status === "blocked") {
-      sendJson(res, 422, {
-        error: {
-          code: "approval_blocked",
-          message: "Decision approval is blocked by workflow findings."
-        },
-        findings: result.findings
-      });
-      return;
-    }
-
-    const stored = attachSanctionValidity(result.application, new Date(result.approval.approvedAt));
-    const nextState = appendEvent(
-      {
-        ...state,
-        loanApplications: {
-          ...state.loanApplications,
-          [stored.applicationId]: stored
-        }
-      },
-      {
-        type: "loan.decision.approval_recorded",
-        applicationId: stored.applicationId,
-        approvalId: result.approval.approvalId,
-        status: stored.status
-      }
-    );
-    await store.save(nextState);
-    sendJson(res, 200, stored);
-    return;
-  }
-
-  const documentPacketMatch = path.match(/^\/loans\/applications\/([^/]+)\/document-packet$/);
-  if (documentPacketMatch) {
-    const applicationId = decodeURIComponent(documentPacketMatch[1]);
-    const state = await store.load();
-    const application = state.loanApplications[applicationId];
-    if (!application) {
-      sendJson(res, 404, { error: { code: "not_found", message: "Loan application not found." } });
-      return;
-    }
-
-    if (method === "GET") {
-      if (!application.documentPacket) {
-        sendJson(res, 404, { error: { code: "not_found", message: "Document packet not found." } });
-        return;
-      }
-      sendJson(res, 200, application.documentPacket);
-      return;
-    }
-
-    if (method === "POST") {
-      const body = await readJson(req);
-      const actorId = resolveSessionActorId(authContext, body.actor ?? body.generatedBy);
-      body.actor = actorId;
-      body.generatedBy = actorId;
-      const accessFindings = validateDocumentPacketAccess(state.users, actorId, "actor");
-      const accessSummary = summarizeFindings(accessFindings);
-      if (accessSummary.status === "blocked") {
-        sendJson(res, 422, {
-          error: {
-            code: "document_packet_access_blocked",
-            message: "Document packet generation is blocked by actor role policy."
-          },
-          findings: accessFindings
-        });
-        return;
-      }
-
-      const packetResult = generateDocumentPacket(application, body);
-      if (packetResult.summary.status === "blocked") {
-        sendJson(res, 422, {
-          error: {
-            code: "document_packet_blocked",
-            message: "Document packet generation is blocked by workflow findings."
-          },
-          findings: packetResult.findings
-        });
-        return;
-      }
-
-      const stored = recordDocumentPacketGenerated(application, packetResult.packet);
-      const nextState = appendEvent(
-        {
-          ...state,
-          loanApplications: {
-            ...state.loanApplications,
-            [stored.applicationId]: stored
-          }
-        },
-        {
-          type: "loan.document_packet.generated",
-          applicationId: stored.applicationId,
-          packetId: packetResult.packet.packetId
-        }
-      );
-      await store.save(nextState);
-      sendJson(res, 201, stored.documentPacket);
-      return;
-    }
-  }
-
-  const documentPacketDeliveryMatch = path.match(/^\/loans\/applications\/([^/]+)\/document-packet\/delivery$/);
-  if (method === "POST" && documentPacketDeliveryMatch) {
-    const body = await readJson(req);
-    const state = await store.load();
-    const application = state.loanApplications[decodeURIComponent(documentPacketDeliveryMatch[1])];
-    if (!application) {
-      sendJson(res, 404, { error: { code: "not_found", message: "Loan application not found." } });
-      return;
-    }
-
-    const actorId = resolveSessionActorId(authContext, body.actor ?? body.deliveredBy);
-    body.actor = actorId;
-    body.deliveredBy = actorId;
-    const accessFindings = validateDocumentPacketAccess(state.users, actorId, "actor");
-    const accessSummary = summarizeFindings(accessFindings);
-    if (accessSummary.status === "blocked") {
-      sendJson(res, 422, {
-        error: {
-          code: "document_packet_access_blocked",
-          message: "Document packet delivery is blocked by actor role policy."
-        },
-        findings: accessFindings
-      });
-      return;
-    }
-
-    const deliveryResult = recordDocumentPacketDelivery(application, body);
-    if (deliveryResult.summary.status === "blocked") {
-      sendJson(res, 422, {
-        error: {
-          code: "document_packet_delivery_blocked",
-          message: "Document packet delivery is blocked by workflow findings."
-        },
-        findings: deliveryResult.findings
-      });
-      return;
-    }
-
-    const stored = recordDocumentPacketDelivered(application, deliveryResult.packet);
-    const nextState = appendEvent(
-      {
-        ...state,
-        loanApplications: {
-          ...state.loanApplications,
-          [stored.applicationId]: stored
-        }
-      },
-      {
-        type: "loan.document_packet.delivered",
-        applicationId: stored.applicationId,
-        packetId: deliveryResult.packet.packetId,
-        deliveryRef: deliveryResult.packet.delivery.deliveryRef
-      }
-    );
-    await store.save(nextState);
-    sendJson(res, 200, stored.documentPacket);
-    return;
-  }
-
-  const documentPacketEsignMatch = path.match(/^\/loans\/applications\/([^/]+)\/document-packet\/esign$/);
-  if (method === "POST" && documentPacketEsignMatch) {
-    const body = await readJson(req);
-    const state = await store.load();
-    const application = state.loanApplications[decodeURIComponent(documentPacketEsignMatch[1])];
-    if (!application) {
-      sendJson(res, 404, { error: { code: "not_found", message: "Loan application not found." } });
-      return;
-    }
-
-    const authenticatedBorrowerName = authContext?.principalType === "borrower"
-      ? application.borrower?.fullName ?? application.borrower?.legalName ?? application.borrower?.name
-      : null;
-    const { aadhaarNumber, otp } = body;
-    const signerName = authenticatedBorrowerName ?? body.signerName;
-    if (!aadhaarNumber || !otp || !signerName) {
-      sendJson(res, 400, { error: { code: "bad_request", message: "aadhaarNumber, otp, and signerName are required." } });
-      return;
-    }
-
-    const manager = new ExternalServiceManager({ isSandbox: tenant.isSandbox, providerCertifications: state.providerCertifications });
-    let esignResult = null;
-    try {
-      const payloadHash = (application.documentPacket?.documents ?? []).map(d => d.checksumSha256).join(",");
-      esignResult = await manager.verifyEsignOtp(aadhaarNumber, otp, payloadHash);
-    } catch (err) {
-      sendJson(res, 422, {
-        error: {
-          code: "esign_verification_failed",
-          message: err.message
-        }
-      });
-      return;
-    }
-
-    const signResult = signDocumentPacket(application, {
-      aadhaarNumber,
-      signerName,
-      signatureRef: esignResult.signatureRef,
-      esignProvider: esignResult.esignProvider,
-      envelopeId: esignResult.envelopeId,
-      externalEnvelopeStorageUrl: esignResult.externalEnvelopeStorageUrl
-    });
-
-    if (signResult.summary.status === "blocked") {
-      sendJson(res, 422, {
-        error: {
-          code: "document_packet_signing_blocked",
-          message: "Document packet signing is blocked by workflow findings."
-        },
-        findings: signResult.findings
-      });
-      return;
-    }
-
-    const stored = {
-      ...application,
-      documentPacket: signResult.packet
-    };
-    const vaultResult = vaultDocumentPacket(state.documentVault, stored, signResult.packet, {
-      vaultedBy: body.actor ?? "esign",
-      retentionPolicyId: body.retentionPolicyId ?? undefined,
-      storageCountry: body.storageCountry ?? undefined
-    });
-    if (vaultResult.summary.status === "blocked") {
-      sendJson(res, 422, {
-        error: {
-          code: "document_vault_blocked",
-          message: "Signed document packet could not be vaulted."
-        },
-        findings: vaultResult.findings
-      });
-      return;
-    }
-    const stateWithSignedPacket = {
-      ...state,
-      loanApplications: {
-        ...state.loanApplications,
-        [stored.applicationId]: stored
-      },
-      documentVault: vaultResult.registry
-    };
-    const nextState = appendEvent(
-      appendEvent(
-        stateWithSignedPacket,
-        {
-          type: "loan.document_packet.signed",
-          applicationId: stored.applicationId,
-          packetId: signResult.packet.packetId,
-          signatureRef: esignResult.signatureRef,
-          signerName,
-          vaultRecordId: vaultResult.record.vaultRecordId
-        }
-      ),
-      {
-        type: "document_vault.packet_vaulted",
-        applicationId: stored.applicationId,
-        packetId: signResult.packet.packetId,
-        vaultRecordId: vaultResult.record.vaultRecordId,
-        documentCount: vaultResult.record.documentCount,
-        manifestChecksumSha256: vaultResult.record.manifestChecksumSha256
-      }
-    );
-    await store.save(nextState);
-    sendJson(res, 200, stored.documentPacket);
-    return;
-  }
-
   if (method === "GET" && path === "/loan-accounts") {
     const state = await store.load();
     sendJson(res, 200, {
@@ -6415,79 +5377,6 @@ async function route(req, res, dataDir, platformAdminKey, observability, allowDi
       ...loanAccount,
       summary: summarizeLoanAccount(loanAccount, asOf)
     });
-    return;
-  }
-
-  const disbursementMatch = path.match(/^\/loans\/applications\/([^/]+)\/disbursement$/);
-  if (method === "POST" && disbursementMatch) {
-    const body = await readJson(req);
-    const state = await store.load();
-    const application = state.loanApplications[disbursementMatch[1]];
-    if (!application) {
-      sendJson(res, 404, { error: { code: "not_found", message: "Loan application not found." } });
-      return;
-    }
-
-    const result = validateDisbursement(application, body);
-    const documentPacketCheck = validateDocumentPacketBeforeDisbursement(application);
-    const cersaiCheck = validateCersaiForDisbursement(application, state);
-    const originationCheck = validateOriginationBeforeDisbursement(application);
-    const findings = [...result.findings, ...documentPacketCheck.findings, ...cersaiCheck.findings, ...originationCheck.findings];
-    const summary = summarizeFindings(findings);
-    if (summary.status === "blocked") {
-      sendJson(res, 422, {
-        error: {
-          code: "disbursement_blocked",
-          message: "Disbursement is blocked by compliance findings."
-        },
-        findings
-      });
-      return;
-    }
-
-    const disbursement = {
-      ...body,
-      disbursedAt: new Date().toISOString(),
-      disbursementId: body.disbursementId ?? createLoanId("disb")
-    };
-    const disbursedApplication = markDisbursed(application, disbursement);
-    const accountResult = createLoanAccountFromApplication(disbursedApplication, disbursement);
-    if (accountResult.summary.status === "blocked") {
-      sendJson(res, 422, {
-        error: {
-          code: "loan_account_blocked",
-          message: "Loan account could not be opened after disbursement."
-        },
-        findings: accountResult.findings
-      });
-      return;
-    }
-
-    const stored = {
-      ...disbursedApplication,
-      loanAccountId: accountResult.loanAccount.loanAccountId
-    };
-    const nextState = appendEvent(
-      {
-        ...state,
-        loanApplications: {
-          ...state.loanApplications,
-          [stored.applicationId]: stored
-        },
-        loanAccounts: {
-          ...state.loanAccounts,
-          [accountResult.loanAccount.loanAccountId]: accountResult.loanAccount
-        }
-      },
-      {
-        type: "loan.disbursement.recorded",
-        applicationId: stored.applicationId,
-        disbursementId: disbursement.disbursementId,
-        loanAccountId: accountResult.loanAccount.loanAccountId
-      }
-    );
-    await store.save(nextState);
-    sendJson(res, 200, stored);
     return;
   }
 
@@ -10381,6 +9270,7 @@ async function serveStaticFile(res, appsRoot, appDir, urlPath, urlPrefix, req = 
     if (fileSubpath.endsWith(".html")) contentType = "text/html; charset=utf-8";
     else if (fileSubpath.endsWith(".css")) contentType = "text/css; charset=utf-8";
     else if (fileSubpath.endsWith(".js")) contentType = "application/javascript; charset=utf-8";
+    else if (fileSubpath.endsWith(".json")) contentType = "application/json; charset=utf-8";
     else if (fileSubpath.endsWith(".webmanifest")) contentType = "application/manifest+json; charset=utf-8";
     else if (fileSubpath.endsWith(".svg")) contentType = "image/svg+xml";
     else if (fileSubpath.endsWith(".png")) contentType = "image/png";
@@ -10851,14 +9741,6 @@ function maskVpa(value) {
 
 function hashString(value) {
   return createHash("sha256").update(String(value ?? "")).digest("hex");
-}
-
-function combineComplianceResults(...results) {
-  const findings = results.flatMap((result) => result?.findings ?? []);
-  return {
-    findings,
-    summary: summarizeFindings(findings)
-  };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

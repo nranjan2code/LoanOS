@@ -60,6 +60,13 @@ test("operational workspace API filters role work, exposes safe metadata and dri
   state.tenants[tenant.tenantId].financeExceptions = {
     "finance-1": { financeExceptionId: "finance-1", status: "open", owner: "finance-operator", sourcePayload: "MUST_NOT_LEAK" }
   };
+  state.tenants[tenant.tenantId].complaints = {
+    "complaint-1": {
+      complaintId: "complaint-1", status: "received", channel: "email", category: "account_servicing",
+      summary: "MUST_NOT_LEAK", borrowerId: "borrower-1", acknowledgementRef: "ack-1",
+      receivedAt: "2026-07-18T00:00:00.000Z", acknowledgedAt: "2026-07-18T00:00:00.000Z", events: []
+    }
+  };
   await saveState(state, dataDir);
 
   response = await fetch(`${base}/operational-workspaces?view=origination`, { headers: { cookie } });
@@ -121,6 +128,20 @@ test("operational workspace API filters role work, exposes safe metadata and dri
   assert.deepEqual(viewerWorkspace.workspaces.map((entry) => entry.id), ["origination"]);
   response = await fetch(`${base}/operational-workspaces?view=control`, { headers: { cookie: viewerCookie } });
   assert.equal(response.status, 403);
+  await response.text();
+
+  response = await fetch(`${base}/operational-workspaces?view=servicing`, { headers: { cookie } });
+  assert.equal(response.status, 200);
+  const complaintTask = (await response.json()).items.find((item) => item.recordType === "complaint.assignment");
+  assert.ok(complaintTask);
+  response = await fetch(`${base}/workflow/tasks/${encodeURIComponent(complaintTask.itemId)}`, { headers: { cookie } });
+  assert.equal(response.status, 200, "governed administrators retain broad read visibility without gaining mutation authority");
+  await response.text();
+  response = await fetch(`${base}/workflow/tasks?type=complaint.assignment`, { headers: { cookie: viewerCookie } });
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).count, 0, "tenant users cannot list tasks outside their role and queue authority");
+  response = await fetch(`${base}/workflow/tasks/${encodeURIComponent(complaintTask.itemId)}`, { headers: { cookie: viewerCookie } });
+  assert.equal(response.status, 404, "task detail is privacy-safe for an unauthorized tenant user");
   await response.text();
 
   response = await fetch(`${base}/operational-workspaces`, { headers: { "x-api-key": tenant.apiKey } });

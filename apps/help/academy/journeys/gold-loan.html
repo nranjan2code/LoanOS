@@ -17,20 +17,21 @@
   <a class="brand" href="/help/" aria-label="LoanOS Guide and Academy"><span class="brand-mark">L</span><span><strong>LoanOS</strong><small>BA Lending Academy</small></span></a>
   <nav aria-label="Academy"><a href="/help/academy/">Course home</a><a href="/help/academy/glossary.html">Glossary</a><a href="/help/">Guide</a></nav>
 </header>
-<nav class="crumbs" aria-label="Breadcrumb"><a href="/help/">Guide &amp; Academy</a><span class="crumb-sep">/</span><a href="/help/academy/">BA Lending Academy</a><span class="crumb-sep">/</span><a href="/help/academy/journeys/">Module 14</a><span class="crumb-sep">/</span><span aria-current="page">Lesson 14.11</span></nav>
+<nav class="crumbs" aria-label="Breadcrumb"><button type="button" class="context-back" data-context-back data-fallback="/help/academy/">← Back</button><span class="crumb-trail"><a href="/help/">Guide &amp; Academy</a><span class="crumb-sep">/</span><a href="/help/academy/">BA Lending Academy</a><span class="crumb-sep">/</span><a href="/help/academy/journeys/">Module 14</a><span class="crumb-sep">/</span><span aria-current="page">Lesson 14.11</span></span></nav>
 <main id="main">
 
 <article class="lesson">
   <header class="lesson-head">
     <figure class="lesson-visual"><img src="/assets/images/products/gold-loan.jpg" alt="Gold loan: a real Indian customer, business or lending team in the product context" loading="eager" decoding="async" style="object-position:center"></figure>
-    <p class="eyebrow">Lesson 14.11 · 10 min · Verified 17 Jul 2026</p>
+    <p class="eyebrow">Lesson 14.11 · 66 of 78 · 10 min · Verified 17 Jul 2026</p>
     <h1>Gold loan</h1>
     <div class="objectives"><strong>After this lesson you can:</strong><ul><li>Run assay, custody and LTV as one discipline</li><li>Explain margin calls and the auction backstop</li></ul></div>
+    <p class="lesson-rhythm"><strong>Learning rhythm:</strong> read one section at a time, pause to explain the control in your own words, then answer the knowledge check without looking back.</p>
   </header>
-  <aside class="toc"><strong>On this page</strong><ol><li>The product</li><li>What a BA watches</li><li>Journey contract</li><li>Platform support</li><li>Where this lives in LoanOS</li><li>Knowledge check</li></ol></aside>
-  <section><h2>1. The product</h2><p>Credit against pledged household gold — India's oldest collateral, and the journey where <strong>custody is the product</strong>.</p><p>Assay determines purity and net eligible weight (stones deducted); the assessed rate prices the collateral; LTV caps the advance; the sealed packet enters dual-control vault custody with a receipt.</p><p>Tenors are short; schedules are often bullet or interest-serviced.</p><p>Because gold is priced daily, <strong>LTV is monitored daily</strong>: a falling gold price triggers margin calls, and sustained breach leads to the regulated auction path — noticed, reserve-priced, surplus returned to the borrower.</p></section>
-  <section><h2>2. What a BA watches</h2><p>Every custody movement is dual-controlled and evidenced — packet seal, vault transfer, release.</p><p>The auction is a borrower-protection process as much as a recovery one: notice, transparency, surplus return.</p><p>Weight is exact; money is exact; there is no rounding culture in a gold vault.</p></section>
-  <section class="panel journey"><h2>Journey contract <span class="muted">(derived from code at build time)</span></h2>
+  <aside class="toc"><strong>On this page</strong><ol><li><a href="#section-1">The product</a></li><li><a href="#section-2">What a BA watches</a></li><li><a href="#journey-contract">Journey contract</a></li><li><a href="#platform-support">Platform support</a></li><li><a href="#regulatory-anchors">Regulatory anchors</a></li><li><a href="#platform-citations">Where this lives in LoanOS</a></li><li><a href="#knowledge-check">Knowledge check</a></li></ol></aside>
+  <section class="content-section" id="section-1"><h2>1. The product</h2><p>Credit against pledged household gold — India's oldest collateral, and the journey where <strong>custody is the product</strong>.</p><p>Assay determines purity and net eligible weight (stones deducted); the assessed rate prices the collateral; LTV caps the advance; the sealed packet enters dual-control vault custody with a receipt.</p><p>Tenors are short; schedules are often bullet or interest-serviced.</p><p>Because gold is priced daily, <strong>LTV is monitored daily</strong>: a falling gold price triggers margin calls, and sustained breach leads to the regulated auction path — noticed, reserve-priced, surplus returned to the borrower.</p></section>
+  <section class="content-section" id="section-2"><h2>2. What a BA watches</h2><p>Every custody movement is dual-controlled and evidenced — packet seal, vault transfer, release.</p><p>The auction is a borrower-protection process as much as a recovery one: notice, transparency, surplus return.</p><p>Weight is exact; money is exact; there is no rounding culture in a gold vault.</p></section>
+  <section class="panel journey" id="journey-contract"><h2>Journey contract <span class="muted">(derived from code at build time)</span></h2>
     <p class="muted">Source: <code>packages/core/src/journeys/product-journey-contracts.js</code> · <code>product-journey/gold_loan</code> v1 · checksum <code>36aea6f42499…</code></p>
     <dl class="contract">
       <div><dt>Workspace archetype</dt><dd><code>gold_custody</code></dd></div>
@@ -42,7 +43,7 @@
     </dl>
     <p class="muted">Every journey additionally enforces exact minor-unit money, fail-closed limit enforcement, dual-control disbursement and evidence-before-disbursement.</p>
   </section>
-  <section class="panel support"><h2>Platform support <span class="muted">(from the journey support matrix)</span></h2>
+  <section class="panel support" id="platform-support"><h2>Platform support <span class="muted">(from the journey support matrix)</span></h2>
     <ul>
       <li><span class="cite-type">Support level</span> <strong>Configurable pattern</strong></li>
       <li><span class="cite-type">Implemented boundary</span> Assay, purity, exact weight, packet, custody, LTV and auction-policy gates</li>
@@ -50,10 +51,10 @@
     </ul>
     <p class="muted">Maturity truth lives in <code>docs/product/product-journey-support-matrix.md</code>; a lesson existing is not evidence of production readiness.</p>
   </section>
-  <section class="panel regulatory"><h2>Regulatory anchors</h2><ul><li><code>RBI-DL-2025</code> — LTV caps and auction conduct for gold lending sit in RBI's lending regulations.</li></ul><p class="muted">Family IDs resolve in the India regulatory register (<code>docs/compliance/india-regulatory-register.md</code>), which owns sources and caveats.</p></section>
-  <section class="panel platform"><h2>Where this lives in LoanOS</h2><ul><li><span class="cite-type">Capability</span> <code>COL-002</code> — Gold among collateral types: assay, custody, release.</li><li><span class="cite-type">Code</span> <code>packages/core/src/journeys/product-journey-contracts.js</code> — The checksummed product contract this page's derived panel is built from.</li></ul></section>
+  <section class="panel regulatory" id="regulatory-anchors"><h2>Regulatory anchors</h2><ul><li><code>RBI-DL-2025</code> — LTV caps and auction conduct for gold lending sit in RBI's lending regulations.</li></ul><p class="muted">Family IDs resolve in the India regulatory register (<code>docs/compliance/india-regulatory-register.md</code>), which owns sources and caveats.</p></section>
+  <section class="panel platform" id="platform-citations"><h2>Where this lives in LoanOS</h2><ul><li><span class="cite-type">Capability</span> <code>COL-002</code> — Gold among collateral types: assay, custody, release.</li><li><span class="cite-type">Code</span> <code>packages/core/src/journeys/product-journey-contracts.js</code> — The checksummed product contract this page's derived panel is built from.</li></ul></section>
   <section class="terms"><h2>Key terms</h2><p><a class="term" href="/help/academy/glossary.html#amortisation">Amortisation</a> <a class="term" href="/help/academy/glossary.html#noc">NOC</a></p></section>
-  <section class="panel checks"><h2>Knowledge check</h2><div class="check"><p class="check-q">1. Gold prices fall 15% in a month. What does the journey do?</p><ol class="check-options" type="A"><li>Nothing — LTV was checked at origination</li><li>Daily LTV monitoring flags breaches, triggers margin calls, and escalates to the noticed auction path if uncured</li><li>Auto-forecloses immediately</li><li>Reprices the interest</li></ol><details><summary>Show answer</summary><p><strong>B.</strong> Daily mark-to-market with margin-call and auction-policy machinery is the contract's core risk control.</p></details></div></section>
+  <section class="panel checks" id="knowledge-check"><p class="eyebrow">Retrieval practice</p><h2>Knowledge check</h2><p class="check-instruction">Answer aloud or write your choice before opening the explanation. If you miss it, revisit the named section—not the whole lesson.</p><div class="check"><p class="check-q">1. Gold prices fall 15% in a month. What does the journey do?</p><ol class="check-options" type="A"><li>Nothing — LTV was checked at origination</li><li>Daily LTV monitoring flags breaches, triggers margin calls, and escalates to the noticed auction path if uncured</li><li>Auto-forecloses immediately</li><li>Reprices the interest</li></ol><details><summary>Reveal answer and reasoning</summary><p><strong>B.</strong> Daily mark-to-market with margin-call and auction-policy machinery is the contract's core risk control.</p></details></div></section>
   <section class="related"><h2>Related lessons</h2><ul><li><a href="/help/academy/m06-collections/legal-recovery.html">Legal recovery: SARFAESI, Section 138 and the court tracks</a> <span class="muted">(module 6)</span></li><li><a href="/help/academy/m08-partners/product-families.html">Product families: how policy changes with the product</a> <span class="muted">(module 8)</span></li></ul></section>
 </article>
 <nav class="pager" aria-label="Lesson navigation">
@@ -66,5 +67,6 @@
   <p class="disclaimer">Educational content, not legal advice. Regulatory statements summarise the control families in the India regulatory register and must be verified with compliance and counsel before reliance. A capability citation reflects catalogue status, not production readiness.</p>
   <p><a href="/help/">Guide &amp; Academy</a> · <a href="/help/academy/glossary.html">Glossary</a> · Course verified 17 Jul 2026</p>
 </footer>
+<script src="/help/learning-experience.js" defer></script>
 </body>
 </html>

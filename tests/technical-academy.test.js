@@ -37,16 +37,22 @@ test("technical academy pages are generated, visual and current", async () => {
   const html=await readFile(new URL("apps/help/technical-academy/index.html",root),"utf8");
   const lesson=await readFile(new URL("apps/help/technical-academy/t01-system/platform-map.html",root),"utf8");
   assert.match(html,/LoanOS Technical Academy/);
+  assert.match(html,/data-context-back/, "course pages provide an explicit return path");
   assert.match(html,/The Rules Engine/);
   assert.match(html,/Explore the enterprise architecture/);
   assert.match(html,/<strong>463<\/strong> (?:capability records|capabilities)/);
   assert.match(lesson,/<svg/);
   assert.match(lesson,/System sources/);
+  assert.match(lesson,/Active recall/);
+  assert.match(lesson,/learning-experience\.js/);
+  assert.match(lesson,/data-context-back/, "interlinked lessons provide an explicit return path");
+  assert.match(lesson,/71/);
   assert.doesNotMatch(lesson,/localStorage|sessionStorage|indexedDB/);
   const journey=await readFile(new URL("apps/help/technical-academy/t05-journeys/personal-loan.html",root),"utf8");
   assert.match(journey,/Complete case matrix/);
   assert.match(journey,/Maturity and production boundary/);
   assert.match(journey,/Provider timeout/);
+  assert.match(journey,/Rebuild the journey from memory/);
 });
 
 test("enterprise architecture explorer links every layer to role-relevant learning", async () => {
@@ -55,6 +61,7 @@ test("enterprise architecture explorer links every layer to role-relevant learni
   assert.match(html,/View by responsibility/);
   assert.match(html,/Study this subsystem/);
   assert.match(html,/architecture-explorer\.js/);
+  assert.match(html,/data-context-back/);
   assert.doesNotMatch(html,/3D|HUD|sci-fi/i);
 });
 

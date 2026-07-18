@@ -10,15 +10,16 @@ export default {
       id: "queues-sla",
       title: "Task queues, SLA clocks and attribution",
       duration: "15 min",
-      verified: "17 Jul 2026",
+      verified: "18 Jul 2026",
       objectives: [
         "Explain derived queues — tasks computed from domain state, not created by hand",
         "Describe SLA clocks, priorities and breach handling",
-        "State why every action carries actor attribution"
+        "State why every action carries actor attribution",
+        "Use an authoritative task contract, timeline and evidence boundary without confusing task state with domain completion"
       ],
       sections: [
         { heading: "Queues that cannot lie", body: "LoanOS's LWS derives task queues **from domain state**: a KFS lacking acknowledgement evidence, a decision awaiting checker approval, an account crossing into an NPA-review threshold, a grievance nearing its clock — each condition *is* the task. Nobody creates or deletes these tasks by hand, so the queue cannot drift from reality: if the underlying state resolves, the task disappears; if not, it stays, visible and ageing.\n\nQueues exist for compliance exceptions, KFS evidence, credit decisions, AI human review, checker approvals, disbursement, collections, NPA review, grievance resolution and RBI CMS escalation — a direct map of the control points this course has covered." },
-        { heading: "Clocks with consequences", body: "Every task carries **SLA metadata**: priority, due time, breach status. Some clocks are internal service standards; others are statutory — the grievance 30-day clock, CIC correction windows, incident-notification hours. Statutory clocks escalate rather than merely embarrass: an approaching breach raises priority and routes to the escalation owner.\n\nRole and queue visibility are enforced server-side: an actor sees and acts only within staffed roles, and assignment, start, release and comments are audited. The Guide's operating articles cover the day-to-day mechanics; what a BA specifies is which state creates a task, who may act, and what clock governs it." },
+        { heading: "Clocks with consequences", body: "Every task carries **SLA metadata**: priority, due time, breach status. Some clocks are internal service standards; others are statutory — the grievance 30-day clock, CIC correction windows, incident-notification hours. Statutory clocks escalate rather than merely embarrass: an approaching breach raises priority and routes to the escalation owner.\n\nRole and queue visibility are enforced server-side: an actor sees and acts only within staffed roles, and assignment, start, release and comments are audited. The operational workspace loads authoritative task detail, shows its timeline and allow-listed evidence references, and submits a reviewed in-memory request only to the exact task-declared owning API. The owning domain still decides whether evidence is sufficient; task state is never a substitute for business completion." },
         { heading: "Attribution is the whole point", body: "Workflow exists so that months later, one question is always answerable: **who did what, in which role, on whose authority, and when**. Every action records its principal, session and correlation lineage — humans via login/SSO, agents via their scoped identities. 'The system did it' is never an acceptable audit answer; LWS makes sure it never has to be." }
       ],
       regulatory: [

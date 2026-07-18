@@ -17,20 +17,21 @@
   <a class="brand" href="/help/" aria-label="LoanOS Guide and Academy"><span class="brand-mark">L</span><span><strong>LoanOS</strong><small>BA Lending Academy</small></span></a>
   <nav aria-label="Academy"><a href="/help/academy/">Course home</a><a href="/help/academy/glossary.html">Glossary</a><a href="/help/">Guide</a></nav>
 </header>
-<nav class="crumbs" aria-label="Breadcrumb"><a href="/help/">Guide &amp; Academy</a><span class="crumb-sep">/</span><a href="/help/academy/">BA Lending Academy</a><span class="crumb-sep">/</span><a href="/help/academy/journeys/">Module 14</a><span class="crumb-sep">/</span><span aria-current="page">Lesson 14.19</span></nav>
+<nav class="crumbs" aria-label="Breadcrumb"><button type="button" class="context-back" data-context-back data-fallback="/help/academy/">← Back</button><span class="crumb-trail"><a href="/help/">Guide &amp; Academy</a><span class="crumb-sep">/</span><a href="/help/academy/">BA Lending Academy</a><span class="crumb-sep">/</span><a href="/help/academy/journeys/">Module 14</a><span class="crumb-sep">/</span><span aria-current="page">Lesson 14.19</span></span></nav>
 <main id="main">
 
 <article class="lesson">
   <header class="lesson-head">
     <figure class="lesson-visual"><img src="/assets/images/products/trade-finance-workflow.jpg" alt="Trade-finance workflow: a real Indian customer, business or lending team in the product context" loading="eager" decoding="async" style="object-position:center"></figure>
-    <p class="eyebrow">Lesson 14.19 · 10 min · Verified 17 Jul 2026</p>
+    <p class="eyebrow">Lesson 14.19 · 74 of 78 · 10 min · Verified 17 Jul 2026</p>
     <h1>Trade-finance workflow</h1>
     <div class="objectives"><strong>After this lesson you can:</strong><ul><li>Handle instruments, documents and sanctions in cross-border trade</li><li>Understand contingent versus funded exposure</li></ul></div>
+    <p class="lesson-rhythm"><strong>Learning rhythm:</strong> read one section at a time, pause to explain the control in your own words, then answer the knowledge check without looking back.</p>
   </header>
-  <aside class="toc"><strong>On this page</strong><ol><li>The product</li><li>What a BA watches</li><li>Journey contract</li><li>Platform support</li><li>Where this lives in LoanOS</li><li>Knowledge check</li></ol></aside>
-  <section><h2>1. The product</h2><p>The documentary end of trade: letters of credit, guarantees and collections, where the bank's promise (a <strong>contingent</strong> exposure) substitutes for trust between distant counterparties, becoming funded only if drawn. The workflow examines <strong>documents, not goods</strong>: instrument terms, shipment documents, customs evidence — discrepancies between them are the daily work.</p><p>Cross-border means <strong>sanctions screening</strong> on every party and route, currency in minor units of its own denomination, incoterms allocating who bears what, and SWIFT messaging as the transport.</p></section>
-  <section><h2>2. What a BA watches</h2><p>Trade-based money laundering is the AML frontier — over/under-invoicing and phantom shipments launder value through exactly these instruments, which is why screening and document examination are contract facts. Contingent accounting (exposure without disbursement) is unlike every other journey; treat it as its own discipline.</p></section>
-  <section class="panel journey"><h2>Journey contract <span class="muted">(derived from code at build time)</span></h2>
+  <aside class="toc"><strong>On this page</strong><ol><li><a href="#section-1">The product</a></li><li><a href="#section-2">What a BA watches</a></li><li><a href="#journey-contract">Journey contract</a></li><li><a href="#platform-support">Platform support</a></li><li><a href="#regulatory-anchors">Regulatory anchors</a></li><li><a href="#platform-citations">Where this lives in LoanOS</a></li><li><a href="#knowledge-check">Knowledge check</a></li></ol></aside>
+  <section class="content-section" id="section-1"><h2>1. The product</h2><p>The documentary end of trade: letters of credit, guarantees and collections, where the bank's promise (a <strong>contingent</strong> exposure) substitutes for trust between distant counterparties, becoming funded only if drawn. The workflow examines <strong>documents, not goods</strong>: instrument terms, shipment documents, customs evidence — discrepancies between them are the daily work.</p><p>Cross-border means <strong>sanctions screening</strong> on every party and route, currency in minor units of its own denomination, incoterms allocating who bears what, and SWIFT messaging as the transport.</p></section>
+  <section class="content-section" id="section-2"><h2>2. What a BA watches</h2><p>Trade-based money laundering is the AML frontier — over/under-invoicing and phantom shipments launder value through exactly these instruments, which is why screening and document examination are contract facts. Contingent accounting (exposure without disbursement) is unlike every other journey; treat it as its own discipline.</p></section>
+  <section class="panel journey" id="journey-contract"><h2>Journey contract <span class="muted">(derived from code at build time)</span></h2>
     <p class="muted">Source: <code>packages/core/src/journeys/product-journey-contracts.js</code> · <code>product-journey/trade_finance_workflow</code> v1 · checksum <code>87b25b140932…</code></p>
     <dl class="contract">
       <div><dt>Workspace archetype</dt><dd><code>trade_finance</code></dd></div>
@@ -42,7 +43,7 @@
     </dl>
     <p class="muted">Every journey additionally enforces exact minor-unit money, fail-closed limit enforcement, dual-control disbursement and evidence-before-disbursement.</p>
   </section>
-  <section class="panel support"><h2>Platform support <span class="muted">(from the journey support matrix)</span></h2>
+  <section class="panel support" id="platform-support"><h2>Platform support <span class="muted">(from the journey support matrix)</span></h2>
     <ul>
       <li><span class="cite-type">Support level</span> <strong>Configurable pattern</strong></li>
       <li><span class="cite-type">Implemented boundary</span> Counterparty/document/shipment/release/proceeds workflow controls</li>
@@ -50,10 +51,10 @@
     </ul>
     <p class="muted">Maturity truth lives in <code>docs/product/product-journey-support-matrix.md</code>; a lesson existing is not evidence of production readiness.</p>
   </section>
-  <section class="panel regulatory"><h2>Regulatory anchors</h2><ul><li><code>RBI-KYC-2016</code> — Sanctions screening and trade-based AML sit inside the KYC/AML regime.</li></ul><p class="muted">Family IDs resolve in the India regulatory register (<code>docs/compliance/india-regulatory-register.md</code>), which owns sources and caveats.</p></section>
-  <section class="panel platform"><h2>Where this lives in LoanOS</h2><ul><li><span class="cite-type">Capability</span> <code>KYC-011</code> — Sanctions and negative-list screening machinery.</li><li><span class="cite-type">Code</span> <code>packages/core/src/journeys/product-journey-contracts.js</code> — The checksummed product contract this page's derived panel is built from.</li></ul></section>
+  <section class="panel regulatory" id="regulatory-anchors"><h2>Regulatory anchors</h2><ul><li><code>RBI-KYC-2016</code> — Sanctions screening and trade-based AML sit inside the KYC/AML regime.</li></ul><p class="muted">Family IDs resolve in the India regulatory register (<code>docs/compliance/india-regulatory-register.md</code>), which owns sources and caveats.</p></section>
+  <section class="panel platform" id="platform-citations"><h2>Where this lives in LoanOS</h2><ul><li><span class="cite-type">Capability</span> <code>KYC-011</code> — Sanctions and negative-list screening machinery.</li><li><span class="cite-type">Code</span> <code>packages/core/src/journeys/product-journey-contracts.js</code> — The checksummed product contract this page's derived panel is built from.</li></ul></section>
   <section class="terms"><h2>Key terms</h2><p><a class="term" href="/help/academy/glossary.html#str">STR</a> <a class="term" href="/help/academy/glossary.html#fiu-ind">FIU-IND</a></p></section>
-  <section class="panel checks"><h2>Knowledge check</h2><div class="check"><p class="check-q">1. Banks in documentary trade deal in…</p><ol class="check-options" type="A"><li>Goods</li><li>Documents — conformity of papers to instrument terms, not the cargo itself</li><li>Ships</li><li>Warehouses</li></ol><details><summary>Show answer</summary><p><strong>B.</strong> The instrument obliges payment against conforming documents; examination and discrepancy management are the craft.</p></details></div></section>
+  <section class="panel checks" id="knowledge-check"><p class="eyebrow">Retrieval practice</p><h2>Knowledge check</h2><p class="check-instruction">Answer aloud or write your choice before opening the explanation. If you miss it, revisit the named section—not the whole lesson.</p><div class="check"><p class="check-q">1. Banks in documentary trade deal in…</p><ol class="check-options" type="A"><li>Goods</li><li>Documents — conformity of papers to instrument terms, not the cargo itself</li><li>Ships</li><li>Warehouses</li></ol><details><summary>Reveal answer and reasoning</summary><p><strong>B.</strong> The instrument obliges payment against conforming documents; examination and discrepancy management are the craft.</p></details></div></section>
   <section class="related"><h2>Related lessons</h2><ul><li><a href="/help/academy/m02-onboarding/kyc-cdd.html">KYC and CDD: CKYC, V-CIP and the KYC state machine</a> <span class="muted">(module 2)</span></li><li><a href="/help/academy/journeys/purchase-order-finance.html">Purchase-order finance</a> <span class="muted">(module 14)</span></li></ul></section>
 </article>
 <nav class="pager" aria-label="Lesson navigation">
@@ -66,5 +67,6 @@
   <p class="disclaimer">Educational content, not legal advice. Regulatory statements summarise the control families in the India regulatory register and must be verified with compliance and counsel before reliance. A capability citation reflects catalogue status, not production readiness.</p>
   <p><a href="/help/">Guide &amp; Academy</a> · <a href="/help/academy/glossary.html">Glossary</a> · Course verified 17 Jul 2026</p>
 </footer>
+<script src="/help/learning-experience.js" defer></script>
 </body>
 </html>

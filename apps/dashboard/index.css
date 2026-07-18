@@ -1905,6 +1905,8 @@ dialog::backdrop {
   align-items: center;
   gap: var(--space-4);
 }
+.footer-bar a { color: inherit; font-weight: 700; text-decoration: none; }
+.footer-bar a:hover { text-decoration: underline; }
 
 .footer-bar .footer-sep {
   width: 1px;

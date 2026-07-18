@@ -1,6 +1,6 @@
 import { journeyCasebookLessons, technicalJourneyLessons } from "./journey-lessons.mjs";
 
-const verified = "2026-07-17";
+const verified = "17 Jul 2026";
 
 const lesson = (id, title, duration, objectives, sections, flow, sources, extra = {}) => ({
   id, title, duration, verified, objectives, sections, flow, sources, ...extra

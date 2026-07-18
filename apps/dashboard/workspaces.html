@@ -17,6 +17,7 @@
     </div>
     <div class="topbar-actions">
       <a class="button secondary" href="./">Loan officer desk</a>
+      <a class="button secondary" href="/status/">Build status</a>
       <a class="button secondary" href="/help/#guide/work-queues">Guide &amp; Academy</a>
       <button id="refresh" type="button">Refresh</button>
     </div>
@@ -84,7 +85,34 @@
           <h3>Governed domain action</h3>
           <p id="domain-action-description"></p>
           <code id="domain-action-path"></code>
-          <p class="boundary">The task declares this action, but this workspace never invents its evidence payload. Use the linked specialist screen or documented API contract.</p>
+          <p class="boundary">The owning API remains authoritative. This workspace sends only the reviewed payload below and never marks the task complete itself.</p>
+        </section>
+
+        <section id="specialist-action" class="specialist-section" aria-labelledby="specialist-action-title" hidden>
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Evidence-gated execution</p>
+              <h3 id="specialist-action-title">Prepare governed action</h3>
+            </div>
+            <span id="action-readiness" class="readiness">Contract loading</span>
+          </div>
+          <p id="action-guidance" class="boundary"></p>
+          <ul id="action-requirements" class="requirement-list"></ul>
+          <form id="domain-action-form" class="control-form">
+            <label for="action-payload">Reviewed JSON request body</label>
+            <textarea id="action-payload" rows="8" spellcheck="false" autocapitalize="off" autocomplete="off" aria-describedby="action-payload-help">{}</textarea>
+            <p id="action-payload-help" class="field-help">Held only in memory. Values are never copied into activity telemetry or browser storage.</p>
+            <div class="action-form-buttons">
+              <button id="insert-skeleton" type="button" class="secondary">Insert contract skeleton</button>
+              <button id="validate-payload" type="button" class="secondary">Validate JSON</button>
+            </div>
+            <label class="attestation" for="action-attestation">
+              <input id="action-attestation" type="checkbox">
+              <span>I reviewed the evidence references and understand the owning API may reject this request.</span>
+            </label>
+            <button id="submit-domain-action" type="submit">Submit to owning control</button>
+          </form>
+          <p id="action-status" class="inspector-status" role="status" aria-live="polite"></p>
         </section>
 
         <section id="task-controls" hidden>
@@ -109,6 +137,36 @@
           </form>
         </section>
 
+        <section id="case-timeline" class="specialist-section" aria-labelledby="timeline-title" hidden>
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Case progression</p>
+              <h3 id="timeline-title">Timeline</h3>
+            </div>
+          </div>
+          <ol id="timeline-list" class="timeline-list"></ol>
+        </section>
+
+        <section id="evidence-panel" class="specialist-section" aria-labelledby="evidence-title" hidden>
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Documents &amp; evidence</p>
+              <h3 id="evidence-title">Evidence boundary</h3>
+            </div>
+          </div>
+          <ul id="evidence-list" class="evidence-list"></ul>
+        </section>
+
+        <section id="audit-panel" class="specialist-section" aria-labelledby="audit-title" hidden>
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Authenticated history</p>
+              <h3 id="audit-title">Task audit</h3>
+            </div>
+          </div>
+          <ol id="audit-list" class="audit-list"></ol>
+        </section>
+
         <p id="inspector-status" class="inspector-status" role="status" aria-live="polite"></p>
       </aside>
     </section>
@@ -118,6 +176,8 @@
       <p>No customer content is stored in browser storage or copied into activity telemetry. Task assignment, start, release and comments are bound to the authenticated session; domain completion remains evidence-gated by its owning API.</p>
     </section>
   </main>
+
+  <footer class="workspace-footer"><span>Repository-backed operating view</span><a href="/status/">Build status</a></footer>
 
   <script type="module" src="./workspaces.js"></script>
 </body>

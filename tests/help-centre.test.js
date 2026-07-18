@@ -2,12 +2,14 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-test("help centre exposes role guidance, learning paths and governed status labels", async () => {
-  const [html, js, roleCss, navigationCss] = await Promise.all([
+test("help centre exposes role guidance, readable learning paths and governed status labels", async () => {
+  const [html, js, roleCss, navigationCss, learningCss, learningJs] = await Promise.all([
     readFile(new URL("../apps/help/index.html", import.meta.url), "utf8"),
     readFile(new URL("../apps/help/help.js", import.meta.url), "utf8"),
     readFile(new URL("../apps/help/responsibility-paths.css", import.meta.url), "utf8"),
-    readFile(new URL("../apps/help/navigation-flow.css", import.meta.url), "utf8")
+    readFile(new URL("../apps/help/navigation-flow.css", import.meta.url), "utf8"),
+    readFile(new URL("../apps/help/learning-experience.css", import.meta.url), "utf8"),
+    readFile(new URL("../apps/help/learning-experience.js", import.meta.url), "utf8")
   ]);
   assert.match(html, /Guide & Academy/);
   assert.match(html, /My learning/);
@@ -19,7 +21,11 @@ test("help centre exposes role guidance, learning paths and governed status labe
   assert.match(js, /work-queues/);
   assert.match(js, /18 Jul 2026/);
   assert.match(html, /BA Lending Academy/);
+  assert.match(html, /<b>12 modules<\/b> · 71 sessions/, "technical course metadata matches its curriculum");
+  assert.doesNotMatch(html + js, /6 modules[^<`]*· 45 sessions/, "stale technical course metadata is removed");
   assert.match(html, /Sequenced curriculum/);
+  assert.match(html, /Before you begin/);
+  assert.match(html, /Stop and check/);
   assert.match(js, /const roleCurricula=/);
   assert.equal((js.match(/practice:\[/g) || []).length, 8, "every responsibility has an applied case");
   assert.match(roleCss, /\.path-module/);
@@ -28,7 +34,14 @@ test("help centre exposes role guidance, learning paths and governed status labe
   assert.match(js, /popstate/);
   assert.match(js, /sourceRole/);
   assert.match(navigationCss, /\.path-nav/);
+  assert.match(learningCss, /\.guide-orientation/);
+  assert.match(learningJs, /Focus mode/);
+  assert.match(learningJs, /IntersectionObserver/);
+  assert.match(learningJs, /data-context-back/);
+  assert.match(learningJs, /history\.back/);
+  assert.match(learningJs, /returnTo/);
   assert.doesNotMatch(js, /localStorage|sessionStorage|indexedDB/);
+  assert.doesNotMatch(learningJs, /localStorage|sessionStorage|indexedDB/);
 });
 
 test("platform surfaces link users to the canonical guide", async () => {

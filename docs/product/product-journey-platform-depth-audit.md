@@ -57,7 +57,7 @@ Important defects found by the audit:
 - Resolved in JD-04: `composed-journey-lifecycle.js` binds all 21 to one ordered application-capture through closure lifecycle. Each transition requires the exact stage evidence contract, current instance version, immutable checksum and independent checker; no stage can be skipped.
 - Resolved in JD-04: authenticated `/admin/composed-journeys` operations persist instances, transition requests and escalations. Product/configuration/principal authority loss pauses work; failures become visible manual intervention; resume returns only to the recorded stage.
 - The schema workspaces and specialist service are now composed through controlled references and stage evidence. They are not yet 21 fully executed browser journeys: JD-05 must drive the mandatory happy/adverse/recovery corpus through every layer and JD-06 must certify real providers and deployment operations.
-- JD-05 foundation implemented: every canonical journey receives 16 stable common scenarios plus one archetype-specific scenario; campaign proposal, independent approval, immutable result evidence, independent assessment, tenant persistence/API and audit events are executable. The scenario contracts exist, but the generated end-to-end runners that drive every platform layer are still to be implemented.
+- JD-05 foundation implemented: every canonical journey receives 16 stable common scenarios plus one archetype-specific scenario; campaign proposal, independent approval, immutable result evidence, independent assessment, tenant persistence/API and audit events are executable. The generated conformance runner now executes the repository-backed file/API, browser safety-contract and optional PostgreSQL/RLS lanes, while interactive browser lifecycle and downstream policy, accounting, repayment, reporting, closure, rollback and replay executors remain.
 
 ### JD-01/JD-02/JD-03/JD-04/JD-05 foundations delivered
 
@@ -65,13 +65,14 @@ Important defects found by the audit:
 - Product-policy validation rejects every removed legacy ID and accepts all canonical built-ins.
 - Tenant onboarding renders the exact canonical catalogue.
 - `product-journey-conformance.js` creates checksum-bound 17-scenario manifests for all 21, with exact-content idempotency, four-eyes approval, evidence checksums, assessor independence and a simulated/live distinction.
+- `product-journey-generated-conformance.js` expands those manifests into an exact 21-journey × 17-scenario × three-lane JD-05 execution matrix for API/file, browser-contract and PostgreSQL/RLS evidence. Missing executors, missing evidence and live/production claims fail closed; the runner never produces production readiness.
 - `/admin/product-journey-conformance` persists campaign administration and exposes tenant coverage; no conformance result directly marks a journey production-ready.
 - The shared specialist service activates immutable configurations, opens version-bound cases, executes the 13 specialised and four trade kernels only after independent action approval, and preserves failures as actionable exceptions.
 - Configuration suspension, principal suspension/inactivation and role revocation immediately pause affected cases and expose critical escalations/tasks.
 - The workspace registry binds all 21 product contracts to distinct schemas; entitlement/channel/role projection, classified fields/documents/actions, exact-money validation, redacted persistent drafts and accessible channel surfaces are executable.
 - The composed lifecycle registry covers every canonical journey and defines 12 monotonic evidence-gated stages plus terminal completion. Instance, stage, product/schema/policy/workflow/accounting and specialist lineage are immutable; transitions are current-version, content-idempotent and maker-checker controlled.
 - Persistent pause, manual-intervention escalation and recovery make authority loss, specialist referral, stale lineage and ambiguous downstream effects visible. Recovery requires governed evidence and cannot skip a stage.
-- Remaining JD-01 work is the complete subscription/add-product/configuration/staffing administration workspace. JD-02, JD-03 and JD-04 are complete at their governed service, workspace and composition-control boundaries. Remaining JD-05 work is generated full-stack/API/browser/PostgreSQL execution for every scenario contract; JD-06 is still the real-provider and production-operations boundary.
+- Remaining JD-01 work is the complete subscription/add-product/configuration/staffing administration workspace. JD-02, JD-03 and JD-04 are complete at their governed service, workspace and composition-control boundaries. Remaining JD-05 work is interactive full-stack browser execution and downstream policy, accounting, repayment, reporting, closure, rollback and replay execution for every scenario contract; JD-06 is still the real-provider and production-operations boundary.
 
 ## Greenfield rule
 
@@ -106,7 +107,7 @@ Create schema-driven capture and workspaces for: unsecured/business term, proper
 
 Acceptance: schemas declare required facts, documents, roles, actions and redaction; borrower/partner/field/staff channels render only entitled journey schemas; accessibility, language, privacy, offline and authorization tests pass.
 
-Status: product-schema/workspace slice delivered. Exactly 21 contract/checksum-bound schemas project across seven authorised channels while reusing archetype components. Effective tenant entitlement, principal/channel/role authorization, complete product facts/evidence, classified action projections, genuine English/Hindi labels, exact-paise validation, actor-bound server drafts, redacted responses, privacy-safe audit, accessible safe-DOM rendering and offline no-cache behavior are tested. Generated browser/PostgreSQL adverse execution remains JD-05; deployment acceptance remains JD-06.
+Status: product-schema/workspace slice delivered. Exactly 21 contract/checksum-bound schemas project across seven authorised channels while reusing archetype components. Effective tenant entitlement, principal/channel/role authorization, complete product facts/evidence, classified action projections, genuine English/Hindi labels, exact-paise validation, actor-bound server drafts, redacted responses, privacy-safe audit, accessible safe-DOM rendering and offline no-cache behavior are tested. Interactive browser lifecycle and downstream adverse execution remain JD-05; deployment acceptance remains JD-06.
 
 ### JD-04 — Composed lifecycle orchestration · all 21
 
@@ -123,6 +124,8 @@ Generate reusable tenant fixtures and run the same baseline corpus plus archetyp
 Minimum corpus: happy path, policy decline, missing evidence, provider timeout, replay/duplicate, stale version, wrong tenant, wrong role, self-approval, revocation mid-work, reconciliation mismatch, accounting balance, reporting output, repayment, delinquency, closure, rollback and audit replay.
 
 Acceptance: the dashboard is generated from test evidence and cannot label a journey deeply ready unless every mandatory scenario passes for its current template version.
+
+Status: generated execution foundation delivered, not JD-05 completion. The deterministic matrix and fail-closed runner cover all 1,071 journey/scenario/lane cases. Repository tests execute all 21 schema projections, malformed-input denial, exact replay, wrong-role denial, cross-tenant isolation and file-store restart recovery; the browser lane currently verifies the shared safe-DOM/accessibility/no-cache contract, and the PostgreSQL lane verifies persistence/RLS when `DATABASE_URL_TEST` is available. Full browser lifecycle actions plus accounting, reporting, repayment, delinquency, closure, rollback and audit-replay execution through every downstream dependency remain required before JD-05 can close.
 
 ### JD-06 — Provider and production operations · all 21
 

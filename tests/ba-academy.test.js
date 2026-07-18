@@ -66,9 +66,21 @@ test("generated academy pages are current and correctly linked", async () => {
   assert.match(lessonHtml, /Regulatory anchors/);
   assert.match(lessonHtml, /Where this lives in LoanOS/);
   assert.match(lessonHtml, /Knowledge check/);
+  assert.match(lessonHtml, /Retrieval practice/);
+  assert.match(lessonHtml, /Learning rhythm/);
+  assert.match(lessonHtml, /href="#section-1"/);
+  assert.match(lessonHtml, /learning-experience\.js/);
   assert.match(lessonHtml, /href="\/help\/academy\/glossary\.html/);
   assert.match(lessonHtml, /class="lesson-visual"/);
   assert.match(lessonHtml, /alt="[^"]+"/);
+  const rendered = [home, lessonHtml];
+  for (const html of rendered) for (const match of html.matchAll(/<img[^>]+src="([^"]+)"[^>]+alt="([^"]+)"/g)) {
+    assert.ok(match[2].trim(), `${match[1]} has useful alternative text`);
+    const file = match[1].startsWith("/assets/") ? new URL(`apps/web${match[1]}`, root)
+      : match[1].startsWith("/shared/") ? new URL(`apps${match[1]}`, root)
+      : new URL(`apps${match[1]}`, root);
+    await access(file);
+  }
 
   for (const module of course.modules) {
     await access(new URL(`${module.id}/index.html`, academy));

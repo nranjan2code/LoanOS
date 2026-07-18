@@ -1,8 +1,8 @@
 {
   "schemaVersion": 2,
-  "generated": "2026-07-18T03:50:55.022Z",
-  "sourceDigest": "5a1401672c76bf32",
-  "snapshotId": "85896c40cbf477c9",
+  "generated": "2026-07-18T04:32:34.984Z",
+  "sourceDigest": "99649e859102426a",
+  "snapshotId": "8c9e54606e3fc2d9",
   "sources": {
     "catalogue": "docs/product/complete-system-capability-catalog.md",
     "trace": "docs/product/capability-trace.json",
@@ -12,11 +12,16 @@
   },
   "git": {
     "branch": "main",
-    "sha": "207bfeac7c75",
-    "count": 223,
+    "sha": "daec00dc8c47",
+    "count": 224,
     "dirty": true,
-    "changeCount": 22,
+    "changeCount": 283,
     "commits": [
+      {
+        "hash": "daec00d",
+        "subject": "feat(workspaces): ship role-specific operational desks",
+        "when": "38 minutes ago"
+      },
       {
         "hash": "207bfea",
         "subject": "refactor(api): extract route modules and add documentation governance",
@@ -25,17 +30,17 @@
       {
         "hash": "edb1a8b",
         "subject": "docs: deep documentation pass for the @loanos/core package boundary",
-        "when": "3 hours ago"
+        "when": "4 hours ago"
       },
       {
         "hash": "4a9ef90",
         "subject": "refactor(core): group domain kernel into @loanos/core package domains",
-        "when": "3 hours ago"
+        "when": "4 hours ago"
       },
       {
         "hash": "8b1c3bd",
         "subject": "docs(core): add JSDoc/rustdoc documentation pass for humans and AI agents",
-        "when": "4 hours ago"
+        "when": "5 hours ago"
       },
       {
         "hash": "bce5d2f",
@@ -45,7 +50,7 @@
       {
         "hash": "3aa511b",
         "subject": "fix(aws): return successful status without domains",
-        "when": "13 hours ago"
+        "when": "14 hours ago"
       },
       {
         "hash": "f98d662",
@@ -55,12 +60,12 @@
       {
         "hash": "5ed96b1",
         "subject": "feat: implement Banker Academy curriculum, build scripts, and updates to help centre",
-        "when": "15 hours ago"
+        "when": "16 hours ago"
       },
       {
         "hash": "ac6bb2c",
         "subject": "feat(help): add complete technical academy",
-        "when": "15 hours ago"
+        "when": "16 hours ago"
       },
       {
         "hash": "c1196e1",
@@ -70,11 +75,6 @@
       {
         "hash": "d435445",
         "subject": "chore: ignore local full-source backup tarballs",
-        "when": "2 days ago"
-      },
-      {
-        "hash": "2730683",
-        "subject": "Merge branch 'android-apps-review'",
         "when": "2 days ago"
       }
     ]
@@ -25410,13 +25410,13 @@
     }
   ],
   "tests": {
-    "pass": 680,
+    "pass": 702,
     "fail": 0,
-    "skipped": 10,
+    "skipped": 11,
     "cancelled": 0,
     "todo": 0,
-    "total": 690,
-    "durationMs": 22859.31975,
+    "total": 713,
+    "durationMs": 24885.480584,
     "ran": true,
     "source": "provided-log",
     "error": ""

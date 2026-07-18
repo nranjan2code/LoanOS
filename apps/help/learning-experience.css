@@ -1,0 +1,35 @@
+/* Readability and learning support shared by the Guide surface. */
+:where(a,button,input,summary):focus-visible{outline:3px solid var(--lime);outline-offset:3px}
+.journey-features{display:flex;flex-wrap:wrap;gap:7px;margin:22px 0;padding:0;list-style:none}
+.journey-features li{padding:7px 10px;border:1px solid rgba(255,255,255,.16);border-radius:999px;color:rgba(255,255,255,.82);font-size:.78rem}
+.guide-orientation{display:grid;grid-template-columns:140px 1fr;gap:14px;margin-top:22px;padding:16px 18px;border-radius:12px;background:var(--sand);font-size:.9rem;line-height:1.55}
+.guide-orientation strong{color:var(--forest)}
+.guide-layout aside{position:sticky;top:105px;align-self:start}
+.guide-layout aside a{color:var(--muted);text-decoration:none}
+.guide-layout aside a:hover{color:var(--leaf);text-decoration:underline}
+.guide-body section,.completion-check{scroll-margin-top:105px}
+.completion-check{margin-top:42px;padding:24px;border:1px solid var(--line);border-left:4px solid var(--leaf);border-radius:14px;background:#eef5f1}
+.completion-check h2{margin:0 0 12px;color:var(--forest);font-family:var(--serif);font-size:1.6rem;font-weight:400}
+.completion-check ul{margin:0;padding-left:22px}
+.completion-check li{margin:8px 0;line-height:1.6}
+.role-card>p,.path-module p,.path-practice p,.foundation-card p:not(.eyebrow),.article-card p,.learning-card p{font-size:.88rem;line-height:1.62}
+.role-card li,.article-card footer,.role-meta,.responsibility-stats span,.tag,.filter,.nav-link,.support-button,.text-button,.back{font-size:.78rem}
+.article-meta,.guide-layout aside,body>footer{font-size:.82rem}
+.article-card{min-height:250px}
+.learning-card p{max-width:62ch}
+@media(max-width:900px){
+  .topbar{height:auto;min-height:78px;padding-top:10px;padding-bottom:10px;gap:16px;flex-wrap:wrap}
+  .topbar nav{display:flex;order:3;width:100%;overflow-x:auto}
+  .topbar nav .nav-link{white-space:nowrap}
+  .guide-layout aside{display:block;position:static;padding:16px;border:1px solid var(--line);border-radius:12px;background:white}
+  .guide-layout aside ol{columns:2}
+}
+@media(max-width:600px){
+  .topbar nav{margin-left:-8px}
+  .guide-orientation{grid-template-columns:1fr}
+  .guide-layout aside ol{columns:1}
+  .journey-features{display:grid}
+  .article-card p,.learning-card p,.guide-body{font-size:1rem}
+  .completion-check{padding:20px}
+}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}

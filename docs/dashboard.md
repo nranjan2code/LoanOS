@@ -29,12 +29,14 @@ for reviewing proof and promoting catalogue maturity.
 
 Outputs written on each run:
 
-- `docs/dashboard.html` — the rendered dashboard (open in any browser).
+- `docs/dashboard.html` — the rendered dashboard (open directly or through the canonical `/status/` application route).
 - `docs/dashboard-data.json` — the same data as JSON, for reuse elsewhere.
 
 Both are build artifacts; edit source documents and implementation evidence, not
 these files. Writes are atomic per artifact so an interrupted render does not
 leave a partially written page.
+
+The portal link is labelled **Build status** deliberately: this dashboard reports repository capability, evidence and test state. It is not a production uptime page and does not establish tenant or journey production readiness.
 
 ## Live and offline behaviour
 

@@ -9,6 +9,8 @@ import {
   validateWorkflowAssignmentAccess
 } from "@loanos/core";
 
+const GOVERNED_ADMIN_ROLES = new Set(["tenant_admin", "security_admin", "auditor", "operator"]);
+
 export async function routeWorkflowTasks(context) {
   const { method, path, url, req, res, store, readJson, sendJson, appendEvent, authContext, resolveSessionActorId } = context;
   if (path !== "/workflow/tasks" && !path.startsWith("/workflow/tasks/")) return false;
@@ -16,7 +18,8 @@ export async function routeWorkflowTasks(context) {
   if (method === "GET" && path === "/workflow/tasks") {
     const state = await store.load();
     const asOf = url.searchParams.get("asOf") ? new Date(url.searchParams.get("asOf")) : new Date();
-    const tasks = deriveWorkflowTasks(state, { asOf, filters: taskFiltersFromUrl(url) });
+    const tasks = deriveWorkflowTasks(state, { asOf, filters: taskFiltersFromUrl(url) })
+      .filter((task) => canReadTask(state.users, task, authContext));
     sendJson(res, 200, { asOf: asOf.toISOString(), count: tasks.length, tasks });
     return true;
   }
@@ -27,7 +30,7 @@ export async function routeWorkflowTasks(context) {
     const taskId = decodeURIComponent(taskMatch[1]);
     const asOf = url.searchParams.get("asOf") ? new Date(url.searchParams.get("asOf")) : new Date();
     const task = deriveWorkflowTasks(state, { asOf }).find((candidate) => candidate.taskId === taskId);
-    if (!task) sendJson(res, 404, { error: { code: "not_found", message: "Workflow task not found or no longer active." } });
+    if (!task || !canReadTask(state.users, task, authContext)) sendJson(res, 404, { error: { code: "not_found", message: "Workflow task not found or no longer active." } });
     else sendJson(res, 200, task);
     return true;
   }
@@ -73,6 +76,14 @@ export async function routeWorkflowTasks(context) {
   }));
   sendJson(res, action === "assignments" ? 201 : 200, { task: result.task, event: result.event });
   return true;
+}
+
+function canReadTask(users, task, authContext) {
+  if (authContext?.principalType !== "tenant_user") return true;
+  const user = users?.[authContext.userId];
+  const adminRoles = [...(authContext.roles ?? []), ...(user?.adminRoles ?? [])];
+  if (adminRoles.some((role) => GOVERNED_ADMIN_ROLES.has(role)) || user?.roles?.includes("workflow_admin")) return true;
+  return summarizeFindings(validateWorkflowActorAccess(users, task, authContext.userId, "actor")).status !== "blocked";
 }
 
 function taskFiltersFromUrl(url) {

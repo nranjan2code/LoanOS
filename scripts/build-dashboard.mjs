@@ -492,12 +492,12 @@ const html = `<!doctype html>
       '',
       '## Remaining scope',feature.notes||'Not recorded',
       '',
-      '## Dependencies',(feature.dependencies||[]).length?feature.dependencies.map((item)=>'- '+item).join('\n'):'- None recorded',
+      '## Dependencies',(feature.dependencies||[]).length?feature.dependencies.map((item)=>'- '+item).join('\\n'):'- None recorded',
       '',
-      '## Existing evidence',(feature.evidence||[]).length?feature.evidence.map((item)=>'- ['+item.type+'] '+item.ref+(item.note?' — '+item.note:'')).join('\n'):'- None linked',
+      '## Existing evidence',(feature.evidence||[]).length?feature.evidence.map((item)=>'- ['+item.type+'] '+item.ref+(item.note?' — '+item.note:'')).join('\\n'):'- None linked',
       '',
       'Return proposed changes and executable verification. Do not promote maturity; the accountable human reviews evidence and updates the catalogue.',
-    ].join('\n');
+    ].join('\\n');
     const copyText=async(text)=>{
       if(navigator.clipboard&&window.isSecureContext){await navigator.clipboard.writeText(text);return}
       const area=document.createElement('textarea');area.value=text;area.style.position='fixed';area.style.left='-9999px';document.body.appendChild(area);area.select();const copied=document.execCommand('copy');area.remove();if(!copied)throw new Error('Copy is unavailable in this browser')
