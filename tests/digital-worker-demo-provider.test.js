@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createDemoDigitalWorkerProvider, DEMO_SCENARIOS } from "../packages/core/src/digital-worker-demo-provider.js";
+import { createDemoDigitalWorkerProvider, DEMO_SCENARIOS } from "@loanos/core/ai/digital-worker-demo-provider.js";
 
 const request = { executionId: "demo-run", action: "cam.draft", modelId: "demo-model", modelVersion: "v1" };
 

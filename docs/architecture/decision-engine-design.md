@@ -194,8 +194,8 @@ Contract rules:
 
 Contract rules:
 
-- `decision` values are fixed per family: lending → `eligible | refer | ineligible` (aligned with `ELIGIBILITY_DECISIONS` in `packages/core/src/eligibility.js`); guardrail → `allow | deny | require_human`.
-- `reasons[]` matches the shape of `createFinding(severity, regulation, message, path)` in `packages/core/src/compliance-controls.js`, extended with `code` and `audience`. Audience values: `internal`, `tenant_ops`, `borrower`. The gateway strips reasons above the caller's audience level (INV-10).
+- `decision` values are fixed per family: lending → `eligible | refer | ineligible` (aligned with `ELIGIBILITY_DECISIONS` in `packages/core/src/lending/eligibility.js`); guardrail → `allow | deny | require_human`.
+- `reasons[]` matches the shape of `createFinding(severity, regulation, message, path)` in `packages/core/src/compliance/compliance-controls.js`, extended with `code` and `audience`. Audience values: `internal`, `tenant_ops`, `borrower`. The gateway strips reasons above the caller's audience level (INV-10).
 - `trace_ref` points into the tenant's encrypted audit stream. Traces are never inlined to agent- or borrower-facing callers (INV-10).
 
 ## 8. Decision Model, Versioning, Lineage
@@ -250,7 +250,7 @@ Two packs load per instance: the platform guardrail pack and the tenant pack (IN
 
 ## 10. Kill Switch and AI Integration
 
-The existing kill-switch state machine (`packages/core/src/model-governance.js`: global / model / workflow levels, incident-gated clearing) remains the source of truth. The engine is its uniform enforcement point.
+The existing kill-switch state machine (`packages/core/src/ai/model-governance.js`: global / model / workflow levels, incident-gated clearing) remains the source of truth. The engine is its uniform enforcement point.
 
 - Distribution: the control plane pushes kill-switch state to instances (stream) with polling fallback. Each instance caches state with a TTL.
 - Enforcement (deterministic, via DEC-4): a decision path "consumes AI" exactly when it reads a fact tagged `model:*`. Guardrail rules evaluate: if global switch active, or the tagged model is suspended/killed, or the cache is stale beyond TTL — the path's outcome degrades to `refer` (lending) or `deny`/`require_human` (guardrail), with a reason naming the switch state (INV-5). Purely deterministic paths continue evaluating during a partition; only model-tagged paths degrade.
@@ -350,7 +350,7 @@ Dependency rule: `rules-core`, `rules-expr`, `rules-model`, `rules-eval` must no
 - Bundles (INV-3, SEC-2): tampered-bundle, wrong-key, and downgrade tests asserting rejection + alarm.
 - Overlay (INV-4): approval-time tests for provable loosening; runtime tests asserting post-check override + trace record + alert.
 - Golden decision corpus: every ruleset version carries a fixture set (inputs → expected outcome + key outputs); approval requires green goldens. Slice 1 seeds this corpus from the existing JS eligibility tests.
-- Differential shadow (PH-1): the ported eligibility graph runs against `packages/core/src/eligibility.js` outcomes over the seed-user corpus; cutover requires zero unexplained divergence.
+- Differential shadow (PH-1): the ported eligibility graph runs against `packages/core/src/lending/eligibility.js` outcomes over the seed-user corpus; cutover requires zero unexplained divergence.
 - Authority isolation (INV-13): tests deny a shared URL, wrong instance identity, missing facts, missing human role coverage, non-independent maker/checker, open staffing pauses, agent attempts to occupy human controls, and unavailable active control engines.
 - Universal route coverage: tests require all FST-001..034 families in the mutation classifier and deny a new/unclassified staff mutation in active mode.
 

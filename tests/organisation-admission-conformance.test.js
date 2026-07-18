@@ -11,7 +11,7 @@ import {
   buildOrganisationAdmissionSimulatorScenarios,
   createOrganisationAdmissionConformanceSimulator,
   createProviderSimulator
-} from "../packages/core/src/index.js";
+} from "@loanos/core";
 
 test("INT-ADM-01 through INT-ADM-10 have complete stable simulator-only packs", () => {
   const suite = assessOrganisationAdmissionConformanceSuite();

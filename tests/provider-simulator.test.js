@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createProviderSimulator, verifySimulatedProviderCallback } from "../packages/core/src/provider-simulator.js";
-import { ExternalServiceManager } from "../packages/core/src/external-services.js";
+import { createProviderSimulator, verifySimulatedProviderCallback } from "@loanos/core/integrations/provider-simulator.js";
+import { ExternalServiceManager } from "@loanos/core/integrations/external-services.js";
 
 const config = { tenantId: "tenant-a", seed: "suite-seed", callbackSecret: "callback-secret", startAt: "2026-07-15T10:00:00.000Z", scenarios: {
   success: { outcome: "success", response: { score: 780 }, callbacks: [{ eventType: "report.ready", delayMs: 1000 }] },

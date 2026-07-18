@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { prepareAccessActivityExport, recordAccessActivityCustody, reconcileAccessActivityCustody } from "../packages/core/src/access-activity-custody.js";
+import { prepareAccessActivityExport, recordAccessActivityCustody, reconcileAccessActivityCustody } from "@loanos/core/identity/access-activity-custody.js";
 
 const NOW = new Date("2026-07-15T06:30:00.000Z");
 

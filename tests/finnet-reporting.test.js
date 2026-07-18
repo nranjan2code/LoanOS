@@ -4,7 +4,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { acknowledgeFiuReport, buildFinnetXml, createFiuReport, deriveWorkflowTasks, fileFiuReport, repairFiuReport, reviewFiuReport } from "../packages/core/src/index.js";
+import { acknowledgeFiuReport, buildFinnetXml, createFiuReport, deriveWorkflowTasks, fileFiuReport, repairFiuReport, reviewFiuReport } from "@loanos/core";
 import { createLoanOsServer } from "../apps/api/src/server.js";
 import { loadState, saveState } from "../apps/api/src/file-store.js";
 

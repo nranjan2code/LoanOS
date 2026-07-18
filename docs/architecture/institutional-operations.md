@@ -4,7 +4,7 @@ Status date: 2026-07-14
 
 ## Implemented scope
 
-`packages/core/src/institutional-operations.js` and `apps/api/src/routes/institutional-operations.js` add a tenant-scoped institutional operating layer above the existing lending domain and derived task engine:
+`packages/core/src/operations/institutional-operations.js` and `apps/api/src/routes/institutional-operations.js` add a tenant-scoped institutional operating layer above the existing lending domain and derived task engine:
 
 - Operating hierarchy registers legal entity, region, business unit and branch nodes beneath one regulated entity. Parent-child types, RE ownership, state/serviceability, cost centre, status and maker-checker evidence are validated.
 - Lending programmes bind one RE to approved product policies, active operating units, channels, borrower segments, an exact-paise portfolio limit, policy lineage and a bounded effective period.

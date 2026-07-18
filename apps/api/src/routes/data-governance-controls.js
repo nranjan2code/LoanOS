@@ -9,7 +9,7 @@ import {
   releaseEvidenceLegalHold,
   reconcileBusinessEventCompleteness,
   registerDataLineage
-} from "../../../../packages/core/src/index.js";
+} from "@loanos/core";
 
 export async function routeDataGovernanceControls(context) {
   const { method, path, req, res, tenant, store, readJson, sendJson, appendEvent } = context;

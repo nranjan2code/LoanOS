@@ -14,11 +14,11 @@ import {
   recordComposedJourneyFailure,
   resumeComposedJourneyInstance,
   validateComposedJourneyLifecycleCatalogue
-} from "../packages/core/src/composed-journey-lifecycle.js";
-import { JOURNEY_WORKSPACE_SCHEMAS, PRODUCT_TO_WORKSPACE_ARCHETYPE } from "../packages/core/src/journey-workspace.js";
-import { PRODUCT_JOURNEY_TYPES } from "../packages/core/src/product-journey-administration.js";
-import { PRODUCT_TEMPLATE_CATALOGUE } from "../packages/core/src/product-template-catalogue.js";
-import { PERSISTENT_SPECIALIST_JOURNEY_TYPES } from "../packages/core/src/specialist-journey-service.js";
+} from "@loanos/core/journeys/composed-journey-lifecycle.js";
+import { JOURNEY_WORKSPACE_SCHEMAS, PRODUCT_TO_WORKSPACE_ARCHETYPE } from "@loanos/core/journeys/journey-workspace.js";
+import { PRODUCT_JOURNEY_TYPES } from "@loanos/core/journeys/product-journey-administration.js";
+import { PRODUCT_TEMPLATE_CATALOGUE } from "@loanos/core/platform/product-template-catalogue.js";
+import { PERSISTENT_SPECIALIST_JOURNEY_TYPES } from "@loanos/core/journeys/specialist-journey-service.js";
 
 const NOW = "2026-07-15T06:30:00.000Z";
 const H = "a".repeat(64);

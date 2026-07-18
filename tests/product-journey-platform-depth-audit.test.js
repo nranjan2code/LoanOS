@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
-import { PRODUCT_JOURNEY_TYPES } from "../packages/core/src/product-journey-administration.js";
-import { COMPOSED_JOURNEY_STAGES, validateComposedJourneyLifecycleCatalogue } from "../packages/core/src/composed-journey-lifecycle.js";
+import { PRODUCT_JOURNEY_TYPES } from "@loanos/core/journeys/product-journey-administration.js";
+import { COMPOSED_JOURNEY_STAGES, validateComposedJourneyLifecycleCatalogue } from "@loanos/core/journeys/composed-journey-lifecycle.js";
 
 const auditUrl = new URL("../docs/product/product-journey-platform-depth.json", import.meta.url);
 

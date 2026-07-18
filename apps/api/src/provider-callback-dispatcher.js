@@ -1,5 +1,5 @@
 import { createHash, createHmac } from "node:crypto";
-import { claimDueProviderCallbacks, projectProviderCallbackQueue, recordProviderCallbackAttempt } from "../../../packages/core/src/provider-callback-delivery.js";
+import { claimDueProviderCallbacks, projectProviderCallbackQueue, recordProviderCallbackAttempt } from "@loanos/core/integrations/provider-callback-delivery.js";
 
 export class ProviderCallbackDispatcher {
   constructor(options = {}) {

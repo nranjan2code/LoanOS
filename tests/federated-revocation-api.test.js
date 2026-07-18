@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createLoanOsServer } from "../apps/api/src/server.js";
 import { loadState, saveState } from "../apps/api/src/file-store.js";
-import { approveFederatedRevocationVerifier, proposeFederatedRevocationVerifier } from "../packages/core/src/index.js";
+import { approveFederatedRevocationVerifier, proposeFederatedRevocationVerifier } from "@loanos/core";
 
 test("federated logout endpoint requires tenant service authority and persists revocation evidence", async (t) => {
   const tenant = { tenantId: "tenant_logout", name: "Logout Bank", apiKey: "logout-service-key" }; const dataDir = await mkdtemp(join(tmpdir(), "loanos-logout-"));

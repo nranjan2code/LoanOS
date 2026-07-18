@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { approveGrievanceRcaCapa, approveServicingPortfolioTransfer, assessPartnerOversight, buildGrievanceAnalytics, closeOmbudsmanAward, createAssistedComplaint, manageLspIncident } from "../packages/core/src/partner-grievance-completion.js";
+import { approveGrievanceRcaCapa, approveServicingPortfolioTransfer, assessPartnerOversight, buildGrievanceAnalytics, closeOmbudsmanAward, createAssistedComplaint, manageLspIncident } from "@loanos/core/operations/partner-grievance-completion.js";
 
 const approval = { proposedBy: "maker", approvedBy: "checker", approvalRef: "APR-1" };
 test("LSP incidents govern remediation, suspension, exit, and idempotency", () => {

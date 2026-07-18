@@ -93,7 +93,7 @@ import {
   acknowledgeFiuReport,
   isTippingOffRisk,
   CTR_THRESHOLD_INR
-} from "../packages/core/src/index.js";
+} from "@loanos/core";
 import { createLoanOsServer } from "../apps/api/src/server.js";
 import { loadState, saveState, createEmptyTenantData, registerTenant, createServiceCredential, revokeServiceCredential, resolveTenantServiceCredential, containServiceCredentialCompromise } from "../apps/api/src/file-store.js";
 

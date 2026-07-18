@@ -1,10 +1,10 @@
 // Module — The 21 product journeys: deep dives.
 // Each lesson sets `journeyType`; the generator derives the journey-contract
 // panel (facts, evidence, facility, security, servicing) from
-// packages/core/src/product-journey-contracts.js and the platform-support
+// packages/core/src/journeys/product-journey-contracts.js and the platform-support
 // panel from docs/product/product-journey-support-matrix.md at build time,
 // so structural detail can never drift from the shipped contracts.
-const CONTRACTS = { type: "code", ref: "packages/core/src/product-journey-contracts.js", note: "The checksummed product contract this page's derived panel is built from." };
+const CONTRACTS = { type: "code", ref: "packages/core/src/journeys/product-journey-contracts.js", note: "The checksummed product contract this page's derived panel is built from." };
 
 function j(journeyType, lesson) {
   return {
@@ -278,7 +278,7 @@ export default {
         { heading: "What a BA watches", body: "Reconciliation is the operating burden: partner statements, escrow movements and subledger legs must agree, with break management for when they don't. First-loss support arrangements (where present) interact with DLG rules — caps and classification duties from module 8 apply without dilution." }
       ],
       regulatory: [{ id: "RBI-CLA-2025", note: "Shares, retention floor, blended rate and escrow — enforced at journey level." }, { id: "RBI-FUND-FLOW", note: "Escrow is the permitted joint-funding channel." }],
-      platform: [{ type: "capability", ref: "PAR-006", note: "Loan-level allocation and share reconciliation." }, { type: "code", ref: "packages/core/src/co-lending.js", note: "The arrangement module the journey binds to." }],
+      platform: [{ type: "capability", ref: "PAR-006", note: "Loan-level allocation and share reconciliation." }, { type: "code", ref: "packages/core/src/lending/co-lending.js", note: "The arrangement module the journey binds to." }],
       terms: ["Co-lending", "Escrow", "DLG"],
       related: ["m08-partners/co-lending", "m08-partners/dlg"],
       check: [{ q: "An EMI arrives on an 80/20 co-lent loan. What happens in accounting?", options: ["It books to the originator", "It splits 80/20 into each partner's principal/interest/fee subledger legs and settles via the escrow waterfall", "It waits for month-end", "The bank keeps interest, the NBFC principal"], answer: 1, why: "Loan-level allocation by share, per component, per event — reconciled through escrow — is the journey's operating core." }]

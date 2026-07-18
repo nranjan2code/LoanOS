@@ -7,7 +7,7 @@ import {
   buildShowcaseDemoProfile,
   buildWorkshopTenantManifest,
   validateDemoProfile
-} from "../packages/core/src/demo-system.js";
+} from "@loanos/core/platform/demo-system.js";
 
 function usage() {
   console.error(`Usage:

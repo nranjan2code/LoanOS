@@ -59,8 +59,8 @@ except `coalesce`. Stdlib grows only via platform release (DEC-8).
 | --- | --- | --- |
 | `coalesce(a, b)` | `(T?, T?) -> T?` | First non-null argument. |
 | `round(x, places)` | `(decimal, int) -> decimal` | Half away from zero (matches JS `Math.round` for positives). |
-| `emi(principal, rate_bps, months)` | `(decimal, int, int) -> decimal?` | Reducing-balance EMI matching the LMS amortization and `estimateEmi` in `packages/core/src/eligibility.js`; rounded to 2 places. Returns `null` when principal or months are non-positive or rate is negative (domain nulls, mirroring the JS). |
-| `age_years(dob, at)` | `(date, date) -> int` | Completed calendar years, matching `calculateAgeYears` in `packages/core/src/loan-policy.js`. |
+| `emi(principal, rate_bps, months)` | `(decimal, int, int) -> decimal?` | Reducing-balance EMI matching the LMS amortization and `estimateEmi` in `packages/core/src/lending/eligibility.js`; rounded to 2 places. Returns `null` when principal or months are non-positive or rate is negative (domain nulls, mirroring the JS). |
+| `age_years(dob, at)` | `(date, date) -> int` | Completed calendar years, matching `calculateAgeYears` in `packages/core/src/lending/loan-policy.js`. |
 | `years_from_months(m)` | `(int) -> int` | `ceil(m / 12)`; used for age at maturity. |
 
 ## Static typing

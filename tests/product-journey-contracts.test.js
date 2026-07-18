@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { PRODUCT_JOURNEY_TYPES } from "../packages/core/src/product-journey-administration.js";
+import { PRODUCT_JOURNEY_TYPES } from "@loanos/core/journeys/product-journey-administration.js";
 import {
   getProductJourneyContract, PRODUCT_CONTRACT_CHANNELS, PRODUCT_CONTRACT_VERSION,
   PRODUCT_JOURNEY_CONTRACTS, PRODUCT_JOURNEY_CONTRACT_TYPES, validateProductJourneyContracts
-} from "../packages/core/src/product-journey-contracts.js";
+} from "@loanos/core/journeys/product-journey-contracts.js";
 
 test("the versioned product contract catalogue covers exactly all 21 canonical journeys", () => {
   assert.equal(PRODUCT_CONTRACT_VERSION, 1);

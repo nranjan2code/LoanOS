@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { SIGNED_FILE_SYSTEMS, buildSignedFileManifest, createSignedFileCorrection, recordSignedFileAcknowledgement, registerSignedFileSchemaProfile, signedFileExportHooks } from "../packages/core/src/signed-file-conformance.js";
+import { SIGNED_FILE_SYSTEMS, buildSignedFileManifest, createSignedFileCorrection, recordSignedFileAcknowledgement, registerSignedFileSchemaProfile, signedFileExportHooks } from "@loanos/core/integrations/signed-file-conformance.js";
 
 const H = "a".repeat(64); const E = "b".repeat(64); const approval = { proposedBy: "maker", approvedBy: "checker", approvalRef: "APR-1" };
 const profileInput = (system, tenantId = "t1") => ({ tenantId, profileId: `${system}-v1`, profileName: `${system}-return`, system, schemaVersion: "1.0", schemaChecksumSha256: H, fileFormat: system === "cims_xbrl" ? "xbrl" : "jsonl", requiredColumns: ["rowId", "amountPaise"], amountFields: ["amountPaise"], signingRequired: true, encryptionRequired: true, ...approval });

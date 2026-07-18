@@ -12,7 +12,7 @@ import {
   proposeConformanceReassessment,
   recordConformanceCampaignEvidence,
   registerConformanceCandidateProfile
-} from "../packages/core/src/conformance-campaign-administration.js";
+} from "@loanos/core/operations/conformance-campaign-administration.js";
 
 const T0 = new Date("2026-07-15T00:00:00.000Z");
 const DAY_2 = new Date("2026-07-17T00:00:00.000Z");

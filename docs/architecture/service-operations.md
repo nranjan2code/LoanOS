@@ -4,7 +4,7 @@
 
 This control-plane slice gives LoanOS operators an auditable system of record for support, on-call ownership, escalation, recurring-problem remediation, vendor reviews, service-level measurement, and dependency concentration. It complements tenant incidents and runtime monitoring: alerts can lead to a support case, and a case may reference an existing incident, but neither workflow silently changes the other.
 
-The implementation is in `packages/core/src/service-operations.js`; authenticated platform routes are in `apps/api/src/server.js`. Current state is projected deterministically from append-only `controlPlane.platformEvents`, so each mutation also participates in the platform audit hash chain.
+The implementation is in `packages/core/src/operations/service-operations.js`; authenticated platform routes are in `apps/api/src/server.js`. Current state is projected deterministically from append-only `controlPlane.platformEvents`, so each mutation also participates in the platform audit hash chain.
 
 ## Support-case lifecycle
 

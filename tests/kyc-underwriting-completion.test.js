@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { acknowledgeBcAssistedKycUpdate, analyzeBankStatement, assessGuardianSpecialCategory, assignRiskGradeAndPrice, buildPeriodicKycAction, calculateHouseholdIndebtedness, recordPhysicalOriginalCustody, verifyUnderwritingSources } from "../packages/core/src/kyc-underwriting-completion.js";
+import { acknowledgeBcAssistedKycUpdate, analyzeBankStatement, assessGuardianSpecialCategory, assignRiskGradeAndPrice, buildPeriodicKycAction, calculateHouseholdIndebtedness, recordPhysicalOriginalCustody, verifyUnderwritingSources } from "@loanos/core/lending/kyc-underwriting-completion.js";
 
 const approval = { proposedBy: "maker", approvedBy: "checker", approvalRef: "APR-1" };
 test("special-category, periodic KYC grace, and BC updates fail closed without evidence", () => {

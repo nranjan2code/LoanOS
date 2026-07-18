@@ -15,7 +15,7 @@ import {
   evaluatePlatformCanary,
   promotePlatformRelease,
   rollbackPlatformRelease
-} from "../packages/core/src/index.js";
+} from "@loanos/core";
 
 function releaseInput() {
   return {

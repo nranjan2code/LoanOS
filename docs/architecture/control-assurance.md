@@ -4,7 +4,7 @@
 
 This platform control plane turns the regulatory control library into a reviewable testing and assurance lifecycle. It governs test plans, populations and samples, workpapers/results, deficiencies and remediation, control-owner certification, internal/statutory/RBI engagements, evidence requests, and board/committee reporting. Current state is reconstructed from append-only platform audit events.
 
-Implementation: `packages/core/src/control-assurance.js`; authenticated platform routes: `apps/api/src/server.js`.
+Implementation: `packages/core/src/compliance/control-assurance.js`; authenticated platform routes: `apps/api/src/server.js`.
 
 ## Control testing lifecycle
 

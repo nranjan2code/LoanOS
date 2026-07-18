@@ -8,8 +8,8 @@ import {
   publishBrandRelease,
   resolveBrandExperience,
   rollbackBrandRelease
-} from "../packages/core/src/brand-governance.js";
-import { PRODUCT_JOURNEY_TYPES } from "../packages/core/src/product-journey-administration.js";
+} from "@loanos/core/operations/brand-governance.js";
+import { PRODUCT_JOURNEY_TYPES } from "@loanos/core/journeys/product-journey-administration.js";
 
 const tenantId = "tenant_brand_a";
 

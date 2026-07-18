@@ -15,7 +15,7 @@ import {
   recordProductJourneyConformanceResult,
   registerProductJourneyConformanceCampaign,
   validateProductPolicy
-} from "../packages/core/src/index.js";
+} from "@loanos/core";
 
 const NOW = new Date("2026-07-15T00:00:00.000Z");
 const sha = (value) => createHash("sha256").update(value).digest("hex");

@@ -60,7 +60,7 @@ export default {
         { type: "capability", ref: "RPT-003", note: "CIC consumer/commercial UCRF formats." },
         { type: "capability", ref: "RPT-004", note: "Fortnightly schedule, acknowledgement, rejects, repair and resubmission." },
         { type: "capability", ref: "RPT-005", note: "CIC dispute/correction and borrower communication." },
-        { type: "code", ref: "packages/core/src/cic-reporting.js", note: "CIC reporting module and correction workflows." }
+        { type: "code", ref: "packages/core/src/compliance/cic-reporting.js", note: "CIC reporting module and correction workflows." }
       ],
       terms: ["CIC", "UCRF", "DPD", "FIU-IND"],
       related: ["m06-collections/delinquency-classification", "m05-lms/servicing", "m03-underwriting/credit-data"],
@@ -131,7 +131,7 @@ export default {
         { type: "capability", ref: "AIG-019", note: "Four-role human approval and control-engine activation for material agents." },
         { type: "capability", ref: "AIG-021", note: "Hash-sealed execution, output, usage and governance-report lineage." },
         { type: "doc", ref: "docs/architecture/agentic-ai-digital-workers.md", note: "The digital-workers architecture: identities, guardrails, autonomy bounds." },
-        { type: "code", ref: "packages/core/src/model-governance.js", note: "Model registry and kill-switch state source." }
+        { type: "code", ref: "packages/core/src/ai/model-governance.js", note: "Model registry and kill-switch state source." }
       ],
       terms: ["Digital worker", "Kill switch", "CAM", "Maker-checker"],
       related: ["m03-underwriting/ai-in-decisions", "m09-compliance/audit-evidence"],

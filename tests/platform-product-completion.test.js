@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { approveProductAddon, approveProfitabilityParameters, approveRiskPricingMatrix, approveTenantPlan, authorizePlanUsage, createTenantCommunication, diffProductVersions, importTenantPortablePackage, promoteEnvironmentConfiguration } from "../packages/core/src/platform-product-completion.js";
+import { approveProductAddon, approveProfitabilityParameters, approveRiskPricingMatrix, approveTenantPlan, authorizePlanUsage, createTenantCommunication, diffProductVersions, importTenantPortablePackage, promoteEnvironmentConfiguration } from "@loanos/core/platform/platform-product-completion.js";
 const NOW = new Date("2026-07-15T10:00:00Z"); const approval = { tenantId: "t1", proposedBy: "maker", approvedBy: "checker", approvalRef: "approval://1" };
 
 test("tenant plans fail closed on entitlement, exact limits and tenant scope", () => { const plan = approveTenantPlan({ ...approval, planId: "pro", version: "1", entitlements: ["origination"], limits: { users: 2 }, termsRef: "terms://1" }, [], NOW); assert.equal(authorizePlanUsage(plan, { tenantId: "t1", entitlement: "origination", limitKey: "users", currentUsage: 1 }).decision, "allow"); assert.throws(() => authorizePlanUsage(plan, { tenantId: "t1", entitlement: "origination", limitKey: "users", currentUsage: 2 }), /limit/); assert.throws(() => authorizePlanUsage(plan, { tenantId: "t2", entitlement: "origination" }), (e) => e.code === "platform_product_tenant_mismatch"); });

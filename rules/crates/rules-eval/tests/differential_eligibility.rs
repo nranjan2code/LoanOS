@@ -1,7 +1,7 @@
 //! PH-1 differential harness: the ported `lending.eligibility` decision model
 //! must reproduce the incumbent JS implementation's decision on every corpus
 //! case (zero unexplained divergence). The corpus is generated from
-//! `packages/core/src/eligibility.js` by `rules/tools/gen-eligibility-corpus.mjs`
+//! `packages/core/src/lending/eligibility.js` by `rules/tools/gen-eligibility-corpus.mjs`
 //! and checked in for reproducibility.
 
 use rules_compile::compile;

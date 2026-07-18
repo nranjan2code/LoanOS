@@ -1,0 +1,11 @@
+{
+  "name": "@loanos/core",
+  "version": "0.2.0-alpha.1",
+  "private": true,
+  "type": "module",
+  "description": "LoanOS domain kernel: compliance controls, lending policy, identity, AI governance and audit primitives, grouped by domain. Import via @loanos/core (barrel) or @loanos/core/<domain>/<module>.js — never by relative path from outside the package.",
+  "exports": {
+    ".": "./src/index.js",
+    "./*": "./src/*"
+  }
+}

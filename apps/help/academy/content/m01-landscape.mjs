@@ -27,7 +27,7 @@ export default {
       ],
       platform: [
         { type: "doc", ref: "docs/product/what-we-are-building.md", note: "Regulatory boundary: the platform serves lending by or on behalf of RBI-regulated entities only." },
-        { type: "code", ref: "packages/core/src/compliance-controls.js", note: "RE registry validation: India residency, RE type, public disclosure, grievance officer, board policy." },
+        { type: "code", ref: "packages/core/src/compliance/compliance-controls.js", note: "RE registry validation: India residency, RE type, public disclosure, grievance officer, board policy." },
         { type: "doc", ref: "docs/decisions/0001-india-only-compliance-first.md", note: "ADR: India-only, compliance-first foundation." }
       ],
       terms: ["RE", "RBI", "Tenant", "Grievance officer"],
@@ -123,7 +123,7 @@ export default {
       platform: [
         { type: "doc", ref: "docs/product/complete-system-capability-catalog.md", note: "Capability register with Implemented/Partial/Mock status — the source of maturity truth." },
         { type: "doc", ref: "docs/product/product-journey-support-matrix.md", note: "Evidence tier for each lending journey; a guide existing is not production readiness." },
-        { type: "code", ref: "packages/core/src/compliance-controls.js", note: "The executable control catalogue: application preflight checks that fail closed." }
+        { type: "code", ref: "packages/core/src/compliance/compliance-controls.js", note: "The executable control catalogue: application preflight checks that fail closed." }
       ],
       terms: ["KFS", "Decision engine", "Compliance OS"],
       related: ["m03-underwriting/policy-as-data", "m10-capstone/ba-toolkit"],

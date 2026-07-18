@@ -4,8 +4,8 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createLoanOsServer } from "../apps/api/src/server.js";
-import { buildBusinessAdapterConformancePack } from "../packages/core/src/business-adapter-conformance.js";
-import { serializeSignedFile } from "../packages/core/src/signed-file-transport.js";
+import { buildBusinessAdapterConformancePack } from "@loanos/core/integrations/business-adapter-conformance.js";
+import { serializeSignedFile } from "@loanos/core/integrations/signed-file-transport.js";
 
 const tenant = { tenantId: "tenant-adapters", name: "Adapter Bank", apiKey: "adapter-key" };
 async function request(base, path, { method = "GET", body, key = tenant.apiKey } = {}) { return fetch(base + path, { method, headers: { "x-api-key": key, "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined }); }

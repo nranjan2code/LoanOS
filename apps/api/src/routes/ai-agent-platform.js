@@ -4,10 +4,10 @@ import {
   proposeAiAgentPricingContract, recordAiAgentUsage, recordTenantAiAgentApproval, suspendTenantAiAgent,
   approveAiAgentUsageBudget, proposeAiAgentUsageBudget, reserveAiAgentUsageBudget,
   approveAiAgentInvoice, proposeAiAgentInvoice
-} from "../../../../packages/core/src/ai-agent-platform.js";
-import { invokeDigitalWorkerProvider } from "../../../../packages/core/src/digital-worker-provider.js";
-import { createDemoDigitalWorkerProvider } from "../../../../packages/core/src/digital-worker-demo-provider.js";
-import { authorizeStaffedFeatureAction, projectTenantFeatureStaffing } from "../../../../packages/core/src/saas-identity-governance.js";
+} from "@loanos/core/ai/ai-agent-platform.js";
+import { invokeDigitalWorkerProvider } from "@loanos/core/ai/digital-worker-provider.js";
+import { createDemoDigitalWorkerProvider } from "@loanos/core/ai/digital-worker-demo-provider.js";
+import { authorizeStaffedFeatureAction, projectTenantFeatureStaffing } from "@loanos/core/identity/saas-identity-governance.js";
 import { decidePlatformControlStaffing } from "../control-rules-engine.js";
 import { decideAiAgentAction, decideAiModelConsumption } from "../rules-engine.js";
 

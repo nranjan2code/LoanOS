@@ -118,7 +118,7 @@ This lot concerns LoanOS's platform customer—the prospective regulated entity 
 
 Admission procurement must support deterministic non-production simulators for unavailable, mismatch, stale/cancelled authority, duplicate, timeout, tampered evidence, callback replay, partial provisioning and failed rollback states. A generic “success” proxy is insufficient for activation UAT.
 
-The table's “current proxy/mock” column describes live-call boundary maturity. For all ten rows, `packages/core/src/organisation-admission-conformance.js` now supplies the complete vendor-neutral simulator contract and compiles it into the shared deterministic provider simulator. This improves procurement/UAT readiness but does not change the listed live-adapter gaps.
+The table's “current proxy/mock” column describes live-call boundary maturity. For all ten rows, `packages/core/src/platform/organisation-admission-conformance.js` now supplies the complete vendor-neutral simulator contract and compiles it into the shared deterministic provider simulator. This improves procurement/UAT readiness but does not change the listed live-adapter gaps.
 
 ## Mock remediation register
 

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { IntegrationWorkerRuntime, createIntegrationWorkerHandlers } from "../packages/core/src/integration-worker-runtime.js";
+import { IntegrationWorkerRuntime, createIntegrationWorkerHandlers } from "@loanos/core/integrations/integration-worker-runtime.js";
 
 const NOW = new Date("2026-07-15T00:00:00.000Z");
 function memory(jobs = []) { const values = new Map(jobs.map((job) => [job.jobId, structuredClone(job)])); return { values, async loadJobs({ limit }) { return [...values.values()].filter((j) => ["pending", "retry"].includes(j.status)).slice(0, limit).map((item) => structuredClone(item)); }, async saveJob(job, { expectedStatus }) { const prior = values.get(job.jobId); if (prior && prior.status !== expectedStatus) throw Object.assign(new Error("optimistic conflict"), { code: "conflict" }); values.set(job.jobId, structuredClone(job)); } }; }

@@ -9,7 +9,7 @@ import {
   assessEnterprisePlatformSimulation,
   buildEnterprisePlatformSimulatorManifest,
   simulateEnterprisePlatformScenario
-} from "../packages/core/src/index.js";
+} from "@loanos/core";
 
 test("enterprise platform packs exhaustively cover mandatory safety classes", () => {
   const suite = assessEnterprisePlatformConformanceSuite();

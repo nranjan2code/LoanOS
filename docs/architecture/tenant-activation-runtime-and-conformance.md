@@ -35,7 +35,7 @@ Tenant-human authority, tenant-service authority and platform activation authori
 
 ## Unified tenant activation gate
 
-`packages/core/src/tenant-activation-gate.js` evaluates eight mandatory dimensions:
+`packages/core/src/platform/tenant-activation-gate.js` evaluates eight mandatory dimensions:
 
 | Dimension | Minimum evidence |
 | --- | --- |
@@ -60,7 +60,7 @@ Simulator evidence can never return `production_ready`. `POST /admin/tenant-acti
 
 ## Persistent conformance administration
 
-`packages/core/src/conformance-campaign-administration.js` manages two canonical target types:
+`packages/core/src/operations/conformance-campaign-administration.js` manages two canonical target types:
 
 - `organisation_admission` uses the versioned `INT-ADM-01..10` scenario packs;
 - `enterprise_platform` uses the KMS/HSM/vault, broker/DLQ, CDC/checkpoint, MDM, deployment-controller and trusted-time packs.
@@ -82,7 +82,7 @@ This campaign registry is procurement/UAT evidence, not vendor activation. Comme
 
 ## Cryptographic provider revocation boundary
 
-`packages/core/src/federated-revocation-verification.js` replaces caller-asserted `signatureVerified` with actual RS256 or ES256 verification.
+`packages/core/src/identity/federated-revocation-verification.js` replaces caller-asserted `signatureVerified` with actual RS256 or ES256 verification.
 
 A verifier profile contains only public JWKs, their key IDs, algorithm, validity windows and evidence references. It is bound to exactly one tenant, federation policy, protocol, issuer and audience. One human proposes it; another activates it. A policy/protocol can have one active verifier. Rotation must name the active superseded profile, retaining both profile and activation checksum lineage.
 
@@ -99,7 +99,7 @@ The resulting cryptographic lineage is mandatory input to the revocation state t
 
 ## Durable identity operations worker
 
-`packages/core/src/identity-operations-worker.js` and `/identity-operations-worker/v1` provide the persistent execution contract for readiness assessment, directory reconciliation, federation-metadata validation and activity-custody verification.
+`packages/core/src/identity/identity-operations-worker.js` and `/identity-operations-worker/v1` provide the persistent execution contract for readiness assessment, directory reconciliation, federation-metadata validation and activity-custody verification.
 
 Human administrators schedule reference-only jobs to an active named service credential. The API derives the workload reference from tenant and credential ID. Worker calls require that same tenant service credential with `identity-operations:work` or `*`; a caller cannot substitute a workload identity in the body.
 

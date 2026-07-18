@@ -27,7 +27,7 @@ import {
   requestEmergencyAccess,
   requestOwnershipTransfer,
   validateCanonicalRoles
-} from "../packages/core/src/saas-identity-governance.js";
+} from "@loanos/core/identity/saas-identity-governance.js";
 
 const NOW = new Date("2026-07-15T10:00:00.000Z");
 const FUTURE = "2026-07-20T10:00:00.000Z";

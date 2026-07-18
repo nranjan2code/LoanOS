@@ -4,7 +4,7 @@
 
 LoanOS release approval must be based on artifact-bound security evidence rather than an opaque scan URL. The security-assurance control plane records scan completeness, signed SBOM metadata, vulnerability SLA and remediation state, tightly bounded risk exceptions, and a deterministic release gate. Records are projected from the append-only platform audit chain.
 
-Implementation: `packages/core/src/security-assurance.js`; authenticated routes and release-approval enforcement: `apps/api/src/server.js`.
+Implementation: `packages/core/src/operations/security-assurance.js`; authenticated routes and release-approval enforcement: `apps/api/src/server.js`.
 
 ## Required evidence for release approval
 

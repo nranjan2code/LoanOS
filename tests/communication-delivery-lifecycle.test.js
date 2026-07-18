@@ -1,5 +1,5 @@
 import test from "node:test"; import assert from "node:assert/strict";
-import { createCommunicationDelivery, projectCommunicationDeliveryReconciliation, recordCommunicationCallback, signCommunicationCallback } from "../packages/core/src/communication-delivery-lifecycle.js";
+import { createCommunicationDelivery, projectCommunicationDeliveryReconciliation, recordCommunicationCallback, signCommunicationCallback } from "@loanos/core/integrations/communication-delivery-lifecycle.js";
 const NOW=new Date("2026-07-15T00:00:00Z"),SECRET="secret",tenantId="tenant-1";
 function callback(eventId,payload,at=NOW){const rawBody=JSON.stringify(payload),timestamp=at.toISOString(),provider="provider_a";return{provider,eventId,timestamp,rawBody,signature:signCommunicationCallback({provider,eventId,timestamp,rawBody},SECRET)};}
 function delivery(channel="sms"){return createCommunicationDelivery({}, {tenantId,deliveryId:"d1",channel,recipientRef:"recipient/1",templateId:"payment_reminder",templateVersion:"1",dltTemplateId:channel==="sms"?"dlt-1":undefined,dltEntityId:channel==="sms"?"entity-1":undefined,idempotencyKey:"idem-1"},NOW);}

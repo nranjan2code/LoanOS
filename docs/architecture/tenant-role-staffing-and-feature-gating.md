@@ -48,7 +48,7 @@ Primary sources include the [RBI IT Governance, Risk, Controls and Assurance Pra
 
 ## 5. Canonical role catalogue
 
-The executable source is `CANONICAL_ROLE_CATALOGUE` in `packages/core/src/saas-identity-governance.js`. The complete grouped inventory is:
+The executable source is `CANONICAL_ROLE_CATALOGUE` in `packages/core/src/identity/saas-identity-governance.js`. The complete grouped inventory is:
 
 | Domain | Roles |
 | --- | --- |

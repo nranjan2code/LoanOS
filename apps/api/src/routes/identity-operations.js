@@ -24,7 +24,7 @@ import {
   revokePrincipalSessions,
   suspendFederationPolicy,
   witnessIdentityOperationsDrill
-} from "../../../../packages/core/src/index.js";
+} from "@loanos/core";
 
 const PREFIX = "/admin/identity-operations";
 const WORKER_PREFIX = "/identity-operations-worker/v1";

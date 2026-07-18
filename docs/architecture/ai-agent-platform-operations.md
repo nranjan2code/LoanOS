@@ -158,7 +158,7 @@ Until these are evidenced, externally describe the feature as a **governed AI-ag
 ## 11. Verification anchors
 
 - Domain/API tests: `tests/ai-agent-platform.test.js`
-- Domain controls: `packages/core/src/ai-agent-platform.js`
+- Domain controls: `packages/core/src/ai/ai-agent-platform.js`
 - API boundary: `apps/api/src/routes/ai-agent-platform.js`
 - Business guardrail: `rules/fixtures/guardrail-agent-action.json`
 - Rust regression: `rules/crates/rules-service/tests/ai_control.rs`

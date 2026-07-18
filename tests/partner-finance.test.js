@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { approvePartnerFinanceReversal, buildPartnerStatement, createPartnerBankPaymentFile, createPartnerPayableInstruction, openPartnerFinanceDispute, reconcilePartnerPayment, validatePartnerCommissionInvoice } from "../packages/core/src/partner-finance.js";
+import { approvePartnerFinanceReversal, buildPartnerStatement, createPartnerBankPaymentFile, createPartnerPayableInstruction, openPartnerFinanceDispute, reconcilePartnerPayment, validatePartnerCommissionInvoice } from "@loanos/core/finance/partner-finance.js";
 
 const approval = { proposedBy: "maker", approvedBy: "checker", approvalRef: "APR-1" };
 const invoiceInput = { invoiceId: "inv-1", idempotencyKey: "ik-inv-1", partnerId: "p-1", invoiceNumber: "P/1", invoiceDate: "2026-07-15", supplierGstin: "27ABCDE1234F1Z5", recipientGstin: "29ABCDE1234F1Z3", taxableAmountPaise: 10001, gstAmountPaise: 1800, tdsAmountPaise: 1000, gstEvidenceRef: "gst-1", tdsEvidenceRef: "tds-1", tdsSection: "194H", ...approval };

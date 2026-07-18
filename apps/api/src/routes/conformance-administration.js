@@ -8,7 +8,7 @@ import {
   proposeConformanceReassessment,
   recordConformanceCampaignEvidence,
   registerConformanceCandidateProfile
-} from "../../../../packages/core/src/index.js";
+} from "@loanos/core";
 
 const PREFIX = "/admin/conformance";
 

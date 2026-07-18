@@ -1,5 +1,5 @@
 import test from "node:test"; import assert from "node:assert/strict"; import { mkdtemp, rm } from "node:fs/promises"; import { tmpdir } from "node:os"; import { join } from "node:path";
-import { createLoanOsServer } from "../apps/api/src/server.js"; import { signCommunicationCallback } from "../packages/core/src/communication-delivery-lifecycle.js";
+import { createLoanOsServer } from "../apps/api/src/server.js"; import { signCommunicationCallback } from "@loanos/core/integrations/communication-delivery-lifecycle.js";
 const tenant={tenantId:"tenant-comms",name:"Comms Bank",apiKey:"comms-key"}, secret="callback-secret";
 async function request(base,path,{method="GET",body,key=tenant.apiKey}={}){return fetch(base+path,{method,headers:{"x-api-key":key,"content-type":"application/json"},body:body?JSON.stringify(body):undefined});}
 test("communication dispatch persists lifecycle, signed callbacks and reconciliation with tenant isolation",async t=>{const dataDir=await mkdtemp(join(tmpdir(),"loanos-comms-lifecycle-"));const server=createLoanOsServer({dataDir,bootstrapTenants:[tenant,{tenantId:"other",name:"Other",apiKey:"other-key"}]});await new Promise(r=>server.listen(0,"127.0.0.1",r));t.after(async()=>{await new Promise(r=>server.close(r));await rm(dataDir,{recursive:true,force:true});});const base=`http://127.0.0.1:${server.address().port}`;

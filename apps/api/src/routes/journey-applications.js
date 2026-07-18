@@ -1,4 +1,4 @@
-import { projectJourneyApplication, promoteSubmittedJourneyDraft } from "../../../../packages/core/src/index.js";
+import { projectJourneyApplication, promoteSubmittedJourneyDraft } from "@loanos/core";
 
 const PREFIX = "/journey-applications";
 const PROMOTION_ROLES = ["tenant_admin", "branch_operator", "partner_user", "partner_admin", "field_officer", "field_supervisor", "operator"];

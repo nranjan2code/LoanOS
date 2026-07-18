@@ -1,4 +1,4 @@
-import test from "node:test";import assert from "node:assert/strict";import{PRODUCT_JOURNEY_TYPES,assessTenantJourneyActivation,certifyProductJourneySupport,projectProductJourneySupport,suspendProductJourneySupport}from"../packages/core/src/product-journey-certification.js";
+import test from "node:test";import assert from "node:assert/strict";import{PRODUCT_JOURNEY_TYPES,assessTenantJourneyActivation,certifyProductJourneySupport,projectProductJourneySupport,suspendProductJourneySupport}from"@loanos/core/journeys/product-journey-certification.js";
 import { readdirSync } from "node:fs";
 const NOW=new Date("2026-07-15T00:00:00Z"),A={proposedBy:"maker",approvedBy:"checker",approvalRef:"approval/1"};
 test("catalogue pins exactly the 21 public journey types and website slugs",()=>{assert.equal(PRODUCT_JOURNEY_TYPES.length,21);assert.equal(new Set(PRODUCT_JOURNEY_TYPES).size,21);const slugs=readdirSync(new URL("../apps/web/loan-types",import.meta.url),{withFileTypes:true}).filter(item=>item.isDirectory()).map(item=>item.name).sort();assert.deepEqual(slugs,PRODUCT_JOURNEY_TYPES.map(type=>type.replaceAll("_","-")).sort())});

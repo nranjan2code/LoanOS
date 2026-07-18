@@ -133,7 +133,7 @@ Asset classification maps DPD → standard/SMA/NPA with a 90-day threshold, but 
 RBI IRAC rule (Nov 2021 clarification): an NPA upgrades to standard **only after all arrears — principal
 and interest — are cleared**, not merely on DPD dropping below 90. Verify current behavior in
 `loan-account.js` and implement if missing. **Acceptance:** a partial catch-up that leaves any arrears does not upgrade the account.
-**Done this session:** `classifyLoanAsset` (`packages/core/src/loan-account.js`) now applies an IRAC
+**Done this session:** `classifyLoanAsset` (`packages/core/src/lending/loan-account.js`) now applies an IRAC
 upgrade guard — it reconstructs the DPD-class trajectory purely from schedule + ledger (adding the exact
 91-DPD crossing point per installment so a mid-window NPA is never missed) and, once an account has been
 NPA, holds it at `npa` until principal **and** interest arrears are fully cleared (charges alone do not
@@ -215,7 +215,7 @@ Product policy now distinguishes `term_loan`, `revolving_credit`, and `overdraft
 ### REV-42 — GST on charges/fees · P1 · DONE
 No GST anywhere. India charges 18% GST on processing/foreclosure/bounce fees, which must appear on the
 KFS, in charge assessment, and in statements; absence would fail a compliance walkthrough. **Acceptance:** every taxable charge computes and discloses GST; KFS APR treatment is correct.
-**Done this session.** New `packages/core/src/tax.js` centralises GST policy: `GST_RATE_BPS` (18%), a
+**Done this session.** New `packages/core/src/finance/tax.js` centralises GST policy: `GST_RATE_BPS` (18%), a
 data-driven applicability rule (`isChargeGstApplicable` — a charge may override via `gstApplicable`/
 `gstRateBps`; defaults exempt `stamp_duty`, `insurance_premium`, `penal_charge`, `late_payment_penalty`
 per CBIC Circular 178/2022 and interest), and exact integer-paise decomposition

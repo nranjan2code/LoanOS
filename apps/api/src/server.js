@@ -30,13 +30,13 @@ import { createObservabilityRegistry } from "./observability.js";
 import { readFile } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createCommunicationDelivery, projectCommunicationDeliveryReconciliation, recordCommunicationCallback, signCommunicationCallback } from "../../../packages/core/src/communication-delivery-lifecycle.js";
-import { claimDueProviderCallbacks, enqueueProviderCallback, projectProviderCallbackQueue, recordProviderCallbackAttempt, replayDeadLetterCallback } from "../../../packages/core/src/provider-callback-delivery.js";
-import { buildSignedFileManifest, createSignedFileCorrection, recordSignedFileAcknowledgement, registerSignedFileSchemaProfile } from "../../../packages/core/src/signed-file-conformance.js";
-import { createTransportRecord, createTransportResubmission, markTransportDispatched, recordTransportPoll } from "../../../packages/core/src/signed-file-transport.js";
-import { createBusinessAdapterRequest, projectBusinessAdapterReconciliation, recordBusinessAdapterEvent, registerBusinessAdapter } from "../../../packages/core/src/business-adapter-conformance.js";
-import { PRODUCT_JOURNEY_CONTRACTS } from "../../../packages/core/src/product-journey-contracts.js";
-import { createProductPlatformAdministrationState, proposePlatformTemplateVersion, publishPlatformTemplateVersion } from "../../../packages/core/src/product-platform-administration.js";
+import { createCommunicationDelivery, projectCommunicationDeliveryReconciliation, recordCommunicationCallback, signCommunicationCallback } from "@loanos/core/integrations/communication-delivery-lifecycle.js";
+import { claimDueProviderCallbacks, enqueueProviderCallback, projectProviderCallbackQueue, recordProviderCallbackAttempt, replayDeadLetterCallback } from "@loanos/core/integrations/provider-callback-delivery.js";
+import { buildSignedFileManifest, createSignedFileCorrection, recordSignedFileAcknowledgement, registerSignedFileSchemaProfile } from "@loanos/core/integrations/signed-file-conformance.js";
+import { createTransportRecord, createTransportResubmission, markTransportDispatched, recordTransportPoll } from "@loanos/core/integrations/signed-file-transport.js";
+import { createBusinessAdapterRequest, projectBusinessAdapterReconciliation, recordBusinessAdapterEvent, registerBusinessAdapter } from "@loanos/core/integrations/business-adapter-conformance.js";
+import { PRODUCT_JOURNEY_CONTRACTS } from "@loanos/core/journeys/product-journey-contracts.js";
+import { createProductPlatformAdministrationState, proposePlatformTemplateVersion, publishPlatformTemplateVersion } from "@loanos/core/platform/product-platform-administration.js";
 import {
   acceptSignupLegalDocuments,
   activateFirstOwner,
@@ -49,7 +49,7 @@ import {
   startOrganisationSignup,
   submitOrganisationIdentity,
   verifySignupContact
-} from "../../../packages/core/src/organisation-signup.js";
+} from "@loanos/core/platform/organisation-signup.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -315,14 +315,14 @@ import {
   fileFiuReport,
   enrichFiuReport,
   listFiuReports
-} from "../../../packages/core/src/index.js";
+} from "@loanos/core";
 import {
   AUDIT_ACTOR_TYPES,
   DEMO_SHOWCASE_PROFILE_ID,
   buildAuditEvidencePack,
   sealAuditChain,
   stampAuditEvents
-} from "../../../packages/core/src/index.js";
+} from "@loanos/core";
 import { assessEligibilityGated } from "./rules-engine.js";
 import { getActiveMasterKey, getMasterKeyById, getMasterKeyRing } from "./encryption.js";
 import {

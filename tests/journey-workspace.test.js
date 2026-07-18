@@ -11,9 +11,9 @@ import {
   projectJourneyWorkspaceSchema,
   saveJourneyWorkspaceDraft,
   validateJourneyWorkspaceCatalogue
-} from "../packages/core/src/journey-workspace.js";
-import { PRODUCT_JOURNEY_TYPES } from "../packages/core/src/product-journey-administration.js";
-import { PRODUCT_JOURNEY_CONTRACTS } from "../packages/core/src/product-journey-contracts.js";
+} from "@loanos/core/journeys/journey-workspace.js";
+import { PRODUCT_JOURNEY_TYPES } from "@loanos/core/journeys/product-journey-administration.js";
+import { PRODUCT_JOURNEY_CONTRACTS } from "@loanos/core/journeys/product-journey-contracts.js";
 
 const NOW = new Date("2026-07-15T10:00:00.000Z");
 const subscription = { subscriptionId: "sub-1", tenantId: "tenant-a", productTypes: PRODUCT_JOURNEY_TYPES, effectiveFrom: "2026-01-01T00:00:00.000Z", validUntil: "2030-01-01T00:00:00.000Z", status: "active" };

@@ -72,7 +72,7 @@ object OfflineQueueManager {
 
         // SHA-256 over the base64 ciphertext string — the backend verifies
         // sha256(input.ciphertext) against ciphertextSha256, and ciphertext
-        // travels as the base64 string (packages/core/src/customer-experience-completion.js).
+        // travels as the base64 string (packages/core/src/operations/customer-experience-completion.js).
         val sha256Digest = MessageDigest.getInstance("SHA-256")
             .digest(ciphertextBase64.toByteArray(Charsets.UTF_8))
             .joinToString("") { "%02x".format(it) }

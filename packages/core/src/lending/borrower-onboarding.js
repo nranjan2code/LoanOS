@@ -1,0 +1,1116 @@
+/**
+ * Borrower onboarding: the borrower profile, DPDP consent, KYC (including
+ * V-CIP and Aadhaar-handling constraints), and PMLA beneficial-ownership
+ * records for legal-entity borrowers, plus the read-only resolution step
+ * (`resolveBorrowerApplicationReferences`) that a loan application uses to
+ * confirm a borrower is actually sanction-eligible (active status,
+ * consented, KYC verified and not due for refresh, beneficial owners
+ * identified where required) before proceeding. This module does not own
+ * CKYC upload/download itself — `searchCkyc`/`downloadCkycRecord` operate
+ * against a mock registry for search/reference purposes only, and direct
+ * upload is deliberately disabled (`uploadCkycRecord`): CKYC identifiers
+ * may only be assigned via the governed CKYCRR submission flow in
+ * `ckyc-reporting.js`, not written directly here.
+ *
+ * KYC has its own periodic-review clock, separate from expiry: a
+ * `"verified"` record whose `nextReviewDueAt` (derived from a risk-based
+ * interval — 10/8/2 years for low/medium/high risk — via
+ * `computeKycReviewDueAt` when not explicitly set) has passed is no longer
+ * good enough to sanction against; `evaluateKycStatus` computes this
+ * "effective" status (verified/expired/refresh_required) on top of the
+ * stored status so callers reason about one value instead of re-deriving
+ * it. V-CIP verification carries its own hard evidence bar (GPS within
+ * India, liveness, >=80% face match, PAN verification, an officially
+ * signed recording) and Aadhaar biometric/OTP/PID data must never be
+ * stored (UIDAI-AADHAAR) — both are enforced as blocking findings, not
+ * warnings. `redactBorrowerProfile`/`redactBorrowerKycRecords`/
+ * `redactBorrowerBeneficialOwners` implement DPDP erasure: they
+ * irreversibly null out personal-data fields while keeping a
+ * non-identifying skeleton (id, type, timestamps) so the record's
+ * existence and erasure event remain auditable.
+ */
+import { createFinding, summarizeFindings } from "../compliance/compliance-controls.js";
+import { calculateAgeYears, createLoanId } from "./loan-policy.js";
+
+const ACTIVE_STATUS = "active";
+const GRANTED_STATUS = "granted";
+const VERIFIED_KYC_STATUS = "verified";
+const CONSENT_PURPOSES = new Set(["data_processing", "third_party_sharing", "credit_bureau", "ckyc", "communications"]);
+const BORROWER_TYPES = new Set(["individual", "sole_proprietor", "company", "partnership", "llp", "trust", "unincorporated_association"]);
+
+// The RBI KYC Master Direction requires periodic updation of KYC on a
+// risk-based cycle. Once a verified record passes its review-due date it is no
+// longer good enough to sanction against — it becomes `refresh_required` until
+// re-verified.
+export const KYC_STATUSES = ["created", "pending", "verified", "rejected", "expired", "refresh_required"];
+const KYC_REVIEW_INTERVAL_YEARS = { low: 10, medium: 8, high: 2 };
+
+/**
+ * Derive when a KYC record is next due for periodic review: uses an
+ * explicit `nextReviewDueAt` if the record already carries one, otherwise
+ * computes `verifiedAt + KYC_REVIEW_INTERVAL_YEARS[riskCategory]`.
+ * @param {object} record - KYC record (verifiedAt, riskCategory, nextReviewDueAt).
+ * @returns {string|null} ISO timestamp, or null if it can't be determined (no verifiedAt or unknown risk category).
+ */
+export function computeKycReviewDueAt(record) {
+  if (record?.nextReviewDueAt) {
+    return record.nextReviewDueAt;
+  }
+  const intervalYears = KYC_REVIEW_INTERVAL_YEARS[record?.riskCategory];
+  if (!record?.verifiedAt || !intervalYears) {
+    return null;
+  }
+  const due = new Date(record.verifiedAt);
+  due.setUTCFullYear(due.getUTCFullYear() + intervalYears);
+  return due.toISOString();
+}
+
+/**
+ * The effective status accounts for expiry and periodic-review lapse on top of
+ * the stored status, so callers reason about one value. A stored `"verified"`
+ * record becomes effectively `"expired"` past its `expiresAt`, or
+ * `"refresh_required"` past its periodic-review due date — either blocks
+ * sanction even though the raw stored status still says `"verified"`.
+ * @param {object} record - KYC record.
+ * @param {Date} [now]
+ * @returns {{effectiveStatus: string|null, expired: boolean, reviewDue: boolean, nextReviewDueAt: string|null}}
+ */
+export function evaluateKycStatus(record, now = new Date()) {
+  const nextReviewDueAt = computeKycReviewDueAt(record);
+  if (record?.status !== VERIFIED_KYC_STATUS) {
+    return { effectiveStatus: record?.status ?? null, expired: false, reviewDue: false, nextReviewDueAt };
+  }
+  const expired = Boolean(record.expiresAt && new Date(record.expiresAt).getTime() <= now.getTime());
+  const reviewDue = Boolean(nextReviewDueAt && new Date(nextReviewDueAt).getTime() <= now.getTime());
+  const effectiveStatus = expired ? "expired" : reviewDue ? "refresh_required" : VERIFIED_KYC_STATUS;
+  return { effectiveStatus, expired, reviewDue, nextReviewDueAt };
+}
+
+/**
+ * Validate a borrower profile: required id/type/residency (India-only),
+ * type-specific identity fields (individual: full name + age >= 18;
+ * non-individual: legal name), at least one contact channel, and — for an
+ * active borrower — occupation (individuals) and a positive monthly
+ * income. In sandbox mode, requires the profile be marked synthetic.
+ * @param {object} profile
+ * @param {Date} [now]
+ * @param {{isSandbox?: boolean}} [options]
+ * @returns {{findings: Array<object>, summary: object}}
+ */
+export function validateBorrowerProfile(profile, now = new Date(), options = {}) {
+  const findings = [];
+
+  if (options.isSandbox && !profile?.isSynthetic) {
+    findings.push(createFinding("error", "SANDBOX-COMPLIANCE", "Sandbox environments only allow synthetic borrowers.", "isSynthetic"));
+  }
+
+  if (!profile?.borrowerId) {
+    findings.push(createFinding("error", "RBI-KYC-2016", "borrowerId is required.", "borrowerId"));
+  }
+  if (!profile?.borrowerType || !BORROWER_TYPES.has(profile.borrowerType)) {
+    findings.push(createFinding("error", "RBI-KYC-2016", "borrowerType is invalid.", "borrowerType"));
+  }
+  if ((profile?.residencyCountry ?? "IN") !== "IN") {
+    findings.push(createFinding("error", "RBI-DL-2025", "Borrower residencyCountry must be IN.", "residencyCountry"));
+  }
+  if ((profile?.primaryAddressCountry ?? "IN") !== "IN") {
+    findings.push(createFinding("error", "RBI-DL-2025", "Borrower primaryAddressCountry must be IN.", "primaryAddressCountry"));
+  }
+  if (profile?.status && !["draft", "active", "suspended", "closed"].includes(profile.status)) {
+    findings.push(createFinding("error", "RBI-KYC-2016", "Borrower status is invalid.", "status"));
+  }
+
+  if (profile?.borrowerType === "individual") {
+    if (!profile?.fullName) {
+      findings.push(createFinding("error", "RBI-KYC-2016", "Individual borrower fullName is required.", "fullName"));
+    }
+    const age = profile?.dateOfBirth ? calculateAgeYears(profile.dateOfBirth, now) : profile?.ageYears;
+    if (!Number.isFinite(age) || age < 18) {
+      findings.push(createFinding("error", "RBI-DL-2025", "Individual borrower must be at least 18.", "dateOfBirth"));
+    }
+  } else if (!profile?.legalName) {
+    findings.push(createFinding("error", "RBI-KYC-2016", "Non-individual borrower legalName is required.", "legalName"));
+  }
+
+  if (!profile?.contact?.mobile && !profile?.contact?.email) {
+    findings.push(createFinding("error", "RBI-DL-2025", "At least one borrower contact channel is required.", "contact"));
+  }
+
+  if ((profile?.status ?? ACTIVE_STATUS) === ACTIVE_STATUS) {
+    if (!profile?.economicProfile?.occupation && profile.borrowerType === "individual") {
+      findings.push(createFinding("error", "RBI-DL-2025", "Active individual borrower requires occupation.", "economicProfile.occupation"));
+    }
+    if (!Number.isFinite(profile?.economicProfile?.monthlyIncome) || profile.economicProfile.monthlyIncome <= 0) {
+      findings.push(createFinding("error", "RBI-DL-2025", "Active borrower requires positive monthlyIncome.", "economicProfile.monthlyIncome"));
+    }
+  }
+
+  return {
+    findings,
+    summary: summarizeFindings(findings)
+  };
+}
+
+/**
+ * Shape a borrower profile from caller input, defaulting residency/address
+ * to India. Structured CIC/UCRF `creditReporting` identity and address
+ * attributes are kept in their own sub-object, separate from operational
+ * KYC fields, so reporting exports never infer or scrape regulated
+ * identifiers from evidence documents.
+ * @param {object} input
+ * @param {Date} [now]
+ * @param {{isSandbox?: boolean}} [options] - sandbox profiles default to synthetic.
+ * @returns {object} normalized borrower profile.
+ */
+export function normalizeBorrowerProfile(input, now = new Date(), options = {}) {
+  return {
+    borrowerId: input.borrowerId,
+    borrowerType: input.borrowerType ?? "individual",
+    status: input.status ?? ACTIVE_STATUS,
+    fullName: input.fullName ?? null,
+    legalName: input.legalName ?? null,
+    dateOfBirth: input.dateOfBirth ?? null,
+    residencyCountry: input.residencyCountry ?? "IN",
+    primaryAddressCountry: input.primaryAddressCountry ?? "IN",
+    primaryAddress: input.primaryAddress ?? null,
+    contact: {
+      mobile: input.contact?.mobile ?? null,
+      email: input.contact?.email ?? null
+    },
+    economicProfile: {
+      occupation: input.economicProfile?.occupation ?? null,
+      monthlyIncome: input.economicProfile?.monthlyIncome ?? null,
+      employerName: input.economicProfile?.employerName ?? null,
+      incomeEvidenceRef: input.economicProfile?.incomeEvidenceRef ?? null
+    },
+    // Structured CIC/UCRF identity and address attributes are kept separate
+    // from operational KYC fields so reporting exports never infer or scrape
+    // regulated identifiers from evidence documents.
+    creditReporting: input.creditReporting
+      ? {
+          ...input.creditReporting,
+          identity: input.creditReporting.identity ? { ...input.creditReporting.identity } : null,
+          address: input.creditReporting.address ? { ...input.creditReporting.address } : null,
+          securities: Array.isArray(input.creditReporting.securities) ? [...input.creditReporting.securities] : [],
+          guarantors: Array.isArray(input.creditReporting.guarantors) ? [...input.creditReporting.guarantors] : [],
+          relatedParties: Array.isArray(input.creditReporting.relatedParties) ? [...input.creditReporting.relatedParties] : []
+        }
+      : null,
+    beneficialOwnershipDeclaration: input.beneficialOwnershipDeclaration
+      ? {
+          complete: input.beneficialOwnershipDeclaration.complete === true,
+          noNaturalOwnerIdentified: input.beneficialOwnershipDeclaration.noNaturalOwnerIdentified === true,
+          verifiedAt: input.beneficialOwnershipDeclaration.verifiedAt ?? null,
+          verifiedBy: input.beneficialOwnershipDeclaration.verifiedBy ?? null,
+          evidenceRef: input.beneficialOwnershipDeclaration.evidenceRef ?? null
+        }
+      : null,
+    isSynthetic: input.isSynthetic === true || (options.isSandbox && input.isSynthetic !== false),
+    createdAt: input.createdAt ?? now.toISOString(),
+    updatedAt: now.toISOString()
+  };
+}
+
+/**
+ * Normalize, validate, and (if valid) persist a borrower profile.
+ * @param {Record<string, object>} registry - borrowerId -> profile.
+ * @param {object} input
+ * @param {Date} [now]
+ * @param {{isSandbox?: boolean}} [options]
+ * @returns {{registry: object, borrower: object, findings: Array<object>, summary: object}}
+ */
+export function upsertBorrowerProfile(registry, input, now = new Date(), options = {}) {
+  const borrower = normalizeBorrowerProfile(input, now, options);
+  const validation = validateBorrowerProfile(borrower, now, options);
+  const nextRegistry =
+    validation.summary.status === "blocked"
+      ? registry ?? {}
+      : {
+          ...(registry ?? {}),
+          [borrower.borrowerId]: borrower
+        };
+
+  return {
+    registry: nextRegistry,
+    borrower,
+    findings: validation.findings,
+    summary: validation.summary
+  };
+}
+
+/**
+ * Validate a DPDP consent record: recognized purpose, notice version,
+ * plain-language purpose description, at least one data category,
+ * retention disclosure, a withdrawal mechanism, recipient identification
+ * for third-party-sharing consent, and status-consistent timestamps
+ * (`acceptedAt` for granted, `revokedAt` for revoked).
+ * @param {object} record
+ * @returns {{findings: Array<object>, summary: object}}
+ */
+export function validateConsentRecord(record) {
+  const findings = [];
+
+  if (!record?.consentId) {
+    findings.push(createFinding("error", "DPDP-2023", "consentId is required.", "consentId"));
+  }
+  if (!record?.borrowerId) {
+    findings.push(createFinding("error", "DPDP-2023", "borrowerId is required for consent.", "borrowerId"));
+  }
+  if (!record?.purpose || !CONSENT_PURPOSES.has(record.purpose)) {
+    findings.push(createFinding("error", "DPDP-2023", "Consent purpose is invalid.", "purpose"));
+  }
+  if (!record?.noticeVersion) {
+    findings.push(createFinding("error", "DPDP-RULES-2025", "noticeVersion is required.", "noticeVersion"));
+  }
+  if (!record?.purposeDescription) {
+    findings.push(createFinding("error", "DPDP-RULES-2025", "Consent must state the specific processing purpose in plain language.", "purposeDescription"));
+  }
+  if (!Array.isArray(record?.dataCategories) || record.dataCategories.length === 0) {
+    findings.push(createFinding("error", "DPDP-RULES-2025", "Consent must identify each category of personal data requested.", "dataCategories"));
+  }
+  if (!record?.retentionPeriod) {
+    findings.push(createFinding("error", "DPDP-RULES-2025", "Consent must disclose the applicable retention period or criterion.", "retentionPeriod"));
+  }
+  if (!record?.withdrawalMechanism) {
+    findings.push(createFinding("error", "DPDP-RULES-2025", "Consent must provide a withdrawal mechanism comparable to the grant flow.", "withdrawalMechanism"));
+  }
+  if (record?.purpose === "third_party_sharing" && (!Array.isArray(record.recipients) || record.recipients.length === 0)) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Third-party sharing consent must identify the recipients or recipient classes.", "recipients"));
+  }
+  if (!["granted", "revoked", "pending_verification"].includes(record?.status)) {
+    findings.push(createFinding("error", "DPDP-2023", "Consent status must be granted, revoked, or pending_verification.", "status"));
+  }
+  if (record?.status === GRANTED_STATUS && !record?.acceptedAt) {
+    findings.push(createFinding("error", "DPDP-2023", "Granted consent requires acceptedAt.", "acceptedAt"));
+  }
+  if (record?.status === "revoked" && !record?.revokedAt) {
+    findings.push(createFinding("error", "DPDP-2023", "Revoked consent requires revokedAt.", "revokedAt"));
+  }
+
+  return {
+    findings,
+    summary: summarizeFindings(findings)
+  };
+}
+
+/**
+ * Shape a consent record from caller input, defaulting purpose to
+ * `"data_processing"` and status to `"granted"`.
+ * @param {object} input
+ * @param {Date} [now]
+ * @returns {object} normalized consent record.
+ */
+export function normalizeConsentRecord(input, now = new Date()) {
+  return {
+    consentId: input.consentId ?? createLoanId("consent"),
+    borrowerId: input.borrowerId,
+    purpose: input.purpose ?? "data_processing",
+    status: input.status ?? GRANTED_STATUS,
+    noticeVersion: input.noticeVersion,
+    purposeDescription: input.purposeDescription ?? null,
+    dataCategories: Array.isArray(input.dataCategories) ? [...new Set(input.dataCategories)] : [],
+    recipients: Array.isArray(input.recipients) ? [...new Set(input.recipients)] : [],
+    retentionPeriod: input.retentionPeriod ?? null,
+    withdrawalMechanism: input.withdrawalMechanism ?? null,
+    lawfulBasis: input.lawfulBasis ?? "consent",
+    acceptedAt: input.acceptedAt ?? input.dataProcessingAcceptedAt ?? null,
+    revokedAt: input.revokedAt ?? null,
+    channel: input.channel ?? null,
+    evidenceRef: input.evidenceRef ?? null,
+    otpVerification: input.otpVerification ?? null,
+    createdAt: input.createdAt ?? now.toISOString(),
+    updatedAt: now.toISOString()
+  };
+}
+
+/**
+ * Normalize, validate, and (if valid) persist a consent record. Fails
+ * closed if the referenced borrower doesn't exist.
+ * @param {Record<string, object>} registry - consentId -> record.
+ * @param {object} input
+ * @param {Record<string, object>} [borrowerProfiles] - for the borrower-existence check.
+ * @param {Date} [now]
+ * @returns {{registry: object, consent: object, findings: Array<object>, summary: object}}
+ */
+export function upsertConsentRecord(registry, input, borrowerProfiles = {}, now = new Date()) {
+  const record = normalizeConsentRecord(input, now);
+  const validation = validateConsentRecord(record);
+  const findings = [...validation.findings];
+
+  if (record.borrowerId && !borrowerProfiles[record.borrowerId]) {
+    findings.push(createFinding("error", "DPDP-2023", "Consent must reference an existing borrower.", "borrowerId"));
+  }
+
+  const summary = summarizeFindings(findings);
+  const nextRegistry =
+    summary.status === "blocked"
+      ? registry ?? {}
+      : {
+          ...(registry ?? {}),
+          [record.consentId]: record
+        };
+
+  return {
+    registry: nextRegistry,
+    consent: record,
+    findings,
+    summary
+  };
+}
+
+/**
+ * Validate a KYC record. A `"verified"` status requires `verifiedAt` plus
+ * clear sanctions/PEP screening (UNSC, UAPA, PEP sources all present,
+ * evidenced, timestamped). Aadhaar biometric/OTP/PID data must never be
+ * stored, regardless of status (UIDAI-AADHAAR). A V-CIP-method
+ * verification additionally requires: India-resident recording storage, a
+ * SHA-256-hashed video recording, GPS coordinates physically within
+ * India's bounding box, PAN verification, confirmed liveness, a face-match
+ * score >= 0.8, and an officially signed recording with the verifying
+ * officer's actor id — all as blocking findings.
+ * @param {object} record
+ * @param {Date} [now]
+ * @returns {{findings: Array<object>, summary: object}}
+ */
+export function validateKycRecord(record, now = new Date()) {
+  const findings = [];
+
+  if (!record?.kycRecordId) {
+    findings.push(createFinding("error", "RBI-KYC-2016", "kycRecordId is required.", "kycRecordId"));
+  }
+  if (!record?.borrowerId) {
+    findings.push(createFinding("error", "RBI-KYC-2016", "borrowerId is required for KYC.", "borrowerId"));
+  }
+  if (!KYC_STATUSES.includes(record?.status)) {
+    findings.push(createFinding("error", "RBI-KYC-2016", "KYC status is invalid.", "status"));
+  }
+  if (record?.riskCategory && !["low", "medium", "high"].includes(record.riskCategory)) {
+    findings.push(createFinding("error", "RBI-KYC-2016", "KYC riskCategory must be low, medium, or high.", "riskCategory"));
+  }
+  if (record?.status === VERIFIED_KYC_STATUS && !record?.verifiedAt) {
+    findings.push(createFinding("error", "RBI-KYC-2016", "Verified KYC requires verifiedAt.", "verifiedAt"));
+  }
+  if (record?.status === VERIFIED_KYC_STATUS) {
+    const screening = record.screening;
+    const requiredSources = ["unsc", "uapa", "pep"];
+    if (screening?.status !== "clear" || !screening.screenedAt || !screening.evidenceRef) {
+      findings.push(
+        createFinding(
+          "error",
+          "RBI-KYC-2016",
+          "Verified KYC requires clear sanctions/PEP screening with timestamp and evidence.",
+          "screening"
+        )
+      );
+    }
+    for (const source of requiredSources) {
+      if (!screening?.sources?.includes(source)) {
+        findings.push(createFinding("error", "RBI-KYC-2016", `Verified KYC screening must include ${source.toUpperCase()}.`, "screening.sources"));
+      }
+    }
+  }
+  if (record?.expiresAt && new Date(record.expiresAt).getTime() <= now.getTime()) {
+    findings.push(createFinding("warning", "RBI-KYC-2016", "KYC record is expired.", "expiresAt"));
+  }
+  if (record?.aadhaar?.biometricStored === true || record?.aadhaar?.otpStored === true || record?.aadhaar?.pidStored === true) {
+    findings.push(createFinding("error", "UIDAI-AADHAAR", "Aadhaar biometric, OTP, or PID data must not be stored.", "aadhaar"));
+  }
+  if (record?.vCip?.used) {
+    if (record.vCip.storageCountry !== "IN") {
+      findings.push(createFinding("error", "RBI-KYC-2016", "V-CIP recordings and logs must be stored in India.", "vCip.storageCountry"));
+    }
+    if (record.method === "vcip") {
+      if (!record.vCip.videoRecordingHash || typeof record.vCip.videoRecordingHash !== "string" || !/^[a-fA-F0-9]{64}$/.test(record.vCip.videoRecordingHash)) {
+        findings.push(createFinding("error", "RBI-KYC-2016", "V-CIP recording hash must be a valid 64-character SHA-256 hex string.", "vCip.videoRecordingHash"));
+      }
+      const lat = record.vCip.gpsCoordinates?.latitude;
+      const lon = record.vCip.gpsCoordinates?.longitude;
+      if (lat === null || lat === undefined || lon === null || lon === undefined) {
+        findings.push(createFinding("error", "RBI-KYC-2016", "V-CIP requires GPS coordinates.", "vCip.gpsCoordinates"));
+      } else {
+        if (lat < 6.0 || lat > 37.6 || lon < 68.1 || lon > 97.4) {
+          findings.push(createFinding("error", "RBI-KYC-2016", "V-CIP customer location must be physically within India.", "vCip.gpsCoordinates"));
+        }
+      }
+      if (!record.vCip.panVerificationRef) {
+        findings.push(createFinding("error", "RBI-KYC-2016", "V-CIP requires PAN verification reference.", "vCip.panVerificationRef"));
+      }
+      if (record.vCip.livenessConfirmed !== true) {
+        findings.push(createFinding("error", "RBI-KYC-2016", "V-CIP requires liveness confirmation.", "vCip.livenessConfirmed"));
+      }
+      if (record.vCip.faceMatchScore === null || record.vCip.faceMatchScore === undefined || record.vCip.faceMatchScore < 0.8) {
+        findings.push(createFinding("error", "RBI-KYC-2016", "V-CIP requires a face match score of at least 0.8 (80%).", "vCip.faceMatchScore"));
+      }
+      if (!record.vCip.officialActorId) {
+        findings.push(createFinding("error", "RBI-KYC-2016", "V-CIP requires official KYC officer actor ID.", "vCip.officialActorId"));
+      }
+      if (record.vCip.signedByOfficial !== true) {
+        findings.push(createFinding("error", "RBI-KYC-2016", "V-CIP recording must be digitally signed by the official.", "vCip.signedByOfficial"));
+      }
+    }
+  }
+
+  return {
+    findings,
+    summary: summarizeFindings(findings)
+  };
+}
+
+/**
+ * Shape a KYC record from caller input, including the nested V-CIP and
+ * Aadhaar sub-objects, and derive `nextReviewDueAt` via
+ * `computeKycReviewDueAt` when not explicitly supplied.
+ * @param {object} input
+ * @param {Date} [now]
+ * @returns {object} normalized KYC record.
+ */
+export function normalizeKycRecord(input, now = new Date()) {
+  const base = {
+    kycRecordId: input.kycRecordId ?? createLoanId("kyc"),
+    borrowerId: input.borrowerId,
+    status: input.status ?? "pending",
+    method: input.method ?? "manual",
+    riskCategory: input.riskCategory ?? null,
+    verifiedAt: input.verifiedAt ?? null,
+    expiresAt: input.expiresAt ?? null,
+    nextReviewDueAt: input.nextReviewDueAt ?? null,
+    ckycRef: input.ckycRef ?? null,
+    screening: input.screening
+      ? {
+          status: input.screening.status ?? null,
+          screenedAt: input.screening.screenedAt ?? null,
+          sources: Array.isArray(input.screening.sources) ? [...new Set(input.screening.sources)] : [],
+          evidenceRef: input.screening.evidenceRef ?? null,
+          reviewedBy: input.screening.reviewedBy ?? null
+        }
+      : null,
+    vCip: {
+      used: Boolean(input.vCip?.used),
+      storageCountry: input.vCip?.storageCountry ?? null,
+      recordingRef: input.vCip?.recordingRef ?? null,
+      activityLogRef: input.vCip?.activityLogRef ?? null,
+      videoRecordingHash: input.vCip?.videoRecordingHash ?? null,
+      recordingTimestamp: input.vCip?.recordingTimestamp ?? null,
+      gpsCoordinates: input.vCip?.gpsCoordinates ? {
+        latitude: Number.isFinite(input.vCip.gpsCoordinates.latitude) ? input.vCip.gpsCoordinates.latitude : null,
+        longitude: Number.isFinite(input.vCip.gpsCoordinates.longitude) ? input.vCip.gpsCoordinates.longitude : null
+      } : null,
+      panVerificationRef: input.vCip?.panVerificationRef ?? null,
+      livenessConfirmed: input.vCip?.livenessConfirmed !== undefined ? Boolean(input.vCip.livenessConfirmed) : null,
+      faceMatchScore: Number.isFinite(input.vCip?.faceMatchScore) ? input.vCip.faceMatchScore : null,
+      officialActorId: input.vCip?.officialActorId ?? null,
+      signedByOfficial: input.vCip?.signedByOfficial !== undefined ? Boolean(input.vCip.signedByOfficial) : null
+    },
+    aadhaar: {
+      biometricStored: Boolean(input.aadhaar?.biometricStored),
+      otpStored: Boolean(input.aadhaar?.otpStored),
+      pidStored: Boolean(input.aadhaar?.pidStored)
+    },
+    createdAt: input.createdAt ?? now.toISOString(),
+    updatedAt: now.toISOString()
+  };
+  // Derive the periodic-review due date from the risk-based cycle when it is not
+  // supplied explicitly, so refresh gating works without extra caller input.
+  return { ...base, nextReviewDueAt: computeKycReviewDueAt(base) };
+}
+
+/**
+ * Normalize, validate, and (if valid) persist a KYC record. Fails closed
+ * if the referenced borrower doesn't exist.
+ * @param {Record<string, object>} registry - kycRecordId -> record.
+ * @param {object} input
+ * @param {Record<string, object>} [borrowerProfiles]
+ * @param {Date} [now]
+ * @returns {{registry: object, kycRecord: object, findings: Array<object>, summary: object}}
+ */
+export function upsertKycRecord(registry, input, borrowerProfiles = {}, now = new Date()) {
+  const record = normalizeKycRecord(input, now);
+  const validation = validateKycRecord(record, now);
+  const findings = [...validation.findings];
+
+  if (record.borrowerId && !borrowerProfiles[record.borrowerId]) {
+    findings.push(createFinding("error", "RBI-KYC-2016", "KYC record must reference an existing borrower.", "borrowerId"));
+  }
+
+  const summary = summarizeFindings(findings);
+  const nextRegistry =
+    summary.status === "blocked"
+      ? registry ?? {}
+      : {
+          ...(registry ?? {}),
+          [record.kycRecordId]: record
+        };
+
+  return {
+    registry: nextRegistry,
+    kycRecord: record,
+    findings,
+    summary
+  };
+}
+
+// PMLA Rules (Rule 9(1A)/9(3)) require a regulated entity to identify the
+// natural person(s) who ultimately own or control a legal-entity customer
+// before an account-based relationship is established: a controlling
+// ownership interest (more than 10% for a company/partnership/LLP, more than
+// 15% for an unincorporated association; trust beneficiaries at 10% or more),
+// or — where no natural person meets the applicable threshold — the senior
+// managing official exercising control. Trusts separately require their
+// author, trustee(s), qualifying beneficiaries, and ultimate controllers.
+// Individuals
+// and sole proprietors are the customer themselves, so no separate
+// beneficial-owner declaration applies to them.
+export const BENEFICIAL_OWNER_TYPES = new Set([
+  "ownership",
+  "control",
+  "senior_managing_official",
+  "trust_author",
+  "trustee",
+  "beneficiary"
+]);
+export const BENEFICIAL_OWNER_ENTITY_TYPES = new Set(["company", "partnership", "llp", "trust", "unincorporated_association"]);
+export const BENEFICIAL_OWNERSHIP_THRESHOLD_PERCENT = {
+  company: 10,
+  partnership: 10,
+  llp: 10,
+  trust: 10,
+  unincorporated_association: 15
+};
+
+/**
+ * Validate a beneficial-owner declaration under PMLA Rule 9(1A)/9(3): must
+ * reference an existing legal-entity borrower (company/partnership/llp/
+ * trust/unincorporated_association — never an individual/sole proprietor,
+ * who are their own customer), have a name and identification reference,
+ * a recognized `type` with its type-specific evidence (ownership/
+ * beneficiary needs a percentage in (0,100]; control needs a basis;
+ * senior_managing_official needs a designation), and — if marked verified
+ * — a `verification.verifiedAt`.
+ * @param {object} record
+ * @param {Record<string, object>} [borrowerProfiles] - for the borrower-existence/type check.
+ * @returns {{findings: Array<object>, summary: object}}
+ */
+export function validateBeneficialOwner(record, borrowerProfiles = {}) {
+  const findings = [];
+  const borrower = record?.borrowerId ? borrowerProfiles[record.borrowerId] : null;
+
+  if (!record?.beneficialOwnerId) {
+    findings.push(createFinding("error", "RBI-KYC-2016", "beneficialOwnerId is required.", "beneficialOwnerId"));
+  }
+  if (!record?.borrowerId) {
+    findings.push(createFinding("error", "RBI-KYC-2016", "borrowerId is required for a beneficial owner.", "borrowerId"));
+  } else if (!borrower) {
+    findings.push(createFinding("error", "RBI-KYC-2016", "Beneficial owner must reference an existing borrower.", "borrowerId"));
+  } else if (!BENEFICIAL_OWNER_ENTITY_TYPES.has(borrower.borrowerType)) {
+    findings.push(
+      createFinding("error", "RBI-KYC-2016", "Beneficial owners apply only to legal-entity (company/partnership/llp/trust) borrowers.", "borrowerId")
+    );
+  }
+  if (!record?.name) {
+    findings.push(createFinding("error", "RBI-KYC-2016", "Beneficial owner name is required.", "name"));
+  }
+  if (!record?.identificationRef) {
+    findings.push(createFinding("error", "RBI-KYC-2016", "Beneficial owner identificationRef (e.g. PAN) is required.", "identificationRef"));
+  }
+  if (!record?.type || !BENEFICIAL_OWNER_TYPES.has(record.type)) {
+    findings.push(createFinding("error", "RBI-KYC-2016", "Beneficial owner type is invalid.", "type"));
+  } else if (record.type === "ownership" || record.type === "beneficiary") {
+    if (!Number.isFinite(record?.ownershipPercentage) || record.ownershipPercentage <= 0 || record.ownershipPercentage > 100) {
+      findings.push(createFinding("error", "RBI-KYC-2016", "Ownership-type beneficial owner requires ownershipPercentage in (0, 100].", "ownershipPercentage"));
+    }
+  } else if (record.type === "control" && !record?.controlBasis) {
+    findings.push(createFinding("error", "RBI-KYC-2016", "Control-type beneficial owner requires controlBasis.", "controlBasis"));
+  } else if (record.type === "senior_managing_official" && !record?.designation) {
+    findings.push(createFinding("error", "RBI-KYC-2016", "Senior-managing-official beneficial owner requires designation.", "designation"));
+  }
+  if (record?.verification?.status === VERIFIED_KYC_STATUS && !record?.verification?.verifiedAt) {
+    findings.push(createFinding("error", "RBI-KYC-2016", "Verified beneficial owner requires verification.verifiedAt.", "verification.verifiedAt"));
+  }
+
+  return {
+    findings,
+    summary: summarizeFindings(findings)
+  };
+}
+
+/**
+ * Merge caller input over an existing beneficial-owner record (or
+ * defaults, for a new one).
+ * @param {object} input
+ * @param {object} [existing]
+ * @param {Date} [now]
+ * @returns {object} normalized record.
+ */
+export function normalizeBeneficialOwner(input, existing = {}, now = new Date()) {
+  return {
+    beneficialOwnerId: input.beneficialOwnerId ?? existing.beneficialOwnerId ?? createLoanId("bo"),
+    borrowerId: input.borrowerId ?? existing.borrowerId,
+    name: input.name ?? existing.name ?? null,
+    identificationType: input.identificationType ?? existing.identificationType ?? "pan",
+    identificationRef: input.identificationRef ?? existing.identificationRef ?? null,
+    type: input.type ?? existing.type ?? "ownership",
+    ownershipPercentage: input.ownershipPercentage ?? existing.ownershipPercentage ?? null,
+    controlBasis: input.controlBasis ?? existing.controlBasis ?? null,
+    designation: input.designation ?? existing.designation ?? null,
+    verification: {
+      status: input.verification?.status ?? existing.verification?.status ?? "pending",
+      verifiedAt: input.verification?.verifiedAt ?? existing.verification?.verifiedAt ?? null,
+      verifiedBy: input.verification?.verifiedBy ?? existing.verification?.verifiedBy ?? null,
+      evidenceRef: input.verification?.evidenceRef ?? existing.verification?.evidenceRef ?? null
+    },
+    createdAt: existing.createdAt ?? input.createdAt ?? now.toISOString(),
+    updatedAt: now.toISOString()
+  };
+}
+
+/**
+ * Normalize, validate, and (if valid) persist a beneficial-owner record.
+ * @param {Record<string, object>} registry - beneficialOwnerId -> record.
+ * @param {object} input
+ * @param {Record<string, object>} [borrowerProfiles]
+ * @param {Date} [now]
+ * @returns {{registry: object, beneficialOwner: object, findings: Array<object>, summary: object}}
+ */
+export function upsertBeneficialOwner(registry, input, borrowerProfiles = {}, now = new Date()) {
+  const record = normalizeBeneficialOwner(input, (registry ?? {})[input?.beneficialOwnerId] ?? {}, now);
+  const validation = validateBeneficialOwner(record, borrowerProfiles);
+  const nextRegistry =
+    validation.summary.status === "blocked"
+      ? registry ?? {}
+      : {
+          ...(registry ?? {}),
+          [record.beneficialOwnerId]: record
+        };
+
+  return {
+    registry: nextRegistry,
+    beneficialOwner: record,
+    findings: validation.findings,
+    summary: validation.summary
+  };
+}
+
+/**
+ * @param {Record<string, object>} beneficialOwners
+ * @param {string} borrowerId
+ * @returns {Array<object>} beneficial-owner records for this borrower.
+ */
+export function listBorrowerBeneficialOwners(beneficialOwners, borrowerId) {
+  return Object.values(beneficialOwners ?? {}).filter((record) => record.borrowerId === borrowerId);
+}
+
+// A beneficial-owner record actually discharges the PMLA identification duty
+// only once it is verified and meets its type's bar: an ownership stake at or
+// above the entity's controlling-interest threshold, or a declared control /
+// senior-managing-official basis.
+function qualifiesAsBeneficialOwner(record, borrowerType) {
+  if (record?.verification?.status !== VERIFIED_KYC_STATUS) {
+    return false;
+  }
+  if (record.type === "ownership" || record.type === "beneficiary") {
+    const threshold = BENEFICIAL_OWNERSHIP_THRESHOLD_PERCENT[borrowerType] ?? 10;
+    const inclusive = borrowerType === "trust";
+    return Number.isFinite(record.ownershipPercentage) && (inclusive
+      ? record.ownershipPercentage >= threshold
+      : record.ownershipPercentage > threshold);
+  }
+  return ["control", "senior_managing_official", "trust_author", "trustee"].includes(record.type);
+}
+
+/**
+ * The sanction-eligibility gate: resolve an application's `borrowerId`
+ * against the full onboarding record set and fail closed unless the
+ * borrower is active; for a legal-entity borrower, a complete verified
+ * beneficial-ownership declaration exists and at least one qualifying
+ * beneficial owner is on file (a trust additionally needs author, trustee,
+ * and beneficiary/controller records — see `qualifiesAsBeneficialOwner`);
+ * an active data-processing consent (and, if third-party sharing is
+ * enabled on the application, an active third-party-sharing consent) is
+ * granted; and a KYC record is verified, not expired, and not due for
+ * refresh. On success, returns the application enriched with a frozen
+ * snapshot of the borrower/consent/KYC facts actually used for the
+ * decision — a pure read/merge, never persisted back to the registries.
+ * @param {object} application - must carry `borrowerId`.
+ * @param {{borrowerProfiles?: object, beneficialOwners?: object, consentRecords?: object, kycRecords?: object}} [registries]
+ * @param {Date} [now]
+ * @returns {{application: object, findings: Array<object>, summary: object}}
+ */
+export function resolveBorrowerApplicationReferences(application, registries = {}, now = new Date()) {
+  const findings = [];
+  let resolved = { ...application };
+
+  if (!application.borrowerId) {
+    return {
+      application: resolved,
+      findings,
+      summary: summarizeFindings(findings)
+    };
+  }
+
+  const borrower = registries.borrowerProfiles?.[application.borrowerId];
+  if (!borrower) {
+    findings.push(createFinding("error", "RBI-KYC-2016", "borrowerId does not match an existing borrower.", "borrowerId"));
+    return {
+      application: resolved,
+      findings,
+      summary: summarizeFindings(findings)
+    };
+  }
+  if (borrower.status !== ACTIVE_STATUS) {
+    findings.push(createFinding("error", "RBI-KYC-2016", "Referenced borrower is not active.", "borrowerId"));
+  }
+
+  if (BENEFICIAL_OWNER_ENTITY_TYPES.has(borrower.borrowerType)) {
+    const beneficialOwners = listBorrowerBeneficialOwners(registries.beneficialOwners ?? {}, borrower.borrowerId);
+    const declaration = borrower.beneficialOwnershipDeclaration;
+    if (!declaration?.complete || !declaration.verifiedAt || !declaration.verifiedBy || !declaration.evidenceRef) {
+      findings.push(
+        createFinding(
+          "error",
+          "RBI-KYC-2016",
+          "A verified complete beneficial-ownership declaration and evidence are required for a legal-entity borrower.",
+          "borrowerId"
+        )
+      );
+    }
+    const qualifyingOwners = beneficialOwners.filter(
+      (record) =>
+        qualifiesAsBeneficialOwner(record, borrower.borrowerType) &&
+        (record.type !== "senior_managing_official" || declaration?.noNaturalOwnerIdentified === true)
+    );
+    if (borrower.borrowerType === "trust") {
+      const hasAuthor = qualifyingOwners.some((record) => record.type === "trust_author");
+      const hasTrustee = qualifyingOwners.some((record) => record.type === "trustee");
+      const hasControllerOrBeneficiary = qualifyingOwners.some((record) => ["beneficiary", "control"].includes(record.type));
+      if (!hasAuthor || !hasTrustee || !hasControllerOrBeneficiary) {
+        findings.push(
+          createFinding(
+            "error",
+            "RBI-KYC-2016",
+            "A trust borrower requires verified author, trustee, and qualifying beneficiary or ultimate-controller records.",
+            "borrowerId"
+          )
+        );
+      }
+    } else if (qualifyingOwners.length === 0) {
+      findings.push(
+        createFinding(
+          "error",
+          "RBI-KYC-2016",
+          "A legal-entity borrower requires verified beneficial owners meeting the current PMLA controlling-interest rule.",
+          "borrowerId"
+        )
+      );
+    }
+  }
+
+  const dataConsent = findLatestConsent(registries.consentRecords ?? {}, borrower.borrowerId, "data_processing");
+  if (!dataConsent || dataConsent.status !== GRANTED_STATUS) {
+    findings.push(createFinding("error", "DPDP-2023", "Active data-processing consent is required.", "borrowerId"));
+  }
+
+  const thirdPartyConsent = application.thirdPartySharing?.enabled
+    ? findLatestConsent(registries.consentRecords ?? {}, borrower.borrowerId, "third_party_sharing")
+    : null;
+  if (application.thirdPartySharing?.enabled && (!thirdPartyConsent || thirdPartyConsent.status !== GRANTED_STATUS)) {
+    findings.push(createFinding("error", "RBI-DL-2025", "Active third-party sharing consent is required.", "borrowerId"));
+  }
+
+  const kycRecord = findLatestKyc(registries.kycRecords ?? {}, borrower.borrowerId);
+  const kycStatus = kycRecord ? evaluateKycStatus(kycRecord, now) : null;
+  if (!kycRecord || kycRecord.status !== VERIFIED_KYC_STATUS) {
+    findings.push(createFinding("error", "RBI-KYC-2016", "A verified KYC record is required.", "borrowerId"));
+  } else if (kycStatus.effectiveStatus === "expired") {
+    findings.push(createFinding("error", "RBI-KYC-2016", "Verified KYC record is expired.", "borrowerId"));
+  } else if (kycStatus.effectiveStatus === "refresh_required") {
+    findings.push(
+      createFinding(
+        "error",
+        "RBI-KYC-2016",
+        "Verified KYC is due for periodic refresh; sanction is blocked until KYC is refreshed.",
+        "borrowerId"
+      )
+    );
+  }
+
+  resolved = {
+    ...resolved,
+    borrower: {
+      borrowerId: borrower.borrowerId,
+      borrowerType: borrower.borrowerType,
+      fullName: borrower.fullName,
+      legalName: borrower.legalName,
+      dateOfBirth: borrower.dateOfBirth,
+      residencyCountry: borrower.residencyCountry,
+      primaryAddressCountry: borrower.primaryAddressCountry,
+      contact: borrower.contact
+    },
+    economicProfile: {
+      ...(borrower.economicProfile ?? {}),
+      ...(application.economicProfile ?? {})
+    },
+    consent: dataConsent
+      ? {
+          consentRecordId: dataConsent.consentId,
+          noticeVersion: dataConsent.noticeVersion,
+          dataProcessingAcceptedAt: dataConsent.acceptedAt,
+          thirdPartySharingAcceptedAt: thirdPartyConsent?.acceptedAt ?? application.consent?.thirdPartySharingAcceptedAt ?? null
+        }
+      : application.consent,
+    kyc: kycRecord
+      ? {
+          kycRecordId: kycRecord.kycRecordId,
+          status: kycRecord.status,
+          effectiveStatus: kycStatus.effectiveStatus,
+          method: kycRecord.method,
+          riskCategory: kycRecord.riskCategory,
+          verifiedAt: kycRecord.verifiedAt,
+          expiresAt: kycRecord.expiresAt,
+          nextReviewDueAt: kycStatus.nextReviewDueAt,
+          screening: kycRecord.screening,
+          aadhaar: kycRecord.aadhaar,
+          vCip: kycRecord.vCip
+        }
+      : application.kyc
+  };
+
+  return {
+    application: resolved,
+    findings,
+    summary: summarizeFindings(findings)
+  };
+}
+
+/**
+ * DPDP erasure: irreversibly redact a borrower's personal data while keeping the
+ * non-identifying skeleton (id, type, timestamps) so the record's existence and
+ * erasure remain auditable. Structural, non-PII fields are retained.
+ * @param {object} profile
+ * @param {Date} [now]
+ * @returns {object} the redacted, `"erased"` profile.
+ */
+export function redactBorrowerProfile(profile, now = new Date()) {
+  return {
+    borrowerId: profile.borrowerId,
+    borrowerType: profile.borrowerType,
+    status: "erased",
+    fullName: null,
+    legalName: null,
+    dateOfBirth: null,
+    residencyCountry: profile.residencyCountry ?? "IN",
+    primaryAddressCountry: profile.primaryAddressCountry ?? "IN",
+    primaryAddress: null,
+    contact: { mobile: null, email: null },
+    economicProfile: { occupation: null, monthlyIncome: null, employerName: null, incomeEvidenceRef: null },
+    createdAt: profile.createdAt ?? now.toISOString(),
+    updatedAt: now.toISOString(),
+    erasedAt: now.toISOString()
+  };
+}
+
+/**
+ * DPDP erasure for a borrower's KYC records: nulls identifying/sensitive
+ * fields (CKYC ref, V-CIP recording/log refs, Aadhaar flags reset false)
+ * while retaining status/method/risk/verification timestamps for audit.
+ * @param {Record<string, object>} kycRecords
+ * @param {string} borrowerId
+ * @param {Date} [now]
+ * @returns {Record<string, object>} the registry with this borrower's records erased.
+ */
+export function redactBorrowerKycRecords(kycRecords = {}, borrowerId, now = new Date()) {
+  const nextKyc = { ...kycRecords };
+  for (const [id, record] of Object.entries(nextKyc)) {
+    if (record.borrowerId === borrowerId) {
+      nextKyc[id] = {
+        kycRecordId: record.kycRecordId,
+        borrowerId: record.borrowerId,
+        status: "erased",
+        method: record.method,
+        riskCategory: record.riskCategory,
+        verifiedAt: record.verifiedAt,
+        expiresAt: record.expiresAt,
+        ckycRef: null,
+        aadhaar: { biometricStored: false, otpStored: false, pidStored: false },
+        vCip: record.vCip ? {
+          used: record.vCip.used,
+          storageCountry: record.vCip.storageCountry,
+          recordingRef: null,
+          activityLogRef: null
+        } : null,
+        updatedAt: now.toISOString(),
+        erasedAt: now.toISOString()
+      };
+    }
+  }
+  return nextKyc;
+}
+
+/**
+ * DPDP erasure for a borrower's beneficial-owner records: nulls name/
+ * identification/DOB while retaining type/ownership-percentage/status for
+ * audit purposes.
+ * @param {Record<string, object>} beneficialOwners
+ * @param {string} borrowerId
+ * @param {Date} [now]
+ * @returns {Record<string, object>} the registry with this borrower's records erased.
+ */
+export function redactBorrowerBeneficialOwners(beneficialOwners = {}, borrowerId, now = new Date()) {
+  const nextBo = { ...beneficialOwners };
+  for (const [id, record] of Object.entries(nextBo)) {
+    if (record.borrowerId === borrowerId) {
+      nextBo[id] = {
+        beneficialOwnerId: record.beneficialOwnerId,
+        borrowerId: record.borrowerId,
+        status: "erased",
+        name: null,
+        type: record.type,
+        ownershipPercentage: record.ownershipPercentage,
+        identificationRef: null,
+        dateOfBirth: null,
+        updatedAt: now.toISOString(),
+        erasedAt: now.toISOString()
+      };
+    }
+  }
+  return nextBo;
+}
+
+/**
+ * @param {Record<string, object>} consentRecords
+ * @param {string} borrowerId
+ * @returns {Array<object>} consent records for this borrower.
+ */
+export function listBorrowerConsents(consentRecords, borrowerId) {
+  return Object.values(consentRecords ?? {}).filter((record) => record.borrowerId === borrowerId);
+}
+
+/**
+ * @param {Record<string, object>} kycRecords
+ * @param {string} borrowerId
+ * @returns {Array<object>} KYC records for this borrower.
+ */
+export function listBorrowerKycRecords(kycRecords, borrowerId) {
+  return Object.values(kycRecords ?? {}).filter((record) => record.borrowerId === borrowerId);
+}
+
+// Most-recent consent of a purpose for a borrower, by latestTime.
+function findLatestConsent(consentRecords, borrowerId, purpose) {
+  return (
+    Object.values(consentRecords)
+      .filter((record) => record.borrowerId === borrowerId && record.purpose === purpose)
+      .sort((a, b) => latestTime(b) - latestTime(a))[0] ?? null
+  );
+}
+
+// Most-recent KYC record for a borrower, by latestTime.
+function findLatestKyc(kycRecords, borrowerId) {
+  return (
+    Object.values(kycRecords)
+      .filter((record) => record.borrowerId === borrowerId)
+      .sort((a, b) => latestTime(b) - latestTime(a))[0] ?? null
+  );
+}
+
+// Best-available "most recent activity" timestamp for a record, preferring
+// the most decision-relevant field (revocation, then verification/acceptance) over generic update time.
+function latestTime(record) {
+  return new Date(record.revokedAt ?? record.verifiedAt ?? record.acceptedAt ?? record.updatedAt ?? record.createdAt ?? 0).getTime();
+}
+
+// --- CKYC Adapter Boundary (Epic 3) -----------------------------------------
+
+/**
+ * Searches the mock CKYC registry database by ID type and number, or contact details.
+ * @param {Object} ckycRegistry - The global ckycRegistry object from the control plane.
+ * @param {Object} query - The search query containing idType and idNumber.
+ * @returns {Object} List of matched CKYC search records (with masked personal info).
+ */
+export function searchCkyc(ckycRegistry, query) {
+  const findings = [];
+  const results = [];
+
+  if (!query?.idType || !query?.idNumber) {
+    findings.push(createFinding("error", "RBI-KYC-2016", "idType and idNumber are required for CKYC search.", "query"));
+    return { results, findings, summary: summarizeFindings(findings) };
+  }
+
+  const normalizedIdType = String(query.idType).toLowerCase();
+  const normalizedIdNumber = String(query.idNumber).trim().toUpperCase();
+
+  const registry = ckycRegistry ?? {};
+  for (const record of Object.values(registry)) {
+    if (
+      record.idType?.toLowerCase() === normalizedIdType &&
+      record.idNumber?.trim().toUpperCase() === normalizedIdNumber
+    ) {
+      results.push({
+        ckycNumber: record.ckycNumber,
+        fullName: maskCkycName(record.fullName),
+        yearOfBirth: record.dateOfBirth?.slice(0, 4) ?? null,
+        gender: record.gender,
+        idType: record.idType,
+        idNumber: maskCkycIdentifier(record.idNumber)
+      });
+    }
+  }
+
+  return {
+    results,
+    findings,
+    summary: summarizeFindings(findings)
+  };
+}
+
+// Mask a name for CKYC search results: keep each word's first letter, star out the rest.
+function maskCkycName(value) {
+  return String(value ?? "").split(/\s+/).filter(Boolean).map((part) => part.length <= 1 ? "*" : `${part[0]}${"*".repeat(Math.max(1, part.length - 1))}`).join(" ");
+}
+
+// Mask an identifier for CKYC search results: keep only the last 4 characters visible.
+function maskCkycIdentifier(value) {
+  const text = String(value ?? "");
+  return text.length <= 4 ? "*".repeat(text.length) : `${"*".repeat(text.length - 4)}${text.slice(-4)}`;
+}
+
+/**
+ * Downloads a customer record from the CKYC registry using a CKYC number.
+ * @param {Object} ckycRegistry - The global ckycRegistry object from the control plane.
+ * @param {string} ckycNumber - The 14-digit CKYC registry number.
+ * @returns {Object} The matching CKYC download result.
+ */
+export function downloadCkycRecord(ckycRegistry, ckycNumber) {
+  const findings = [];
+
+  if (!ckycNumber || typeof ckycNumber !== "string" || ckycNumber.length !== 14 || !/^\d{14}$/.test(ckycNumber)) {
+    findings.push(createFinding("error", "RBI-KYC-2016", "ckycNumber must be a valid 14-digit numeric string.", "ckycNumber"));
+    return { record: null, findings, summary: summarizeFindings(findings) };
+  }
+
+  const record = ckycRegistry?.[ckycNumber];
+  if (!record) {
+    findings.push(createFinding("error", "RBI-KYC-2016", `ckycNumber '${ckycNumber}' not found in registry.`, "ckycNumber"));
+    return { record: null, findings, summary: summarizeFindings(findings) };
+  }
+
+  return {
+    record,
+    findings,
+    summary: summarizeFindings(findings)
+  };
+}
+
+/**
+ * Uploads a verified KYC record to CKYC, generating a new 14-digit CKYC number.
+ * @param {Object} ckycRegistry - The global ckycRegistry object (to mutate).
+ * @param {Object} borrower - The verified Borrower profile.
+ * @param {Object} kycRecord - The verified local KycRecord.
+ * @returns {Object} The result of upload including success status and generated ckycNumber.
+ */
+export function uploadCkycRecord(ckycRegistry, borrower, kycRecord, now = new Date()) {
+  // Deliberately a no-op that always fails: CKYC identifiers may only be
+  // assigned via the governed CKYCRR submission/response flow in
+  // ckyc-reporting.js, never by a direct write from this module.
+  void ckycRegistry; void borrower; void kycRecord; void now;
+  const findings = [createFinding("error", "CERSAI-CKYC", "Direct CKYC upload is disabled. Create a governed /reporting/ckycrr/submissions packet and record the CKYCRR response; identifiers are assigned only by CKYCRR.", "upload")];
+  return { success: false, findings, summary: summarizeFindings(findings) };
+}

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildSuccessionOperationsQueue, reconcileSuccessionExternalInstruction, registerSuccessionOperationsPolicy, submitSuccessionExternalInstruction } from "../packages/core/src/succession-operations.js";
+import { buildSuccessionOperationsQueue, reconcileSuccessionExternalInstruction, registerSuccessionOperationsPolicy, submitSuccessionExternalInstruction } from "@loanos/core/operations/succession-operations.js";
 
 const NOW = new Date("2026-07-15T12:00:00.000Z"); const approval = { proposedBy: "ops-maker", approvedBy: "ops-checker", approvalRef: "approval/1" };
 

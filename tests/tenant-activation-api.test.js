@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createLoanOsServer } from "../apps/api/src/server.js";
 import { totpCode } from "../apps/api/src/identity.js";
-import { checksumTenantActivationEvidence, TENANT_ACTIVATION_DIMENSIONS } from "../packages/core/src/index.js";
+import { checksumTenantActivationEvidence, TENANT_ACTIVATION_DIMENSIONS } from "@loanos/core";
 
 const MFA = "JBSWY3DPEHPK3PXP"; const PASSWORD = "TenantAccessPass1!";
 

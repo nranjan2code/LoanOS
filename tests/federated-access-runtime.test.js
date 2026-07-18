@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
-import { canonicalFederationEvidence, evaluateAuthenticationAssurance, federatedPrincipalFromClaims, scimUserResourceToIdentityEvent, verifyOidcIdToken, verifySamlValidationAttestation } from "../packages/core/src/federated-access-runtime.js";
+import { canonicalFederationEvidence, evaluateAuthenticationAssurance, federatedPrincipalFromClaims, scimUserResourceToIdentityEvent, verifyOidcIdToken, verifySamlValidationAttestation } from "@loanos/core/identity/federated-access-runtime.js";
 import { validateFederatedLogin } from "../apps/api/src/federation-runtime.js";
 
 const NOW = new Date("2026-07-15T06:30:00.000Z");

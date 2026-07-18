@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile, readdir } from "node:fs/promises";
-import { FEATURE_STAFFING_POLICY_IDS } from "../packages/core/src/saas-identity-governance.js";
+import { FEATURE_STAFFING_POLICY_IDS } from "@loanos/core/identity/saas-identity-governance.js";
 import { MUTATION_STAFFING_ROUTE_RULES, classifyProtectedMutation, enforceUniversalMutationStaffing } from "../apps/api/src/mutation-staffing-policy.js";
 
 test("universal mutation classifier covers every staffing family and defaults unknown mutations to deny", async () => {

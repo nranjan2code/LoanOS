@@ -5,7 +5,7 @@ import {
   projectProductJourneyConformanceCoverage,
   recordProductJourneyConformanceResult,
   registerProductJourneyConformanceCampaign
-} from "../../../../packages/core/src/index.js";
+} from "@loanos/core";
 
 const PREFIX = "/admin/product-journey-conformance";
 

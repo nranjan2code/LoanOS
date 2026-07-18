@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert";
 import { createHmac } from "node:crypto";
-import { ExternalServiceManager } from "../packages/core/src/index.js";
+import { ExternalServiceManager } from "@loanos/core";
 
 const activeCertification = (integration) => ({
   [integration]: { integration, status: "certified", environment: "production", dataResidencyCountry: "IN", expiresAt: "2099-01-01T00:00:00.000Z" }

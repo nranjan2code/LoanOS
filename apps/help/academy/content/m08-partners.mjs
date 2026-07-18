@@ -58,7 +58,7 @@ export default {
       platform: [
         { type: "capability", ref: "PAR-003", note: "DLG provider eligibility, form, cap, tenor and invocation." },
         { type: "capability", ref: "PAR-004", note: "DLG exposure, replenishment, recovery, disclosure and accounting." },
-        { type: "code", ref: "packages/core/src/dlg.js", note: "The DLG module: caps, forms, invocation windows." }
+        { type: "code", ref: "packages/core/src/lending/dlg.js", note: "The DLG module: caps, forms, invocation windows." }
       ],
       terms: ["DLG", "NPA", "LSP"],
       related: ["m06-collections/delinquency-classification", "m08-partners/co-lending"],
@@ -90,7 +90,7 @@ export default {
         { type: "capability", ref: "PAR-005", note: "Co-lending agreement, roles, shares, retention, rate and escrow." },
         { type: "capability", ref: "PAR-006", note: "Loan-level allocation and share reconciliation." },
         { type: "capability", ref: "DSB-011", note: "Co-lending escrow and partner funding confirmation." },
-        { type: "code", ref: "packages/core/src/co-lending.js", note: "The co-lending module: shares, blended rate, escrow." }
+        { type: "code", ref: "packages/core/src/lending/co-lending.js", note: "The co-lending module: shares, blended rate, escrow." }
       ],
       terms: ["Co-lending", "Escrow", "EMI", "KFS"],
       related: ["m04-kfs-sanction/disbursement-fund-flow", "m08-partners/dlg"],

@@ -239,7 +239,7 @@ test("Postgres tenant lock makes competing identity-worker claims atomic and RLS
 
   const connectionString = rewriteRole(DATABASE_URL_TEST, "loanos_control_plane");
   const postgresStore = await import("../apps/api/src/postgres-store.js");
-  const { claimIdentityOperationsJobs, scheduleIdentityOperationsJob } = await import("../packages/core/src/identity-operations-worker.js");
+  const { claimIdentityOperationsJobs, scheduleIdentityOperationsJob } = await import("@loanos/core/identity/identity-operations-worker.js");
   await postgresStore.resetPoolForTests(connectionString);
   t.after(() => postgresStore.resetPoolForTests(connectionString));
   const tenantId = "tnt_worker_atomic";
@@ -286,7 +286,7 @@ test("Postgres persists specialist journey cases under tenant RLS without cross-
     await adminPool.query(`INSERT INTO tenants (tenant_id, name, api_key_hash, onboarding) VALUES ($1, $2, $3, '{}'::jsonb)`, [tenantId, tenantId, "hash"]);
   }
   const postgresStore = await import("../apps/api/src/postgres-store.js");
-  const { approveSpecialistJourneyConfiguration, openSpecialistJourneyCase, proposeSpecialistJourneyConfiguration } = await import("../packages/core/src/specialist-journey-service.js");
+  const { approveSpecialistJourneyConfiguration, openSpecialistJourneyCase, proposeSpecialistJourneyConfiguration } = await import("@loanos/core/journeys/specialist-journey-service.js");
   await postgresStore.resetPoolForTests(rewriteRole(DATABASE_URL_TEST, "loanos_control_plane"));
   t.after(() => postgresStore.resetPoolForTests(DATABASE_URL_TEST));
   const H = "a".repeat(64), tenantId = "tnt_specialist_a";
@@ -312,9 +312,9 @@ test("Postgres persists composed journey lifecycles under tenant RLS without cro
     await adminPool.query(`INSERT INTO tenants (tenant_id, name, api_key_hash, onboarding) VALUES ($1, $2, $3, '{}'::jsonb)`, [tenantId, tenantId, "hash"]);
   }
   const postgresStore = await import("../apps/api/src/postgres-store.js");
-  const { createComposedJourneyInstance } = await import("../packages/core/src/composed-journey-lifecycle.js");
-  const { JOURNEY_WORKSPACE_SCHEMAS } = await import("../packages/core/src/journey-workspace.js");
-  const { PRODUCT_TEMPLATE_CATALOGUE } = await import("../packages/core/src/product-template-catalogue.js");
+  const { createComposedJourneyInstance } = await import("@loanos/core/journeys/composed-journey-lifecycle.js");
+  const { JOURNEY_WORKSPACE_SCHEMAS } = await import("@loanos/core/journeys/journey-workspace.js");
+  const { PRODUCT_TEMPLATE_CATALOGUE } = await import("@loanos/core/platform/product-template-catalogue.js");
   await postgresStore.resetPoolForTests(rewriteRole(DATABASE_URL_TEST, "loanos_control_plane"));
   t.after(() => postgresStore.resetPoolForTests(DATABASE_URL_TEST));
   const tenantId = "tnt_composed_a", H = "a".repeat(64), template = PRODUCT_TEMPLATE_CATALOGUE.personal_loan, schema = JOURNEY_WORKSPACE_SCHEMAS.term_lending;

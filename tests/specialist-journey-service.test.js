@@ -12,8 +12,8 @@ import {
   proposeSpecialistJourneyAction,
   proposeSpecialistJourneyConfiguration,
   suspendSpecialistJourneyConfiguration
-} from "../packages/core/src/specialist-journey-service.js";
-import { deriveWorkflowTasks } from "../packages/core/src/workflow-tasks.js";
+} from "@loanos/core/journeys/specialist-journey-service.js";
+import { deriveWorkflowTasks } from "@loanos/core/journeys/workflow-tasks.js";
 
 const NOW = new Date("2026-07-15T00:00:00.000Z");
 const H = "a".repeat(64);

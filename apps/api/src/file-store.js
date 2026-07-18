@@ -15,7 +15,7 @@ import {
   sealAuditChain,
   stampAuditEvents,
   verifyAuditChain
-} from "../../../packages/core/src/index.js";
+} from "@loanos/core";
 import {
   encryptTenantData,
   decryptTenantData,

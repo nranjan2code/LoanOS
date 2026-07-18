@@ -59,7 +59,7 @@ fn null_semantics_match_spec() {
 fn emi_matches_lms_amortization() {
     let env = ValueEnv::new();
     // 300000 @ 18.50% for 24 months. Cross-checked against estimateEmi in
-    // packages/core/src/eligibility.js: 15049.81.
+    // packages/core/src/lending/eligibility.js: 15049.81.
     assert_eq!(
         run("emi(300000.00, 1850, 24)", &env).unwrap(),
         dec("15049.81")

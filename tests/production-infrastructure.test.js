@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { REQUIRED_PRODUCTION_COMPONENTS, assessProductionGoLive, attestProductionComponent, evaluateProductionDependencyGraph, recordProductionResilienceDrill } from "../packages/core/src/production-infrastructure.js";
+import { REQUIRED_PRODUCTION_COMPONENTS, assessProductionGoLive, attestProductionComponent, evaluateProductionDependencyGraph, recordProductionResilienceDrill } from "@loanos/core/platform/production-infrastructure.js";
 
 const now = new Date("2026-07-15T00:00:00.000Z");
 const approval = { attestedBy: "platform-maker", approvedBy: "risk-checker", approvalRef: "APR-1" };

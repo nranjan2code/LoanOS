@@ -26,7 +26,7 @@ export default {
         { id: "RBI-FPC-PENAL", note: "Penal charges must be disclosed upfront in KFS/MITC and the agreement." }
       ],
       platform: [
-        { type: "code", ref: "packages/core/src/loan-policy.js", note: "Server-grounded KFS builder and validator (buildKeyFactStatement, validateKfsBeforeDecision)." },
+        { type: "code", ref: "packages/core/src/lending/loan-policy.js", note: "Server-grounded KFS builder and validator (buildKeyFactStatement, validateKfsBeforeDecision)." },
         { type: "capability", ref: "OFR-004", note: "KFS unique proposal, validity, APR sheet and amortisation schedule." },
         { type: "capability", ref: "OFR-006", note: "KFS in a language understood by the borrower." },
         { type: "capability", ref: "OFR-007", note: "Evidence that KFS contents were explained and understood." },
@@ -95,7 +95,7 @@ export default {
         { type: "capability", ref: "DSB-002", note: "Verified borrower/end-beneficiary bank account." },
         { type: "capability", ref: "DSB-003", note: "Direct fund flow without LSP/pass-through control." },
         { type: "capability", ref: "DSB-004", note: "Maker-checker disbursement authorization." },
-        { type: "code", ref: "packages/core/src/compliance-controls.js", note: "Disbursement and collection account validator — the fund-flow gate." }
+        { type: "code", ref: "packages/core/src/compliance/compliance-controls.js", note: "Disbursement and collection account validator — the fund-flow gate." }
       ],
       terms: ["Escrow", "Maker-checker", "NACH"],
       related: ["m05-lms/loan-account-ledger", "m08-partners/co-lending"],

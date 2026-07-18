@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { claimDueProviderCallbacks, enqueueProviderCallback, projectProviderCallbackQueue, recordProviderCallbackAttempt, replayDeadLetterCallback } from "../packages/core/src/provider-callback-delivery.js";
+import { claimDueProviderCallbacks, enqueueProviderCallback, projectProviderCallbackQueue, recordProviderCallbackAttempt, replayDeadLetterCallback } from "@loanos/core/integrations/provider-callback-delivery.js";
 
 const T0 = new Date("2026-07-15T10:00:00.000Z");
 const input = (overrides = {}) => ({ tenantId: "tenant_1", deliveryId: "delivery_1", provider: "bureau", eventId: "event_1", targetRef: "callback_subscription_1", payload: { status: "available" }, signature: "sha256=abc", maxAttempts: 2, baseDelayMs: 1000, ...overrides });

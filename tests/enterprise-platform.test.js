@@ -21,7 +21,7 @@ import {
   registerManagedKeyAttestation,
   registerPitrPolicy,
   registerSecurityLogCustody
-} from "../packages/core/src/index.js";
+} from "@loanos/core";
 import { upsertFederatedTenantUser } from "../apps/api/src/identity.js";
 import { createLoanOsServer } from "../apps/api/src/server.js";
 

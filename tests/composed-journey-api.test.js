@@ -7,8 +7,8 @@ import test from "node:test";
 import { createLoanOsServer } from "../apps/api/src/server.js";
 import { loadState, saveState } from "../apps/api/src/file-store.js";
 import { totpCode } from "../apps/api/src/identity.js";
-import { JOURNEY_WORKSPACE_SCHEMAS } from "../packages/core/src/journey-workspace.js";
-import { PRODUCT_TEMPLATE_CATALOGUE } from "../packages/core/src/product-template-catalogue.js";
+import { JOURNEY_WORKSPACE_SCHEMAS } from "@loanos/core/journeys/journey-workspace.js";
+import { PRODUCT_TEMPLATE_CATALOGUE } from "@loanos/core/platform/product-template-catalogue.js";
 
 const PASSWORD = "TenantAccessPass1!";
 const MFA = "JBSWY3DPEHPK3PXP";

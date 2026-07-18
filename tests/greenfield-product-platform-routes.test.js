@@ -8,7 +8,7 @@ import {
   createProductPlatformAdministrationState,
   proposePlatformTemplateVersion,
   publishPlatformTemplateVersion
-} from "../packages/core/src/index.js";
+} from "@loanos/core";
 
 function context(store, { path, method = "GET", body = {}, actor = "admin_1", principalType = "tenant_user", url = path }) {
   const sent = {};

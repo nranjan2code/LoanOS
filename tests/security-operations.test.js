@@ -12,7 +12,7 @@ import {
   preserveInvestigationEvidence,
   transitionSecurityInvestigation,
   triageSecurityAlert
-} from "../packages/core/src/index.js";
+} from "@loanos/core";
 
 const now = new Date("2026-07-14T12:00:00.000Z");
 

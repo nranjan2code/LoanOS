@@ -9,7 +9,7 @@ import {
   registerMigrationMapping,
   reviewHypercare,
   validateOpeningBalances
-} from "../../../../packages/core/src/index.js";
+} from "@loanos/core";
 
 export async function routeImplementationControls(context) {
   const { method, path, req, res, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor } = context;

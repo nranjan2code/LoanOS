@@ -59,7 +59,7 @@ A device cannot connect to the backend or download field allocations unless it h
 * **Independent Approval:** A device's certification signature must be verified by `certifyFieldDevice()` on the backend, requiring independent review by a security administrator (four-eyes principle) — `certifyFieldDevice()` rejects any submission where `testedBy === approvedBy`. **The app itself never calls this endpoint.** A field device cannot legitimately certify itself, so `DeviceCertificationScreen` only polls the read-only `GET /experience/devices/{deviceId}/status` endpoint after login, displaying the device's stable ID (`Settings.Secure.ANDROID_ID`) for the security administrator to certify from the tenant back office, and re-checks every 15 seconds until certified.
 
 ```javascript
-// Verification anchor in packages/core/src/customer-experience-completion.js
+// Verification anchor in packages/core/src/operations/customer-experience-completion.js
 if (input.encryptedStorage !== true || input.screenLockEnforced !== true || input.remoteWipeEnabled !== true) {
   fail("device_certification_blocked", "Encrypted storage, screen lock, and remote wipe are mandatory.");
 }

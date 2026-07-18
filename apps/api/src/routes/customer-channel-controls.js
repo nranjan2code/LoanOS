@@ -19,7 +19,7 @@ import {
   transitionSuccessionCase,
   transitionSuccessionLegalReview,
   revokeSuccessionAuthority
-} from "../../../../packages/core/src/index.js";
+} from "@loanos/core";
 
 export async function routeCustomerChannelControls(context) {
   const { method, path, req, res, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor } = context;

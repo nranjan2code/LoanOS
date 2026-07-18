@@ -1,4 +1,4 @@
-import { FEATURE_STAFFING_POLICIES, authorizeStaffedFeatureAction } from "../../../packages/core/src/saas-identity-governance.js";
+import { FEATURE_STAFFING_POLICIES, authorizeStaffedFeatureAction } from "@loanos/core/identity/saas-identity-governance.js";
 import { decidePlatformControlStaffing } from "./control-rules-engine.js";
 
 const MUTATION_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);

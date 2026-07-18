@@ -4,7 +4,7 @@ import {
   assessTenantActivation,
   checksumTenantActivationEvidence,
   TENANT_ACTIVATION_DIMENSIONS
-} from "../packages/core/src/tenant-activation-gate.js";
+} from "@loanos/core/platform/tenant-activation-gate.js";
 
 const NOW = new Date("2026-07-15T10:00:00.000Z");
 const VALID_UNTIL = "2026-10-15T10:00:00.000Z";

@@ -37,7 +37,7 @@ cargo fmt --all --check
 cargo audit
 ```
 
-The differential harness (`rules-eval/tests/differential_eligibility.rs`) replays the checked-in corpus generated from the JS implementation and requires zero divergence. Regenerate the corpus after changing `packages/core/src/eligibility.js`:
+The differential harness (`rules-eval/tests/differential_eligibility.rs`) replays the checked-in corpus generated from the JS implementation and requires zero divergence. Regenerate the corpus after changing `packages/core/src/lending/eligibility.js`:
 
 ```bash
 node tools/gen-eligibility-corpus.mjs

@@ -16,7 +16,7 @@ import {
   satisfyUnderwritingCondition,
   validateOriginationBeforeDecision,
   validateOriginationBeforeDisbursement,
-} from "../packages/core/src/index.js";
+} from "@loanos/core";
 import { createLoanOsServer } from "../apps/api/src/server.js";
 
 const TENANT = { tenantId: "tnt_origination", name: "Origination NBFC", apiKey: "origination-key" };

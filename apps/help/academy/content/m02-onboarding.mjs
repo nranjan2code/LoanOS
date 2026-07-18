@@ -61,7 +61,7 @@ export default {
         { type: "capability", ref: "CON-001", note: "Purpose-specific notice and consent ledger." },
         { type: "capability", ref: "CON-003", note: "Consent denial, withdrawal and downstream propagation." },
         { type: "capability", ref: "CON-008", note: "Erasure request with statutory-retention hold." },
-        { type: "code", ref: "packages/core/src/compliance-controls.js", note: "Consent and DPDP notice evidence checks in the application preflight." }
+        { type: "code", ref: "packages/core/src/compliance/compliance-controls.js", note: "Consent and DPDP notice evidence checks in the application preflight." }
       ],
       terms: ["DPDP", "Cooling-off period"],
       related: ["m09-compliance/data-protection", "m02-onboarding/kyc-cdd"],
@@ -95,7 +95,7 @@ export default {
         { type: "capability", ref: "KYC-004", note: "V-CIP evidence, liveness, location and official approval." },
         { type: "capability", ref: "KYC-005", note: "Aadhaar boundary with prohibited-data controls." },
         { type: "capability", ref: "KYC-011", note: "PEP, UAPA, UN sanctions and internal negative-list screening." },
-        { type: "code", ref: "packages/core/src/compliance-controls.js", note: "KYC verified-state and Aadhaar prohibited-storage checks feeding the preflight." }
+        { type: "code", ref: "packages/core/src/compliance/compliance-controls.js", note: "KYC verified-state and Aadhaar prohibited-storage checks feeding the preflight." }
       ],
       terms: ["CKYC", "V-CIP", "Aadhaar", "PAN", "FIU-IND", "STR"],
       related: ["m02-onboarding/consent-dpdp", "m02-onboarding/fraud-screening", "m09-compliance/data-protection"],

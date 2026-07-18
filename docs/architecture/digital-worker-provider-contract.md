@@ -1,6 +1,6 @@
 # Digital Worker Provider Contract
 
-This is the LoanOS-owned, provider-neutral boundary for a live model or agent SDK. It is implemented in `packages/core/src/digital-worker-provider.js`; the adapter is deliberately injected and this repository contains no provider credentials, network client, or live model call.
+This is the LoanOS-owned, provider-neutral boundary for a live model or agent SDK. It is implemented in `packages/core/src/ai/digital-worker-provider.js`; the adapter is deliberately injected and this repository contains no provider credentials, network client, or live model call.
 
 ## Preconditions
 

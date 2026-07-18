@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { federatedPrincipalFromClaims, verifyOidcIdToken, verifySamlValidationAttestation } from "../../../packages/core/src/federated-access-runtime.js";
+import { federatedPrincipalFromClaims, verifyOidcIdToken, verifySamlValidationAttestation } from "@loanos/core/identity/federated-access-runtime.js";
 
 export async function validateFederatedLogin(policy, evidence, options = {}) {
   if (!policy || policy.status !== "active" || Date.parse(policy.metadataValidUntil) <= (options.now ?? new Date()).getTime()) fail("federation_policy_inactive", "An active, current federation policy is required.");

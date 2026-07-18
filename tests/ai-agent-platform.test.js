@@ -6,7 +6,7 @@ import {
   installTenantAiAgent, projectAiAgentMarketplace, proposeAiAgentPricingContract, recordAiAgentUsage,
   recordTenantAiAgentApproval, suspendTenantAiAgent, proposeAiAgentUsageBudget, approveAiAgentUsageBudget,
   reserveAiAgentUsageBudget, proposeAiAgentInvoice, approveAiAgentInvoice
-} from "../packages/core/src/ai-agent-platform.js";
+} from "@loanos/core/ai/ai-agent-platform.js";
 import { routeAiAgentPlatform } from "../apps/api/src/routes/ai-agent-platform.js";
 
 const NOW = new Date("2026-07-15T00:00:00.000Z");

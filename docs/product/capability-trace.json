@@ -9,7 +9,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/accounting.js",
+        "ref": "packages/core/src/finance/accounting.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -35,7 +35,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/accounting.js",
+        "ref": "packages/core/src/finance/accounting.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -61,7 +61,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/accounting.js",
+        "ref": "packages/core/src/finance/accounting.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -87,7 +87,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/accounting.js",
+        "ref": "packages/core/src/finance/accounting.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -113,7 +113,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/accounting.js",
+        "ref": "packages/core/src/finance/accounting.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -139,7 +139,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/accounting.js",
+        "ref": "packages/core/src/finance/accounting.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -165,7 +165,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/accounting.js",
+        "ref": "packages/core/src/finance/accounting.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -191,7 +191,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/accounting.js",
+        "ref": "packages/core/src/finance/accounting.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -217,7 +217,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/accounting.js",
+        "ref": "packages/core/src/finance/accounting.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -243,7 +243,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/accounting.js",
+        "ref": "packages/core/src/finance/accounting.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -269,7 +269,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/accounting.js",
+        "ref": "packages/core/src/finance/accounting.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -295,7 +295,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/accounting.js",
+        "ref": "packages/core/src/finance/accounting.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -321,7 +321,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/accounting.js",
+        "ref": "packages/core/src/finance/accounting.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -347,7 +347,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/accounting.js",
+        "ref": "packages/core/src/finance/accounting.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -373,7 +373,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/accounting.js",
+        "ref": "packages/core/src/finance/accounting.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -399,7 +399,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/model-governance.js",
+        "ref": "packages/core/src/ai/model-governance.js",
         "note": "Executable control implementation relevant to AIG-001."
       },
       {
@@ -431,7 +431,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/model-governance.js",
+        "ref": "packages/core/src/ai/model-governance.js",
         "note": "Executable control implementation relevant to AIG-002."
       },
       {
@@ -463,7 +463,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/model-governance.js",
+        "ref": "packages/core/src/ai/model-governance.js",
         "note": "Executable control implementation relevant to AIG-003."
       },
       {
@@ -495,7 +495,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/model-governance.js",
+        "ref": "packages/core/src/ai/model-governance.js",
         "note": "Executable control implementation relevant to AIG-004."
       },
       {
@@ -527,7 +527,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/model-governance.js",
+        "ref": "packages/core/src/ai/model-governance.js",
         "note": "Executable control implementation relevant to AIG-005."
       },
       {
@@ -559,7 +559,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/model-governance.js",
+        "ref": "packages/core/src/ai/model-governance.js",
         "note": "Executable control implementation relevant to AIG-006."
       },
       {
@@ -591,7 +591,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/model-governance.js",
+        "ref": "packages/core/src/ai/model-governance.js",
         "note": "Executable control implementation relevant to AIG-007."
       },
       {
@@ -623,7 +623,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/model-governance.js",
+        "ref": "packages/core/src/ai/model-governance.js",
         "note": "Executable control implementation relevant to AIG-008."
       },
       {
@@ -655,7 +655,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/model-governance.js",
+        "ref": "packages/core/src/ai/model-governance.js",
         "note": "Executable control implementation relevant to AIG-009."
       },
       {
@@ -687,7 +687,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/model-governance.js",
+        "ref": "packages/core/src/ai/model-governance.js",
         "note": "Executable control implementation relevant to AIG-010."
       },
       {
@@ -719,7 +719,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/model-governance.js",
+        "ref": "packages/core/src/ai/model-governance.js",
         "note": "Executable control implementation relevant to AIG-011."
       },
       {
@@ -751,7 +751,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/model-governance.js",
+        "ref": "packages/core/src/ai/model-governance.js",
         "note": "Executable control implementation relevant to AIG-012."
       },
       {
@@ -783,7 +783,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/model-governance.js",
+        "ref": "packages/core/src/ai/model-governance.js",
         "note": "Executable control implementation relevant to AIG-013."
       },
       {
@@ -815,7 +815,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/model-governance.js",
+        "ref": "packages/core/src/ai/model-governance.js",
         "note": "Executable control implementation relevant to AIG-014."
       },
       {
@@ -847,7 +847,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/model-governance.js",
+        "ref": "packages/core/src/ai/model-governance.js",
         "note": "Executable control implementation relevant to AIG-015."
       },
       {
@@ -879,7 +879,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/ai-agent-platform.js",
+        "ref": "packages/core/src/ai/ai-agent-platform.js",
         "note": "Versioned bounded templates and marketplace records."
       },
       {
@@ -912,7 +912,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/ai-agent-platform.js",
+        "ref": "packages/core/src/ai/ai-agent-platform.js",
         "note": "Maker-checker pricing, integer-paise rating, usage and reports."
       },
       {
@@ -945,7 +945,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/ai-agent-platform.js",
+        "ref": "packages/core/src/ai/ai-agent-platform.js",
         "note": "Tenant-local pinned installation configuration and checksums."
       },
       {
@@ -978,7 +978,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/ai-agent-platform.js",
+        "ref": "packages/core/src/ai/ai-agent-platform.js",
         "note": "Distinct-human approval and activation orchestration."
       },
       {
@@ -1011,7 +1011,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/ai-agent-platform.js",
+        "ref": "packages/core/src/ai/ai-agent-platform.js",
         "note": "Fresh dual-guardrail authorization and trace capture."
       },
       {
@@ -1049,7 +1049,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/ai-agent-platform.js",
+        "ref": "packages/core/src/ai/ai-agent-platform.js",
         "note": "Execution lifecycle, checksums, output disposition, usage rating and reports."
       },
       {
@@ -1092,7 +1092,7 @@
       },
       {
         "type": "code",
-        "ref": "packages/core/src/digital-worker-provider.js",
+        "ref": "packages/core/src/ai/digital-worker-provider.js",
         "note": "Injected Mumbai-only provider boundary with tenant/model allowlists, output validation, timeout and checksums."
       },
       {
@@ -1120,7 +1120,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/model-governance.js",
+        "ref": "packages/core/src/ai/model-governance.js",
         "note": "General model monitoring, drift and automatic suspension controls."
       },
       {
@@ -1211,7 +1211,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/data-governance.js",
+        "ref": "packages/core/src/compliance/data-governance.js",
         "note": "Executable control implementation relevant to AUD-001."
       },
       {
@@ -1271,7 +1271,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/data-governance.js",
+        "ref": "packages/core/src/compliance/data-governance.js",
         "note": "Executable control implementation relevant to AUD-003."
       },
       {
@@ -1302,7 +1302,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/data-governance.js",
+        "ref": "packages/core/src/compliance/data-governance.js",
         "note": "Executable control implementation relevant to AUD-004."
       },
       {
@@ -1312,7 +1312,7 @@
       },
       {
         "type": "code",
-        "ref": "packages/core/src/access-activity-custody.js",
+        "ref": "packages/core/src/identity/access-activity-custody.js",
         "note": "Verified contiguous activity export and independent India WORM custody reconciliation."
       },
       {
@@ -1343,7 +1343,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/data-governance.js",
+        "ref": "packages/core/src/compliance/data-governance.js",
         "note": "Executable control implementation relevant to AUD-005."
       },
       {
@@ -1374,7 +1374,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/data-governance.js",
+        "ref": "packages/core/src/compliance/data-governance.js",
         "note": "Executable control implementation relevant to AUD-006."
       },
       {
@@ -1405,7 +1405,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/data-governance.js",
+        "ref": "packages/core/src/compliance/data-governance.js",
         "note": "Executable control implementation relevant to AUD-007."
       },
       {
@@ -1436,7 +1436,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/data-governance.js",
+        "ref": "packages/core/src/compliance/data-governance.js",
         "note": "Executable control implementation relevant to AUD-008."
       },
       {
@@ -1467,7 +1467,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/data-governance.js",
+        "ref": "packages/core/src/compliance/data-governance.js",
         "note": "Executable control implementation relevant to AUD-009."
       },
       {
@@ -1498,7 +1498,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/data-governance.js",
+        "ref": "packages/core/src/compliance/data-governance.js",
         "note": "Executable control implementation relevant to AUD-010."
       },
       {
@@ -1529,7 +1529,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/data-governance.js",
+        "ref": "packages/core/src/compliance/data-governance.js",
         "note": "Executable control implementation relevant to AUD-011."
       },
       {
@@ -1560,7 +1560,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/data-governance.js",
+        "ref": "packages/core/src/compliance/data-governance.js",
         "note": "Executable control implementation relevant to AUD-012."
       },
       {
@@ -1591,7 +1591,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/customer-channel-operations.js",
+        "ref": "packages/core/src/operations/customer-channel-operations.js",
         "note": "Implementation evidence for digital self-serve application capture."
       },
       {
@@ -1618,7 +1618,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/customer-channel-operations.js",
+        "ref": "packages/core/src/operations/customer-channel-operations.js",
         "note": "Implementation evidence for branch-assisted application capture."
       },
       {
@@ -1645,7 +1645,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/customer-channel-operations.js",
+        "ref": "packages/core/src/operations/customer-channel-operations.js",
         "note": "Implementation evidence for dsa, bc, connector, dealer, merchant, and lsp lead intake."
       },
       {
@@ -1672,7 +1672,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/customer-channel-operations.js",
+        "ref": "packages/core/src/operations/customer-channel-operations.js",
         "note": "Implementation evidence for api/embedded-finance application intake."
       },
       {
@@ -1699,7 +1699,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/customer-channel-operations.js",
+        "ref": "packages/core/src/operations/customer-channel-operations.js",
         "note": "Implementation evidence for lead source, campaign, referral, and attribution."
       },
       {
@@ -1726,7 +1726,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/customer-channel-operations.js",
+        "ref": "packages/core/src/operations/customer-channel-operations.js",
         "note": "Implementation evidence for lead qualification, follow-up, conversion, and abandonment."
       },
       {
@@ -1753,7 +1753,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/customer-channel-operations.js",
+        "ref": "packages/core/src/operations/customer-channel-operations.js",
         "note": "Implementation evidence for duplicate-lead and existing-customer matching."
       },
       {
@@ -1780,7 +1780,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/customer-channel-operations.js",
+        "ref": "packages/core/src/operations/customer-channel-operations.js",
         "note": "Implementation evidence for channel eligibility, geographic serviceability, and branch routing."
       },
       {
@@ -1807,7 +1807,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/customer-channel-operations.js",
+        "ref": "packages/core/src/operations/customer-channel-operations.js",
         "note": "Implementation evidence for partner commission and payout basis."
       },
       {
@@ -1834,7 +1834,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/customer-channel-operations.js",
+        "ref": "packages/core/src/operations/customer-channel-operations.js",
         "note": "Implementation evidence for channel conduct, consent, and disclosure monitoring."
       },
       {
@@ -1861,7 +1861,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collections-recovery.js",
+        "ref": "packages/core/src/lending/collections-recovery.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -1887,7 +1887,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collections-recovery.js",
+        "ref": "packages/core/src/lending/collections-recovery.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -1913,7 +1913,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collections-recovery.js",
+        "ref": "packages/core/src/lending/collections-recovery.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -1939,7 +1939,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collections-recovery.js",
+        "ref": "packages/core/src/lending/collections-recovery.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -1965,7 +1965,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collections-recovery.js",
+        "ref": "packages/core/src/lending/collections-recovery.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -1991,7 +1991,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collections-recovery.js",
+        "ref": "packages/core/src/lending/collections-recovery.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -2017,7 +2017,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collections-recovery.js",
+        "ref": "packages/core/src/lending/collections-recovery.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -2043,7 +2043,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collections-recovery.js",
+        "ref": "packages/core/src/lending/collections-recovery.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -2069,7 +2069,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collections-recovery.js",
+        "ref": "packages/core/src/lending/collections-recovery.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -2095,7 +2095,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collections-recovery.js",
+        "ref": "packages/core/src/lending/collections-recovery.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -2121,7 +2121,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collections-recovery.js",
+        "ref": "packages/core/src/lending/collections-recovery.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -2147,7 +2147,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collections-recovery.js",
+        "ref": "packages/core/src/lending/collections-recovery.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -2173,7 +2173,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collections-recovery.js",
+        "ref": "packages/core/src/lending/collections-recovery.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -2199,7 +2199,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collections-recovery.js",
+        "ref": "packages/core/src/lending/collections-recovery.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -2225,7 +2225,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collections-recovery.js",
+        "ref": "packages/core/src/lending/collections-recovery.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -2251,7 +2251,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/loan-account.js",
+        "ref": "packages/core/src/lending/loan-account.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -2277,7 +2277,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/loan-account.js",
+        "ref": "packages/core/src/lending/loan-account.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -2303,7 +2303,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/loan-account.js",
+        "ref": "packages/core/src/lending/loan-account.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -2329,7 +2329,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/loan-account.js",
+        "ref": "packages/core/src/lending/loan-account.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -2355,7 +2355,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/loan-account.js",
+        "ref": "packages/core/src/lending/loan-account.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -2381,7 +2381,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/loan-account.js",
+        "ref": "packages/core/src/lending/loan-account.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -2407,7 +2407,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/loan-account.js",
+        "ref": "packages/core/src/lending/loan-account.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -2433,7 +2433,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/loan-account.js",
+        "ref": "packages/core/src/lending/loan-account.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -2459,7 +2459,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/loan-account.js",
+        "ref": "packages/core/src/lending/loan-account.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -2485,7 +2485,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/loan-account.js",
+        "ref": "packages/core/src/lending/loan-account.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -2511,7 +2511,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/loan-account.js",
+        "ref": "packages/core/src/lending/loan-account.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -2537,7 +2537,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/loan-account.js",
+        "ref": "packages/core/src/lending/loan-account.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -2563,7 +2563,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/loan-account.js",
+        "ref": "packages/core/src/lending/loan-account.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -2589,7 +2589,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collections-recovery.js",
+        "ref": "packages/core/src/lending/collections-recovery.js",
         "note": "Implementation evidence for collateral and asset master."
       },
       {
@@ -2616,7 +2616,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collections-recovery.js",
+        "ref": "packages/core/src/lending/collections-recovery.js",
         "note": "Implementation evidence for property, vehicle, equipment, gold, receivable, deposit, and guarantee types."
       },
       {
@@ -2643,7 +2643,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collections-recovery.js",
+        "ref": "packages/core/src/lending/collections-recovery.js",
         "note": "Implementation evidence for ownership, encumbrance, and eligibility checks."
       },
       {
@@ -2670,7 +2670,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collections-recovery.js",
+        "ref": "packages/core/src/lending/collections-recovery.js",
         "note": "Implementation evidence for valuer panel, valuation order, report, review, and expiry."
       },
       {
@@ -2697,7 +2697,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collections-recovery.js",
+        "ref": "packages/core/src/lending/collections-recovery.js",
         "note": "Implementation evidence for legal counsel panel, title/legal opinion, and exception."
       },
       {
@@ -2724,7 +2724,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collections-recovery.js",
+        "ref": "packages/core/src/lending/collections-recovery.js",
         "note": "Implementation evidence for ltv, margin, haircut, and revaluation policy."
       },
       {
@@ -2751,7 +2751,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collections-recovery.js",
+        "ref": "packages/core/src/lending/collections-recovery.js",
         "note": "Implementation evidence for insurance requirement, policy, renewal, assignment, and claim."
       },
       {
@@ -2778,7 +2778,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collections-recovery.js",
+        "ref": "packages/core/src/lending/collections-recovery.js",
         "note": "Implementation evidence for cersai search, filing, registration, modification, and satisfaction."
       },
       {
@@ -2805,7 +2805,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collections-recovery.js",
+        "ref": "packages/core/src/lending/collections-recovery.js",
         "note": "Implementation evidence for roc, rto, land registry, depository, lien, and other perfection evidence."
       },
       {
@@ -2832,7 +2832,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collections-recovery.js",
+        "ref": "packages/core/src/lending/collections-recovery.js",
         "note": "Implementation evidence for document custody, release approval, and borrower acknowledgement."
       },
       {
@@ -2859,7 +2859,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collections-recovery.js",
+        "ref": "packages/core/src/lending/collections-recovery.js",
         "note": "Implementation evidence for original-document release within the required closure timeline."
       },
       {
@@ -2886,7 +2886,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collections-recovery.js",
+        "ref": "packages/core/src/lending/collections-recovery.js",
         "note": "Implementation evidence for collateral inspection, covenant, impairment, and early-warning monitoring."
       },
       {
@@ -2913,7 +2913,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/data-principal-rights.js",
+        "ref": "packages/core/src/compliance/data-principal-rights.js",
         "note": "Executable control implementation relevant to CON-001."
       },
       {
@@ -2942,7 +2942,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/data-principal-rights.js",
+        "ref": "packages/core/src/compliance/data-principal-rights.js",
         "note": "Executable control implementation relevant to CON-002."
       },
       {
@@ -2973,7 +2973,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/data-principal-rights.js",
+        "ref": "packages/core/src/compliance/data-principal-rights.js",
         "note": "Executable control implementation relevant to CON-003."
       },
       {
@@ -3004,7 +3004,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/data-principal-rights.js",
+        "ref": "packages/core/src/compliance/data-principal-rights.js",
         "note": "Executable control implementation relevant to CON-004."
       },
       {
@@ -3035,7 +3035,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/data-principal-rights.js",
+        "ref": "packages/core/src/compliance/data-principal-rights.js",
         "note": "Executable control implementation relevant to CON-005."
       },
       {
@@ -3066,7 +3066,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/data-principal-rights.js",
+        "ref": "packages/core/src/compliance/data-principal-rights.js",
         "note": "Executable control implementation relevant to CON-006."
       },
       {
@@ -3097,7 +3097,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/data-principal-rights.js",
+        "ref": "packages/core/src/compliance/data-principal-rights.js",
         "note": "Executable control implementation relevant to CON-007."
       },
       {
@@ -3128,7 +3128,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/data-principal-rights.js",
+        "ref": "packages/core/src/compliance/data-principal-rights.js",
         "note": "Executable control implementation relevant to CON-008."
       },
       {
@@ -3159,7 +3159,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/data-principal-rights.js",
+        "ref": "packages/core/src/compliance/data-principal-rights.js",
         "note": "Executable control implementation relevant to CON-009."
       },
       {
@@ -3190,7 +3190,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/data-principal-rights.js",
+        "ref": "packages/core/src/compliance/data-principal-rights.js",
         "note": "Executable control implementation relevant to CON-010."
       },
       {
@@ -3221,7 +3221,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/data-principal-rights.js",
+        "ref": "packages/core/src/compliance/data-principal-rights.js",
         "note": "Executable control implementation relevant to CON-011."
       },
       {
@@ -3252,7 +3252,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/data-principal-rights.js",
+        "ref": "packages/core/src/compliance/data-principal-rights.js",
         "note": "Executable control implementation relevant to CON-012."
       },
       {
@@ -3283,7 +3283,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/data-principal-rights.js",
+        "ref": "packages/core/src/compliance/data-principal-rights.js",
         "note": "Executable control implementation relevant to CON-013."
       },
       {
@@ -3314,7 +3314,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/data-principal-rights.js",
+        "ref": "packages/core/src/compliance/data-principal-rights.js",
         "note": "Executable control implementation relevant to CON-014."
       },
       {
@@ -3345,7 +3345,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/customer-identity-operations.js",
+        "ref": "packages/core/src/identity/customer-identity-operations.js",
         "note": "Implementation evidence for individual and legal-entity customer profile."
       },
       {
@@ -3372,7 +3372,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/customer-identity-operations.js",
+        "ref": "packages/core/src/identity/customer-identity-operations.js",
         "note": "Implementation evidence for stable customer id and relationship across applications/accounts."
       },
       {
@@ -3399,7 +3399,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/customer-identity-operations.js",
+        "ref": "packages/core/src/identity/customer-identity-operations.js",
         "note": "Implementation evidence for customer deduplication and merge governance."
       },
       {
@@ -3426,7 +3426,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/customer-identity-operations.js",
+        "ref": "packages/core/src/identity/customer-identity-operations.js",
         "note": "Implementation evidence for customer-360 across loans, complaints, documents, and consents."
       },
       {
@@ -3453,7 +3453,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/customer-identity-operations.js",
+        "ref": "packages/core/src/identity/customer-identity-operations.js",
         "note": "Implementation evidence for co-applicant, co-borrower, and guarantor relationships."
       },
       {
@@ -3480,7 +3480,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/customer-identity-operations.js",
+        "ref": "packages/core/src/identity/customer-identity-operations.js",
         "note": "Implementation evidence for household, group, jlg, and connected-party relationships."
       },
       {
@@ -3507,7 +3507,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/customer-identity-operations.js",
+        "ref": "packages/core/src/identity/customer-identity-operations.js",
         "note": "Implementation evidence for beneficial owner, controller, and authorised signatory."
       },
       {
@@ -3534,7 +3534,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/customer-identity-operations.js",
+        "ref": "packages/core/src/identity/customer-identity-operations.js",
         "note": "Implementation evidence for nominee, legal heir, deceased borrower, and succession workflow."
       },
       {
@@ -3561,7 +3561,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/customer-identity-operations.js",
+        "ref": "packages/core/src/identity/customer-identity-operations.js",
         "note": "Implementation evidence for address, contact, employment, and business history."
       },
       {
@@ -3588,7 +3588,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/customer-identity-operations.js",
+        "ref": "packages/core/src/identity/customer-identity-operations.js",
         "note": "Implementation evidence for customer risk, vulnerability, language, and accessibility preferences."
       },
       {
@@ -3615,7 +3615,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/customer-identity-operations.js",
+        "ref": "packages/core/src/identity/customer-identity-operations.js",
         "note": "Implementation evidence for communication preferences and do-not-contact controls."
       },
       {
@@ -3642,7 +3642,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/customer-identity-operations.js",
+        "ref": "packages/core/src/identity/customer-identity-operations.js",
         "note": "Implementation evidence for exposure aggregation across all facilities and related parties."
       },
       {
@@ -3669,7 +3669,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/document-packet.js",
+        "ref": "packages/core/src/shared/document-packet.js",
         "note": "Implementation evidence for product- and stage-specific document checklist."
       },
       {
@@ -3696,7 +3696,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/document-packet.js",
+        "ref": "packages/core/src/shared/document-packet.js",
         "note": "Implementation evidence for secure upload, malware scan, type/size validation, and quarantine."
       },
       {
@@ -3723,7 +3723,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/document-packet.js",
+        "ref": "packages/core/src/shared/document-packet.js",
         "note": "Implementation evidence for ocr, classification, field extraction, and confidence."
       },
       {
@@ -3750,7 +3750,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/document-packet.js",
+        "ref": "packages/core/src/shared/document-packet.js",
         "note": "Implementation evidence for manual verification and discrepancy resolution."
       },
       {
@@ -3777,7 +3777,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/document-packet.js",
+        "ref": "packages/core/src/shared/document-packet.js",
         "note": "Implementation evidence for document versioning, supersession, and expiry."
       },
       {
@@ -3804,7 +3804,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/document-packet.js",
+        "ref": "packages/core/src/shared/document-packet.js",
         "note": "Implementation evidence for kyc, income, bank, property, asset, and legal document categories."
       },
       {
@@ -3831,7 +3831,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/document-packet.js",
+        "ref": "packages/core/src/shared/document-packet.js",
         "note": "Implementation evidence for deficiency, waiver, re-request, and sla workflow."
       },
       {
@@ -3858,7 +3858,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/document-packet.js",
+        "ref": "packages/core/src/shared/document-packet.js",
         "note": "Implementation evidence for document access control, watermarking, and download audit."
       },
       {
@@ -3885,7 +3885,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/document-packet.js",
+        "ref": "packages/core/src/shared/document-packet.js",
         "note": "Implementation evidence for india storage, retention, checksum, and legal hold."
       },
       {
@@ -3912,7 +3912,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/document-packet.js",
+        "ref": "packages/core/src/shared/document-packet.js",
         "note": "Implementation evidence for production pdf generation and accessible rendering."
       },
       {
@@ -3939,7 +3939,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/document-packet.js",
+        "ref": "packages/core/src/shared/document-packet.js",
         "note": "Implementation evidence for esign envelope, signer authentication, callback, and evidence."
       },
       {
@@ -3966,7 +3966,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/document-packet.js",
+        "ref": "packages/core/src/shared/document-packet.js",
         "note": "Implementation evidence for document vault, manifest, and borrower delivery."
       },
       {
@@ -3993,7 +3993,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/document-packet.js",
+        "ref": "packages/core/src/shared/document-packet.js",
         "note": "Implementation evidence for original physical-document custody and movement."
       },
       {
@@ -4020,7 +4020,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collateral-disbursement-completion.js",
+        "ref": "packages/core/src/lending/collateral-disbursement-completion.js",
         "note": "Implementation evidence for disbursement-readiness checklist and blocking findings."
       },
       {
@@ -4047,7 +4047,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collateral-disbursement-completion.js",
+        "ref": "packages/core/src/lending/collateral-disbursement-completion.js",
         "note": "Implementation evidence for verified borrower/end-beneficiary bank account."
       },
       {
@@ -4074,7 +4074,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collateral-disbursement-completion.js",
+        "ref": "packages/core/src/lending/collateral-disbursement-completion.js",
         "note": "Implementation evidence for direct fund flow without lsp/pass-through control."
       },
       {
@@ -4101,7 +4101,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collateral-disbursement-completion.js",
+        "ref": "packages/core/src/lending/collateral-disbursement-completion.js",
         "note": "Implementation evidence for maker-checker disbursement authorization."
       },
       {
@@ -4128,7 +4128,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collateral-disbursement-completion.js",
+        "ref": "packages/core/src/lending/collateral-disbursement-completion.js",
         "note": "Implementation evidence for single full disbursement."
       },
       {
@@ -4155,7 +4155,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collateral-disbursement-completion.js",
+        "ref": "packages/core/src/lending/collateral-disbursement-completion.js",
         "note": "Implementation evidence for multiple, tranche, stage, and construction-linked disbursement."
       },
       {
@@ -4182,7 +4182,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collateral-disbursement-completion.js",
+        "ref": "packages/core/src/lending/collateral-disbursement-completion.js",
         "note": "Implementation evidence for supplier/dealer/end-use payment and invoice linkage."
       },
       {
@@ -4209,7 +4209,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collateral-disbursement-completion.js",
+        "ref": "packages/core/src/lending/collateral-disbursement-completion.js",
         "note": "Implementation evidence for conditions-precedent satisfaction and waiver."
       },
       {
@@ -4236,7 +4236,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collateral-disbursement-completion.js",
+        "ref": "packages/core/src/lending/collateral-disbursement-completion.js",
         "note": "Implementation evidence for payment initiation, bank response, settlement, and failure repair."
       },
       {
@@ -4263,7 +4263,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collateral-disbursement-completion.js",
+        "ref": "packages/core/src/lending/collateral-disbursement-completion.js",
         "note": "Implementation evidence for disbursement cancellation, reversal, return, and refund."
       },
       {
@@ -4290,7 +4290,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collateral-disbursement-completion.js",
+        "ref": "packages/core/src/lending/collateral-disbursement-completion.js",
         "note": "Implementation evidence for co-lending escrow and partner funding confirmation."
       },
       {
@@ -4317,7 +4317,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collateral-disbursement-completion.js",
+        "ref": "packages/core/src/lending/collateral-disbursement-completion.js",
         "note": "Implementation evidence for disbursement advice and borrower communication."
       },
       {
@@ -4344,7 +4344,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collateral-disbursement-completion.js",
+        "ref": "packages/core/src/lending/collateral-disbursement-completion.js",
         "note": "Implementation evidence for post-disbursement document and end-use follow-up."
       },
       {
@@ -4371,7 +4371,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/finance-accounting.js",
+        "ref": "packages/core/src/finance/finance-accounting.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -4398,7 +4398,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/finance-accounting.js",
+        "ref": "packages/core/src/finance/finance-accounting.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -4425,7 +4425,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/finance-accounting.js",
+        "ref": "packages/core/src/finance/finance-accounting.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -4452,7 +4452,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/finance-accounting.js",
+        "ref": "packages/core/src/finance/finance-accounting.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -4479,7 +4479,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/finance-accounting.js",
+        "ref": "packages/core/src/finance/finance-accounting.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -4506,7 +4506,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/finance-accounting.js",
+        "ref": "packages/core/src/finance/finance-accounting.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -4533,7 +4533,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/finance-accounting.js",
+        "ref": "packages/core/src/finance/finance-accounting.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -4560,7 +4560,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/finance-accounting.js",
+        "ref": "packages/core/src/finance/finance-accounting.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -4587,7 +4587,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/finance-accounting.js",
+        "ref": "packages/core/src/finance/finance-accounting.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -4614,7 +4614,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/finance-accounting.js",
+        "ref": "packages/core/src/finance/finance-accounting.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -4641,7 +4641,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/finance-accounting.js",
+        "ref": "packages/core/src/finance/finance-accounting.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -4668,7 +4668,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/finance-accounting.js",
+        "ref": "packages/core/src/finance/finance-accounting.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -4695,7 +4695,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/fraud-case.js",
+        "ref": "packages/core/src/lending/fraud-case.js",
         "note": "Implementation evidence for application fraud flags and investigation case."
       },
       {
@@ -4722,7 +4722,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/fraud-case.js",
+        "ref": "packages/core/src/lending/fraud-case.js",
         "note": "Implementation evidence for device, ip, velocity, location, and behavioral signals."
       },
       {
@@ -4749,7 +4749,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/fraud-case.js",
+        "ref": "packages/core/src/lending/fraud-case.js",
         "note": "Implementation evidence for synthetic identity and identity-link analysis."
       },
       {
@@ -4776,7 +4776,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/fraud-case.js",
+        "ref": "packages/core/src/lending/fraud-case.js",
         "note": "Implementation evidence for document tamper and face/document consistency checks."
       },
       {
@@ -4803,7 +4803,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/fraud-case.js",
+        "ref": "packages/core/src/lending/fraud-case.js",
         "note": "Implementation evidence for internal/external negative lists and mule indicators."
       },
       {
@@ -4830,7 +4830,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/fraud-case.js",
+        "ref": "packages/core/src/lending/fraud-case.js",
         "note": "Implementation evidence for duplicate customer, bank account, address, device, and employer detection."
       },
       {
@@ -4857,7 +4857,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/fraud-case.js",
+        "ref": "packages/core/src/lending/fraud-case.js",
         "note": "Implementation evidence for fraud scorecard and policy decision."
       },
       {
@@ -4884,7 +4884,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/fraud-case.js",
+        "ref": "packages/core/src/lending/fraud-case.js",
         "note": "Implementation evidence for natural-justice show-cause and response workflow."
       },
       {
@@ -4911,7 +4911,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/fraud-case.js",
+        "ref": "packages/core/src/lending/fraud-case.js",
         "note": "Implementation evidence for four-eyes fraud classification and committee pack."
       },
       {
@@ -4938,7 +4938,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/fraud-case.js",
+        "ref": "packages/core/src/lending/fraud-case.js",
         "note": "Implementation evidence for lea, fraud registry, and regulator reporting evidence."
       },
       {
@@ -4965,7 +4965,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/fraud-case.js",
+        "ref": "packages/core/src/lending/fraud-case.js",
         "note": "Implementation evidence for early-warning signals after disbursement."
       },
       {
@@ -4992,7 +4992,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/fraud-case.js",
+        "ref": "packages/core/src/lending/fraud-case.js",
         "note": "Implementation evidence for fraud losses, recoveries, root cause, and control remediation."
       },
       {
@@ -5019,7 +5019,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/grievance.js",
+        "ref": "packages/core/src/compliance/grievance.js",
         "note": "Implementation evidence for complaint intake from portal, branch, phone, email, lsp, and post."
       },
       {
@@ -5046,7 +5046,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/grievance.js",
+        "ref": "packages/core/src/compliance/grievance.js",
         "note": "Implementation evidence for immediate acknowledgement and reference."
       },
       {
@@ -5073,7 +5073,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/grievance.js",
+        "ref": "packages/core/src/compliance/grievance.js",
         "note": "Implementation evidence for categorisation, assignment, investigation, and resolution."
       },
       {
@@ -5100,7 +5100,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/grievance.js",
+        "ref": "packages/core/src/compliance/grievance.js",
         "note": "Implementation evidence for 30-day clock and overdue escalation."
       },
       {
@@ -5127,7 +5127,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/grievance.js",
+        "ref": "packages/core/src/compliance/grievance.js",
         "note": "Implementation evidence for borrower dissatisfaction/rejection and rbi cms eligibility."
       },
       {
@@ -5154,7 +5154,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/grievance.js",
+        "ref": "packages/core/src/compliance/grievance.js",
         "note": "Implementation evidence for rbi cms link, submission, acknowledgement, and order tracking."
       },
       {
@@ -5181,7 +5181,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/grievance.js",
+        "ref": "packages/core/src/compliance/grievance.js",
         "note": "Implementation evidence for root cause, corrective action, restitution, and compensation."
       },
       {
@@ -5208,7 +5208,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/grievance.js",
+        "ref": "packages/core/src/compliance/grievance.js",
         "note": "Implementation evidence for lsp/dla/recovery-agent conduct attribution."
       },
       {
@@ -5235,7 +5235,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/grievance.js",
+        "ref": "packages/core/src/compliance/grievance.js",
         "note": "Implementation evidence for vulnerable customer, language, accessibility, and assisted complaint."
       },
       {
@@ -5262,7 +5262,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/grievance.js",
+        "ref": "packages/core/src/compliance/grievance.js",
         "note": "Implementation evidence for complaint analytics, repeat issues, product/channel trends, and board reporting."
       },
       {
@@ -5289,7 +5289,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/grievance.js",
+        "ref": "packages/core/src/compliance/grievance.js",
         "note": "Implementation evidence for ombudsman award/compliance and closure evidence."
       },
       {
@@ -5316,7 +5316,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/implementation-governance.js",
+        "ref": "packages/core/src/platform/implementation-governance.js",
         "note": "Implementation evidence for product discovery and target-operating-model assessment."
       },
       {
@@ -5343,7 +5343,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/implementation-governance.js",
+        "ref": "packages/core/src/platform/implementation-governance.js",
         "note": "Implementation evidence for regulatory applicability and control-mapping workshop."
       },
       {
@@ -5370,7 +5370,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/implementation-governance.js",
+        "ref": "packages/core/src/platform/implementation-governance.js",
         "note": "Implementation evidence for configuration workbook and approval."
       },
       {
@@ -5397,7 +5397,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/implementation-governance.js",
+        "ref": "packages/core/src/platform/implementation-governance.js",
         "note": "Implementation evidence for source-data inventory, mapping, cleansing, and reconciliation."
       },
       {
@@ -5424,7 +5424,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/implementation-governance.js",
+        "ref": "packages/core/src/platform/implementation-governance.js",
         "note": "Implementation evidence for customer, application, loan, ledger, document, and audit migration."
       },
       {
@@ -5451,7 +5451,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/implementation-governance.js",
+        "ref": "packages/core/src/platform/implementation-governance.js",
         "note": "Implementation evidence for opening-balance and historical-schedule validation."
       },
       {
@@ -5478,7 +5478,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/implementation-governance.js",
+        "ref": "packages/core/src/platform/implementation-governance.js",
         "note": "Implementation evidence for mock conversion, dress rehearsal, cutover, and rollback."
       },
       {
@@ -5505,7 +5505,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/implementation-governance.js",
+        "ref": "packages/core/src/platform/implementation-governance.js",
         "note": "Implementation evidence for parallel run and finance/regulatory reconciliation."
       },
       {
@@ -5532,7 +5532,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/implementation-governance.js",
+        "ref": "packages/core/src/platform/implementation-governance.js",
         "note": "Implementation evidence for uat packs by product, role, exception, and regulatory control."
       },
       {
@@ -5559,7 +5559,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/implementation-governance.js",
+        "ref": "packages/core/src/platform/implementation-governance.js",
         "note": "Implementation evidence for training, role certification, sops, and operating manuals."
       },
       {
@@ -5586,7 +5586,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/implementation-governance.js",
+        "ref": "packages/core/src/platform/implementation-governance.js",
         "note": "Implementation evidence for go-live readiness, hypercare, issue triage, and exit criteria."
       },
       {
@@ -5613,7 +5613,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/implementation-governance.js",
+        "ref": "packages/core/src/platform/implementation-governance.js",
         "note": "Implementation evidence for tenant due-diligence pack, audit rights, contracts, and certifications."
       },
       {
@@ -5640,7 +5640,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/platform-delivery.js",
+        "ref": "packages/core/src/platform/platform-delivery.js",
         "note": "Implementation evidence for data exit, transition support, and independent deletion assurance."
       },
       {
@@ -5667,7 +5667,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/external-services.js",
+        "ref": "packages/core/src/integrations/external-services.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -5693,7 +5693,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/external-services.js",
+        "ref": "packages/core/src/integrations/external-services.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -5719,7 +5719,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/external-services.js",
+        "ref": "packages/core/src/integrations/external-services.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -5745,7 +5745,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/external-services.js",
+        "ref": "packages/core/src/integrations/external-services.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -5771,7 +5771,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/external-services.js",
+        "ref": "packages/core/src/integrations/external-services.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -5797,7 +5797,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/external-services.js",
+        "ref": "packages/core/src/integrations/external-services.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -5823,7 +5823,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/external-services.js",
+        "ref": "packages/core/src/integrations/external-services.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -5849,7 +5849,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/external-services.js",
+        "ref": "packages/core/src/integrations/external-services.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -5875,7 +5875,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/signed-file-conformance.js",
+        "ref": "packages/core/src/integrations/signed-file-conformance.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -5885,7 +5885,7 @@
       },
       {
         "type": "code",
-        "ref": "packages/core/src/integration-worker-runtime.js",
+        "ref": "packages/core/src/integrations/integration-worker-runtime.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -5895,7 +5895,7 @@
       },
       {
         "type": "code",
-        "ref": "packages/core/src/organisation-admission-conformance.js",
+        "ref": "packages/core/src/platform/organisation-admission-conformance.js",
         "note": "153 stable deterministic simulator scenarios across INT-ADM-01 through INT-ADM-10."
       },
       {
@@ -5910,7 +5910,7 @@
       },
       {
         "type": "code",
-        "ref": "packages/core/src/conformance-campaign-administration.js",
+        "ref": "packages/core/src/operations/conformance-campaign-administration.js",
         "note": "Persistent candidate profiles, immutable canonical manifests, append-only evidence, expiry and reassessment across admission and enterprise packs."
       },
       {
@@ -5936,7 +5936,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/external-services.js",
+        "ref": "packages/core/src/integrations/external-services.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -5962,7 +5962,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/external-services.js",
+        "ref": "packages/core/src/integrations/external-services.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -5988,7 +5988,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/external-services.js",
+        "ref": "packages/core/src/integrations/external-services.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -6014,7 +6014,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/reporting-data-integration-completion.js",
+        "ref": "packages/core/src/compliance/reporting-data-integration-completion.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -6040,7 +6040,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/external-services.js",
+        "ref": "packages/core/src/integrations/external-services.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -6066,7 +6066,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/kyc-underwriting-completion.js",
+        "ref": "packages/core/src/lending/kyc-underwriting-completion.js",
         "note": "Implementation evidence for customer acceptance policy checks."
       },
       {
@@ -6093,7 +6093,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/kyc-underwriting-completion.js",
+        "ref": "packages/core/src/lending/kyc-underwriting-completion.js",
         "note": "Implementation evidence for pan and officially valid document capture/verification."
       },
       {
@@ -6120,7 +6120,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/kyc-underwriting-completion.js",
+        "ref": "packages/core/src/lending/kyc-underwriting-completion.js",
         "note": "Implementation evidence for ckyc search, download, update, and upload."
       },
       {
@@ -6147,7 +6147,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/kyc-underwriting-completion.js",
+        "ref": "packages/core/src/lending/kyc-underwriting-completion.js",
         "note": "Implementation evidence for v-cip evidence, liveness, location, and official approval."
       },
       {
@@ -6174,7 +6174,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/kyc-underwriting-completion.js",
+        "ref": "packages/core/src/lending/kyc-underwriting-completion.js",
         "note": "Implementation evidence for aadhaar boundary with prohibited-data controls."
       },
       {
@@ -6201,7 +6201,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/kyc-underwriting-completion.js",
+        "ref": "packages/core/src/lending/kyc-underwriting-completion.js",
         "note": "Implementation evidence for risk categorisation and periodic-review cycle."
       },
       {
@@ -6228,7 +6228,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/kyc-underwriting-completion.js",
+        "ref": "packages/core/src/lending/kyc-underwriting-completion.js",
         "note": "Implementation evidence for advance kyc-update notices and post-due reminders."
       },
       {
@@ -6255,7 +6255,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/kyc-underwriting-completion.js",
+        "ref": "packages/core/src/lending/kyc-underwriting-completion.js",
         "note": "Implementation evidence for low-risk customer grace and monitored continuation."
       },
       {
@@ -6282,7 +6282,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/kyc-underwriting-completion.js",
+        "ref": "packages/core/src/lending/kyc-underwriting-completion.js",
         "note": "Implementation evidence for bc-assisted kyc update and acknowledgement."
       },
       {
@@ -6309,7 +6309,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/kyc-underwriting-completion.js",
+        "ref": "packages/core/src/lending/kyc-underwriting-completion.js",
         "note": "Implementation evidence for beneficial-owner threshold and control declarations."
       },
       {
@@ -6336,7 +6336,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/kyc-underwriting-completion.js",
+        "ref": "packages/core/src/lending/kyc-underwriting-completion.js",
         "note": "Implementation evidence for pep, uapa, un sanctions, and internal negative-list screening."
       },
       {
@@ -6363,7 +6363,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/kyc-underwriting-completion.js",
+        "ref": "packages/core/src/lending/kyc-underwriting-completion.js",
         "note": "Implementation evidence for screening-list refresh, rescreening, and match disposition."
       },
       {
@@ -6390,7 +6390,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/kyc-underwriting-completion.js",
+        "ref": "packages/core/src/lending/kyc-underwriting-completion.js",
         "note": "Implementation evidence for ongoing customer due diligence and risk refresh."
       },
       {
@@ -6417,7 +6417,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/kyc-underwriting-completion.js",
+        "ref": "packages/core/src/lending/kyc-underwriting-completion.js",
         "note": "Implementation evidence for transaction monitoring and aml alert investigation."
       },
       {
@@ -6444,7 +6444,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/kyc-underwriting-completion.js",
+        "ref": "packages/core/src/lending/kyc-underwriting-completion.js",
         "note": "Implementation evidence for str/ctr/ccr case preparation, review, filing, and acknowledgement."
       },
       {
@@ -6471,7 +6471,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/kyc-underwriting-completion.js",
+        "ref": "packages/core/src/lending/kyc-underwriting-completion.js",
         "note": "Implementation evidence for tipping-off controls and restricted case access."
       },
       {
@@ -6498,7 +6498,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/kyc-underwriting-completion.js",
+        "ref": "packages/core/src/lending/kyc-underwriting-completion.js",
         "note": "Implementation evidence for record retention and regulator/auditor retrieval."
       },
       {
@@ -6525,7 +6525,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/repayment-schedule.js",
+        "ref": "packages/core/src/lending/repayment-schedule.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -6551,7 +6551,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/repayment-schedule.js",
+        "ref": "packages/core/src/lending/repayment-schedule.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -6577,7 +6577,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/repayment-schedule.js",
+        "ref": "packages/core/src/lending/repayment-schedule.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -6603,7 +6603,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/repayment-schedule.js",
+        "ref": "packages/core/src/lending/repayment-schedule.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -6629,7 +6629,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/repayment-schedule.js",
+        "ref": "packages/core/src/lending/repayment-schedule.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -6655,7 +6655,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/repayment-schedule.js",
+        "ref": "packages/core/src/lending/repayment-schedule.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -6681,7 +6681,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/repayment-schedule.js",
+        "ref": "packages/core/src/lending/repayment-schedule.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -6707,7 +6707,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/repayment-schedule.js",
+        "ref": "packages/core/src/lending/repayment-schedule.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -6733,7 +6733,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/repayment-schedule.js",
+        "ref": "packages/core/src/lending/repayment-schedule.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -6759,7 +6759,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/repayment-schedule.js",
+        "ref": "packages/core/src/lending/repayment-schedule.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -6785,7 +6785,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/repayment-schedule.js",
+        "ref": "packages/core/src/lending/repayment-schedule.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -6811,7 +6811,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/repayment-schedule.js",
+        "ref": "packages/core/src/lending/repayment-schedule.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -6837,7 +6837,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/repayment-schedule.js",
+        "ref": "packages/core/src/lending/repayment-schedule.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -6863,7 +6863,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/repayment-schedule.js",
+        "ref": "packages/core/src/lending/repayment-schedule.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -6889,7 +6889,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/repayment-schedule.js",
+        "ref": "packages/core/src/lending/repayment-schedule.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -6915,7 +6915,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/workflow-tasks.js",
+        "ref": "packages/core/src/journeys/workflow-tasks.js",
         "note": "Implementation evidence for derived queues by domain state and exception."
       },
       {
@@ -6925,7 +6925,7 @@
       },
       {
         "type": "code",
-        "ref": "packages/core/src/specialist-journey-service.js",
+        "ref": "packages/core/src/journeys/specialist-journey-service.js",
         "note": "Specialist cases project active, paused and exception work into the shared workflow task boundary."
       },
       {
@@ -6952,7 +6952,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/workflow-tasks.js",
+        "ref": "packages/core/src/journeys/workflow-tasks.js",
         "note": "Implementation evidence for task sla, priority, due time, and breach status."
       },
       {
@@ -6979,7 +6979,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/workflow-tasks.js",
+        "ref": "packages/core/src/journeys/workflow-tasks.js",
         "note": "Implementation evidence for role/queue visibility and server-side action authorization."
       },
       {
@@ -7006,7 +7006,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/workflow-tasks.js",
+        "ref": "packages/core/src/journeys/workflow-tasks.js",
         "note": "Implementation evidence for assignment, start, release, comment, and audit."
       },
       {
@@ -7033,7 +7033,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/institutional-operations.js",
+        "ref": "packages/core/src/operations/institutional-operations.js",
         "note": "Implementation evidence for configurable workflow and state-machine designer."
       },
       {
@@ -7060,7 +7060,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/institutional-operations.js",
+        "ref": "packages/core/src/operations/institutional-operations.js",
         "note": "Implementation evidence for configurable approval matrix by amount, product, risk, and deviation."
       },
       {
@@ -7087,7 +7087,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/institutional-operations.js",
+        "ref": "packages/core/src/operations/institutional-operations.js",
         "note": "Implementation evidence for maker-checker/four-eyes policy library."
       },
       {
@@ -7114,7 +7114,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/institutional-operations.js",
+        "ref": "packages/core/src/operations/institutional-operations.js",
         "note": "Implementation evidence for escalation, delegation, substitution, leave, and workload balancing."
       },
       {
@@ -7141,7 +7141,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/institutional-operations.js",
+        "ref": "packages/core/src/operations/institutional-operations.js",
         "note": "Implementation evidence for bulk action with limits, approval, and audit."
       },
       {
@@ -7168,7 +7168,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/workflow-tasks.js",
+        "ref": "packages/core/src/journeys/workflow-tasks.js",
         "note": "Implementation evidence for queue dashboards, ageing, throughput, and productivity."
       },
       {
@@ -7195,7 +7195,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/workflow-tasks.js",
+        "ref": "packages/core/src/journeys/workflow-tasks.js",
         "note": "Implementation evidence for case timeline combining data, decisions, documents, and communications."
       },
       {
@@ -7222,7 +7222,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/workflow-tasks.js",
+        "ref": "packages/core/src/journeys/workflow-tasks.js",
         "note": "Implementation evidence for committee agenda, circulation, decision, minutes, and conditions."
       },
       {
@@ -7249,7 +7249,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/workflow-tasks.js",
+        "ref": "packages/core/src/journeys/workflow-tasks.js",
         "note": "Implementation evidence for operational exception taxonomy and root-cause reporting."
       },
       {
@@ -7276,7 +7276,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/institutional-operations.js",
+        "ref": "packages/core/src/operations/institutional-operations.js",
         "note": "Implementation evidence for business-calendar and sla pause/resume policy."
       },
       {
@@ -7303,7 +7303,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/offer-marketplace.js",
+        "ref": "packages/core/src/lending/offer-marketplace.js",
         "note": "Implementation evidence for offer generation from approved product and decision."
       },
       {
@@ -7330,7 +7330,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/offer-marketplace.js",
+        "ref": "packages/core/src/lending/offer-marketplace.js",
         "note": "Implementation evidence for multi-lender matching and complete offer presentation."
       },
       {
@@ -7357,7 +7357,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/offer-marketplace.js",
+        "ref": "packages/core/src/lending/offer-marketplace.js",
         "note": "Implementation evidence for objective ranking disclosure and dark-pattern prevention."
       },
       {
@@ -7384,7 +7384,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/offer-marketplace.js",
+        "ref": "packages/core/src/lending/offer-marketplace.js",
         "note": "Implementation evidence for kfs unique proposal, validity, apr sheet, and amortisation schedule."
       },
       {
@@ -7411,7 +7411,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/offer-marketplace.js",
+        "ref": "packages/core/src/lending/offer-marketplace.js",
         "note": "Implementation evidence for kfs charges, gst, cooling-off, recovery, and grievance disclosure."
       },
       {
@@ -7438,7 +7438,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/offer-marketplace.js",
+        "ref": "packages/core/src/lending/offer-marketplace.js",
         "note": "Implementation evidence for kfs in a language understood by the borrower."
       },
       {
@@ -7465,7 +7465,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/offer-marketplace.js",
+        "ref": "packages/core/src/lending/offer-marketplace.js",
         "note": "Implementation evidence for evidence that kfs contents were explained and understood."
       },
       {
@@ -7492,7 +7492,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/offer-marketplace.js",
+        "ref": "packages/core/src/lending/offer-marketplace.js",
         "note": "Implementation evidence for borrower acceptance bound to proposal and verified identity."
       },
       {
@@ -7519,7 +7519,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/offer-marketplace.js",
+        "ref": "packages/core/src/lending/offer-marketplace.js",
         "note": "Implementation evidence for sanction letter with conditions and validity."
       },
       {
@@ -7546,7 +7546,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/offer-marketplace.js",
+        "ref": "packages/core/src/lending/offer-marketplace.js",
         "note": "Implementation evidence for agreement generation, versioning, negotiation, and acceptance."
       },
       {
@@ -7573,7 +7573,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/offer-marketplace.js",
+        "ref": "packages/core/src/lending/offer-marketplace.js",
         "note": "Implementation evidence for multi-party signing for co-borrowers/guarantors."
       },
       {
@@ -7600,7 +7600,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/offer-marketplace.js",
+        "ref": "packages/core/src/lending/offer-marketplace.js",
         "note": "Implementation evidence for production esign envelope and callback reconciliation."
       },
       {
@@ -7627,7 +7627,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/offer-marketplace.js",
+        "ref": "packages/core/src/lending/offer-marketplace.js",
         "note": "Implementation evidence for digitally signed document delivery and proof."
       },
       {
@@ -7654,7 +7654,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/offer-marketplace.js",
+        "ref": "packages/core/src/lending/offer-marketplace.js",
         "note": "Implementation evidence for cooling-off cancellation, proportionate cost, and refund."
       },
       {
@@ -7681,7 +7681,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/operations-monitoring.js",
+        "ref": "packages/core/src/operations/operations-monitoring.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -7708,7 +7708,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/integration-worker-runtime.js",
+        "ref": "packages/core/src/integrations/integration-worker-runtime.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -7718,7 +7718,7 @@
       },
       {
         "type": "code",
-        "ref": "packages/core/src/identity-operational-automation.js",
+        "ref": "packages/core/src/identity/identity-operational-automation.js",
         "note": "Checksum-sealed run-once identity scheduler contract with containment as the only automatic mutation."
       },
       {
@@ -7728,7 +7728,7 @@
       },
       {
         "type": "code",
-        "ref": "packages/core/src/identity-operations-worker.js",
+        "ref": "packages/core/src/identity/identity-operations-worker.js",
         "note": "Persistent tenant/workload-fenced scheduling with monotonic claim fences, deterministic retries, DLQ and run finalization."
       },
       {
@@ -7738,7 +7738,7 @@
       },
       {
         "type": "code",
-        "ref": "packages/core/src/identity-operations-worker-runtime.js",
+        "ref": "packages/core/src/identity/identity-operations-worker-runtime.js",
         "note": "Bounded service-plane execution, exact evidence checksums, explicit simulator/live ports, fail-closed persistence handling and worker health metrics."
       },
       {
@@ -7775,7 +7775,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/enterprise-platform.js",
+        "ref": "packages/core/src/platform/enterprise-platform.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -7802,7 +7802,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/enterprise-platform.js",
+        "ref": "packages/core/src/platform/enterprise-platform.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -7829,7 +7829,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/operations-monitoring.js",
+        "ref": "packages/core/src/operations/operations-monitoring.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -7861,7 +7861,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/operations-monitoring.js",
+        "ref": "packages/core/src/operations/operations-monitoring.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -7888,7 +7888,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/operations-monitoring.js",
+        "ref": "packages/core/src/operations/operations-monitoring.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -7915,7 +7915,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/operations-monitoring.js",
+        "ref": "packages/core/src/operations/operations-monitoring.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -7925,7 +7925,7 @@
       },
       {
         "type": "code",
-        "ref": "packages/core/src/identity-operations-worker.js",
+        "ref": "packages/core/src/identity/identity-operations-worker.js",
         "note": "Lease expiry, retry exhaustion, DLQ, alert and critical escalation records make stuck identity work explicit."
       },
       {
@@ -7952,7 +7952,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/operations-monitoring.js",
+        "ref": "packages/core/src/operations/operations-monitoring.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -7979,7 +7979,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/operations-monitoring.js",
+        "ref": "packages/core/src/operations/operations-monitoring.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -8006,7 +8006,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/platform-delivery.js",
+        "ref": "packages/core/src/platform/platform-delivery.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -8038,7 +8038,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/platform-delivery.js",
+        "ref": "packages/core/src/platform/platform-delivery.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -8065,7 +8065,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/platform-delivery.js",
+        "ref": "packages/core/src/platform/platform-delivery.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -8092,7 +8092,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/operations-monitoring.js",
+        "ref": "packages/core/src/operations/operations-monitoring.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -8119,7 +8119,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/operations-monitoring.js",
+        "ref": "packages/core/src/operations/operations-monitoring.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -8146,7 +8146,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/partner-grievance-completion.js",
+        "ref": "packages/core/src/operations/partner-grievance-completion.js",
         "note": "Implementation evidence for lsp agreement, role, due diligence, review, data, and fee controls."
       },
       {
@@ -8173,7 +8173,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/partner-grievance-completion.js",
+        "ref": "packages/core/src/operations/partner-grievance-completion.js",
         "note": "Implementation evidence for lsp incident, breach, remediation, suspension, and exit."
       },
       {
@@ -8200,7 +8200,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/partner-grievance-completion.js",
+        "ref": "packages/core/src/operations/partner-grievance-completion.js",
         "note": "Implementation evidence for dlg provider eligibility, form, cap, tenor, and invocation."
       },
       {
@@ -8227,7 +8227,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/partner-grievance-completion.js",
+        "ref": "packages/core/src/operations/partner-grievance-completion.js",
         "note": "Implementation evidence for dlg exposure, replenishment, recovery, disclosure, and accounting."
       },
       {
@@ -8254,7 +8254,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/partner-grievance-completion.js",
+        "ref": "packages/core/src/operations/partner-grievance-completion.js",
         "note": "Implementation evidence for co-lending agreement, roles, shares, retention, rate, and escrow."
       },
       {
@@ -8281,7 +8281,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/partner-grievance-completion.js",
+        "ref": "packages/core/src/operations/partner-grievance-completion.js",
         "note": "Implementation evidence for loan-level allocation and share reconciliation."
       },
       {
@@ -8308,7 +8308,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/partner-grievance-completion.js",
+        "ref": "packages/core/src/operations/partner-grievance-completion.js",
         "note": "Implementation evidence for partner funding, disbursement, and settlement confirmation."
       },
       {
@@ -8335,7 +8335,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/partner-grievance-completion.js",
+        "ref": "packages/core/src/operations/partner-grievance-completion.js",
         "note": "Implementation evidence for partner principal, interest, fee, tax, and provision ledger legs."
       },
       {
@@ -8362,7 +8362,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/partner-grievance-completion.js",
+        "ref": "packages/core/src/operations/partner-grievance-completion.js",
         "note": "Implementation evidence for collection and recovery allocation by partner share."
       },
       {
@@ -8389,7 +8389,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/partner-grievance-completion.js",
+        "ref": "packages/core/src/operations/partner-grievance-completion.js",
         "note": "Implementation evidence for partner reconciliation, break management, and statements."
       },
       {
@@ -8416,7 +8416,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/partner-grievance-completion.js",
+        "ref": "packages/core/src/operations/partner-grievance-completion.js",
         "note": "Implementation evidence for servicing transfer, portfolio sale, assignment, and participation."
       },
       {
@@ -8443,7 +8443,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/partner-grievance-completion.js",
+        "ref": "packages/core/src/operations/partner-grievance-completion.js",
         "note": "Implementation evidence for partner sla, performance, concentration, and audit."
       },
       {
@@ -8470,7 +8470,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/partner-grievance-completion.js",
+        "ref": "packages/core/src/operations/partner-grievance-completion.js",
         "note": "Implementation evidence for dsa/bc/dealer/merchant commission and clawback."
       },
       {
@@ -8497,7 +8497,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/payment-reconciliation.js",
+        "ref": "packages/core/src/finance/payment-reconciliation.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -8523,7 +8523,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/payment-reconciliation.js",
+        "ref": "packages/core/src/finance/payment-reconciliation.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -8549,7 +8549,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/payment-reconciliation.js",
+        "ref": "packages/core/src/finance/payment-reconciliation.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -8575,7 +8575,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/payment-reconciliation.js",
+        "ref": "packages/core/src/finance/payment-reconciliation.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -8585,7 +8585,7 @@
       },
       {
         "type": "code",
-        "ref": "packages/core/src/signed-file-transport.js",
+        "ref": "packages/core/src/integrations/signed-file-transport.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -8611,7 +8611,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/payment-reconciliation.js",
+        "ref": "packages/core/src/finance/payment-reconciliation.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -8637,7 +8637,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/payment-reconciliation.js",
+        "ref": "packages/core/src/finance/payment-reconciliation.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -8663,7 +8663,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/payment-reconciliation.js",
+        "ref": "packages/core/src/finance/payment-reconciliation.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -8689,7 +8689,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/payment-reconciliation.js",
+        "ref": "packages/core/src/finance/payment-reconciliation.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -8715,7 +8715,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/payment-reconciliation.js",
+        "ref": "packages/core/src/finance/payment-reconciliation.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -8741,7 +8741,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/payment-reconciliation.js",
+        "ref": "packages/core/src/finance/payment-reconciliation.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -8767,7 +8767,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/payment-reconciliation.js",
+        "ref": "packages/core/src/finance/payment-reconciliation.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -8793,7 +8793,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/payment-reconciliation.js",
+        "ref": "packages/core/src/finance/payment-reconciliation.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -8819,7 +8819,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/payment-reconciliation.js",
+        "ref": "packages/core/src/finance/payment-reconciliation.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -8829,7 +8829,7 @@
       },
       {
         "type": "code",
-        "ref": "packages/core/src/signed-file-transport.js",
+        "ref": "packages/core/src/integrations/signed-file-transport.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -8855,7 +8855,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/payment-reconciliation.js",
+        "ref": "packages/core/src/finance/payment-reconciliation.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -8881,7 +8881,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/payment-reconciliation.js",
+        "ref": "packages/core/src/finance/payment-reconciliation.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -8934,7 +8934,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/enterprise-platform.js",
+        "ref": "packages/core/src/platform/enterprise-platform.js",
         "note": "Implementation evidence for pooled tenant isolation at application and database layers."
       },
       {
@@ -8961,7 +8961,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/platform-delivery.js",
+        "ref": "packages/core/src/platform/platform-delivery.js",
         "note": "Implementation evidence for dedicated database/data-plane deployment tier."
       },
       {
@@ -8988,7 +8988,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/enterprise-platform.js",
+        "ref": "packages/core/src/platform/enterprise-platform.js",
         "note": "Implementation evidence for per-tenant data encryption and key hierarchy."
       },
       {
@@ -9015,7 +9015,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/organisation-signup.js",
+        "ref": "packages/core/src/platform/organisation-signup.js",
         "note": "Fail-closed organisation admission, representative verification, quarantined tenant reservation and bootstrap-owner handoff."
       },
       {
@@ -9102,7 +9102,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/platform-product-completion.js",
+        "ref": "packages/core/src/platform/platform-product-completion.js",
         "note": "Implementation evidence for entitlements, subscribed modules, limits, and commercial plan controls."
       },
       {
@@ -9129,7 +9129,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/platform-product-completion.js",
+        "ref": "packages/core/src/platform/platform-product-completion.js",
         "note": "Implementation evidence for tenant configuration promotion across dev/test/uat/production."
       },
       {
@@ -9156,7 +9156,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/platform-delivery.js",
+        "ref": "packages/core/src/platform/platform-delivery.js",
         "note": "Implementation evidence for tenant portability export and evidenced offboarding."
       },
       {
@@ -9183,7 +9183,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/platform-product-completion.js",
+        "ref": "packages/core/src/platform/platform-product-completion.js",
         "note": "Implementation evidence for data reload/import from the portability format."
       },
       {
@@ -9210,7 +9210,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/enterprise-platform.js",
+        "ref": "packages/core/src/platform/enterprise-platform.js",
         "note": "Implementation evidence for platform operations console and tenant health view."
       },
       {
@@ -9237,7 +9237,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/enterprise-platform.js",
+        "ref": "packages/core/src/platform/enterprise-platform.js",
         "note": "Implementation evidence for time-boxed platform break-glass access with tenant visibility."
       },
       {
@@ -9264,7 +9264,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/enterprise-platform.js",
+        "ref": "packages/core/src/platform/enterprise-platform.js",
         "note": "Implementation evidence for data-residency and processing-location policy per tenant."
       },
       {
@@ -9291,7 +9291,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/platform-product-completion.js",
+        "ref": "packages/core/src/platform/platform-product-completion.js",
         "note": "Implementation evidence for tenant-level sla, maintenance, release, and incident communications."
       },
       {
@@ -9318,7 +9318,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/loan-policy.js",
+        "ref": "packages/core/src/lending/loan-policy.js",
         "note": "Executable control implementation relevant to PRD-001."
       },
       {
@@ -9349,7 +9349,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/loan-policy.js",
+        "ref": "packages/core/src/lending/loan-policy.js",
         "note": "Executable control implementation relevant to PRD-002."
       },
       {
@@ -9380,7 +9380,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/loan-policy.js",
+        "ref": "packages/core/src/lending/loan-policy.js",
         "note": "Executable control implementation relevant to PRD-003."
       },
       {
@@ -9411,7 +9411,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/loan-policy.js",
+        "ref": "packages/core/src/lending/loan-policy.js",
         "note": "Executable control implementation relevant to PRD-004."
       },
       {
@@ -9442,7 +9442,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/loan-policy.js",
+        "ref": "packages/core/src/lending/loan-policy.js",
         "note": "Executable control implementation relevant to PRD-005."
       },
       {
@@ -9473,7 +9473,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/loan-policy.js",
+        "ref": "packages/core/src/lending/loan-policy.js",
         "note": "Executable control implementation relevant to PRD-006."
       },
       {
@@ -9504,7 +9504,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/loan-policy.js",
+        "ref": "packages/core/src/lending/loan-policy.js",
         "note": "Executable control implementation relevant to PRD-007."
       },
       {
@@ -9535,7 +9535,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/loan-policy.js",
+        "ref": "packages/core/src/lending/loan-policy.js",
         "note": "Executable control implementation relevant to PRD-008."
       },
       {
@@ -9566,7 +9566,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/loan-policy.js",
+        "ref": "packages/core/src/lending/loan-policy.js",
         "note": "Executable control implementation relevant to PRD-009."
       },
       {
@@ -9597,7 +9597,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/loan-policy.js",
+        "ref": "packages/core/src/lending/loan-policy.js",
         "note": "Executable control implementation relevant to PRD-010."
       },
       {
@@ -9612,7 +9612,7 @@
       },
       {
         "type": "code",
-        "ref": "packages/core/src/specialist-journey-service.js",
+        "ref": "packages/core/src/journeys/specialist-journey-service.js",
         "note": "All 17 specialist/trade configurations and business actions require independent authenticated approval."
       },
       {
@@ -9638,7 +9638,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/loan-policy.js",
+        "ref": "packages/core/src/lending/loan-policy.js",
         "note": "Executable control implementation relevant to PRD-011."
       },
       {
@@ -9669,7 +9669,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/loan-policy.js",
+        "ref": "packages/core/src/lending/loan-policy.js",
         "note": "Executable control implementation relevant to PRD-012."
       },
       {
@@ -9700,7 +9700,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/loan-policy.js",
+        "ref": "packages/core/src/lending/loan-policy.js",
         "note": "Executable control implementation relevant to PRD-013."
       },
       {
@@ -9731,7 +9731,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/loan-policy.js",
+        "ref": "packages/core/src/lending/loan-policy.js",
         "note": "Executable control implementation relevant to PRD-014."
       },
       {
@@ -9762,7 +9762,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/loan-policy.js",
+        "ref": "packages/core/src/lending/loan-policy.js",
         "note": "Executable control implementation relevant to PRD-015."
       },
       {
@@ -9793,7 +9793,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collections-recovery.js",
+        "ref": "packages/core/src/lending/collections-recovery.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -9819,7 +9819,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collections-recovery.js",
+        "ref": "packages/core/src/lending/collections-recovery.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -9845,7 +9845,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collections-recovery.js",
+        "ref": "packages/core/src/lending/collections-recovery.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -9871,7 +9871,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collections-recovery.js",
+        "ref": "packages/core/src/lending/collections-recovery.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -9897,7 +9897,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collections-recovery.js",
+        "ref": "packages/core/src/lending/collections-recovery.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -9923,7 +9923,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collections-recovery.js",
+        "ref": "packages/core/src/lending/collections-recovery.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -9949,7 +9949,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collections-recovery.js",
+        "ref": "packages/core/src/lending/collections-recovery.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -9975,7 +9975,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collections-recovery.js",
+        "ref": "packages/core/src/lending/collections-recovery.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -10001,7 +10001,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collections-recovery.js",
+        "ref": "packages/core/src/lending/collections-recovery.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -10027,7 +10027,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collections-recovery.js",
+        "ref": "packages/core/src/lending/collections-recovery.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -10053,7 +10053,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collections-recovery.js",
+        "ref": "packages/core/src/lending/collections-recovery.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -10079,7 +10079,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/collections-recovery.js",
+        "ref": "packages/core/src/lending/collections-recovery.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -10105,7 +10105,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/registries.js",
+        "ref": "packages/core/src/shared/registries.js",
         "note": "Executable control implementation relevant to REG-001."
       },
       {
@@ -10136,7 +10136,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/registries.js",
+        "ref": "packages/core/src/shared/registries.js",
         "note": "Executable control implementation relevant to REG-002."
       },
       {
@@ -10167,7 +10167,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/registries.js",
+        "ref": "packages/core/src/shared/registries.js",
         "note": "Executable control implementation relevant to REG-003."
       },
       {
@@ -10198,7 +10198,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/registries.js",
+        "ref": "packages/core/src/shared/registries.js",
         "note": "Executable control implementation relevant to REG-004."
       },
       {
@@ -10229,7 +10229,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/registries.js",
+        "ref": "packages/core/src/shared/registries.js",
         "note": "Executable control implementation relevant to REG-005."
       },
       {
@@ -10260,7 +10260,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/registries.js",
+        "ref": "packages/core/src/shared/registries.js",
         "note": "Executable control implementation relevant to REG-006."
       },
       {
@@ -10291,7 +10291,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/registries.js",
+        "ref": "packages/core/src/shared/registries.js",
         "note": "Executable control implementation relevant to REG-007."
       },
       {
@@ -10322,7 +10322,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/registries.js",
+        "ref": "packages/core/src/shared/registries.js",
         "note": "Executable control implementation relevant to REG-008."
       },
       {
@@ -10353,7 +10353,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/registries.js",
+        "ref": "packages/core/src/shared/registries.js",
         "note": "Executable control implementation relevant to REG-009."
       },
       {
@@ -10384,7 +10384,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/registries.js",
+        "ref": "packages/core/src/shared/registries.js",
         "note": "Executable control implementation relevant to REG-010."
       },
       {
@@ -10415,7 +10415,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/reporting-data-integration-completion.js",
+        "ref": "packages/core/src/compliance/reporting-data-integration-completion.js",
         "note": "Executable control implementation relevant to RPT-001."
       },
       {
@@ -10447,7 +10447,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/reporting-data-integration-completion.js",
+        "ref": "packages/core/src/compliance/reporting-data-integration-completion.js",
         "note": "Executable control implementation relevant to RPT-002."
       },
       {
@@ -10479,7 +10479,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/reporting-data-integration-completion.js",
+        "ref": "packages/core/src/compliance/reporting-data-integration-completion.js",
         "note": "Executable control implementation relevant to RPT-003."
       },
       {
@@ -10511,7 +10511,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/reporting-data-integration-completion.js",
+        "ref": "packages/core/src/compliance/reporting-data-integration-completion.js",
         "note": "Executable control implementation relevant to RPT-004."
       },
       {
@@ -10543,7 +10543,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/reporting-data-integration-completion.js",
+        "ref": "packages/core/src/compliance/reporting-data-integration-completion.js",
         "note": "Executable control implementation relevant to RPT-005."
       },
       {
@@ -10575,7 +10575,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/reporting-data-integration-completion.js",
+        "ref": "packages/core/src/compliance/reporting-data-integration-completion.js",
         "note": "Executable control implementation relevant to RPT-006."
       },
       {
@@ -10607,7 +10607,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/reporting-data-integration-completion.js",
+        "ref": "packages/core/src/compliance/reporting-data-integration-completion.js",
         "note": "Executable control implementation relevant to RPT-007."
       },
       {
@@ -10639,7 +10639,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/reporting-data-integration-completion.js",
+        "ref": "packages/core/src/compliance/reporting-data-integration-completion.js",
         "note": "Executable control implementation relevant to RPT-008."
       },
       {
@@ -10671,7 +10671,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/reporting-data-integration-completion.js",
+        "ref": "packages/core/src/compliance/reporting-data-integration-completion.js",
         "note": "Executable control implementation relevant to RPT-009."
       },
       {
@@ -10703,7 +10703,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/reporting-data-integration-completion.js",
+        "ref": "packages/core/src/compliance/reporting-data-integration-completion.js",
         "note": "Executable control implementation relevant to RPT-010."
       },
       {
@@ -10735,7 +10735,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/reporting-data-integration-completion.js",
+        "ref": "packages/core/src/compliance/reporting-data-integration-completion.js",
         "note": "Executable control implementation relevant to RPT-011."
       },
       {
@@ -10767,7 +10767,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/reporting-data-integration-completion.js",
+        "ref": "packages/core/src/compliance/reporting-data-integration-completion.js",
         "note": "Executable control implementation relevant to RPT-012."
       },
       {
@@ -10799,7 +10799,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/reporting-data-integration-completion.js",
+        "ref": "packages/core/src/compliance/reporting-data-integration-completion.js",
         "note": "Executable control implementation relevant to RPT-013."
       },
       {
@@ -10831,7 +10831,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/reporting-data-integration-completion.js",
+        "ref": "packages/core/src/compliance/reporting-data-integration-completion.js",
         "note": "Executable control implementation relevant to RPT-014."
       },
       {
@@ -10863,7 +10863,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/risk-aml-governance.js",
+        "ref": "packages/core/src/compliance/risk-aml-governance.js",
         "note": "Executable control implementation relevant to RSK-001."
       },
       {
@@ -10894,7 +10894,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/risk-aml-governance.js",
+        "ref": "packages/core/src/compliance/risk-aml-governance.js",
         "note": "Executable control implementation relevant to RSK-002."
       },
       {
@@ -10925,7 +10925,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/risk-aml-governance.js",
+        "ref": "packages/core/src/compliance/risk-aml-governance.js",
         "note": "Executable control implementation relevant to RSK-003."
       },
       {
@@ -10956,7 +10956,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/risk-aml-governance.js",
+        "ref": "packages/core/src/compliance/risk-aml-governance.js",
         "note": "Executable control implementation relevant to RSK-004."
       },
       {
@@ -10987,7 +10987,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/risk-aml-governance.js",
+        "ref": "packages/core/src/compliance/risk-aml-governance.js",
         "note": "Executable control implementation relevant to RSK-005."
       },
       {
@@ -11018,7 +11018,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/risk-aml-governance.js",
+        "ref": "packages/core/src/compliance/risk-aml-governance.js",
         "note": "Executable control implementation relevant to RSK-006."
       },
       {
@@ -11049,7 +11049,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/risk-aml-governance.js",
+        "ref": "packages/core/src/compliance/risk-aml-governance.js",
         "note": "Executable control implementation relevant to RSK-007."
       },
       {
@@ -11080,7 +11080,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/risk-aml-governance.js",
+        "ref": "packages/core/src/compliance/risk-aml-governance.js",
         "note": "Executable control implementation relevant to RSK-008."
       },
       {
@@ -11111,7 +11111,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/risk-aml-governance.js",
+        "ref": "packages/core/src/compliance/risk-aml-governance.js",
         "note": "Executable control implementation relevant to RSK-009."
       },
       {
@@ -11142,7 +11142,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/risk-aml-governance.js",
+        "ref": "packages/core/src/compliance/risk-aml-governance.js",
         "note": "Executable control implementation relevant to RSK-010."
       },
       {
@@ -11173,7 +11173,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/risk-aml-governance.js",
+        "ref": "packages/core/src/compliance/risk-aml-governance.js",
         "note": "Executable control implementation relevant to RSK-011."
       },
       {
@@ -11204,7 +11204,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/security-operations.js",
+        "ref": "packages/core/src/operations/security-operations.js",
         "note": "Executable control implementation relevant to SEC-001."
       },
       {
@@ -11235,12 +11235,12 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/enterprise-identity.js",
+        "ref": "packages/core/src/identity/enterprise-identity.js",
         "note": "Certified Entra, Okta, AD FS, Keycloak, OpenLDAP-bridge and generic OIDC/SAML provider-policy contract."
       },
       {
         "type": "code",
-        "ref": "packages/core/src/federated-access-runtime.js",
+        "ref": "packages/core/src/identity/federated-access-runtime.js",
         "note": "Cryptographic OIDC verification plus fail-closed SAML and MFA/WebAuthn/device assurance validation."
       },
       {
@@ -11255,7 +11255,7 @@
       },
       {
         "type": "code",
-        "ref": "packages/core/src/identity-integration-conformance.js",
+        "ref": "packages/core/src/identity/identity-integration-conformance.js",
         "note": "Exhaustive simulator-only OIDC and SAML-gateway positive, rollover, replay, cross-tenant, stale-evidence and outage packs."
       },
       {
@@ -11265,7 +11265,7 @@
       },
       {
         "type": "code",
-        "ref": "packages/core/src/identity-operational-automation.js",
+        "ref": "packages/core/src/identity/identity-operational-automation.js",
         "note": "Trusted-adapter-attested, fresh, issuer/audience/tenant/session-bound and replay-safe federated logout containment contract."
       },
       {
@@ -11275,7 +11275,7 @@
       },
       {
         "type": "code",
-        "ref": "packages/core/src/federated-revocation-verification.js",
+        "ref": "packages/core/src/identity/federated-revocation-verification.js",
         "note": "Maker-checker public-JWK profiles and exact-byte RS256/ES256 verification bind logout to tenant, policy, protocol, issuer, audience and key validity."
       },
       {
@@ -11306,7 +11306,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/enterprise-identity.js",
+        "ref": "packages/core/src/identity/enterprise-identity.js",
         "note": "Idempotent SCIM events, group mappings and canonical-role request disposition."
       },
       {
@@ -11321,7 +11321,7 @@
       },
       {
         "type": "code",
-        "ref": "packages/core/src/identity-operations.js",
+        "ref": "packages/core/src/identity/identity-operations.js",
         "note": "Provider-directory reconciliation and explicit tenant-principal session revocation without accepting provider-pushed roles."
       },
       {
@@ -11352,7 +11352,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/security-operations.js",
+        "ref": "packages/core/src/operations/security-operations.js",
         "note": "Executable control implementation relevant to SEC-004."
       },
       {
@@ -11362,7 +11362,7 @@
       },
       {
         "type": "code",
-        "ref": "packages/core/src/identity-operations.js",
+        "ref": "packages/core/src/identity/identity-operations.js",
         "note": "Independent authenticator recovery clears the old factor, forces clean enrolment and supports immediate global session revocation."
       },
       {
@@ -11393,7 +11393,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/saas-identity-governance.js",
+        "ref": "packages/core/src/identity/saas-identity-governance.js",
         "note": "85 canonical roles, hard SoD, 34 feature staffing policies, sponsored-agent restrictions and immediate containment."
       },
       {
@@ -11449,7 +11449,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/security-operations.js",
+        "ref": "packages/core/src/operations/security-operations.js",
         "note": "Executable control implementation relevant to SEC-006."
       },
       {
@@ -11480,7 +11480,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/security-operations.js",
+        "ref": "packages/core/src/operations/security-operations.js",
         "note": "Executable control implementation relevant to SEC-007."
       },
       {
@@ -11521,7 +11521,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/security-operations.js",
+        "ref": "packages/core/src/operations/security-operations.js",
         "note": "Executable control implementation relevant to SEC-008."
       },
       {
@@ -11557,7 +11557,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/security-operations.js",
+        "ref": "packages/core/src/operations/security-operations.js",
         "note": "Executable control implementation relevant to SEC-009."
       },
       {
@@ -11588,7 +11588,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/security-operations.js",
+        "ref": "packages/core/src/operations/security-operations.js",
         "note": "Executable control implementation relevant to SEC-010."
       },
       {
@@ -11619,7 +11619,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/security-operations.js",
+        "ref": "packages/core/src/operations/security-operations.js",
         "note": "Executable control implementation relevant to SEC-011."
       },
       {
@@ -11650,7 +11650,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/security-operations.js",
+        "ref": "packages/core/src/operations/security-operations.js",
         "note": "Executable control implementation relevant to SEC-012."
       },
       {
@@ -11681,7 +11681,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/security-operations.js",
+        "ref": "packages/core/src/operations/security-operations.js",
         "note": "Executable control implementation relevant to SEC-013."
       },
       {
@@ -11717,7 +11717,7 @@
       },
       {
         "type": "code",
-        "ref": "packages/core/src/security-operations.js",
+        "ref": "packages/core/src/operations/security-operations.js",
         "note": "Executable control implementation relevant to SEC-014."
       },
       {
@@ -11753,7 +11753,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/security-operations.js",
+        "ref": "packages/core/src/operations/security-operations.js",
         "note": "Executable control implementation relevant to SEC-015."
       },
       {
@@ -11784,7 +11784,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/security-operations.js",
+        "ref": "packages/core/src/operations/security-operations.js",
         "note": "Executable control implementation relevant to SEC-016."
       },
       {
@@ -11820,7 +11820,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/security-operations.js",
+        "ref": "packages/core/src/operations/security-operations.js",
         "note": "Executable control implementation relevant to SEC-017."
       },
       {
@@ -11851,7 +11851,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/loan-account.js",
+        "ref": "packages/core/src/lending/loan-account.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -11877,7 +11877,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/loan-account.js",
+        "ref": "packages/core/src/lending/loan-account.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -11903,7 +11903,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/loan-account.js",
+        "ref": "packages/core/src/lending/loan-account.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -11929,7 +11929,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/loan-account.js",
+        "ref": "packages/core/src/lending/loan-account.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -11955,7 +11955,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/loan-account.js",
+        "ref": "packages/core/src/lending/loan-account.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -11981,7 +11981,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/loan-account.js",
+        "ref": "packages/core/src/lending/loan-account.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -12007,7 +12007,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/loan-account.js",
+        "ref": "packages/core/src/lending/loan-account.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -12033,7 +12033,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/loan-account.js",
+        "ref": "packages/core/src/lending/loan-account.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -12059,7 +12059,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/loan-account.js",
+        "ref": "packages/core/src/lending/loan-account.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -12085,7 +12085,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/loan-account.js",
+        "ref": "packages/core/src/lending/loan-account.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -12111,7 +12111,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/loan-account.js",
+        "ref": "packages/core/src/lending/loan-account.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -12137,7 +12137,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/loan-account.js",
+        "ref": "packages/core/src/lending/loan-account.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -12163,7 +12163,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/loan-account.js",
+        "ref": "packages/core/src/lending/loan-account.js",
         "note": "implementation evidence for the currently tracked capability slice"
       },
       {
@@ -12189,7 +12189,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/kyc-underwriting-completion.js",
+        "ref": "packages/core/src/lending/kyc-underwriting-completion.js",
         "note": "Implementation evidence for bureau pull with permissible purpose and consent."
       },
       {
@@ -12216,7 +12216,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/kyc-underwriting-completion.js",
+        "ref": "packages/core/src/lending/kyc-underwriting-completion.js",
         "note": "Implementation evidence for multi-bureau score bands and policy knockouts."
       },
       {
@@ -12243,7 +12243,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/kyc-underwriting-completion.js",
+        "ref": "packages/core/src/lending/kyc-underwriting-completion.js",
         "note": "Implementation evidence for bureau trade-line obligations and delinquency analysis."
       },
       {
@@ -12270,7 +12270,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/kyc-underwriting-completion.js",
+        "ref": "packages/core/src/lending/kyc-underwriting-completion.js",
         "note": "Implementation evidence for enquiry, vintage, write-off, settlement, and thin-file policy."
       },
       {
@@ -12297,7 +12297,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/kyc-underwriting-completion.js",
+        "ref": "packages/core/src/lending/kyc-underwriting-completion.js",
         "note": "Implementation evidence for account aggregator consent and fi fetch."
       },
       {
@@ -12324,7 +12324,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/kyc-underwriting-completion.js",
+        "ref": "packages/core/src/lending/kyc-underwriting-completion.js",
         "note": "Implementation evidence for aa income and obligation analytics with provenance."
       },
       {
@@ -12351,7 +12351,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/kyc-underwriting-completion.js",
+        "ref": "packages/core/src/lending/kyc-underwriting-completion.js",
         "note": "Implementation evidence for bank-statement categorisation, stability, bounce, and cash-flow analysis."
       },
       {
@@ -12378,7 +12378,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/kyc-underwriting-completion.js",
+        "ref": "packages/core/src/lending/kyc-underwriting-completion.js",
         "note": "Implementation evidence for gst, itr, udyam, employment, and business verification."
       },
       {
@@ -12405,7 +12405,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/kyc-underwriting-completion.js",
+        "ref": "packages/core/src/lending/kyc-underwriting-completion.js",
         "note": "Implementation evidence for emi, foir, age, amount, and tenor eligibility."
       },
       {
@@ -12432,7 +12432,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/kyc-underwriting-completion.js",
+        "ref": "packages/core/src/lending/kyc-underwriting-completion.js",
         "note": "Implementation evidence for household foir and microfinance indebtedness."
       },
       {
@@ -12459,7 +12459,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/kyc-underwriting-completion.js",
+        "ref": "packages/core/src/lending/kyc-underwriting-completion.js",
         "note": "Implementation evidence for credit scorecard, rating, grade, and risk-based pricing."
       },
       {
@@ -12486,7 +12486,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/kyc-underwriting-completion.js",
+        "ref": "packages/core/src/lending/kyc-underwriting-completion.js",
         "note": "Implementation evidence for policy deviations and approval-authority matrix."
       },
       {
@@ -12513,7 +12513,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/kyc-underwriting-completion.js",
+        "ref": "packages/core/src/lending/kyc-underwriting-completion.js",
         "note": "Implementation evidence for manual underwriting workspace and credit note."
       },
       {
@@ -12540,7 +12540,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/kyc-underwriting-completion.js",
+        "ref": "packages/core/src/lending/kyc-underwriting-completion.js",
         "note": "Implementation evidence for coded decline and borrower explanation."
       },
       {
@@ -12567,7 +12567,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/kyc-underwriting-completion.js",
+        "ref": "packages/core/src/lending/kyc-underwriting-completion.js",
         "note": "Implementation evidence for maker-checker and four-eyes approval."
       },
       {
@@ -12594,7 +12594,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/kyc-underwriting-completion.js",
+        "ref": "packages/core/src/lending/kyc-underwriting-completion.js",
         "note": "Implementation evidence for conditions precedent/subsequent and covenants."
       },
       {
@@ -12621,7 +12621,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/kyc-underwriting-completion.js",
+        "ref": "packages/core/src/lending/kyc-underwriting-completion.js",
         "note": "Implementation evidence for sanction validity and material-change reassessment."
       },
       {
@@ -12648,7 +12648,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/kyc-underwriting-completion.js",
+        "ref": "packages/core/src/lending/kyc-underwriting-completion.js",
         "note": "Implementation evidence for deterministic decision models with golden corpus."
       },
       {
@@ -12675,7 +12675,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/kyc-underwriting-completion.js",
+        "ref": "packages/core/src/lending/kyc-underwriting-completion.js",
         "note": "Implementation evidence for decision trace, policy/data/model lineage, and replay."
       },
       {
@@ -12702,7 +12702,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/kyc-underwriting-completion.js",
+        "ref": "packages/core/src/lending/kyc-underwriting-completion.js",
         "note": "Implementation evidence for champion/challenger, shadow, divergence, and cutover."
       },
       {
@@ -12788,7 +12788,7 @@
       },
       {
         "type": "code",
-        "ref": "packages/core/src/journey-workspace.js",
+        "ref": "packages/core/src/journeys/journey-workspace.js",
         "note": "Tenant-entitled borrower schemas cover common and specialist capture for all 21 journeys with field classification and redaction."
       },
       {
@@ -12798,7 +12798,7 @@
       },
       {
         "type": "code",
-        "ref": "packages/core/src/composed-journey-lifecycle.js",
+        "ref": "packages/core/src/journeys/composed-journey-lifecycle.js",
         "note": "The submitted workspace lineage enters one evidence-bound, tenant-persistent lifecycle shared by all 21 journeys."
       },
       {
@@ -12867,7 +12867,7 @@
       },
       {
         "type": "code",
-        "ref": "packages/core/src/composed-journey-lifecycle.js",
+        "ref": "packages/core/src/journeys/composed-journey-lifecycle.js",
         "note": "KFS acceptance and contracting are ordered evidence gates; stale or incomplete transitions fail closed."
       },
       {
@@ -12904,7 +12904,7 @@
       },
       {
         "type": "code",
-        "ref": "packages/core/src/composed-journey-lifecycle.js",
+        "ref": "packages/core/src/journeys/composed-journey-lifecycle.js",
         "note": "LMS/accounting, servicing, collections, reporting and closure are explicit ordered composition stages."
       },
       {
@@ -13000,7 +13000,7 @@
       },
       {
         "type": "code",
-        "ref": "packages/core/src/journey-workspace.js",
+        "ref": "packages/core/src/journeys/journey-workspace.js",
         "note": "Operations channel projections expose product-specific documents and actions under role and maker-checker metadata."
       },
       {
@@ -13096,7 +13096,7 @@
       },
       {
         "type": "code",
-        "ref": "packages/core/src/composed-journey-lifecycle.js",
+        "ref": "packages/core/src/journeys/composed-journey-lifecycle.js",
         "note": "Portfolio projection exposes current stage, open transition, pause and critical escalation state by tenant."
       },
       {
@@ -13202,12 +13202,12 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/customer-experience-completion.js",
+        "ref": "packages/core/src/operations/customer-experience-completion.js",
         "note": "Implementation evidence for multilingual indian-language content and templates."
       },
       {
         "type": "code",
-        "ref": "packages/core/src/journey-workspace.js",
+        "ref": "packages/core/src/journeys/journey-workspace.js",
         "note": "Every workspace field, section and action has English/Hindi schema labels; governed tenant language packs remain follow-on."
       },
       {
@@ -13234,7 +13234,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/customer-experience-completion.js",
+        "ref": "packages/core/src/operations/customer-experience-completion.js",
         "note": "Implementation evidence for accessibility testing, assisted journeys, and reduced-motion support."
       },
       {
@@ -13266,7 +13266,7 @@
     "evidence": [
       {
         "type": "code",
-        "ref": "packages/core/src/customer-experience-completion.js",
+        "ref": "packages/core/src/operations/customer-experience-completion.js",
         "note": "Implementation evidence for mobile/pwa/offline capability."
       },
       {

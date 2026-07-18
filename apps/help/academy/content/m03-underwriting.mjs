@@ -30,7 +30,7 @@ export default {
         { type: "capability", ref: "UWG-001", note: "Bureau pull with permissible purpose and consent." },
         { type: "capability", ref: "UWG-005", note: "Account Aggregator consent and FI fetch." },
         { type: "capability", ref: "UWG-007", note: "Bank-statement categorisation, stability, bounce and cash-flow analysis." },
-        { type: "code", ref: "packages/core/src/account-aggregator.js", note: "AA consent module: artefact lifecycle and evidence." }
+        { type: "code", ref: "packages/core/src/integrations/account-aggregator.js", note: "AA consent module: artefact lifecycle and evidence." }
       ],
       terms: ["CIC", "AA", "EMI", "FOIR"],
       related: ["m03-underwriting/policy-as-data", "m09-compliance/cic-reporting"],
@@ -128,7 +128,7 @@ export default {
         { type: "capability", ref: "AIG-008", note: "Global, model, workflow and use-case kill switches." },
         { type: "capability", ref: "AIG-010", note: "Human review, customer disclosure and human handoff." },
         { type: "capability", ref: "AIG-014", note: "Decision reason lineage from the actual deciding authority." },
-        { type: "code", ref: "packages/core/src/model-governance.js", note: "Kill-switch state source of truth; the decision engine enforces it." }
+        { type: "code", ref: "packages/core/src/ai/model-governance.js", note: "Kill-switch state source of truth; the decision engine enforces it." }
       ],
       terms: ["Kill switch", "Digital worker", "Decision engine"],
       related: ["m09-compliance/model-governance", "m03-underwriting/policy-as-data"],

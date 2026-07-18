@@ -26,7 +26,7 @@ import {
   scimUserResourceToIdentityEvent,
   suspendSaasPrincipalFromIdentityProvider,
   verifyFederatedRevocationEnvelope
-} from "../../../../packages/core/src/index.js";
+} from "@loanos/core";
 
 export async function routeEnterpriseTenantControls(context) {
   const { method, path, req, res, store, stateRef, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor, upsertFederatedTenantUser } = context;

@@ -1,6 +1,6 @@
 // Generates the differential corpus for the lending.eligibility port (PH-1).
 //
-// Runs the incumbent JS implementation (packages/core/src/eligibility.js)
+// Runs the incumbent JS implementation (packages/core/src/lending/eligibility.js)
 // over a deterministic, seeded case sample and records each case's facts (in
 // the engine's contract shape) alongside the JS decision. The Rust test
 // rules-eval/tests/differential_eligibility.rs replays the corpus against the
@@ -12,7 +12,7 @@
 import { writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { evaluateEligibility } from "../../packages/core/src/eligibility.js";
+import { evaluateEligibility } from "@loanos/core/lending/eligibility.js";
 
 const NOW = new Date("2026-07-10T00:00:00.000Z");
 

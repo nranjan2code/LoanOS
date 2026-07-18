@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { assessProductionRelease, recordGovernanceSignoff, recordIndependentAssuranceTest, recordOperationalReadiness, recordSourceEtlRun, registerInstitutionConfiguration, remediateAssuranceFinding } from "../packages/core/src/bank-assurance-operations.js";
+import { assessProductionRelease, recordGovernanceSignoff, recordIndependentAssuranceTest, recordOperationalReadiness, recordSourceEtlRun, registerInstitutionConfiguration, remediateAssuranceFinding } from "@loanos/core/compliance/bank-assurance-operations.js";
 const NOW = new Date("2026-07-15T00:00:00.000Z"); const sha = "a".repeat(64); const approval = { proposedBy: "maker", approvedBy: "checker", approvalRef: "approval/1", evidenceRefs: ["evidence/1"] };
 
 test("configuration and ETL require independent approval and exact reconciliation", () => {

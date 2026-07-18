@@ -7,7 +7,7 @@ import {
   assessIdentityConformanceCampaign,
   createIdentityConformanceCampaign,
   recordIdentityConformanceResult
-} from "../packages/core/src/index.js";
+} from "@loanos/core";
 
 test("identity conformance catalogue is exhaustive, vendor-neutral, and simulator-only", () => {
   assert.deepEqual([...new Set(IDENTITY_CONFORMANCE_CATALOG.map((item) => item.family))], IDENTITY_INTEGRATION_FAMILIES);

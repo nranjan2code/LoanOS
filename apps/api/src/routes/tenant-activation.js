@@ -1,4 +1,4 @@
-import { assessTenantActivation } from "../../../../packages/core/src/index.js";
+import { assessTenantActivation } from "@loanos/core";
 
 const PREFIX = "/admin/tenant-activation";
 

@@ -239,7 +239,7 @@ fn eval_call(
 }
 
 /// Reducing-balance EMI matching `estimateEmi` in
-/// `packages/core/src/eligibility.js`, computed exactly in decimal and
+/// `packages/core/src/lending/eligibility.js`, computed exactly in decimal and
 /// rounded half-away-from-zero to 2 places. Domain violations return null
 /// (mirroring the JS), not an error: requiredness is the rule table's job.
 fn emi(

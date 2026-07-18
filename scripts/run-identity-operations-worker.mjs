@@ -4,7 +4,7 @@ import {
   IdentityOperationsWorkerRuntime,
   createIdentityOperationsExecutionHandlers,
   createIdentityOperationsWorkerApiClient
-} from "../packages/core/src/index.js";
+} from "@loanos/core";
 
 const env = process.env;
 const executionMode = env.LOANOS_IDENTITY_WORKER_EXECUTION_MODE ?? "simulated";

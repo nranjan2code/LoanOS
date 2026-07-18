@@ -35,7 +35,7 @@ const MODULE_VISUALS = {
 };
 
 const { course, glossary } = await import(pathToFileURL(join(OUT, "content/course.mjs")).href);
-const { PRODUCT_JOURNEY_CONTRACTS } = await import(pathToFileURL(join(ROOT, "packages/core/src/product-journey-contracts.js")).href);
+const { PRODUCT_JOURNEY_CONTRACTS } = await import("@loanos/core/journeys/product-journey-contracts.js");
 course.modules.forEach((module, index) => { module.number = index + 1; });
 const BASE_LIFECYCLE = new Set(["draft", "submitted", "identity_verified", "underwriting", "approved", "contracted", "disbursed", "active", "delinquent", "restructured", "closed", "cancelled"]);
 const supportMatrix = new Map();
@@ -309,7 +309,7 @@ function journeyPanels(journeyType) {
   const servicing = contract.lifecycleCapabilities.filter((capability) => !BASE_LIFECYCLE.has(capability));
   const term = (value) => `<code>${esc(value)}</code>`;
   return `  <section class="panel journey"><h2>Journey contract <span class="muted">(derived from code at build time)</span></h2>
-    <p class="muted">Source: <code>packages/core/src/product-journey-contracts.js</code> · <code>${esc(contract.contractId)}</code> v${contract.contractVersion} · checksum <code>${esc(contract.checksumSha256.slice(0, 12))}…</code></p>
+    <p class="muted">Source: <code>packages/core/src/journeys/product-journey-contracts.js</code> · <code>${esc(contract.contractId)}</code> v${contract.contractVersion} · checksum <code>${esc(contract.checksumSha256.slice(0, 12))}…</code></p>
     <dl class="contract">
       <div><dt>Workspace archetype</dt><dd>${term(contract.archetype)}</dd></div>
       <div><dt>Facility type</dt><dd>${term(contract.facility.type)}</dd></div>

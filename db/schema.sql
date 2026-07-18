@@ -164,7 +164,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON platform_users, sessions, login_attempts
 
 -- ─── Control plane: platform audit chain ──────────────────────────────────
 -- One row per sealed event rather than a JSON array in a blob: this is the
--- audit evidence spine (packages/core/src/audit.js) and a real append-only
+-- audit evidence spine (packages/core/src/shared/audit.js) and a real append-only
 -- table is a strict improvement over a JSONB array for the same reasons the
 -- domain doc flags external anchoring as a follow-on — a table gives you
 -- database-level append-only enforcement (via the trigger below) and makes

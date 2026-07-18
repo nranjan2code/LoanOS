@@ -4,7 +4,7 @@ Status date: 2026-07-14
 
 ## Implemented scope
 
-`packages/core/src/implementation-governance.js` and the tenant route module `apps/api/src/routes/implementation-controls.js` provide one auditable control chain from approved configuration through hypercare exit:
+`packages/core/src/platform/implementation-governance.js` and the tenant route module `apps/api/src/routes/implementation-controls.js` provide one auditable control chain from approved configuration through hypercare exit:
 
 1. An implementation project freezes products, source systems, operating roles, target environment, configuration workbook/checksum, owner, data-freeze time, rollback plan, and maker-checker approval.
 2. Source inventory and mapping retain every customer/application/loan/ledger/document/audit source, target, record count/checksum, required fields, versioned transformation checksum, cleansing exceptions, reconciliation method, and independent approval. A mapping with unresolved cleansing issues cannot drive a migration run.

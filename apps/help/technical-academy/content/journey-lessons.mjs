@@ -1,4 +1,4 @@
-import { PRODUCT_JOURNEY_CONTRACTS } from "../../../../packages/core/src/product-journey-contracts.js";
+import { PRODUCT_JOURNEY_CONTRACTS } from "@loanos/core/journeys/product-journey-contracts.js";
 
 const verified = "2026-07-17";
 
@@ -104,7 +104,7 @@ function make(journeyType) {
     ],
     flow: ["Tenant journey readiness", "Typed capture + evidence", "Specialist + credit decision", "KFS + contract", "Controlled disbursement", "LMS + servicing", "Distress / closure + replay"],
     cases: commonCases(adverse),
-    sources: [["code", "packages/core/src/product-journey-contracts.js"], ["code", "packages/core/src/product-journey-schemas.js"], ["code", "packages/core/src/composed-journey-lifecycle.js"], ["code", "apps/api/src/routes/composed-journeys.js"], ["test", "tests/product-journey-conformance.test.js"], ["doc", "docs/product/product-journey-support-matrix.md"]]
+    sources: [["code", "packages/core/src/journeys/product-journey-contracts.js"], ["code", "packages/core/src/journeys/product-journey-schemas.js"], ["code", "packages/core/src/journeys/composed-journey-lifecycle.js"], ["code", "apps/api/src/routes/composed-journeys.js"], ["test", "tests/product-journey-conformance.test.js"], ["doc", "docs/product/product-journey-support-matrix.md"]]
   };
 }
 
@@ -123,7 +123,7 @@ export const journeyCasebookLessons = [
     ],
     flow: ["Detect failure", "Classify certainty + authority", "Deny / refer / pause", "Reconcile effects", "Approve compensation or resume", "Replay evidence"],
     cases: commonCases("Apply the journey-specific adverse list in its dedicated lesson"),
-    sources: [["doc", "docs/product/product-journey-platform-depth-audit.md"], ["code", "packages/core/src/product-journey-conformance.js"], ["test", "tests/product-journey-conformance.test.js"]]
+    sources: [["doc", "docs/product/product-journey-platform-depth-audit.md"], ["code", "packages/core/src/journeys/product-journey-conformance.js"], ["test", "tests/product-journey-conformance.test.js"]]
   },
   {
     id: "journey-state-evidence-map", title: "Journey state, API and evidence reference", duration: "36 min", verified,
@@ -135,7 +135,7 @@ export const journeyCasebookLessons = [
       ["Evidence export", "A defensible pack connects product version and actors to input facts/evidence, deterministic decisions, human approvals, borrower documents/communications, money/security events, exceptions, remediation, reporting and closure. Hashes and exact amounts allow independent verification."]
     ],
     flow: ["Product configuration", "Workspace draft", "Journey application", "Specialist case", "Composed lifecycle", "Account + workflow", "Audit/evidence export"],
-    sources: [["code", "packages/core/src/journey-application-service.js"], ["code", "packages/core/src/specialist-journey-service.js"], ["code", "packages/core/src/composed-journey-lifecycle.js"], ["code", "apps/api/src/routes/journey-applications.js"]]
+    sources: [["code", "packages/core/src/journeys/journey-application-service.js"], ["code", "packages/core/src/journeys/specialist-journey-service.js"], ["code", "packages/core/src/journeys/composed-journey-lifecycle.js"], ["code", "apps/api/src/routes/journey-applications.js"]]
   },
   {
     id: "journey-production-certification", title: "Journey production-certification casebook", duration: "38 min", verified,
@@ -147,6 +147,6 @@ export const journeyCasebookLessons = [
       ["Decision", "Production-ready is tenant-, environment-, journey-, configuration- and version-specific. Evidence has owners and expiry. A changed policy/provider/template or expired critical assurance reopens certification and may suspend new originations."]
     ],
     flow: ["Platform conformance", "Tenant configuration", "Live-provider certification", "UAT + migration", "Security + DR", "Independent approvals", "Production admission + expiry monitoring"],
-    sources: [["code", "packages/core/src/product-journey-certification.js"], ["doc", "docs/architecture/production-completion-controls.md"], ["doc", "docs/architecture/implementation-migration-go-live.md"], ["test", "tests/product-journey-certification.test.js"]]
+    sources: [["code", "packages/core/src/journeys/product-journey-certification.js"], ["doc", "docs/architecture/production-completion-controls.md"], ["doc", "docs/architecture/implementation-migration-go-live.md"], ["test", "tests/product-journey-certification.test.js"]]
   }
 ];

@@ -24,7 +24,7 @@ import {
   transitionSuccessionCase,
   transitionSuccessionLegalReview,
   revokeSuccessionAuthority
-} from "../packages/core/src/index.js";
+} from "@loanos/core";
 import { createLoanOsServer } from "../apps/api/src/server.js";
 import { projectChannelOperations } from "../apps/api/src/routes/customer-channel-controls.js";
 import { upsertTenantUser } from "../apps/api/src/identity.js";

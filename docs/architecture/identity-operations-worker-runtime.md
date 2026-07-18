@@ -13,7 +13,7 @@ This runtime makes four tenant identity-control checks durably schedulable and e
 | `federation_metadata_validation` | Check issuer metadata, signing keys, certificates and expiry windows. |
 | `activity_custody_verification` | Confirm activity evidence reached its configured immutable custody boundary. |
 
-`packages/core/src/identity-operations-worker.js` is the deterministic state transition layer. `packages/core/src/identity-operations-worker-runtime.js` is the bounded execution loop and service-plane client. `scripts/run-identity-operations-worker.mjs` is the runnable process. The transition layer does not open network connections or hold provider secrets; the runner authenticates only through a tenant-bound service credential and never accepts a tenant ID from a job payload.
+`packages/core/src/identity/identity-operations-worker.js` is the deterministic state transition layer. `packages/core/src/identity/identity-operations-worker-runtime.js` is the bounded execution loop and service-plane client. `scripts/run-identity-operations-worker.mjs` is the runnable process. The transition layer does not open network connections or hold provider secrets; the runner authenticates only through a tenant-bound service credential and never accepts a tenant ID from a job payload.
 
 ## Persistent state contract
 

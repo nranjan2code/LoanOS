@@ -15,7 +15,7 @@ import {
   registerMigrationMapping,
   reviewHypercare,
   validateOpeningBalances
-} from "../packages/core/src/index.js";
+} from "@loanos/core";
 import { createLoanOsServer } from "../apps/api/src/server.js";
 
 const NOW = new Date("2026-07-14T00:00:00.000Z"); const approval = { proposedBy: "implementation_maker", approvedBy: "implementation_checker", approvalRef: "approval-1" }; const sha = (value) => createHash("sha256").update(value).digest("hex");

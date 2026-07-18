@@ -33,7 +33,7 @@ Both tiers are India-hosted. Tier choice is a tenant-contract fact recorded in t
 
 ## Audit Evidence Spine
 
-*Implemented (S4).* Every save seals the tenant's events into an append-only, tenant-scoped SHA-256 hash chain in `packages/core/src/audit.js`; `GET /audit/events` reports chain validity and `GET /audit/export` produces an integrity-attested evidence pack (which 409s rather than hand out a tampered pack). The chain root is bound to the tenant, so a chain cannot be transplanted between tenants. Each event carries:
+*Implemented (S4).* Every save seals the tenant's events into an append-only, tenant-scoped SHA-256 hash chain in `packages/core/src/shared/audit.js`; `GET /audit/events` reports chain validity and `GET /audit/export` produces an integrity-attested evidence pack (which 409s rather than hand out a tampered pack). The chain root is bound to the tenant, so a chain cannot be transplanted between tenants. Each event carries:
 
 - `sequence`, `eventId`, `tenantId`, `occurredAt` — stamped by the spine today.
 - `previousHash` and `hash` — the per-tenant SHA-256 chain; stamped by the spine today.

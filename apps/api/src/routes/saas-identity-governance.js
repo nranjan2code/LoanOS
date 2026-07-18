@@ -26,9 +26,9 @@ import {
   registerSaasPrincipal,
   requestEmergencyAccess,
   requestOwnershipTransfer
-} from "../../../../packages/core/src/saas-identity-governance.js";
-import { pauseSpecialistCasesForPrincipal } from "../../../../packages/core/src/specialist-journey-service.js";
-import { pauseComposedJourneysForPrincipal } from "../../../../packages/core/src/composed-journey-lifecycle.js";
+} from "@loanos/core/identity/saas-identity-governance.js";
+import { pauseSpecialistCasesForPrincipal } from "@loanos/core/journeys/specialist-journey-service.js";
+import { pauseComposedJourneysForPrincipal } from "@loanos/core/journeys/composed-journey-lifecycle.js";
 import { decidePlatformControlStaffing } from "../control-rules-engine.js";
 
 const PREFIX = "/admin/identity-governance";

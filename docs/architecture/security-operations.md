@@ -4,7 +4,7 @@
 
 This audit-backed platform control plane governs detection rules, security alerts, SOC triage, investigations, evidence preservation, response transitions, and log-source coverage. It accepts references and checksums from a SIEM/evidence vault; it does not replace those production systems. Tenant incident ids and platform support-case ids are retained as lineage, while regulatory notification and service workflows remain governed by their own state machines.
 
-Implementation: `packages/core/src/security-operations.js`; authenticated routes: `apps/api/src/server.js`.
+Implementation: `packages/core/src/operations/security-operations.js`; authenticated routes: `apps/api/src/server.js`.
 
 ## Detection and alert controls
 

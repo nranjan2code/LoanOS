@@ -1,4 +1,4 @@
-import test from "node:test";import assert from "node:assert/strict";import{PRODUCT_JOURNEY_TYPES,REQUIRED_CHECKS,activateProductJourney,approveProductJourney,cloneProductJourneyTemplate,configureProductJourney,createProductJourneyDraft,projectProductJourneyReadiness,retireProductJourney,suspendProductJourney}from"../packages/core/src/product-journey-administration.js";
+import test from "node:test";import assert from "node:assert/strict";import{PRODUCT_JOURNEY_TYPES,REQUIRED_CHECKS,activateProductJourney,approveProductJourney,cloneProductJourneyTemplate,configureProductJourney,createProductJourneyDraft,projectProductJourneyReadiness,retireProductJourney,suspendProductJourney}from"@loanos/core/journeys/product-journey-administration.js";
 const NOW=new Date("2026-07-15T10:00:00Z");
 const readinessEvidence={entitlementRef:"entitlement/1",supportCertificationRef:"support/1",tenantUatRef:"uat/1",operationsSignoffRef:"ops/1"};
 const checks=()=>REQUIRED_CHECKS.map(checkId=>({checkId,status:"complete",evidenceRef:`evidence://${checkId}`,completedBy:"admin"}));

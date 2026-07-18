@@ -1,4 +1,4 @@
-import { ExternalServiceManager, certifyProvider, suspendProviderCertification } from "../../../../packages/core/src/index.js";
+import { ExternalServiceManager, certifyProvider, suspendProviderCertification } from "@loanos/core";
 
 // Provider operational controls are isolated from the large resource router so
 // readiness and callback security can evolve without coupling to loan flows.

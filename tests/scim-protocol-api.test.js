@@ -4,12 +4,12 @@ import { createHash } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createFederationPolicy, certifyFederationPolicy } from "../packages/core/src/enterprise-identity.js";
+import { createFederationPolicy, certifyFederationPolicy } from "@loanos/core/identity/enterprise-identity.js";
 import { createLoanOsServer } from "../apps/api/src/server.js";
 import { loadState, saveState } from "../apps/api/src/file-store.js";
-import { createComposedJourneyInstance } from "../packages/core/src/composed-journey-lifecycle.js";
-import { JOURNEY_WORKSPACE_SCHEMAS } from "../packages/core/src/journey-workspace.js";
-import { PRODUCT_TEMPLATE_CATALOGUE } from "../packages/core/src/product-template-catalogue.js";
+import { createComposedJourneyInstance } from "@loanos/core/journeys/composed-journey-lifecycle.js";
+import { JOURNEY_WORKSPACE_SCHEMAS } from "@loanos/core/journeys/journey-workspace.js";
+import { PRODUCT_TEMPLATE_CATALOGUE } from "@loanos/core/platform/product-template-catalogue.js";
 
 test("SCIM 2.0 service surface is tenant-scoped, idempotent and deactivates immediately", async (t) => {
   const dataDir = await mkdtemp(join(tmpdir(), "loanos-scim-")); const tenant = { tenantId: "tenant_scim", name: "SCIM Bank", apiKey: "scim-service-key" };

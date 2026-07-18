@@ -4,7 +4,7 @@ Status date: 2026-07-14
 
 ## Implemented scope
 
-`packages/core/src/risk-aml-governance.js` provides a deterministic, tenant-scoped control layer for the institution's second-line risk work:
+`packages/core/src/compliance/risk-aml-governance.js` provides a deterministic, tenant-scoped control layer for the institution's second-line risk work:
 
 - Screening-list registration requires a SHA-256 content digest, provider/version lineage, India storage, current validity, evidence, and maker-checker approval. Ongoing CDD cannot complete without current UN-sanctions, UAPA, PEP, and internal-negative lists or without evaluating every mandatory family.
 - Ongoing CDD records purpose/nature, source-of-funds and beneficial-ownership evidence, exact-paise expected versus observed activity, geography risk, match outcomes, the next review date, and an evidence checksum. Screening matches, material profile deviations, and high-risk geography fail to enhanced due diligence.

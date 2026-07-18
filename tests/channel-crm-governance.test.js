@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { allocateTerritoryCapacity, approvePartnerOnboarding, certifyPartnerAccess, closePartnerConductCase, createFieldHierarchy, createPartnerOnboarding, issuePartnerCredential, openPartnerConductCase, revokePartnerCredential } from "../packages/core/src/channel-crm-governance.js";
+import { allocateTerritoryCapacity, approvePartnerOnboarding, certifyPartnerAccess, closePartnerConductCase, createFieldHierarchy, createPartnerOnboarding, issuePartnerCredential, openPartnerConductCase, revokePartnerCredential } from "@loanos/core/operations/channel-crm-governance.js";
 
 const NOW = new Date("2026-07-15T10:00:00.000Z");
 const approval = { tenantId: "tenant-a", proposedBy: "maker", approvedBy: "checker", approvalRef: "approval://1" };

@@ -5,7 +5,7 @@ import {
   publishBrandRelease,
   resolveBrandExperience,
   rollbackBrandRelease
-} from "../../../../packages/core/src/index.js";
+} from "@loanos/core";
 
 const ADMIN_PREFIX = "/admin/brand-governance";
 const EXPERIENCE_PATH = "/brand-experience";

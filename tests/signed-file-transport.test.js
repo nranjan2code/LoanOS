@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createTransportRecord, createTransportResubmission, markTransportDispatched, parseSignedFile, recordTransportPoll, serializeSignedFile } from "../packages/core/src/signed-file-transport.js";
+import { createTransportRecord, createTransportResubmission, markTransportDispatched, parseSignedFile, recordTransportPoll, serializeSignedFile } from "@loanos/core/integrations/signed-file-transport.js";
 
 const rows = [{ rowId: "1", amountPaise: "101", note: "a,b" }, { rowId: "2", amountPaise: "99", note: "<ok>" }]; const columns = ["rowId", "amountPaise", "note"];
 test("CSV, JSON, XML and fixed-width serialization round-trip with binary checksums", () => {

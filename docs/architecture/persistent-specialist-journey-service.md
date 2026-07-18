@@ -32,7 +32,7 @@ flowchart LR
   P --> W
 ```
 
-`packages/core/src/specialist-journey-service.js` is pure domain orchestration. `apps/api/src/routes/specialist-journeys.js` derives tenant and actor authority from the authenticated request. The file and PostgreSQL stores persist the same tenant-data document; PostgreSQL applies the existing tenant row-level-security and advisory-lock boundary.
+`packages/core/src/journeys/specialist-journey-service.js` is pure domain orchestration. `apps/api/src/routes/specialist-journeys.js` derives tenant and actor authority from the authenticated request. The file and PostgreSQL stores persist the same tenant-data document; PostgreSQL applies the existing tenant row-level-security and advisory-lock boundary.
 
 ## Persisted state
 

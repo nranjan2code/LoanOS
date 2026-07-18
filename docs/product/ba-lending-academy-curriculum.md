@@ -59,7 +59,7 @@ Curriculum content is data, not markup — one ES module per course module under
 | `terms` | Glossary terms used in the lesson; each must exist in the course glossary. |
 | `related` | Cross-links to other lessons as `module-id/lesson-id`; must resolve. |
 | `check` | ≥ 1 knowledge-check question `{ q, options, answer, why }`. |
-| `journeyType` | Journey deep-dive lessons only: a canonical journey type from `packages/core/src/product-journey-contracts.js`. The build derives the lesson's journey-contract panel (archetype, facility, security, required facts/evidence, servicing capabilities, contract id and checksum) directly from that module and the platform-support panel from `docs/product/product-journey-support-matrix.md`, so structural detail cannot drift from the shipped contracts. Both references are validated; a missing contract or matrix row fails the build. |
+| `journeyType` | Journey deep-dive lessons only: a canonical journey type from `packages/core/src/journeys/product-journey-contracts.js`. The build derives the lesson's journey-contract panel (archetype, facility, security, required facts/evidence, servicing capabilities, contract id and checksum) directly from that module and the platform-support panel from `docs/product/product-journey-support-matrix.md`, so structural detail cannot drift from the shipped contracts. Both references are validated; a missing contract or matrix row fails the build. |
 
 Citation rules:
 

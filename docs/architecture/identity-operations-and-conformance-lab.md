@@ -113,15 +113,15 @@ Both catalogues are deterministic, checksum-bound, tenant-isolated and fail clos
 
 ## Executable evidence
 
-- `packages/core/src/identity-operations.js`
-- `packages/core/src/identity-integration-conformance.js`
-- `packages/core/src/identity-operational-automation.js`
-- `packages/core/src/identity-operations-worker.js`
-- `packages/core/src/federated-revocation-verification.js`
-- `packages/core/src/conformance-campaign-administration.js`
-- `packages/core/src/tenant-activation-gate.js`
-- `packages/core/src/enterprise-platform-conformance.js`
-- `packages/core/src/organisation-admission-conformance.js`
+- `packages/core/src/identity/identity-operations.js`
+- `packages/core/src/identity/identity-integration-conformance.js`
+- `packages/core/src/identity/identity-operational-automation.js`
+- `packages/core/src/identity/identity-operations-worker.js`
+- `packages/core/src/identity/federated-revocation-verification.js`
+- `packages/core/src/operations/conformance-campaign-administration.js`
+- `packages/core/src/platform/tenant-activation-gate.js`
+- `packages/core/src/platform/enterprise-platform-conformance.js`
+- `packages/core/src/platform/organisation-admission-conformance.js`
 - `apps/api/src/routes/identity-operations.js`
 - `apps/api/src/routes/enterprise-controls.js`
 - `apps/dashboard/index.html` and `apps/dashboard/index.js`

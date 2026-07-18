@@ -92,7 +92,7 @@ export default {
         { type: "capability", ref: "GRV-004", note: "30-day clock and overdue escalation." },
         { type: "capability", ref: "GRV-006", note: "RBI CMS link, submission, acknowledgement and order tracking." },
         { type: "capability", ref: "FRD-008", note: "Natural-justice show-cause and response workflow." },
-        { type: "code", ref: "packages/core/src/compliance-controls.js", note: "Complaint registry with grievance-officer workflow and RBI clock." }
+        { type: "code", ref: "packages/core/src/compliance/compliance-controls.js", note: "Complaint registry with grievance-officer workflow and RBI clock." }
       ],
       terms: ["Grievance officer", "RBI CMS", "LSP"],
       related: ["m02-onboarding/fraud-screening", "m06-collections/collections-operations", "m08-partners/lsp-dla-governance"],

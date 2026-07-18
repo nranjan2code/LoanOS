@@ -7,7 +7,7 @@ import {
   proposeSpecialistJourneyAction,
   proposeSpecialistJourneyConfiguration,
   suspendSpecialistJourneyConfiguration
-} from "../../../../packages/core/src/index.js";
+} from "@loanos/core";
 
 const PREFIX = "/admin/specialist-journeys";
 

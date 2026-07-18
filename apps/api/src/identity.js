@@ -1,5 +1,5 @@
 import { createHash, createHmac, pbkdf2Sync, randomBytes, timingSafeEqual } from "node:crypto";
-import { CANONICAL_ROLE_CATALOGUE, KNOWN_STAFF_ROLES } from "../../../packages/core/src/index.js";
+import { CANONICAL_ROLE_CATALOGUE, KNOWN_STAFF_ROLES } from "@loanos/core";
 
 const PASSWORD_ITERATIONS = 120000;
 const PASSWORD_KEYLEN = 32;

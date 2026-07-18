@@ -29,7 +29,7 @@ export default {
         { type: "capability", ref: "CLL-001", note: "DPD, overdue amount, bucket and delinquency status." },
         { type: "capability", ref: "CLL-014", note: "Collection analytics: roll rates, cure and liquidation." },
         { type: "capability", ref: "RPT-009", note: "CRILC/SMA and large-exposure reporting." },
-        { type: "code", ref: "packages/core/src/compliance-controls.js", note: "Delinquency computation and asset classification on the LMS account model." }
+        { type: "code", ref: "packages/core/src/compliance/compliance-controls.js", note: "Delinquency computation and asset classification on the LMS account model." }
       ],
       terms: ["DPD", "SMA", "NPA", "IRACP", "EMI"],
       related: ["m05-lms/loan-account-ledger", "m06-collections/collections-operations", "m09-compliance/cic-reporting"],

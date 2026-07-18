@@ -1,4 +1,4 @@
-import test from "node:test"; import assert from "node:assert/strict"; import { createHmac } from "node:crypto"; import { enqueueProviderCallback } from "../packages/core/src/provider-callback-delivery.js"; import { ProviderCallbackDispatcher } from "../apps/api/src/provider-callback-dispatcher.js";
+import test from "node:test"; import assert from "node:assert/strict"; import { createHmac } from "node:crypto"; import { enqueueProviderCallback } from "@loanos/core/integrations/provider-callback-delivery.js"; import { ProviderCallbackDispatcher } from "../apps/api/src/provider-callback-dispatcher.js";
 const T0=new Date("2026-07-15T10:00:00Z");
 function queued(overrides={}){return enqueueProviderCallback({}, {tenantId:"t1",deliveryId:"d1",provider:"partner",eventId:"e1",targetRef:"target/1",payload:{status:"ready"},signature:"queued-signature",maxAttempts:3,baseDelayMs:100,...overrides},T0).registry;}
 function worker(fetch,options={}){return new ProviderCallbackDispatcher({fetch,resolveTarget:()=>"http://callback.test/hook",resolveSecret:()=>"secret",timeoutMs:100,leaseMs:1000,circuitFailureThreshold:2,circuitCooldownMs:1000,...options});}

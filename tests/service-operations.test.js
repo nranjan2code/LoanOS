@@ -15,7 +15,7 @@ import {
   escalateSupportCase,
   transitionProblemRecord,
   transitionSupportCase
-} from "../packages/core/src/index.js";
+} from "@loanos/core";
 
 const start = new Date("2026-07-14T10:00:00.000Z");
 

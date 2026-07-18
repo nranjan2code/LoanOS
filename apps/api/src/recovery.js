@@ -1,5 +1,5 @@
 import { createCipheriv, createDecipheriv, createHash, hkdfSync, randomBytes } from "node:crypto";
-import { verifyAuditChain } from "../../../packages/core/src/index.js";
+import { verifyAuditChain } from "@loanos/core";
 
 const FORMAT = "loanos.recovery.v1";
 const ALGORITHM = "aes-256-gcm";

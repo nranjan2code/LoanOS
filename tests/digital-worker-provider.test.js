@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { INDIA_REGION, invokeDigitalWorkerProvider } from "../packages/core/src/digital-worker-provider.js";
+import { INDIA_REGION, invokeDigitalWorkerProvider } from "@loanos/core/ai/digital-worker-provider.js";
 
 const H = "a".repeat(64);
 const request = () => ({ requestId: "req-1", tenantId: "re-1", executionId: "run-1", installationId: "agent-1", action: "cam.draft", purpose: "prepare CAM", inputRef: "case/1", inputHash: H, promptHash: H, region: INDIA_REGION, modelId: "model-1", modelVersion: "2026-07", providerAllowlist: ["test-provider"], modelAllowlist: [{ modelId: "model-1", version: "2026-07" }], authorization: { modelConsumptionTraceRef: "trace:model", actionGuardrailTraceRef: "trace:action", proposalOnly: true }, outputSchema: { type: "object", required: ["summary", "needsHumanReview"], additionalProperties: false, properties: { summary: { type: "string" }, needsHumanReview: { type: "boolean" } } } });

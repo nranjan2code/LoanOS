@@ -9,7 +9,7 @@
 // and the AI/agent guardrail decisions (`guardrail.model_consumption`,
 // `guardrail.agent_action`) — it does not own the engine itself (see
 // `rules/`) or model lifecycle/kill-switch state (see
-// `packages/core/src/model-governance.js`); it only calls out to whichever of
+// `packages/core/src/ai/model-governance.js`); it only calls out to whichever of
 // those the tenant's engine instance enforces.
 //
 // Bridges the Node API to the per-tenant rules-service instance. Modes via

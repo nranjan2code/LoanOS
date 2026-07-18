@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { VENDOR_UAT_SCENARIOS, assessVendorActivation, certifyVendorUat, mapVendorPayload, registerVendorMapping } from "../packages/core/src/vendor-payload-mapping.js";
+import { VENDOR_UAT_SCENARIOS, assessVendorActivation, certifyVendorUat, mapVendorPayload, registerVendorMapping } from "@loanos/core/integrations/vendor-payload-mapping.js";
 
 const NOW = new Date("2026-07-15T00:00:00.000Z"), H = "a".repeat(64), H2 = "b".repeat(64), approval = { proposedBy: "maker", approvedBy: "checker", approvalRef: "approval/1" };
 const mappingInput = { tenantId: "t1", mappingId: "cic-v1", family: "cic", provider: "vendor", operation: "submit", sourceSchemaVersion: "1", sourceSchemaChecksumSha256: H, targetSchemaVersion: "2026", targetSchemaChecksumSha256: H2, dataResidencyCountry: "IN", certificationRef: "cert/contract", fields: [{ source: "loan.amountPaise", target: "tradeline.amount", transform: "paise_string" }, { source: "party.name", target: "borrower.name", transform: "trim" }], ...approval };

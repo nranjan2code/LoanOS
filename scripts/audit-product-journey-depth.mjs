@@ -1,10 +1,10 @@
 import { access, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
-import { PRODUCT_JOURNEY_TYPES } from "../packages/core/src/product-journey-administration.js";
-import { PERSISTENT_SPECIALIST_JOURNEY_TYPES } from "../packages/core/src/specialist-journey-service.js";
-import { JOURNEY_WORKSPACE_ARCHETYPES, PRODUCT_TO_WORKSPACE_ARCHETYPE, validateJourneyWorkspaceCatalogue } from "../packages/core/src/journey-workspace.js";
-import { COMPOSED_JOURNEY_STAGES, validateComposedJourneyLifecycleCatalogue } from "../packages/core/src/composed-journey-lifecycle.js";
+import { PRODUCT_JOURNEY_TYPES } from "@loanos/core/journeys/product-journey-administration.js";
+import { PERSISTENT_SPECIALIST_JOURNEY_TYPES } from "@loanos/core/journeys/specialist-journey-service.js";
+import { JOURNEY_WORKSPACE_ARCHETYPES, PRODUCT_TO_WORKSPACE_ARCHETYPE, validateJourneyWorkspaceCatalogue } from "@loanos/core/journeys/journey-workspace.js";
+import { COMPOSED_JOURNEY_STAGES, validateComposedJourneyLifecycleCatalogue } from "@loanos/core/journeys/composed-journey-lifecycle.js";
 
 const root = resolve(new URL("..", import.meta.url).pathname);
 const audit = JSON.parse(await readFile(resolve(root, "docs/product/product-journey-platform-depth.json"), "utf8"));

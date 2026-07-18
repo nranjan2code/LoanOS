@@ -1,4 +1,4 @@
-import { prepareAccessActivityExport, recordAccessActivityCustody, reconcileAccessActivityCustody } from "../../../../packages/core/src/access-activity-custody.js";
+import { prepareAccessActivityExport, recordAccessActivityCustody, reconcileAccessActivityCustody } from "@loanos/core/identity/access-activity-custody.js";
 
 export async function routeAccessActivityCustody(context) {
   const { method, path, req, res, tenant, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor } = context;

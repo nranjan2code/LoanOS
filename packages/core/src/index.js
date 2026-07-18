@@ -4,7 +4,7 @@ export {
   getRegulatoryControl,
   listRegulatoryControls,
   summarizeFindings
-} from "./compliance-controls.js";
+} from "./compliance/compliance-controls.js";
 
 export {
   GST_RATE_BPS,
@@ -14,7 +14,7 @@ export {
   decomposeGstInclusive,
   withGstDisclosure,
   summarizeGst
-} from "./tax.js";
+} from "./finance/tax.js";
 
 export {
   AUDIT_ACTOR_TYPES,
@@ -26,7 +26,7 @@ export {
   sealAuditChain,
   stampAuditEvents,
   verifyAuditChain
-} from "./audit.js";
+} from "./shared/audit.js";
 
 export {
   KNOWN_STAFF_ROLES,
@@ -42,7 +42,7 @@ export {
   validateRecoveryAssignmentAccess,
   validateWorkflowActorAccess,
   validateWorkflowAssignmentAccess
-} from "./access-control.js";
+} from "./identity/access-control.js";
 
 export {
   HANDOFF_STATUSES,
@@ -50,7 +50,7 @@ export {
   listHumanHandoffRequests,
   requestHumanHandoff,
   resolveHumanHandoff
-} from "./ai-interaction.js";
+} from "./ai/ai-interaction.js";
 
 export {
   PRODUCT_CONTRACT_VERSION,
@@ -61,7 +61,7 @@ export {
   PRODUCT_CONTRACT_WHITE_LABEL_CONTENT_KEYS,
   getProductJourneyContract,
   validateProductJourneyContracts
-} from "./product-journey-contracts.js";
+} from "./journeys/product-journey-contracts.js";
 
 export {
   PRODUCT_READINESS_GATES,
@@ -79,7 +79,7 @@ export {
   administerTenantProgramme,
   assessTenantProductReadiness,
   diffTenantProductConfigurations
-} from "./product-platform-administration.js";
+} from "./platform/product-platform-administration.js";
 
 export {
   BRAND_SCOPE_LEVELS,
@@ -90,12 +90,12 @@ export {
   rollbackBrandRelease,
   resolveBrandExperience,
   projectBrandAdministration
-} from "./brand-governance.js";
+} from "./operations/brand-governance.js";
 
 export {
   promoteSubmittedJourneyDraft,
   projectJourneyApplication
-} from "./journey-application-service.js";
+} from "./journeys/journey-application-service.js";
 
 export {
   MODEL_STATUSES,
@@ -108,7 +108,7 @@ export {
   triggerKillSwitch,
   clearGlobalKillSwitch,
   evaluateModelUse
-} from "./model-governance.js";
+} from "./ai/model-governance.js";
 
 export {
   AI_AGENT_MARKETPLACE_TEMPLATES,
@@ -131,17 +131,17 @@ export {
   recordAiAgentUsage,
   suspendTenantAiAgent,
   buildAiAgentGovernanceReport
-} from "./ai-agent-platform.js";
+} from "./ai/ai-agent-platform.js";
 
 export {
   INDIA_REGION as DIGITAL_WORKER_INDIA_REGION,
   invokeDigitalWorkerProvider
-} from "./digital-worker-provider.js";
+} from "./ai/digital-worker-provider.js";
 
 export {
   DEMO_SCENARIOS,
   createDemoDigitalWorkerProvider
-} from "./digital-worker-demo-provider.js";
+} from "./ai/digital-worker-demo-provider.js";
 
 export {
   ALLOWED_RE_TYPES,
@@ -154,7 +154,7 @@ export {
   validateDisbursement,
   validateKfs,
   validateKfsBeforeDecision
-} from "./loan-policy.js";
+} from "./lending/loan-policy.js";
 
 export {
   generateDlaCimsExport,
@@ -172,7 +172,7 @@ export {
   validateLendingServiceProvider,
   validateProductPolicy,
   validateRegulatedEntity
-} from "./registries.js";
+} from "./shared/registries.js";
 
 export {
   BENEFICIAL_OWNER_ENTITY_TYPES,
@@ -203,7 +203,7 @@ export {
   uploadCkycRecord,
   redactBorrowerKycRecords,
   redactBorrowerBeneficialOwners
-} from "./borrower-onboarding.js";
+} from "./lending/borrower-onboarding.js";
 
 export {
   ERASURE_REQUEST_STATUSES,
@@ -215,14 +215,14 @@ export {
   rejectErasureRequest,
   findExpiredRetentionBorrowers,
   executeAutoRetentionCleanup
-} from "./data-retention.js";
+} from "./compliance/data-retention.js";
 
 export {
   SHARING_LEGAL_BASES,
   SHARING_RECIPIENT_TYPES,
   listDataDisclosures,
   recordDataDisclosure
-} from "./data-sharing.js";
+} from "./compliance/data-sharing.js";
 
 export {
   APPLICATION_STATUSES,
@@ -235,7 +235,7 @@ export {
   recordDocumentPacketDelivered,
   recordDocumentPacketGenerated,
   recordHumanReview
-} from "./application-workflow.js";
+} from "./lending/application-workflow.js";
 
 export {
   ORIGINATION_CHANNELS,
@@ -249,7 +249,7 @@ export {
   satisfyUnderwritingCondition,
   validateOriginationBeforeDecision,
   validateOriginationBeforeDisbursement
-} from "./origination-journey.js";
+} from "./lending/origination-journey.js";
 
 export {
   accrueInterest,
@@ -283,9 +283,9 @@ export {
   executeCoolingOffCancellation,
   waiveLoanAccountCharge,
   summarizeLoanAccount
-} from "./loan-account.js";
+} from "./lending/loan-account.js";
 
-export { reconcileBankStatementEntry, reconcilePaymentRailSettlement } from "./payment-reconciliation.js";
+export { reconcileBankStatementEntry, reconcilePaymentRailSettlement } from "./finance/payment-reconciliation.js";
 export {
   BUSINESS_EVENT_EXPECTATIONS,
   assessDataQuality,
@@ -298,13 +298,13 @@ export {
   releaseEvidenceLegalHold,
   reconcileBusinessEventCompleteness,
   registerDataLineage
-} from "./data-governance.js";
+} from "./compliance/data-governance.js";
 export {
   applyScimIdentityEvent,
   assessFederationPolicy,
   certifyFederationPolicy,
   createFederationPolicy
-} from "./enterprise-identity.js";
+} from "./identity/enterprise-identity.js";
 export {
   assessPlatformCapacity,
   createWebhookSubscription,
@@ -318,7 +318,7 @@ export {
   registerManagedKeyAttestation,
   registerPitrPolicy,
   registerSecurityLogCustody
-} from "./enterprise-platform.js";
+} from "./platform/enterprise-platform.js";
 export {
   assessFraudSignals,
   buildPortfolioRiskSnapshot,
@@ -331,7 +331,7 @@ export {
   registerFraudRiskPolicy,
   registerScreeningList,
   stressPortfolio
-} from "./risk-aml-governance.js";
+} from "./compliance/risk-aml-governance.js";
 
 export {
   assessGoLiveReadiness,
@@ -344,7 +344,7 @@ export {
   registerMigrationMapping,
   reviewHypercare,
   validateOpeningBalances
-} from "./implementation-governance.js";
+} from "./platform/implementation-governance.js";
 
 export {
   createComplianceObligationCalendar,
@@ -361,7 +361,7 @@ export {
   registerWorkforcePolicy,
   resolveApprovalRequirement,
   transitionConfiguredWorkflowCase
-} from "./institutional-operations.js";
+} from "./operations/institutional-operations.js";
 
 export {
   buildCustomer360,
@@ -384,33 +384,33 @@ export {
   transitionSuccessionCase,
   transitionSuccessionLegalReview,
   revokeSuccessionAuthority
-} from "./customer-channel-operations.js";
-export { allocateTerritoryCapacity, approvePartnerOnboarding, certifyPartnerAccess, closePartnerConductCase, createFieldHierarchy, createPartnerOnboarding, issuePartnerCredential, openPartnerConductCase, revokePartnerCredential } from "./channel-crm-governance.js";
-export { approvePartnerFinanceReversal, buildPartnerStatement, createPartnerBankPaymentFile, createPartnerPayableInstruction, openPartnerFinanceDispute, reconcilePartnerPayment, validatePartnerCommissionInvoice } from "./partner-finance.js";
-export { executeCustomerIdentityMerge, prepareCustomerIdentityMerge, reconcileExternalIdentity, rollbackCustomerIdentityMerge } from "./customer-identity-operations.js";
-export { buildSuccessionOperationsQueue, reconcileSuccessionExternalInstruction, registerSuccessionOperationsPolicy, submitSuccessionExternalInstruction } from "./succession-operations.js";
-export { approveLanguagePack, approveLocalizedTemplate, certifyFieldDevice, enqueueEncryptedOfflineWork, reconcileEncryptedOfflineWork, resolveLocalizedTemplate } from "./customer-experience-completion.js";
-export { REQUIRED_PRODUCTION_COMPONENTS, assessProductionGoLive, attestProductionComponent, evaluateProductionDependencyGraph, recordProductionResilienceDrill } from "./production-infrastructure.js";
-export { assessProductionRelease, recordGovernanceSignoff, recordIndependentAssuranceTest, recordOperationalReadiness, recordSourceEtlRun, registerInstitutionConfiguration, remediateAssuranceFinding } from "./bank-assurance-operations.js";
-export { activateLiveIntegration, approveLiveIntegrationOnboarding, assessLiveIntegrationReadiness, recordLiveIntegrationConformance } from "./live-integration-operations.js";
-export { approveProfitabilityParameters, approveProductAddon, approveRiskPricingMatrix, approveTenantPlan, authorizePlanUsage, createTenantCommunication, diffProductVersions, importTenantPortablePackage, promoteEnvironmentConfiguration } from "./platform-product-completion.js";
-export { acknowledgeBcAssistedKycUpdate, analyzeBankStatement, assessGuardianSpecialCategory, assignRiskGradeAndPrice, buildPeriodicKycAction, calculateHouseholdIndebtedness, recordPhysicalOriginalCustody, verifyUnderwritingSources } from "./kyc-underwriting-completion.js";
-export { authorizeDisbursementTranche, completeMultipartySigning, recordCollateralMonitoring, recordCollateralRelease, recordPostDisbursementFollowup, registerCollateralAssessment } from "./collateral-disbursement-completion.js";
-export { allocateCollectionPortfolio, approveServicingChange, buildCollectionPerformance, deriveCollectionTreatment, issueServicingDocument, registerCollectionStrategy, settleCollectionAgencyFee } from "./servicing-collections-completion.js";
-export { accountRecoveryProceeds, allocatePostWriteoffRecovery, assessClosureSla, authorizeRepossession, buildInstallmentVariants, conductRecoveryAuction, moveDueDateForHoliday, recordPossessionAndValuation, releaseOriginalsAndCollateral, releaseRepossessedAsset } from "./lms-recovery-closure-completion.js";
-export { approveGrievanceRcaCapa, approveServicingPortfolioTransfer, assessPartnerOversight, buildGrievanceAnalytics, closeOmbudsmanAward, createAssistedComplaint, manageLspIncident } from "./partner-grievance-completion.js";
-export { amendRegulatoryReturn, createRegulatoryReturn, publishMasterReferenceVersion, reconcileRegulatorySubmission, registerDataProduct, registerGovernedConnector } from "./reporting-data-integration-completion.js";
+} from "./operations/customer-channel-operations.js";
+export { allocateTerritoryCapacity, approvePartnerOnboarding, certifyPartnerAccess, closePartnerConductCase, createFieldHierarchy, createPartnerOnboarding, issuePartnerCredential, openPartnerConductCase, revokePartnerCredential } from "./operations/channel-crm-governance.js";
+export { approvePartnerFinanceReversal, buildPartnerStatement, createPartnerBankPaymentFile, createPartnerPayableInstruction, openPartnerFinanceDispute, reconcilePartnerPayment, validatePartnerCommissionInvoice } from "./finance/partner-finance.js";
+export { executeCustomerIdentityMerge, prepareCustomerIdentityMerge, reconcileExternalIdentity, rollbackCustomerIdentityMerge } from "./identity/customer-identity-operations.js";
+export { buildSuccessionOperationsQueue, reconcileSuccessionExternalInstruction, registerSuccessionOperationsPolicy, submitSuccessionExternalInstruction } from "./operations/succession-operations.js";
+export { approveLanguagePack, approveLocalizedTemplate, certifyFieldDevice, enqueueEncryptedOfflineWork, reconcileEncryptedOfflineWork, resolveLocalizedTemplate } from "./operations/customer-experience-completion.js";
+export { REQUIRED_PRODUCTION_COMPONENTS, assessProductionGoLive, attestProductionComponent, evaluateProductionDependencyGraph, recordProductionResilienceDrill } from "./platform/production-infrastructure.js";
+export { assessProductionRelease, recordGovernanceSignoff, recordIndependentAssuranceTest, recordOperationalReadiness, recordSourceEtlRun, registerInstitutionConfiguration, remediateAssuranceFinding } from "./compliance/bank-assurance-operations.js";
+export { activateLiveIntegration, approveLiveIntegrationOnboarding, assessLiveIntegrationReadiness, recordLiveIntegrationConformance } from "./integrations/live-integration-operations.js";
+export { approveProfitabilityParameters, approveProductAddon, approveRiskPricingMatrix, approveTenantPlan, authorizePlanUsage, createTenantCommunication, diffProductVersions, importTenantPortablePackage, promoteEnvironmentConfiguration } from "./platform/platform-product-completion.js";
+export { acknowledgeBcAssistedKycUpdate, analyzeBankStatement, assessGuardianSpecialCategory, assignRiskGradeAndPrice, buildPeriodicKycAction, calculateHouseholdIndebtedness, recordPhysicalOriginalCustody, verifyUnderwritingSources } from "./lending/kyc-underwriting-completion.js";
+export { authorizeDisbursementTranche, completeMultipartySigning, recordCollateralMonitoring, recordCollateralRelease, recordPostDisbursementFollowup, registerCollateralAssessment } from "./lending/collateral-disbursement-completion.js";
+export { allocateCollectionPortfolio, approveServicingChange, buildCollectionPerformance, deriveCollectionTreatment, issueServicingDocument, registerCollectionStrategy, settleCollectionAgencyFee } from "./lending/servicing-collections-completion.js";
+export { accountRecoveryProceeds, allocatePostWriteoffRecovery, assessClosureSla, authorizeRepossession, buildInstallmentVariants, conductRecoveryAuction, moveDueDateForHoliday, recordPossessionAndValuation, releaseOriginalsAndCollateral, releaseRepossessedAsset } from "./lending/lms-recovery-closure-completion.js";
+export { approveGrievanceRcaCapa, approveServicingPortfolioTransfer, assessPartnerOversight, buildGrievanceAnalytics, closeOmbudsmanAward, createAssistedComplaint, manageLspIncident } from "./operations/partner-grievance-completion.js";
+export { amendRegulatoryReturn, createRegulatoryReturn, publishMasterReferenceVersion, reconcileRegulatorySubmission, registerDataProduct, registerGovernedConnector } from "./compliance/reporting-data-integration-completion.js";
 export {
   PROVIDER_INTEGRATIONS,
   assessProviderCertification,
   certifyProvider,
   suspendProviderCertification,
   validateProviderCertification
-} from "./provider-governance.js";
-export { createSuspenseReceipt, resolveSuspenseReceipt, writeOffSuspenseReceipt } from "./payment-operations.js";
-export { buildLoanJournalEntries } from "./accounting.js";
-export { buildFinanceJournalEntries, buildGstReturnData, buildTdsReturnData, calculateEclAssessment } from "./finance-accounting.js";
-export { buildAlmReport, buildManagementFinanceJournals, buildProfitabilityReport } from "./finance-management.js";
+} from "./integrations/provider-governance.js";
+export { createSuspenseReceipt, resolveSuspenseReceipt, writeOffSuspenseReceipt } from "./finance/payment-operations.js";
+export { buildLoanJournalEntries } from "./finance/accounting.js";
+export { buildFinanceJournalEntries, buildGstReturnData, buildTdsReturnData, calculateEclAssessment } from "./finance/finance-accounting.js";
+export { buildAlmReport, buildManagementFinanceJournals, buildProfitabilityReport } from "./finance/finance-management.js";
 
 export {
   CIC_BATCH_STATUSES,
@@ -426,7 +426,7 @@ export {
   enrichCicCorrection,
   resolveCicCorrectionRequest,
   submitCicBatch
-} from "./cic-reporting.js";
+} from "./compliance/cic-reporting.js";
 
 export {
   CKYCRR_PACKET_VERSION,
@@ -437,13 +437,13 @@ export {
   resolveCkycrrProbableMatch,
   submitCkycrrSubmission,
   validateCkycrrDownload
-} from "./ckyc-reporting.js";
+} from "./compliance/ckyc-reporting.js";
 
 export {
   normalizeRecoveryAgent,
   upsertRecoveryAgent,
   validateRecoveryAgent
-} from "./recovery-agent.js";
+} from "./lending/recovery-agent.js";
 
 export {
   LEGAL_RECOVERY_TRACKS,
@@ -454,7 +454,7 @@ export {
   issueLegalRecoveryNotice,
   recordCollectionContact,
   recordLegalRecoveryEvent
-} from "./collections-recovery.js";
+} from "./lending/collections-recovery.js";
 
 export {
   DLG_CAP_PERCENT,
@@ -466,7 +466,7 @@ export {
   normalizeDlgArrangement,
   upsertDlgArrangement,
   validateDlgArrangement
-} from "./dlg.js";
+} from "./lending/dlg.js";
 
 export {
   CO_LENDING_ROLES,
@@ -477,7 +477,7 @@ export {
   recordCoLendingLoanAllocation,
   upsertCoLendingArrangement,
   validateCoLendingArrangement
-} from "./co-lending.js";
+} from "./lending/co-lending.js";
 
 export {
   acknowledgeCoLendingTaxExchange,
@@ -488,7 +488,7 @@ export {
   createCoLendingSettlementStatement,
   createCoLendingTaxExchange,
   recordCoLendingSettlementPayment
-} from "./co-lending-finance.js";
+} from "./lending/co-lending-finance.js";
 
 export {
   AA_CONSENT_MODES,
@@ -504,7 +504,7 @@ export {
   normalizeAccountAggregatorConsent,
   revokeAccountAggregatorConsent,
   validateAccountAggregatorConsent
-} from "./account-aggregator.js";
+} from "./integrations/account-aggregator.js";
 
 export {
   COMPLAINT_CATEGORIES,
@@ -517,7 +517,7 @@ export {
   escalateComplaintToRbiCms,
   resolveComplaint,
   startComplaintReview
-} from "./grievance.js";
+} from "./compliance/grievance.js";
 
 export {
   FRAUD_CASE_STATUSES,
@@ -529,7 +529,7 @@ export {
   generateFraudCommitteePack,
   issueShowCauseNotice,
   recordFraudResponse
-} from "./fraud-case.js";
+} from "./lending/fraud-case.js";
 
 export {
   INCIDENT_CATEGORIES,
@@ -540,7 +540,7 @@ export {
   createIncident,
   enrichIncident,
   recordIncidentNotification
-} from "./incident-notification.js";
+} from "./compliance/incident-notification.js";
 
 export {
   generateDocumentPacket,
@@ -549,18 +549,18 @@ export {
   validateDocumentPacketBeforeDisbursement,
   validateDocumentPacketGeneration,
   signDocumentPacket
-} from "./document-packet.js";
+} from "./shared/document-packet.js";
 
 export {
   listDocumentVaultRecords,
   vaultDocumentPacket
-} from "./document-vault.js";
+} from "./shared/document-vault.js";
 
 export {
   ELIGIBILITY_DECISIONS,
   estimateEmi,
   evaluateEligibility
-} from "./eligibility.js";
+} from "./lending/eligibility.js";
 
 export {
   WORKFLOW_TASK_STATUSES,
@@ -571,9 +571,9 @@ export {
   normalizeWorkflowTaskStore,
   releaseWorkflowTask,
   startWorkflowTask
-} from "./workflow-tasks.js";
+} from "./journeys/workflow-tasks.js";
 
-export { buildTenantOperationalHealth } from "./operations-monitoring.js";
+export { buildTenantOperationalHealth } from "./operations/operations-monitoring.js";
 
 export {
   approvePlatformRelease,
@@ -588,7 +588,7 @@ export {
   proposePlatformRollback,
   approvePlatformRollback,
   rollbackPlatformRelease
-} from "./platform-delivery.js";
+} from "./platform/platform-delivery.js";
 
 export {
   DEFAULT_SLA_MINUTES,
@@ -610,7 +610,7 @@ export {
   projectServiceOperations,
   transitionProblemRecord,
   transitionSupportCase
-} from "./service-operations.js";
+} from "./operations/service-operations.js";
 
 export {
   SBOM_FORMATS,
@@ -627,7 +627,7 @@ export {
   projectSecurityAssurance,
   registerSbom,
   transitionVulnerability
-} from "./security-assurance.js";
+} from "./operations/security-assurance.js";
 
 export {
   ALERT_ACKNOWLEDGEMENT_MINUTES,
@@ -643,7 +643,7 @@ export {
   projectSecurityOperations,
   transitionSecurityInvestigation,
   triageSecurityAlert
-} from "./security-operations.js";
+} from "./operations/security-operations.js";
 
 export {
   CERTIFICATION_RESULTS,
@@ -664,16 +664,16 @@ export {
   respondAuditRequest,
   transitionAssuranceIssue,
   transitionAuditEngagement
-} from "./control-assurance.js";
+} from "./compliance/control-assurance.js";
 
 export {
   validateMarketplaceNeutrality,
   rankMarketplaceOffers
-} from "./offer-marketplace.js";
+} from "./lending/offer-marketplace.js";
 
 export {
   ExternalServiceManager
-} from "./external-services.js";
+} from "./integrations/external-services.js";
 
 export {
   ORIGINATION_PROVIDER_CONFORMANCE_PACKS,
@@ -682,7 +682,7 @@ export {
   assessOriginationConformancePack,
   assessOriginationConformanceSuite,
   buildOriginationSimulatorScenarios
-} from "./origination-provider-conformance.js";
+} from "./integrations/origination-provider-conformance.js";
 
 export {
   ORGANISATION_ADMISSION_CONFORMANCE_PACKS,
@@ -694,13 +694,13 @@ export {
   assessOrganisationAdmissionConformanceSuite,
   buildOrganisationAdmissionSimulatorScenarios,
   createOrganisationAdmissionConformanceSimulator
-} from "./organisation-admission-conformance.js";
+} from "./platform/organisation-admission-conformance.js";
 
 export {
   DeterministicProviderSimulator,
   createProviderSimulator,
   verifySimulatedProviderCallback
-} from "./provider-simulator.js";
+} from "./integrations/provider-simulator.js";
 
 export {
   createCommunicationDelivery,
@@ -708,7 +708,7 @@ export {
   recordCommunicationCallback,
   signCommunicationCallback,
   verifyCommunicationCallback
-} from "./communication-delivery-lifecycle.js";
+} from "./integrations/communication-delivery-lifecycle.js";
 
 export {
   claimDueProviderCallbacks,
@@ -716,7 +716,7 @@ export {
   projectProviderCallbackQueue,
   recordProviderCallbackAttempt,
   replayDeadLetterCallback
-} from "./provider-callback-delivery.js";
+} from "./integrations/provider-callback-delivery.js";
 
 export {
   SIGNED_FILE_SYSTEMS,
@@ -725,7 +725,7 @@ export {
   recordSignedFileAcknowledgement,
   registerSignedFileSchemaProfile,
   signedFileExportHooks
-} from "./signed-file-conformance.js";
+} from "./integrations/signed-file-conformance.js";
 
 export {
   createTransportRecord,
@@ -734,7 +734,7 @@ export {
   parseSignedFile,
   recordTransportPoll,
   serializeSignedFile
-} from "./signed-file-transport.js";
+} from "./integrations/signed-file-transport.js";
 
 export {
   BUSINESS_ADAPTER_DEFINITIONS,
@@ -747,44 +747,44 @@ export {
   projectBusinessAdapterReconciliation,
   recordBusinessAdapterEvent,
   registerBusinessAdapter
-} from "./business-adapter-conformance.js";
+} from "./integrations/business-adapter-conformance.js";
 
-export { HttpsProviderClient, PortalProviderClient, SftpProviderClient } from "./provider-transport-clients.js";
-export { registerCryptographicKey, executeCryptographicOperation, rotateCryptographicKey } from "./cryptographic-execution-ports.js";
-export { IntegrationWorkerRuntime, createIntegrationWorkerHandlers } from "./integration-worker-runtime.js";
-export { VENDOR_MAPPING_TRANSFORMS, VENDOR_UAT_SCENARIOS, registerVendorMapping, mapVendorPayload, certifyVendorUat, assessVendorActivation } from "./vendor-payload-mapping.js";
-export { emptyIntegrationWorkerState, integrationPayloadChecksum, createIntegrationJob, acquireIntegrationJobLease, heartbeatIntegrationJobLease, completeIntegrationJob, failIntegrationJob, replayDeadLetterJob, integrationWorkerHealth, runIntegrationWorkerOnce } from "./integration-worker-operations.js";
-export { registerSecurityAdapterProfile, createSecurityProviderPort, recordSecurityCompromiseExercise } from "./production-security-adapters.js";
-export { registerProviderMappingPack, recordSandboxCertificationCampaign, createVendorRfqComparison, approveVendorActivation, projectVendorActivationDashboard } from "./vendor-onboarding-operations.js";
-export { scheduleWorkflowTimer, claimDueWorkflowTimers, completeWorkflowTimer, routeWorkflowTask, pauseWorkflowCase, resumeWorkflowCase, migrateWorkflowCase, executeTransactionalBulkAction } from "./workflow-runtime-operations.js";
-export { PRODUCT_JOURNEY_TYPES, BUILT_IN_PRODUCT_JOURNEY_TYPES, BUSINESS_PRODUCT_JOURNEY_TYPES, REQUIRED_CHECKS, isCanonicalProductJourneyType, isBusinessProductJourneyType, createProductJourneyDraft, configureProductJourney, approveProductJourney, activateProductJourney, suspendProductJourney, retireProductJourney, cloneProductJourneyTemplate, projectProductJourneyReadiness } from "./product-journey-administration.js";
-export { PRODUCT_JOURNEY_CONFORMANCE_BASELINE, PRODUCT_JOURNEY_ARCHETYPES, buildProductJourneyConformanceManifest, registerProductJourneyConformanceCampaign, approveProductJourneyConformanceCampaign, recordProductJourneyConformanceResult, assessProductJourneyConformanceCampaign, projectProductJourneyConformanceCoverage } from "./product-journey-conformance.js";
+export { HttpsProviderClient, PortalProviderClient, SftpProviderClient } from "./integrations/provider-transport-clients.js";
+export { registerCryptographicKey, executeCryptographicOperation, rotateCryptographicKey } from "./integrations/cryptographic-execution-ports.js";
+export { IntegrationWorkerRuntime, createIntegrationWorkerHandlers } from "./integrations/integration-worker-runtime.js";
+export { VENDOR_MAPPING_TRANSFORMS, VENDOR_UAT_SCENARIOS, registerVendorMapping, mapVendorPayload, certifyVendorUat, assessVendorActivation } from "./integrations/vendor-payload-mapping.js";
+export { emptyIntegrationWorkerState, integrationPayloadChecksum, createIntegrationJob, acquireIntegrationJobLease, heartbeatIntegrationJobLease, completeIntegrationJob, failIntegrationJob, replayDeadLetterJob, integrationWorkerHealth, runIntegrationWorkerOnce } from "./integrations/integration-worker-operations.js";
+export { registerSecurityAdapterProfile, createSecurityProviderPort, recordSecurityCompromiseExercise } from "./platform/production-security-adapters.js";
+export { registerProviderMappingPack, recordSandboxCertificationCampaign, createVendorRfqComparison, approveVendorActivation, projectVendorActivationDashboard } from "./integrations/vendor-onboarding-operations.js";
+export { scheduleWorkflowTimer, claimDueWorkflowTimers, completeWorkflowTimer, routeWorkflowTask, pauseWorkflowCase, resumeWorkflowCase, migrateWorkflowCase, executeTransactionalBulkAction } from "./journeys/workflow-runtime-operations.js";
+export { PRODUCT_JOURNEY_TYPES, BUILT_IN_PRODUCT_JOURNEY_TYPES, BUSINESS_PRODUCT_JOURNEY_TYPES, REQUIRED_CHECKS, isCanonicalProductJourneyType, isBusinessProductJourneyType, createProductJourneyDraft, configureProductJourney, approveProductJourney, activateProductJourney, suspendProductJourney, retireProductJourney, cloneProductJourneyTemplate, projectProductJourneyReadiness } from "./journeys/product-journey-administration.js";
+export { PRODUCT_JOURNEY_CONFORMANCE_BASELINE, PRODUCT_JOURNEY_ARCHETYPES, buildProductJourneyConformanceManifest, registerProductJourneyConformanceCampaign, approveProductJourneyConformanceCampaign, recordProductJourneyConformanceResult, assessProductJourneyConformanceCampaign, projectProductJourneyConformanceCoverage } from "./journeys/product-journey-conformance.js";
 
-export { JOURNEY_WORKSPACE_ARCHETYPES, JOURNEY_WORKSPACE_CHANNELS, JOURNEY_WORKSPACE_SCHEMAS, PRODUCT_TO_WORKSPACE_ARCHETYPE, listJourneyWorkspaceDrafts, projectJourneyWorkspaceCatalogue, projectJourneyWorkspaceSchema, resolveEntitledJourneyTypes, saveJourneyWorkspaceDraft, validateJourneyWorkspaceCatalogue } from "./journey-workspace.js";
-export { COMPOSED_JOURNEY_STAGES, COMPOSED_JOURNEY_STAGE_DEFINITIONS, validateComposedJourneyLifecycleCatalogue, createComposedJourneyInstance, proposeComposedJourneyTransition, approveComposedJourneyTransition, pauseComposedJourneyInstance, pauseComposedJourneysForPrincipal, pauseComposedJourneysForProduct, recordComposedJourneyFailure, resumeComposedJourneyInstance, projectComposedJourneyInstance, projectComposedJourneyPortfolio } from "./composed-journey-lifecycle.js";
-export { JOURNEY_SUPPORT_LEVELS, certifyProductJourneySupport, suspendProductJourneySupport, projectProductJourneySupport, assessTenantJourneyActivation } from "./product-journey-certification.js";
-export { SPECIALISED_JOURNEY_FAMILIES, registerSpecialisedJourney, assessSpecialisedJourney } from "./specialised-lending-journeys.js";
-export { TRADE_JOURNEY_TYPES, configureTradeJourneyPack, registerTradeParty, registerTradeAsset, approveTradeFacilityTransaction, drawTradeFacility, settleTradeProceeds } from "./working-capital-trade-journeys.js";
-export { SPECIALIST_JOURNEY_TYPE_TO_FAMILY, PERSISTENT_SPECIALIST_JOURNEY_TYPES, proposeSpecialistJourneyConfiguration, approveSpecialistJourneyConfiguration, openSpecialistJourneyCase, proposeSpecialistJourneyAction, approveSpecialistJourneyAction, suspendSpecialistJourneyConfiguration, pauseSpecialistCasesForPrincipal, projectSpecialistJourneyWorkspace, projectSpecialistJourneyTasks } from "./specialist-journey-service.js";
-export { startGettingStartedSession, recordGettingStartedPrerequisites, assignGettingStartedAdministrators, bindGettingStartedConfiguration, recordGettingStartedValidation, approveGettingStartedLaunch, startProductAmendment, resumeGettingStartedSession, projectGettingStartedProgress } from "./tenant-getting-started.js";
-export { registerTenantCustomProduct, projectPlatformProductCatalogue, createTenantProductSubscription, requestProductAddon, decideProductAddon, grantProductAdminRole, revokeProductAdminRole, assessTenantProductEntitlement, projectTenantProductReadiness } from "./tenant-product-entitlements.js";
-export { PRODUCT_TEMPLATE_CATALOGUE, validateProductTemplateCatalogue, registerPlatformProductTemplate, deriveTenantProductTemplate, planTenantProductImplementation, activatePlannedTenantProducts } from "./product-template-catalogue.js";
-export { DEMO_REFERENCE_TIME, DEMO_SHOWCASE_PROFILE_ID, DEMO_WORKSHOP_PROFILE_ID, DEMO_INTEGRATION_KEYS, DEMO_PRODUCT_ADMIN_ROLES, DEMO_PERSONAS, buildShowcaseDemoProfile, validateDemoProfile, applyShowcaseDemoProfile, buildWorkshopTenantManifest } from "./demo-system.js";
-export { planTenantProvisioningSaga, acquireProvisioningStep, approveIrreversibleProvisioningStep, completeProvisioningStep, failProvisioningStep, nextProvisioningCompensation, recordProvisioningCompensation, reconcileProvisioningSaga, completeProvisioningHandover } from "./tenant-provisioning-saga.js";
-export { SAAS_DEPLOYMENT_MODELS, REQUIRED_DEPLOYMENT_COMPONENTS, createDeploymentBlueprintDraft, approveDeploymentBlueprint, compileTenantProvisioningPlan, assessTenantProvisioningReadiness } from "./saas-deployment-blueprints.js";
-export { CANONICAL_ROLE_CATALOGUE, CANONICAL_ROLE_IDS, PRODUCT_TEMPLATE_REQUIRED_ROLE_IDS, BOOTSTRAP_OWNER_ACTIONS, EMERGENCY_ALLOWED_ACTIONS, SEGREGATION_OF_DUTIES_RULES, MINIMUM_LAUNCH_ROLE_COVERAGE, FEATURE_STAFFING_POLICIES, FEATURE_STAFFING_POLICY_IDS, AGENT_ASSIGNABLE_ROLE_IDS, getCanonicalRole, validateCanonicalRoles, configureTenantFeatureStaffing, assessFeatureStaffingReadiness, projectTenantFeatureStaffing, authorizeStaffedFeatureAction, assessPrincipalRemovalImpact, closeStaffingEscalation, registerSaasPrincipal, issueBootstrapOwner, issueBootstrapChecker, proposeRoleGrant, approveRoleGrant, proposeRoleRevocation, approveRoleRevocation, assessMinimumLaunchCoverage, completeBootstrapTransition, requestOwnershipTransfer, approveOwnershipTransfer, requestEmergencyAccess, approveEmergencyAccess, closeEmergencyAccess, changeSaasPrincipalStatus, suspendSaasPrincipalFromIdentityProvider, authorizeSaasAction, projectPrincipalAccess } from "./saas-identity-governance.js";
-export { verifyOidcIdToken, verifySamlValidationAttestation, evaluateAuthenticationAssurance, federatedPrincipalFromClaims, scimUserResourceToIdentityEvent, scimUserProjection, canonicalFederationEvidence } from "./federated-access-runtime.js";
-export { prepareAccessActivityExport, recordAccessActivityCustody, reconcileAccessActivityCustody } from "./access-activity-custody.js";
-export { IDENTITY_INTEGRATION_FAMILIES, IDENTITY_CONFORMANCE_CATALOG, createIdentityConformanceCampaign, approveIdentityConformanceCampaign, simulateIdentityConformanceScenario, recordIdentityConformanceResult, assessIdentityConformanceCampaign } from "./identity-integration-conformance.js";
-export { ENTERPRISE_PLATFORM_FAMILIES, REQUIRED_ENTERPRISE_SCENARIO_CLASSES, ENTERPRISE_PLATFORM_CONFORMANCE_PACKS, assessEnterprisePlatformConformancePack, assessEnterprisePlatformConformanceSuite, buildEnterprisePlatformSimulatorManifest, simulateEnterprisePlatformScenario, assessEnterprisePlatformSimulation } from "./enterprise-platform-conformance.js";
-export { proposeFederationRotation, approveFederationRotation, suspendFederationPolicy, revokePrincipalSessions, proposeAuthenticatorRecovery, approveAuthenticatorRecovery, reconcileFederatedDirectory, projectIdentityOperationalReadiness } from "./identity-operations.js";
-export { FEDERATED_REVOCATION_PROTOCOLS, IDENTITY_DRILL_SCENARIOS, applyFederatedRevocationEvent, planIdentityOperationalRun, executeIdentityOperationalRun, proposeIdentityOperationsDrill, witnessIdentityOperationsDrill } from "./identity-operational-automation.js";
-export { FEDERATED_REVOCATION_SIGNATURE_ALGORITHMS, proposeFederatedRevocationVerifier, approveFederatedRevocationVerifier, verifyFederatedRevocationEnvelope } from "./federated-revocation-verification.js";
-export { TENANT_ACTIVATION_STATUSES, TENANT_ACTIVATION_EVIDENCE_MODES, TENANT_ACTIVATION_DIMENSIONS, checksumTenantActivationEvidence, assessTenantActivation } from "./tenant-activation-gate.js";
-export { CONFORMANCE_CAMPAIGN_TARGET_TYPES, CONFORMANCE_CAMPAIGN_STATUSES, CONFORMANCE_CERTIFICATION_MAX_DAYS, registerConformanceCandidateProfile, proposeConformanceCampaign, approveConformanceCampaign, recordConformanceCampaignEvidence, assessConformanceCampaign, expireConformanceCampaigns, proposeConformanceReassessment, projectConformanceCampaignAdministration } from "./conformance-campaign-administration.js";
-export { IDENTITY_OPERATION_JOB_TYPES, IDENTITY_OPERATIONS_WORKER_STATE_FIELDS, scheduleIdentityOperationsJob, claimIdentityOperationsJobs, recordIdentityOperationsJobOutcome, finalizeIdentityOperationsWorkerRun, replayIdentityOperationsDeadLetter } from "./identity-operations-worker.js";
-export { IdentityOperationsWorkerRuntime, createIdentityOperationsWorkerApiClient, createIdentityOperationsExecutionHandlers } from "./identity-operations-worker-runtime.js";
-export { CONTACTS, LEGAL_ACCEPTANCES, REQUIRED_ADMISSION_CONTROLS, REQUIRED_ORGANISATION_EVIDENCE, startOrganisationSignup, verifySignupContact, submitOrganisationIdentity, recordCorporateDomainProof, recordAuthorisedRepresentativeProof, acceptSignupLegalDocuments, decideOrganisationAdmission, appealOrganisationRejection, decideOrganisationAppeal, resumeOrganisationReverification, issueFirstOwnerInvitation, activateFirstOwner, requestTenantProvisioning, cancelOrganisationSignup, resumeOrganisationSignup, projectOrganisationSignup } from "./organisation-signup.js";
+export { JOURNEY_WORKSPACE_ARCHETYPES, JOURNEY_WORKSPACE_CHANNELS, JOURNEY_WORKSPACE_SCHEMAS, PRODUCT_TO_WORKSPACE_ARCHETYPE, listJourneyWorkspaceDrafts, projectJourneyWorkspaceCatalogue, projectJourneyWorkspaceSchema, resolveEntitledJourneyTypes, saveJourneyWorkspaceDraft, validateJourneyWorkspaceCatalogue } from "./journeys/journey-workspace.js";
+export { COMPOSED_JOURNEY_STAGES, COMPOSED_JOURNEY_STAGE_DEFINITIONS, validateComposedJourneyLifecycleCatalogue, createComposedJourneyInstance, proposeComposedJourneyTransition, approveComposedJourneyTransition, pauseComposedJourneyInstance, pauseComposedJourneysForPrincipal, pauseComposedJourneysForProduct, recordComposedJourneyFailure, resumeComposedJourneyInstance, projectComposedJourneyInstance, projectComposedJourneyPortfolio } from "./journeys/composed-journey-lifecycle.js";
+export { JOURNEY_SUPPORT_LEVELS, certifyProductJourneySupport, suspendProductJourneySupport, projectProductJourneySupport, assessTenantJourneyActivation } from "./journeys/product-journey-certification.js";
+export { SPECIALISED_JOURNEY_FAMILIES, registerSpecialisedJourney, assessSpecialisedJourney } from "./lending/specialised-lending-journeys.js";
+export { TRADE_JOURNEY_TYPES, configureTradeJourneyPack, registerTradeParty, registerTradeAsset, approveTradeFacilityTransaction, drawTradeFacility, settleTradeProceeds } from "./lending/working-capital-trade-journeys.js";
+export { SPECIALIST_JOURNEY_TYPE_TO_FAMILY, PERSISTENT_SPECIALIST_JOURNEY_TYPES, proposeSpecialistJourneyConfiguration, approveSpecialistJourneyConfiguration, openSpecialistJourneyCase, proposeSpecialistJourneyAction, approveSpecialistJourneyAction, suspendSpecialistJourneyConfiguration, pauseSpecialistCasesForPrincipal, projectSpecialistJourneyWorkspace, projectSpecialistJourneyTasks } from "./journeys/specialist-journey-service.js";
+export { startGettingStartedSession, recordGettingStartedPrerequisites, assignGettingStartedAdministrators, bindGettingStartedConfiguration, recordGettingStartedValidation, approveGettingStartedLaunch, startProductAmendment, resumeGettingStartedSession, projectGettingStartedProgress } from "./platform/tenant-getting-started.js";
+export { registerTenantCustomProduct, projectPlatformProductCatalogue, createTenantProductSubscription, requestProductAddon, decideProductAddon, grantProductAdminRole, revokeProductAdminRole, assessTenantProductEntitlement, projectTenantProductReadiness } from "./platform/tenant-product-entitlements.js";
+export { PRODUCT_TEMPLATE_CATALOGUE, validateProductTemplateCatalogue, registerPlatformProductTemplate, deriveTenantProductTemplate, planTenantProductImplementation, activatePlannedTenantProducts } from "./platform/product-template-catalogue.js";
+export { DEMO_REFERENCE_TIME, DEMO_SHOWCASE_PROFILE_ID, DEMO_WORKSHOP_PROFILE_ID, DEMO_INTEGRATION_KEYS, DEMO_PRODUCT_ADMIN_ROLES, DEMO_PERSONAS, buildShowcaseDemoProfile, validateDemoProfile, applyShowcaseDemoProfile, buildWorkshopTenantManifest } from "./platform/demo-system.js";
+export { planTenantProvisioningSaga, acquireProvisioningStep, approveIrreversibleProvisioningStep, completeProvisioningStep, failProvisioningStep, nextProvisioningCompensation, recordProvisioningCompensation, reconcileProvisioningSaga, completeProvisioningHandover } from "./platform/tenant-provisioning-saga.js";
+export { SAAS_DEPLOYMENT_MODELS, REQUIRED_DEPLOYMENT_COMPONENTS, createDeploymentBlueprintDraft, approveDeploymentBlueprint, compileTenantProvisioningPlan, assessTenantProvisioningReadiness } from "./platform/saas-deployment-blueprints.js";
+export { CANONICAL_ROLE_CATALOGUE, CANONICAL_ROLE_IDS, PRODUCT_TEMPLATE_REQUIRED_ROLE_IDS, BOOTSTRAP_OWNER_ACTIONS, EMERGENCY_ALLOWED_ACTIONS, SEGREGATION_OF_DUTIES_RULES, MINIMUM_LAUNCH_ROLE_COVERAGE, FEATURE_STAFFING_POLICIES, FEATURE_STAFFING_POLICY_IDS, AGENT_ASSIGNABLE_ROLE_IDS, getCanonicalRole, validateCanonicalRoles, configureTenantFeatureStaffing, assessFeatureStaffingReadiness, projectTenantFeatureStaffing, authorizeStaffedFeatureAction, assessPrincipalRemovalImpact, closeStaffingEscalation, registerSaasPrincipal, issueBootstrapOwner, issueBootstrapChecker, proposeRoleGrant, approveRoleGrant, proposeRoleRevocation, approveRoleRevocation, assessMinimumLaunchCoverage, completeBootstrapTransition, requestOwnershipTransfer, approveOwnershipTransfer, requestEmergencyAccess, approveEmergencyAccess, closeEmergencyAccess, changeSaasPrincipalStatus, suspendSaasPrincipalFromIdentityProvider, authorizeSaasAction, projectPrincipalAccess } from "./identity/saas-identity-governance.js";
+export { verifyOidcIdToken, verifySamlValidationAttestation, evaluateAuthenticationAssurance, federatedPrincipalFromClaims, scimUserResourceToIdentityEvent, scimUserProjection, canonicalFederationEvidence } from "./identity/federated-access-runtime.js";
+export { prepareAccessActivityExport, recordAccessActivityCustody, reconcileAccessActivityCustody } from "./identity/access-activity-custody.js";
+export { IDENTITY_INTEGRATION_FAMILIES, IDENTITY_CONFORMANCE_CATALOG, createIdentityConformanceCampaign, approveIdentityConformanceCampaign, simulateIdentityConformanceScenario, recordIdentityConformanceResult, assessIdentityConformanceCampaign } from "./identity/identity-integration-conformance.js";
+export { ENTERPRISE_PLATFORM_FAMILIES, REQUIRED_ENTERPRISE_SCENARIO_CLASSES, ENTERPRISE_PLATFORM_CONFORMANCE_PACKS, assessEnterprisePlatformConformancePack, assessEnterprisePlatformConformanceSuite, buildEnterprisePlatformSimulatorManifest, simulateEnterprisePlatformScenario, assessEnterprisePlatformSimulation } from "./platform/enterprise-platform-conformance.js";
+export { proposeFederationRotation, approveFederationRotation, suspendFederationPolicy, revokePrincipalSessions, proposeAuthenticatorRecovery, approveAuthenticatorRecovery, reconcileFederatedDirectory, projectIdentityOperationalReadiness } from "./identity/identity-operations.js";
+export { FEDERATED_REVOCATION_PROTOCOLS, IDENTITY_DRILL_SCENARIOS, applyFederatedRevocationEvent, planIdentityOperationalRun, executeIdentityOperationalRun, proposeIdentityOperationsDrill, witnessIdentityOperationsDrill } from "./identity/identity-operational-automation.js";
+export { FEDERATED_REVOCATION_SIGNATURE_ALGORITHMS, proposeFederatedRevocationVerifier, approveFederatedRevocationVerifier, verifyFederatedRevocationEnvelope } from "./identity/federated-revocation-verification.js";
+export { TENANT_ACTIVATION_STATUSES, TENANT_ACTIVATION_EVIDENCE_MODES, TENANT_ACTIVATION_DIMENSIONS, checksumTenantActivationEvidence, assessTenantActivation } from "./platform/tenant-activation-gate.js";
+export { CONFORMANCE_CAMPAIGN_TARGET_TYPES, CONFORMANCE_CAMPAIGN_STATUSES, CONFORMANCE_CERTIFICATION_MAX_DAYS, registerConformanceCandidateProfile, proposeConformanceCampaign, approveConformanceCampaign, recordConformanceCampaignEvidence, assessConformanceCampaign, expireConformanceCampaigns, proposeConformanceReassessment, projectConformanceCampaignAdministration } from "./operations/conformance-campaign-administration.js";
+export { IDENTITY_OPERATION_JOB_TYPES, IDENTITY_OPERATIONS_WORKER_STATE_FIELDS, scheduleIdentityOperationsJob, claimIdentityOperationsJobs, recordIdentityOperationsJobOutcome, finalizeIdentityOperationsWorkerRun, replayIdentityOperationsDeadLetter } from "./identity/identity-operations-worker.js";
+export { IdentityOperationsWorkerRuntime, createIdentityOperationsWorkerApiClient, createIdentityOperationsExecutionHandlers } from "./identity/identity-operations-worker-runtime.js";
+export { CONTACTS, LEGAL_ACCEPTANCES, REQUIRED_ADMISSION_CONTROLS, REQUIRED_ORGANISATION_EVIDENCE, startOrganisationSignup, verifySignupContact, submitOrganisationIdentity, recordCorporateDomainProof, recordAuthorisedRepresentativeProof, acceptSignupLegalDocuments, decideOrganisationAdmission, appealOrganisationRejection, decideOrganisationAppeal, resumeOrganisationReverification, issueFirstOwnerInvitation, activateFirstOwner, requestTenantProvisioning, cancelOrganisationSignup, resumeOrganisationSignup, projectOrganisationSignup } from "./platform/organisation-signup.js";
 
 export {
   ASSET_TYPES,
@@ -802,7 +802,7 @@ export {
   satisfySecurityInterest,
   searchCersaiCharges,
   validateCersaiForDisbursement
-} from "./cersai.js";
+} from "./compliance/cersai.js";
 
 export {
   ACCESS_REQUEST_STATUSES,
@@ -813,7 +813,7 @@ export {
   enrichCorrectionRequest,
   fulfillAccessRequest,
   reviewCorrectionRequest
-} from "./data-principal-rights.js";
+} from "./compliance/data-principal-rights.js";
 
 export {
   CTR_THRESHOLD_INR,
@@ -830,4 +830,4 @@ export {
   listFiuReports,
   repairFiuReport,
   reviewFiuReport
-} from "./fiu-str.js";
+} from "./compliance/fiu-str.js";

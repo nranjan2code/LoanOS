@@ -22,7 +22,7 @@ test("BA academy curriculum satisfies its content contract", async () => {
   assert.equal(course.modules.reduce((total, module) => total + module.lessons.length, 0), 78);
   assert.ok(course.disclaimer.includes("not legal advice"));
 
-  const { PRODUCT_JOURNEY_CONTRACTS } = await import(new URL("packages/core/src/product-journey-contracts.js", root).href);
+  const { PRODUCT_JOURNEY_CONTRACTS } = await import("@loanos/core/journeys/product-journey-contracts.js");
   const journeysModule = course.modules.find((module) => module.id === "journeys");
   assert.equal(journeysModule.lessons.length, 21, "one deep-dive lesson per canonical journey");
   const covered = new Set(journeysModule.lessons.map((lesson) => lesson.journeyType));

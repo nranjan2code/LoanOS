@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { executeCustomerIdentityMerge, prepareCustomerIdentityMerge, reconcileExternalIdentity, rollbackCustomerIdentityMerge } from "../packages/core/src/customer-identity-operations.js";
+import { executeCustomerIdentityMerge, prepareCustomerIdentityMerge, reconcileExternalIdentity, rollbackCustomerIdentityMerge } from "@loanos/core/identity/customer-identity-operations.js";
 
 const NOW = new Date("2026-07-15T00:00:00.000Z");
 const approval = { proposedBy: "identity_maker", approvedBy: "identity_checker", approvalRef: "approval/identity/1" };

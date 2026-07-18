@@ -3,7 +3,7 @@ import {
   enqueueEncryptedOfflineWork,
   leaseEncryptionKey,
   reconcileEncryptedOfflineWork
-} from "../../../../packages/core/src/customer-experience-completion.js";
+} from "@loanos/core/operations/customer-experience-completion.js";
 
 export async function routeCustomerExperienceCompletion(context) {
   const { method, path, req, res, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor } = context;

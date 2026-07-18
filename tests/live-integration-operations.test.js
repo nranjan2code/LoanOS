@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { activateLiveIntegration, approveLiveIntegrationOnboarding, assessLiveIntegrationReadiness, recordLiveIntegrationConformance } from "../packages/core/src/live-integration-operations.js";
+import { activateLiveIntegration, approveLiveIntegrationOnboarding, assessLiveIntegrationReadiness, recordLiveIntegrationConformance } from "@loanos/core/integrations/live-integration-operations.js";
 
 const NOW = new Date("2026-07-15T00:00:00.000Z"); const approval = { proposedBy: "integration-maker", approvedBy: "integration-checker", approvalRef: "approval/1" };
 test("live integration activation requires India residency and complete adverse conformance", () => {

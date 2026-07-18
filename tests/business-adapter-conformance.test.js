@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { BUSINESS_ADAPTER_FAMILIES, assessBusinessAdapterConformancePack, assessBusinessAdapterSuite, buildBusinessAdapterConformancePack, createBusinessAdapterRequest, projectBusinessAdapterReconciliation, recordBusinessAdapterEvent, registerBusinessAdapter } from "../packages/core/src/business-adapter-conformance.js";
+import { BUSINESS_ADAPTER_FAMILIES, assessBusinessAdapterConformancePack, assessBusinessAdapterSuite, buildBusinessAdapterConformancePack, createBusinessAdapterRequest, projectBusinessAdapterReconciliation, recordBusinessAdapterEvent, registerBusinessAdapter } from "@loanos/core/integrations/business-adapter-conformance.js";
 
 const NOW = new Date("2026-07-15T10:00:00.000Z");
 const profile = (family, overrides = {}) => ({ tenantId: "tenant_1", adapterId: `${family}_1`, family, provider: "mock", mode: "mock", dataResidencyCountry: "IN", contractRef: "contract_1", certificationRef: "cert_1", certificationExpiresAt: "2027-07-15T00:00:00.000Z", endpointRef: "endpoint_1", credentialRef: "vault_1", callbackSecretRef: "secret_1", reconciliationProfileRef: "recon_1", exitPlanRef: "exit_1", conformancePack: buildBusinessAdapterConformancePack(family), proposedBy: "maker_1", approvedBy: "checker_1", approvalRef: "approval_1", ...overrides });

@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
-import { ExternalServiceManager } from "../packages/core/src/external-services.js";
-import { reconcilePaymentRailSettlement } from "../packages/core/src/payment-reconciliation.js";
+import { ExternalServiceManager } from "@loanos/core/integrations/external-services.js";
+import { reconcilePaymentRailSettlement } from "@loanos/core/finance/payment-reconciliation.js";
 import { createLoanOsServer } from "../apps/api/src/server.js";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";

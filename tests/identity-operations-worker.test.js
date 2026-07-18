@@ -9,7 +9,7 @@ import {
   recordIdentityOperationsJobOutcome,
   replayIdentityOperationsDeadLetter,
   scheduleIdentityOperationsJob
-} from "../packages/core/src/identity-operations-worker.js";
+} from "@loanos/core/identity/identity-operations-worker.js";
 
 const NOW = new Date("2026-07-15T12:00:00.000Z");
 const digest = (value) => createHash("sha256").update(value).digest("hex");

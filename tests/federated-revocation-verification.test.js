@@ -5,7 +5,7 @@ import {
   approveFederatedRevocationVerifier,
   proposeFederatedRevocationVerifier,
   verifyFederatedRevocationEnvelope
-} from "../packages/core/src/federated-revocation-verification.js";
+} from "@loanos/core/identity/federated-revocation-verification.js";
 
 const NOW = new Date("2026-07-15T12:00:00.000Z");
 

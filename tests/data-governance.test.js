@@ -19,7 +19,7 @@ import {
   registerDataLineage,
   sealAuditChain,
   verifyAuditChain
-} from "../packages/core/src/index.js";
+} from "@loanos/core";
 import { createLoanOsServer } from "../apps/api/src/server.js";
 
 const TENANT_ID = "tenant_governance";

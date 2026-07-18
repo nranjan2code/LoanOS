@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { PRODUCT_JOURNEY_TYPES } from "../packages/core/src/product-journey-administration.js";
+import { PRODUCT_JOURNEY_TYPES } from "@loanos/core/journeys/product-journey-administration.js";
 import {
   PRODUCT_READINESS_GATES,
   activateTenantProduct,
@@ -15,7 +15,7 @@ import {
   retireTenantProduct,
   subscribeTenantProduct,
   suspendTenantProduct
-} from "../packages/core/src/product-platform-administration.js";
+} from "@loanos/core/platform/product-platform-administration.js";
 
 const NOW = new Date("2026-07-16T10:00:00.000Z");
 const cmd = (commandId, rest = {}) => ({ commandId, ...rest });

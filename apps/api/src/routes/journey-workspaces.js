@@ -3,7 +3,7 @@ import {
   projectJourneyWorkspaceCatalogue,
   projectJourneyWorkspaceSchema,
   saveJourneyWorkspaceDraft
-} from "../../../../packages/core/src/index.js";
+} from "@loanos/core";
 
 const PREFIX = "/journey-workspaces";
 

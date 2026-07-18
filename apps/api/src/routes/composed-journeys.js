@@ -6,7 +6,7 @@ import {
   proposeComposedJourneyTransition,
   recordComposedJourneyFailure,
   resumeComposedJourneyInstance
-} from "../../../../packages/core/src/index.js";
+} from "@loanos/core";
 
 const PREFIX = "/admin/composed-journeys";
 const READ_ROLES = ["tenant_admin", "operator", "credit_manager", "security_admin", "auditor"];

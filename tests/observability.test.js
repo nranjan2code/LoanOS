@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { createLoanOsServer } from "../apps/api/src/server.js";
 import { createObservabilityRegistry, normalizeRoutePath } from "../apps/api/src/observability.js";
 import { createEmptyTenantData } from "../apps/api/src/file-store.js";
-import { buildTenantOperationalHealth } from "../packages/core/src/index.js";
+import { buildTenantOperationalHealth } from "@loanos/core";
 
 test("runtime registry evaluates availability, latency, capacity, and low-cardinality routes", () => {
   const asOf = new Date("2026-07-14T12:00:00.000Z");

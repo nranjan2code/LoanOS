@@ -11,7 +11,7 @@ import {
   createSecurityInterest,
   fileSecurityInterest,
   repairCersaiSecurityInterest
-} from "../packages/core/src/index.js";
+} from "@loanos/core";
 import { createLoanOsServer } from "../apps/api/src/server.js";
 import { loadState, saveState } from "../apps/api/src/file-store.js";
 

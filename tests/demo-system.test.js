@@ -18,8 +18,8 @@ import {
   buildShowcaseDemoProfile,
   buildWorkshopTenantManifest,
   validateDemoProfile
-} from "../packages/core/src/demo-system.js";
-import { PRODUCT_JOURNEY_TYPES } from "../packages/core/src/product-journey-administration.js";
+} from "@loanos/core/platform/demo-system.js";
+import { PRODUCT_JOURNEY_TYPES } from "@loanos/core/journeys/product-journey-administration.js";
 
 function listen(server) {
   return new Promise((resolve, reject) => {

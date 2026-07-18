@@ -12,7 +12,7 @@ import {
   retireTenantProduct,
   subscribeTenantProduct,
   suspendTenantProduct
-} from "../../../../packages/core/src/index.js";
+} from "@loanos/core";
 
 const PREFIX = "/admin/product-platform";
 const READ_ROLES = ["tenant_admin", "operator", "credit_manager", "compliance_officer", "security_admin", "auditor"];

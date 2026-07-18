@@ -10,7 +10,7 @@ import {
   reconcileFederatedDirectory,
   revokePrincipalSessions,
   suspendFederationPolicy
-} from "../packages/core/src/index.js";
+} from "@loanos/core";
 
 const now = new Date("2026-07-15T10:00:00.000Z");
 const base = () => ({

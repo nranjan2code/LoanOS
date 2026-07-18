@@ -10,7 +10,7 @@ import {
   finalizeIdentityOperationsWorkerRun,
   recordIdentityOperationsJobOutcome,
   scheduleIdentityOperationsJob
-} from "../packages/core/src/index.js";
+} from "@loanos/core";
 
 const TENANT = "tenant-runtime";
 const WORKLOAD = "loanos-service://tenant-runtime/svc-worker";

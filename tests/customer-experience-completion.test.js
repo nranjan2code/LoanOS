@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { approveLanguagePack, approveLocalizedTemplate, certifyFieldDevice, enqueueEncryptedOfflineWork, reconcileEncryptedOfflineWork, resolveLocalizedTemplate } from "../packages/core/src/customer-experience-completion.js";
+import { approveLanguagePack, approveLocalizedTemplate, certifyFieldDevice, enqueueEncryptedOfflineWork, reconcileEncryptedOfflineWork, resolveLocalizedTemplate } from "@loanos/core/operations/customer-experience-completion.js";
 
 const NOW = new Date("2026-07-15T10:00:00.000Z");
 const sum = (value) => createHash("sha256").update(value).digest("hex");

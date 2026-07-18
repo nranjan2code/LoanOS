@@ -7,8 +7,9 @@ LoanOS is a multi-tenant, RBI-compliance-first lending platform (LOS + LMS + LWS
 ```
 apps/web, apps/tenant, apps/customer, apps/dashboard, apps/help, apps/android-field-ops, apps/android-dsa-ops   frontends & Android apps
 apps/api          Node HTTP API (no framework), multi-tenant, session/API-key auth
-packages/core     domain kernel: compliance controls, KYC, KFS, loan policy,
-                  audit hash chain, model governance (kill-switch source of truth)
+packages/core     domain kernel (@loanos/core workspace package): compliance controls,
+                  KYC, KFS, loan policy, audit hash chain, model governance (kill-switch
+                  source of truth); modules grouped by domain under src/ (ADR 0008)
 db/               Postgres schema (optional driver; RLS per tenant)
 rules/            THE DECISION ENGINE (Rust cargo workspace) — see below
 deploy/aws/       generation-2 synthetic-showcase infrastructure and immutable release tooling (server/browser only; never Android)
@@ -44,7 +45,7 @@ They meet at two deliberately isolated gateways: `apps/api/src/rules-engine.js` 
 - **Tenant isolation is absolute.** One engine runtime per tenant (ADR 0003); app-layer tenant partitions plus Postgres RLS on the Node side. Never introduce cross-tenant state.
 - **Policy is data.** New lending/guardrail policy becomes a decision model (JSON) with a golden corpus — not engine code, not scattered `if`s in `server.js`.
 - **Determinism and lineage.** Engine evaluation reads no clock, no RNG, no I/O; every decision is replayable byte-identically from its audit record (INV-1/8/12).
-- **AI is gated.** Model outputs enter decisions only as provenance-tagged facts (DEC-4); the kill switch (`packages/core/src/model-governance.js` is the state source; the engine enforces) degrades model-dependent decisions to manual review. Agent actions go through `guardrail.*` decisions (`allow/deny/require_human`).
+- **AI is gated.** Model outputs enter decisions only as provenance-tagged facts (DEC-4); the kill switch (`packages/core/src/ai/model-governance.js` is the state source; the engine enforces) degrades model-dependent decisions to manual review. Agent actions go through `guardrail.*` decisions (`allow/deny/require_human`).
 - **AI cannot approve releases.** A scoped platform agent may propose releases or rollback and submit attributed canary evidence only with installation/model/prompt/guardrail lineage. Release approval, production promotion and rollback approval require independent authenticated humans; see `docs/architecture/delivery-operations.md`.
 - **The AWS showcase release boundary is explicit.** `deploy/aws/demo-package-manifest.txt` is the allowlist; never archive the repository root, add `apps/android-*`, package local dependencies/build outputs, or bypass the committed-`HEAD` default. Releases use immutable S3 keys plus SHA-256 verification; bootstrap is first-boot only and ordinary updates go through SSM with an atomic release switch and health rollback. A database-schema difference must fail closed until a reviewed migration or replacement-stack path exists. Do not manually mutate CloudFormation-owned CloudFront, IAM, network, instance, or alias resources. Read `docs/architecture/aws-showcase-deployment.md` and `deploy/aws/README.md`.
 - **Docs are part of done.** Architecture change → update `docs/architecture/`; irreversible choice → new ADR; engine change → check the design doc's INV/DEC tables; user-visible workflow change → update the canonical Guide & Academy content and verification date.
@@ -74,4 +75,5 @@ CI (`.github/workflows/ci.yml`): Node tests (file + Postgres drivers) and the Ru
 - Commit messages: `feat(scope): summary` with body explaining invariants touched; cite INV/DEC/SEC IDs where relevant.
 - The repo commits directly to `main` (single-maintainer trunk flow).
 - ESM JavaScript throughout (`import`/`export`); no new npm dependencies without strong cause (the API deliberately has one: `pg`).
+- Import the domain kernel as `@loanos/core` (barrel) or `@loanos/core/<domain>/<module>.js` — never by relative path across the package boundary (ADR 0008). Inside `packages/core`, plain relative specifiers.
 - Rust: workspace lints are load-bearing (`#![forbid(unsafe_code)]`, float denies); keep pure crates (`rules-core/expr/model/eval`) free of I/O and async deps.

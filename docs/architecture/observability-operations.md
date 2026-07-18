@@ -33,7 +33,7 @@ Invalid or non-positive numeric configuration falls back to the restrictive docu
 
 ## Operational health projection
 
-`packages/core/src/operations-monitoring.js` is a read-only deterministic projection over tenant state plus current provider/runtime observations. It opens alerts for:
+`packages/core/src/operations/operations-monitoring.js` is a read-only deterministic projection over tenant state plus current provider/runtime observations. It opens alerts for:
 
 | Signal | Default trigger | Severity |
 | --- | --- | --- |

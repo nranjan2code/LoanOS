@@ -7,7 +7,7 @@ import {
   issueFirstOwnerInvitation, projectOrganisationSignup, recordAuthorisedRepresentativeProof,
   recordCorporateDomainProof, requestTenantProvisioning, resumeOrganisationReverification,
   resumeOrganisationSignup, startOrganisationSignup, submitOrganisationIdentity, verifySignupContact
-} from "../packages/core/src/organisation-signup.js";
+} from "@loanos/core/platform/organisation-signup.js";
 
 const NOW = new Date("2026-07-15T10:00:00Z");
 const h = (value) => createHash("sha256").update(value).digest("hex");

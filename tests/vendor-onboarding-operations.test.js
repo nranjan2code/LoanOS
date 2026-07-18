@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { approveVendorActivation, createVendorRfqComparison, projectVendorActivationDashboard, recordSandboxCertificationCampaign, registerProviderMappingPack } from "../packages/core/src/vendor-onboarding-operations.js";
+import { approveVendorActivation, createVendorRfqComparison, projectVendorActivationDashboard, recordSandboxCertificationCampaign, registerProviderMappingPack } from "@loanos/core/integrations/vendor-onboarding-operations.js";
 
 const NOW = new Date("2026-07-15T00:00:00.000Z"); const H = "a".repeat(64); const approval = { proposedBy: "maker", approvedBy: "checker", approvalRef: "APR-1" };
 const mappingInput = { tenantId: "t1", mappingPackId: "map1", providerId: "vendor1", providerFamily: "payment_rail", category: "LMS", schemaVersion: "1", operations: ["settle", "collect"], mappingChecksumSha256: H, fixtureChecksumSha256: H, fieldMappingEvidenceRef: "evidence/fields", errorMappingEvidenceRef: "evidence/errors", idempotencyMappingRef: "evidence/idempotency", dataClassificationRef: "evidence/classification", ...approval };

@@ -7,9 +7,9 @@ import {
   assessOriginationConformancePack,
   assessOriginationConformanceSuite,
   buildOriginationSimulatorScenarios
-} from "../packages/core/src/origination-provider-conformance.js";
-import { createProviderSimulator } from "../packages/core/src/provider-simulator.js";
-import { ExternalServiceManager } from "../packages/core/src/external-services.js";
+} from "@loanos/core/integrations/origination-provider-conformance.js";
+import { createProviderSimulator } from "@loanos/core/integrations/provider-simulator.js";
+import { ExternalServiceManager } from "@loanos/core/integrations/external-services.js";
 
 test("origination provider suite supplies every adverse class for every family", () => {
   const result = assessOriginationConformanceSuite();

@@ -6,9 +6,9 @@ import { join } from "node:path";
 import { createLoanOsServer } from "../apps/api/src/server.js";
 import { totpCode } from "../apps/api/src/identity.js";
 import { loadState, saveState } from "../apps/api/src/file-store.js";
-import { createComposedJourneyInstance } from "../packages/core/src/composed-journey-lifecycle.js";
-import { JOURNEY_WORKSPACE_SCHEMAS } from "../packages/core/src/journey-workspace.js";
-import { PRODUCT_TEMPLATE_CATALOGUE } from "../packages/core/src/product-template-catalogue.js";
+import { createComposedJourneyInstance } from "@loanos/core/journeys/composed-journey-lifecycle.js";
+import { JOURNEY_WORKSPACE_SCHEMAS } from "@loanos/core/journeys/journey-workspace.js";
+import { PRODUCT_TEMPLATE_CATALOGUE } from "@loanos/core/platform/product-template-catalogue.js";
 
 const TENANT = { tenantId: "tenant_verified_rbac", name: "Verified RBAC Bank", apiKey: "rbac-service-key", organisationSignupId: "signup_verified_rbac" };
 const MFA_SECRET = "JBSWY3DPEHPK3PXP";
