@@ -1,1 +1,124 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>LoanOS Operational Workspaces</title><link rel="stylesheet" href="/dashboard/workspaces.css"></head><body><a class="skip" href="#main">Skip to workspaces</a><header><p class="eyebrow">LoanOS India</p><h1>Operational workspaces</h1><p>Role-aware, evidence-led views. No customer data is stored in this browser. <a href="/help/" aria-label="Open LoanOS Guide and Academy">Guide &amp; Academy</a></p></header><nav aria-label="Workspace selector"><button data-view="servicing" aria-pressed="true">Servicing</button><button data-view="collections" aria-pressed="false">Collections & field</button><button data-view="control" aria-pressed="false">Control functions</button></nav><main id="main"><section class="summary" aria-live="polite"><article><span>Open</span><strong id="open-count">—</strong></article><article><span>Overdue</span><strong id="overdue-count">—</strong></article><article><span>Exceptions</span><strong id="exception-count">—</strong></article></section><section><div class="heading"><div><p class="eyebrow" id="view-kicker">Customer service</p><h2 id="view-title">Servicing account desk</h2></div><button id="refresh">Refresh</button></div><p id="view-description">Account context, service requests, mandate changes, documents, succession authority and closure evidence.</p><div id="status" role="status">Select refresh to load authorized tenant data.</div><table><caption id="table-caption">Servicing work queue</caption><thead><tr><th scope="col">Reference</th><th scope="col">Type</th><th scope="col">Status</th><th scope="col">Owner / evidence</th></tr></thead><tbody id="queue"><tr><td colspan="4">No data loaded.</td></tr></tbody></table></section></main><script type="module" src="/dashboard/workspaces.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Role-aware LoanOS work queues for origination, servicing, collections, control and partner operations.">
+  <title>LoanOS Operational Workspaces</title>
+  <link rel="stylesheet" href="./workspaces.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to workspaces</a>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">LoanOS India · governed operations</p>
+      <h1>Operational workspaces</h1>
+      <p id="actor-authority">Loading your role and queue authority…</p>
+    </div>
+    <div class="topbar-actions">
+      <a class="button secondary" href="./">Loan officer desk</a>
+      <a class="button secondary" href="/help/#guide/work-queues">Guide &amp; Academy</a>
+      <button id="refresh" type="button">Refresh</button>
+    </div>
+  </header>
+
+  <div id="offline" class="offline" role="alert" hidden>Network unavailable. Mutations are disabled and no business data is queued in this browser.</div>
+
+  <nav id="workspace-tabs" class="tabs" aria-label="Workspace selector"></nav>
+
+  <main id="main">
+    <section class="workspace-intro" aria-labelledby="view-title">
+      <div>
+        <p class="eyebrow" id="view-kicker">Authorised work</p>
+        <h2 id="view-title">Operational workspace</h2>
+        <p id="view-description">Loading the server-authorised work projection.</p>
+      </div>
+      <div id="status" class="status" role="status" aria-live="polite">Loading authorised tenant data…</div>
+    </section>
+
+    <section class="summary" aria-label="Workspace summary" aria-live="polite">
+      <article><span>Open</span><strong id="open-count">—</strong></article>
+      <article><span>Overdue</span><strong id="overdue-count">—</strong></article>
+      <article><span>Exceptions</span><strong id="exception-count">—</strong></article>
+      <article><span>Unassigned tasks</span><strong id="unassigned-count">—</strong></article>
+    </section>
+
+    <section class="workbench">
+      <div class="queue-panel">
+        <div class="queue-heading">
+          <div>
+            <h2>Work queue</h2>
+            <p>Tasks are role-filtered; records expose metadata only.</p>
+          </div>
+          <label class="search" for="queue-search">
+            <span>Filter queue</span>
+            <input id="queue-search" type="search" autocomplete="off" placeholder="Reference, type, status or owner">
+          </label>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <caption id="table-caption">Authorised operational work</caption>
+            <thead>
+              <tr>
+                <th scope="col">Priority</th>
+                <th scope="col">Work item</th>
+                <th scope="col">Status</th>
+                <th scope="col">Owner</th>
+                <th scope="col">Due</th>
+              </tr>
+            </thead>
+            <tbody id="queue">
+              <tr><td colspan="5">No data loaded.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <aside id="inspector" class="inspector" aria-labelledby="inspector-title">
+        <p class="eyebrow">Selected work</p>
+        <h2 id="inspector-title">Choose a work item</h2>
+        <p id="inspector-description">Select a row to review safe metadata, evidence boundaries and permitted task controls.</p>
+        <dl id="inspector-meta" class="meta"></dl>
+
+        <section id="domain-action" class="domain-action" hidden>
+          <h3>Governed domain action</h3>
+          <p id="domain-action-description"></p>
+          <code id="domain-action-path"></code>
+          <p class="boundary">The task declares this action, but this workspace never invents its evidence payload. Use the linked specialist screen or documented API contract.</p>
+        </section>
+
+        <section id="task-controls" hidden>
+          <h3>Task controls</h3>
+          <form id="assignment-form" class="control-form">
+            <label for="assignee">Assign to eligible staff actor</label>
+            <select id="assignee" required><option value="">Select eligible actor</option></select>
+            <label for="assignment-notes">Assignment note</label>
+            <input id="assignment-notes" autocomplete="off" maxlength="300">
+            <button id="assign-task" type="submit">Assign task</button>
+          </form>
+          <label class="release-reason" for="release-reason">Release reason</label>
+          <input id="release-reason" autocomplete="off" maxlength="300" placeholder="Required before release">
+          <div class="task-buttons">
+            <button id="start-task" type="button">Start</button>
+            <button id="release-task" type="button" class="secondary">Release</button>
+          </div>
+          <form id="comment-form" class="control-form">
+            <label for="task-comment">Audit comment</label>
+            <textarea id="task-comment" rows="3" maxlength="1000" required></textarea>
+            <button id="comment-task" type="submit" class="secondary">Add comment</button>
+          </form>
+        </section>
+
+        <p id="inspector-status" class="inspector-status" role="status" aria-live="polite"></p>
+      </aside>
+    </section>
+
+    <section class="evidence-note">
+      <h2>Control boundary</h2>
+      <p>No customer content is stored in browser storage or copied into activity telemetry. Task assignment, start, release and comments are bound to the authenticated session; domain completion remains evidence-gated by its owning API.</p>
+    </section>
+  </main>
+
+  <script type="module" src="./workspaces.js"></script>
+</body>
+</html>

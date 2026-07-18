@@ -1,66 +1,71 @@
 {
   "schemaVersion": 2,
-  "generated": "2026-07-18T01:06:10.355Z",
-  "sourceDigest": "9794edfa4385f995",
-  "snapshotId": "48bb42e2a3cf48fc",
+  "generated": "2026-07-18T03:50:55.022Z",
+  "sourceDigest": "5a1401672c76bf32",
+  "snapshotId": "85896c40cbf477c9",
   "sources": {
     "catalogue": "docs/product/complete-system-capability-catalog.md",
     "trace": "docs/product/capability-trace.json",
     "planes": "scripts/planes.mjs",
     "backlog": "docs/product/build-backlog.md",
-    "tests": "live Node test run"
+    "tests": "reused build test log"
   },
   "git": {
     "branch": "main",
-    "sha": "edb1a8b8ac88",
-    "count": 222,
+    "sha": "207bfeac7c75",
+    "count": 223,
     "dirty": true,
-    "changeCount": 16,
+    "changeCount": 22,
     "commits": [
+      {
+        "hash": "207bfea",
+        "subject": "refactor(api): extract route modules and add documentation governance",
+        "when": "3 hours ago"
+      },
       {
         "hash": "edb1a8b",
         "subject": "docs: deep documentation pass for the @loanos/core package boundary",
-        "when": "35 minutes ago"
+        "when": "3 hours ago"
       },
       {
         "hash": "4a9ef90",
         "subject": "refactor(core): group domain kernel into @loanos/core package domains",
-        "when": "40 minutes ago"
+        "when": "3 hours ago"
       },
       {
         "hash": "8b1c3bd",
         "subject": "docs(core): add JSDoc/rustdoc documentation pass for humans and AI agents",
-        "when": "65 minutes ago"
+        "when": "4 hours ago"
       },
       {
         "hash": "bce5d2f",
         "subject": "feat(academy): implement technical academy and update compliance controls",
-        "when": "8 hours ago"
+        "when": "11 hours ago"
       },
       {
         "hash": "3aa511b",
         "subject": "fix(aws): return successful status without domains",
-        "when": "11 hours ago"
+        "when": "13 hours ago"
       },
       {
         "hash": "f98d662",
         "subject": "fix(aws): support committed release on macOS bash",
-        "when": "11 hours ago"
+        "when": "14 hours ago"
       },
       {
         "hash": "5ed96b1",
         "subject": "feat: implement Banker Academy curriculum, build scripts, and updates to help centre",
-        "when": "12 hours ago"
+        "when": "15 hours ago"
       },
       {
         "hash": "ac6bb2c",
         "subject": "feat(help): add complete technical academy",
-        "when": "13 hours ago"
+        "when": "15 hours ago"
       },
       {
         "hash": "c1196e1",
         "subject": "feat(deploy): update AWS showcase deployment, demo script, and architecture documentation",
-        "when": "35 hours ago"
+        "when": "2 days ago"
       },
       {
         "hash": "d435445",
@@ -70,11 +75,6 @@
       {
         "hash": "2730683",
         "subject": "Merge branch 'android-apps-review'",
-        "when": "2 days ago"
-      },
-      {
-        "hash": "f4a8b75",
-        "subject": "feat(applications): establish greenfield product web platform",
         "when": "2 days ago"
       }
     ]
@@ -25410,15 +25410,15 @@
     }
   ],
   "tests": {
-    "pass": 687,
+    "pass": 680,
     "fail": 0,
     "skipped": 10,
     "cancelled": 0,
     "todo": 0,
-    "total": 697,
-    "durationMs": 22664.284084,
+    "total": 690,
+    "durationMs": 22859.31975,
     "ran": true,
-    "source": "live",
+    "source": "provided-log",
     "error": ""
   }
 }

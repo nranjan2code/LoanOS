@@ -16,6 +16,8 @@ test("help centre exposes role guidance, learning paths and governed status labe
   assert.match(js, /Controlled first slice/);
   assert.match(js, /Content scope: LoanOS canonical/);
   assert.match(js, /first-compliant-loan/);
+  assert.match(js, /work-queues/);
+  assert.match(js, /18 Jul 2026/);
   assert.match(html, /BA Lending Academy/);
   assert.match(html, /Sequenced curriculum/);
   assert.match(js, /const roleCurricula=/);

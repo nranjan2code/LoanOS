@@ -27,7 +27,7 @@ export default {
       platform: [
         { type: "guide", ref: "first-compliant-loan", note: "The Guide's guided exercise this capstone wraps." },
         { type: "guide", ref: "evidence-pack", note: "Export and verify the evidence pack at the end." },
-        { type: "surface", ref: "/dashboard/", note: "Staff workspace where the journey's tasks surface." },
+        { type: "surface", ref: "/t/{tenantId}/staff/workspaces", note: "Canonical tenant-scoped staff workspace where the journey's tasks surface." },
         { type: "doc", ref: "docs/operations/demo-handbook.md", note: "Showcase operating model — the same journey, presented." }
       ],
       terms: ["Sandbox", "KFS", "DPD", "Evidence pack", "Maker-checker"],

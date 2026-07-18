@@ -17,6 +17,8 @@ import { routeTenantActivation } from "./routes/tenant-activation.js";
 import { routeProductJourneyConformance } from "./routes/product-journey-conformance.js";
 import { routeSpecialistJourneys } from "./routes/specialist-journeys.js";
 import { routeJourneyWorkspaces } from "./routes/journey-workspaces.js";
+import { routeOperationalWorkspaces } from "./routes/operational-workspaces.js";
+import { routeWorkflowTasks } from "./routes/workflow-tasks.js";
 import { routeComposedJourneys } from "./routes/composed-journeys.js";
 import { routeProductPlatformAdministration } from "./routes/product-platform-administration.js";
 import { routeBrandGovernance } from "./routes/brand-governance.js";
@@ -71,7 +73,6 @@ import {
   assignComplaint,
   assignRecoveryAgent,
   assignSupportCase,
-  assignWorkflowTask,
   assessChargeToLoanAccount,
   assessDetectionCoverage,
   assessDependencyConcentration,
@@ -97,7 +98,6 @@ import {
   acknowledgeCicBatch,
   classifyLoanAsset,
   clearGlobalKillSwitch,
-  commentOnWorkflowTask,
   completeWorkflowTask,
   completeVendorReview,
   createLoanAccountFromApplication,
@@ -184,7 +184,6 @@ import {
   requestHumanHandoff,
   resolveHumanHandoff,
   listHumanHandoffRequests,
-  releaseWorkflowTask,
   renderLoanStatementDocument,
   resolveComplaint,
   respondAuditRequest,
@@ -238,7 +237,6 @@ import {
   executeCoolingOffCancellation,
   summarizeLoanAccount,
   startComplaintReview,
-  startWorkflowTask,
   transitionAssuranceIssue,
   transitionAuditEngagement,
   transitionModel,
@@ -291,8 +289,6 @@ import {
   validateOriginationBeforeDecision,
   validateOriginationBeforeDisbursement,
   validateRecoveryAssignmentAccess,
-  validateWorkflowActorAccess,
-  validateWorkflowAssignmentAccess,
   waiveLoanAccountCharge,
   validateMarketplaceNeutrality,
   rankMarketplaceOffers,
@@ -862,17 +858,6 @@ async function route(req, res, dataDir, platformAdminKey, observability, allowDi
     }
   }
 
-  // --- Backward compatibility: /dashboard/ → /t/dev/staff/ ---
-  if (method === "GET" && (path === "/dashboard" || path === "/dashboard/")) {
-    res.writeHead(302, { Location: "/t/dev/staff/" });
-    res.end();
-    return;
-  }
-  // Serve dashboard CSS/JS assets at /dashboard/ so existing <link> tags work
-  if (method === "GET" && path.startsWith("/dashboard/")) {
-    return serveStaticFile(res, appsRoot, "dashboard", path, "/dashboard/");
-  }
-
   // --- Tenant-scoped routes at /t/{tenantId}/ ---
   const tenantRouteMatch = path.match(/^\/t\/([^/]+)(\/.*)?$/);
   if (method === "GET" && tenantRouteMatch) {
@@ -923,7 +908,20 @@ async function route(req, res, dataDir, platformAdminKey, observability, allowDi
     if (subPath === "/staff/journeys" || subPath === "/staff/journeys/") {
       return serveStaticFile(res, appsRoot, "journey-workspace", "/index.html", "/");
     }
-    if (subPath === "/staff" || subPath === "/staff/") {
+    if (subPath === "/staff/workspaces/") {
+      res.writeHead(308, { Location: `/t/${encodeURIComponent(tenantSlug)}/staff/workspaces` });
+      res.end();
+      return;
+    }
+    if (subPath === "/staff/workspaces") {
+      return serveStaticFile(res, appsRoot, "dashboard", "/workspaces.html", "/");
+    }
+    if (subPath === "/staff") {
+      res.writeHead(308, { Location: `/t/${encodeURIComponent(tenantSlug)}/staff/` });
+      res.end();
+      return;
+    }
+    if (subPath === "/staff/") {
       return serveStaticFile(res, appsRoot, "dashboard", "/index.html", "/");
     }
     if (subPath.startsWith("/staff/")) {
@@ -1335,6 +1333,8 @@ async function route(req, res, dataDir, platformAdminKey, observability, allowDi
   if (await routeProductJourneyConformance({ method, path, req, res, tenant, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
   if (await routeSpecialistJourneys({ method, path, req, res, tenant, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
   if (await routeJourneyWorkspaces({ method, path, req, res, tenant, store, readJson, sendJson, appendEvent, authContext, authActor })) return;
+  if (await routeOperationalWorkspaces({ method, path, req, res, tenant, store, readJson, sendJson, appendEvent, authContext, authActor })) return;
+  if (await routeWorkflowTasks({ method, path, url, req, res, tenant, store, readJson, sendJson, appendEvent, authContext, resolveSessionActorId })) return;
   if (await routeComposedJourneys({ method, path, req, res, tenant, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
   if (await routeProductPlatformAdministration({ method, path, req, res, tenant, store, stateRef, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
   if (await routeBrandGovernance({ method, path, req, res, tenant, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
@@ -2026,33 +2026,6 @@ async function route(req, res, dataDir, platformAdminKey, observability, allowDi
     sendJson(res, 200, {
       message: `Sandbox environment "${sandboxName}" has been deleted.`
     });
-    return;
-  }
-
-  // "Staff actors" are just tenant login users with a workflow role — there is
-  // no separate registry. This read is intentionally not admin-gated (unlike
-  // /admin/users): any signed-in tenant user needs to see who they can assign
-  // work to, and the projection below excludes admin-sensitive fields
-  // (email, adminRoles, credentials) that /admin/users would expose.
-  if (method === "GET" && path === "/staff/actors") {
-    const state = await store.load();
-    sendJson(res, 200, {
-      actors: Object.values(state.users)
-        .filter((user) => (user.roles ?? []).length > 0)
-        .map(publicStaffActorView)
-    });
-    return;
-  }
-
-  const staffActorViewMatch = path.match(/^\/staff\/actors\/([^/]+)$/);
-  if (method === "GET" && staffActorViewMatch) {
-    const state = await store.load();
-    const user = state.users[decodeURIComponent(staffActorViewMatch[1])];
-    if (!user || (user.roles ?? []).length === 0) {
-      sendJson(res, 404, { error: { code: "not_found", message: "Staff actor not found." } });
-      return;
-    }
-    sendJson(res, 200, publicStaffActorView(user));
     return;
   }
 
@@ -2751,101 +2724,6 @@ async function route(req, res, dataDir, platformAdminKey, observability, allowDi
     );
     await store.save(nextState);
     sendJson(res, 200, result);
-    return;
-  }
-
-  if (method === "GET" && path === "/workflow/tasks") {
-    const state = await store.load();
-    const asOf = url.searchParams.get("asOf") ? new Date(url.searchParams.get("asOf")) : new Date();
-    const filters = taskFiltersFromUrl(url);
-    const tasks = deriveWorkflowTasks(state, { asOf, filters });
-    sendJson(res, 200, {
-      asOf: asOf.toISOString(),
-      count: tasks.length,
-      tasks
-    });
-    return;
-  }
-
-  const workflowTaskMatch = path.match(/^\/workflow\/tasks\/([^/]+)$/);
-  if (method === "GET" && workflowTaskMatch) {
-    const state = await store.load();
-    const taskId = decodeURIComponent(workflowTaskMatch[1]);
-    const asOf = url.searchParams.get("asOf") ? new Date(url.searchParams.get("asOf")) : new Date();
-    const task = deriveWorkflowTasks(state, { asOf }).find((candidate) => candidate.taskId === taskId);
-    if (!task) {
-      sendJson(res, 404, { error: { code: "not_found", message: "Workflow task not found or no longer active." } });
-      return;
-    }
-    sendJson(res, 200, task);
-    return;
-  }
-
-  const workflowTaskActionMatch = path.match(/^\/workflow\/tasks\/([^/]+)\/(assignments|start|release|comments)$/);
-  if (method === "POST" && workflowTaskActionMatch) {
-    const body = await readJson(req);
-    const state = await store.load();
-    const taskId = decodeURIComponent(workflowTaskActionMatch[1]);
-    const action = workflowTaskActionMatch[2];
-    const asOf = body.asOf ? new Date(body.asOf) : new Date();
-    const activeTasks = deriveWorkflowTasks(state, { asOf });
-    const activeTask = activeTasks.find((task) => task.taskId === taskId) ?? null;
-    if (action === "assignments") {
-      body.assignedBy = resolveSessionActorId(authContext, body.assignedBy);
-    } else {
-      body.actor = resolveSessionActorId(authContext, body.actor);
-    }
-    const accessFindings =
-      action === "assignments"
-        ? validateWorkflowAssignmentAccess(state.users, activeTask, body)
-        : validateWorkflowActorAccess(state.users, activeTask, body.actor, "actor");
-    const accessSummary = summarizeFindings(accessFindings);
-    if (accessSummary.status === "blocked") {
-      sendJson(res, 422, {
-        error: {
-          code: "workflow_task_access_blocked",
-          message: "Workflow task action is blocked by actor role or queue access."
-        },
-        findings: accessFindings
-      });
-      return;
-    }
-    const taskAction =
-      action === "assignments"
-        ? assignWorkflowTask
-        : action === "start"
-          ? startWorkflowTask
-          : action === "release"
-            ? releaseWorkflowTask
-            : commentOnWorkflowTask;
-    const result = taskAction(state.workflowTasks, taskId, body, activeTasks);
-    if (result.summary.status === "blocked") {
-      sendJson(res, 422, {
-        error: {
-          code: "workflow_task_blocked",
-          message: "Workflow task action is blocked by control findings."
-        },
-        findings: result.findings
-      });
-      return;
-    }
-
-    const nextState = appendEvent(
-      {
-        ...state,
-        workflowTasks: result.workflowTasks
-      },
-      {
-        type: result.event.type,
-        taskId,
-        actor: body.actor ?? body.assignedBy ?? null
-      }
-    );
-    await store.save(nextState);
-    sendJson(res, action === "assignments" ? 201 : 200, {
-      task: result.task,
-      event: result.event
-    });
     return;
   }
 
@@ -7736,21 +7614,6 @@ function validateScreenActivity(input = {}) {
   };
 }
 
-// A non-admin-safe projection of a tenant login user's workflow-facing
-// identity — used by GET /staff/actors so any signed-in user can see who they
-// can assign work to, without exposing email/adminRoles/credentials.
-function publicStaffActorView(user) {
-  return {
-    actorId: user.userId,
-    displayName: user.displayName,
-    status: user.status,
-    country: user.country,
-    roles: user.roles,
-    queues: user.queues,
-    canAssignQueues: user.canAssignQueues
-  };
-}
-
 function publicAuthContext(authContext) {
   if (!authContext) return null;
   const { sessionId, ...rest } = authContext;
@@ -10719,17 +10582,6 @@ function buildReconciliationBreakQueue(state, now = new Date()) {
 function auditFiltersFromUrl(url) {
   const filters = {};
   for (const key of ["type", "subjectId", "from", "to"]) {
-    const value = url.searchParams.get(key);
-    if (value) {
-      filters[key] = value;
-    }
-  }
-  return filters;
-}
-
-function taskFiltersFromUrl(url) {
-  const filters = {};
-  for (const key of ["queue", "status", "type", "entityType", "assignedTo", "slaStatus"]) {
     const value = url.searchParams.get(key);
     if (value) {
       filters[key] = value;

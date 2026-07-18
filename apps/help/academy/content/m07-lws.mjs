@@ -29,7 +29,7 @@ export default {
         { type: "capability", ref: "LWS-001", note: "Derived queues by domain state and exception." },
         { type: "capability", ref: "LWS-002", note: "Task SLA, priority, due time and breach status." },
         { type: "capability", ref: "LWS-004", note: "Assignment, start, release, comment and audit." },
-        { type: "surface", ref: "/dashboard/", note: "Staff workspace where queues surface." }
+        { type: "surface", ref: "/t/{tenantId}/staff/workspaces", note: "Canonical tenant-scoped staff workspace where queues and task controls surface." }
       ],
       terms: ["LWS", "SMA", "RBI CMS"],
       related: ["m07-lws/maker-checker", "m01-landscape/regulation-as-controls"],
