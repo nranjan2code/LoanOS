@@ -9,6 +9,7 @@ test("universal mutation classifier covers every staffing family and defaults un
   assert.equal(classifyProtectedMutation("POST", "/loans/applications/app-1/sanction").featureId, "FST-003");
   assert.equal(classifyProtectedMutation("POST", "/admin/conformance/campaigns/proposals").featureId, "FST-022");
   assert.equal(classifyProtectedMutation("POST", "/admin/tenant-activation/assessments").featureId, "FST-031");
+  assert.equal(classifyProtectedMutation("POST", "/admin/product-platform/products/gold_loan/subscription-proposal").featureId, "FST-030");
   assert.equal(classifyProtectedMutation("POST", "/identity-operations-worker/v1/claims").featureId, "FST-001");
   assert.equal(classifyProtectedMutation("PATCH", "/new-sensitive-surface/item-1").disposition, "unclassified");
   const result = await enforceUniversalMutationStaffing({ state: {}, tenantId: "tenant-a", authContext: { principalType: "tenant_user", userId: "user-a" }, method: "PATCH", path: "/new-sensitive-surface/item-1", requestId: "req-1", env: { LOANOS_UNIVERSAL_STAFFING: "active" } });

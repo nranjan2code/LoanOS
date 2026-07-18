@@ -38,6 +38,8 @@ test("every depth claim has repository evidence and maps only to governed shared
   assert.equal(audit.journeys.filter((item) => item.testDepth === "composed_lifecycle_partial").length, 21);
   assert.deepEqual([...COMPOSED_JOURNEY_STAGES].slice(-1), ["completed"]);
   assert.equal(validateComposedJourneyLifecycleCatalogue().valid, true);
-  for (const journey of audit.journeys) assert.deepEqual(journey.gaps, ["JD-01", "JD-05", "JD-06"]);
+  assert.equal(audit.journeys.filter((item) => item.gaps.includes("JD-01")).length, 0);
+  for (const ref of audit.completedBatchEvidence["JD-01"]) await access(new URL(`../${ref}`, import.meta.url));
+  for (const journey of audit.journeys) assert.deepEqual(journey.gaps, ["JD-05", "JD-06"]);
   for (const ref of audit.completedBatchEvidence["JD-04"]) await access(new URL(`../${ref}`, import.meta.url));
 });

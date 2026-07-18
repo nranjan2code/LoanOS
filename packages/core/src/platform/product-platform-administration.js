@@ -9,6 +9,39 @@ export const PRODUCT_READINESS_GATES = Object.freeze([
   "provider_certification", "document_pack", "customer_content", "operations_runbook", "support_model",
   "tenant_uat", "reconciliation", "rollback_plan"
 ]);
+export const PRODUCT_ADMINISTRATION_FORM_SCHEMA_VERSION = 1;
+
+const PRODUCT_ADMINISTRATION_FORM_SCHEMAS = Object.freeze({
+  subscription: Object.freeze({
+    action: "subscription", allowedStatuses: ["not_subscribed"], makerChecker: false,
+    fields: [field("commandId", "reference"), field("templateVersion", "positive_integer"), field("subscriptionRef", "reference")]
+  }),
+  subscription_proposal: Object.freeze({
+    action: "subscription-proposal", allowedStatuses: ["not_subscribed"], makerChecker: true,
+    fields: [field("requestId", "reference"), field("sagaId", "reference"), field("templateVersion", "positive_integer"), field("subscriptionRef", "reference")]
+  }),
+  subscription_approval: Object.freeze({ action: "subscription", allowedStatuses: ["not_subscribed"], makerChecker: true, fields: [field("commandId", "reference")] }),
+  configuration: Object.freeze({
+    action: "configuration", allowedStatuses: ["subscribed", "configured", "suspended"], makerChecker: true,
+    fields: [
+      field("commandId", "reference"), field("configuration.regulatedEntityRefs", "reference_list"),
+      field("configuration.channels", "reference_list"), field("configuration.productPolicyRef", "reference"),
+      field("configuration.decisionBundleRef", "reference"), field("configuration.accountingProfileRef", "reference"),
+      field("configuration.complianceProfileRef", "reference"), field("configuration.providerProfileRefs", "reference_list"),
+      field("configuration.documentPackRef", "reference"), field("configuration.staffingGrants", "staffing_grant_list"),
+      field("configuration.programmeRefs", "reference_list", false), field("configuration.whiteLabelBinding", "white_label_binding"),
+      field("configuration.readinessEvidence", "readiness_evidence", true, { keys: PRODUCT_READINESS_GATES }),
+      field("configuration.effectiveFrom", "iso_datetime"), field("configuration.effectiveTo", "iso_datetime", false)
+    ]
+  }),
+  approval: Object.freeze({ action: "approval", allowedStatuses: ["configured"], makerChecker: true, fields: [field("commandId", "reference"), field("approvalRef", "reference")] }),
+  activation_proposal: Object.freeze({ action: "activation-proposal", allowedStatuses: ["approved"], makerChecker: true, fields: [field("requestId", "reference"), field("activationRef", "reference")] }),
+  activation: Object.freeze({ action: "activation", allowedStatuses: ["approved"], makerChecker: true, fields: [field("commandId", "reference"), field("approvalRef", "reference")] }),
+  suspension_proposal: Object.freeze({ action: "suspension-proposal", allowedStatuses: ["active"], makerChecker: true, fields: [field("requestId", "reference"), field("reason", "text")] }),
+  suspension: Object.freeze({ action: "suspension", allowedStatuses: ["active"], makerChecker: true, fields: [field("commandId", "reference"), field("approvalRef", "reference")] }),
+  retirement_proposal: Object.freeze({ action: "retirement-proposal", allowedStatuses: ["approved", "active", "suspended"], makerChecker: true, fields: [field("requestId", "reference"), field("reason", "text")] }),
+  retirement: Object.freeze({ action: "retirement", allowedStatuses: ["approved", "active", "suspended"], makerChecker: true, fields: [field("commandId", "reference"), field("approvalRef", "reference")] })
+});
 
 export function createProductPlatformAdministrationState() {
   return { templates: {}, products: {}, programmes: {}, commands: {} };
@@ -43,7 +76,10 @@ export function subscribeTenantProduct(state, input, now = new Date()) {
     if (!template || template.status !== "published") fail("product_admin_template_unavailable", "Published template version is required.");
     const key = productKey(input.tenantId, input.productType);
     if (state.products[key]) fail("product_admin_product_exists", "Tenant product already exists.");
-    const product = { tenantId: input.tenantId, productType: input.productType, templateId: template.templateId, templateVersion: template.version, templateChecksumSha256: template.specificationChecksumSha256, subscriptionRef: input.subscriptionRef, status: "subscribed", configurationVersion: 0, configuration: null, configurationChecksumSha256: null, history: [], approval: null, activation: null, suspension: null, retirement: null, subscribedBy: input.subscribedBy, subscribedAt: iso(now) };
+    const subscribedAt = iso(now);
+    const provisioningLineage = input.provisioningLineage ? object(input.provisioningLineage, "provisioningLineage") : null;
+    const staffingLineage = input.staffingLineage ? object(input.staffingLineage, "staffingLineage") : null;
+    const product = { tenantId: input.tenantId, productType: input.productType, templateId: template.templateId, templateVersion: template.version, templateChecksumSha256: template.specificationChecksumSha256, subscriptionRef: input.subscriptionRef, provisioningLineage, staffingLineage, status: "subscribed", configurationVersion: 0, configuration: null, configurationChecksumSha256: null, history: [], lifecycleHistory: [lifecycle("subscribed", input.subscribedBy, subscribedAt, { subscriptionRef: input.subscriptionRef, templateVersion: template.version, provisioningSagaId: provisioningLineage?.sagaId ?? null, staffingConfigurationVersion: staffingLineage?.configurationVersion ?? null })], approval: null, activation: null, suspension: null, retirement: null, subscribedBy: input.subscribedBy, subscribedAt };
     return output({ ...state, products: { ...state.products, [key]: product } }, { product });
   });
 }
@@ -57,7 +93,9 @@ export function proposeTenantProductConfiguration(state, input, now = new Date()
     const configurationChecksumSha256 = checksum(configuration);
     const nextVersion = current.configurationVersion + 1;
     const history = current.configuration ? [...current.history, snapshot(current)] : current.history;
-    const product = { ...current, status: "configured", configurationVersion: nextVersion, configuration, configurationChecksumSha256, history, proposedBy: input.proposedBy, proposedAt: iso(now), approval: null, activation: null };
+    const proposedAt = iso(now);
+    const administrationAuthority = input.administrationAuthority ? object(input.administrationAuthority, "administrationAuthority") : null;
+    const product = { ...current, status: "configured", configurationVersion: nextVersion, configuration, configurationChecksumSha256, administrationAuthority, history, lifecycleHistory: appendLifecycle(current, lifecycle("configuration_proposed", input.proposedBy, proposedAt, { configurationVersion: nextVersion, configurationChecksumSha256, staffingConfigurationVersion: administrationAuthority?.configurationVersion ?? null })), proposedBy: input.proposedBy, proposedAt, approval: null, activation: null };
     return output({ ...state, products: { ...state.products, [productKey(input.tenantId, input.productType)]: product } }, { product, readiness: assessTenantProductReadiness(product, state, now), diff: diffValues(current.configuration, configuration) });
   });
 }
@@ -69,7 +107,8 @@ export function approveTenantProductConfiguration(state, input, now = new Date()
     ref(input.approvedBy, "approvedBy"); ref(input.approvalRef, "approvalRef"); independent(current.proposedBy, input.approvedBy);
     const readiness = assessTenantProductReadiness(current, state, now);
     if (!readiness.complete) fail("product_admin_not_ready", `Readiness is incomplete: ${readiness.gaps.join(", ")}`);
-    const product = { ...current, status: "approved", approval: { approvedBy: input.approvedBy, approvalRef: input.approvalRef, approvedAt: iso(now), configurationChecksumSha256: current.configurationChecksumSha256 } };
+    const approvedAt = iso(now);
+    const product = { ...current, status: "approved", lifecycleHistory: appendLifecycle(current, lifecycle("configuration_approved", input.approvedBy, approvedAt, { approvalRef: input.approvalRef, configurationVersion: current.configurationVersion, configurationChecksumSha256: current.configurationChecksumSha256 })), approval: { approvedBy: input.approvedBy, approvalRef: input.approvalRef, approvedAt, configurationChecksumSha256: current.configurationChecksumSha256 } };
     return output(replaceProduct(state, product), { product, readiness });
   });
 }
@@ -82,7 +121,8 @@ export function activateTenantProduct(state, input, now = new Date()) {
     if (current.approval.configurationChecksumSha256 !== current.configurationChecksumSha256) fail("product_admin_stale_approval", "Approval does not cover the current configuration.");
     const readiness = assessTenantProductReadiness(current, state, now);
     if (!readiness.complete || !readiness.effective) fail("product_admin_not_ready", "Product is not ready or effective.");
-    const product = { ...current, status: "active", activation: { proposedBy: input.proposedBy, approvedBy: input.approvedBy, approvalRef: input.approvalRef, activationRef: input.activationRef, activatedAt: iso(now) }, suspension: null };
+    const activatedAt = iso(now);
+    const product = { ...current, status: "active", lifecycleHistory: appendLifecycle(current, lifecycle("activated", input.approvedBy, activatedAt, { proposedBy: input.proposedBy, approvalRef: input.approvalRef, activationRef: input.activationRef, configurationVersion: current.configurationVersion })), activation: { proposedBy: input.proposedBy, approvedBy: input.approvedBy, approvalRef: input.approvalRef, activationRef: input.activationRef, activatedAt }, suspension: null };
     return output(replaceProduct(state, product), { product, readiness });
   });
 }
@@ -125,6 +165,57 @@ export function diffTenantProductConfigurations(product, fromVersion, toVersion)
   return { tenantId: product.tenantId, productType: product.productType, fromVersion, toVersion, changes: diffValues(versions.get(fromVersion), versions.get(toVersion)) };
 }
 
+export function getProductAdministrationFormSchema(productType, action) {
+  canonical(productType);
+  const key = typeof action === "string" ? action.replaceAll("-", "_") : "";
+  const schema = PRODUCT_ADMINISTRATION_FORM_SCHEMAS[key];
+  if (!schema) fail("product_admin_form_not_found", "A supported product administration form action is required.");
+  return structuredClone({ schemaId: `product-administration/${productType}/${schema.action}`, schemaVersion: PRODUCT_ADMINISTRATION_FORM_SCHEMA_VERSION, productType, ...schema });
+}
+
+export function projectTenantProductNextActions(product, state, now = new Date()) {
+  if (!product || !PRODUCT_STATUSES.has(product.status)) invalid("Valid product is required.");
+  const readiness = assessTenantProductReadiness(product, state, now);
+  const staleApproval = Boolean(product.approval) && product.approval.configurationChecksumSha256 !== product.configurationChecksumSha256;
+  return [
+    nextAction("configuration", ["subscribed", "configured", "suspended"].includes(product.status) ? [] : [`status:${product.status}`]),
+    nextAction("approval", product.status !== "configured" ? [`status:${product.status}`] : readiness.complete ? [] : readiness.gaps),
+    nextAction("activation-proposal", product.status !== "approved" ? [`status:${product.status}`] : [...(!readiness.complete ? readiness.gaps : []), ...(!readiness.effective ? ["effective_window"] : []), ...(staleApproval ? ["stale_approval"] : [])]),
+    nextAction("suspension-proposal", product.status === "active" ? [] : [`status:${product.status}`]),
+    nextAction("retirement-proposal", ["approved", "active", "suspended"].includes(product.status) ? [] : [`status:${product.status}`])
+  ];
+}
+
+export function projectTenantProductLifecycleHistory(product) {
+  if (!product || !PRODUCT_STATUSES.has(product.status)) invalid("Valid product is required.");
+  if (Array.isArray(product.lifecycleHistory)) return structuredClone(product.lifecycleHistory).map((record, sequence) => ({ ...record, sequence }));
+  const records = [lifecycle("subscribed", product.subscribedBy, product.subscribedAt, { subscriptionRef: product.subscriptionRef, templateVersion: product.templateVersion })];
+  for (const entry of product.history ?? []) records.push(lifecycle("configuration_snapshot", "system", product.proposedAt ?? product.subscribedAt, { configurationVersion: entry.configurationVersion, configurationChecksumSha256: entry.configurationChecksumSha256 }));
+  if (product.configuration) records.push(lifecycle("configuration_proposed", product.proposedBy, product.proposedAt, { configurationVersion: product.configurationVersion, configurationChecksumSha256: product.configurationChecksumSha256 }));
+  if (product.approval) records.push(lifecycle("configuration_approved", product.approval.approvedBy, product.approval.approvedAt, { approvalRef: product.approval.approvalRef, configurationVersion: product.configurationVersion, configurationChecksumSha256: product.configurationChecksumSha256 }));
+  if (product.activation) records.push(lifecycle("activated", product.activation.approvedBy, product.activation.activatedAt, { proposedBy: product.activation.proposedBy, approvalRef: product.activation.approvalRef, activationRef: product.activation.activationRef, configurationVersion: product.configurationVersion }));
+  if (product.suspension) records.push(lifecycle("suspended", product.suspension.approvedBy, product.suspension.at, { proposedBy: product.suspension.proposedBy, approvalRef: product.suspension.approvalRef, reason: product.suspension.reason }));
+  if (product.retirement) records.push(lifecycle("retired", product.retirement.approvedBy, product.retirement.at, { proposedBy: product.retirement.proposedBy, approvalRef: product.retirement.approvalRef, reason: product.retirement.reason }));
+  return records.map((record, sequence) => ({ ...record, sequence }));
+}
+
+export function projectTenantProductDocuments(product) {
+  if (!product || !PRODUCT_STATUSES.has(product.status)) invalid("Valid product is required.");
+  const documents = [document("subscription", "subscription", product.subscriptionRef, 0), document("template", "template_checksum", product.templateChecksumSha256, 0)];
+  const c = product.configuration;
+  if (c) {
+    for (const [key, reference] of Object.entries({ product_policy: c.productPolicyRef, decision_bundle: c.decisionBundleRef, accounting_profile: c.accountingProfileRef, compliance_profile: c.complianceProfileRef, document_pack: c.documentPackRef, brand_release: c.whiteLabelBinding.brandVersionRef, legal_entity_disclosure: c.whiteLabelBinding.legalEntityDisclosureRef, communication_templates: c.whiteLabelBinding.communicationTemplateSetRef, document_templates: c.whiteLabelBinding.documentTemplateSetRef })) documents.push(document("configuration", key, reference, product.configurationVersion));
+    for (const reference of c.providerProfileRefs) documents.push(document("provider", "provider_profile", reference, product.configurationVersion));
+    for (const grant of c.staffingGrants) documents.push(document("staffing", grant.grantId, grant.evidenceRef, product.configurationVersion));
+    for (const [key, reference] of Object.entries(c.readinessEvidence)) documents.push(document("readiness", key, reference, product.configurationVersion));
+  }
+  if (product.approval) documents.push(document("approval", "configuration_approval", product.approval.approvalRef, product.configurationVersion));
+  if (product.activation) documents.push(document("approval", "activation", product.activation.activationRef, product.configurationVersion), document("approval", "activation_approval", product.activation.approvalRef, product.configurationVersion));
+  if (product.suspension) documents.push(document("approval", "suspension_approval", product.suspension.approvalRef, product.configurationVersion));
+  if (product.retirement) documents.push(document("approval", "retirement_approval", product.retirement.approvalRef, product.configurationVersion));
+  return documents.sort((a, b) => `${a.category}:${a.key}:${a.reference}`.localeCompare(`${b.category}:${b.key}:${b.reference}`));
+}
+
 function normalizeConfiguration(value, state, tenantId, productType) {
   const c = object(value, "configuration");
   const effectiveFrom = date(c.effectiveFrom, "effectiveFrom"), effectiveTo = c.effectiveTo == null ? null : date(c.effectiveTo, "effectiveTo");
@@ -141,8 +232,9 @@ function terminalTransition(state, input, now, target) {
     const current = localProduct(state, input), allowed = target === "suspended" ? ["active"] : ["approved", "active", "suspended"];
     if (!allowed.includes(current.status)) fail(`product_admin_${target}_forbidden`, `Product cannot be ${target} from its current state.`);
     const maker = ref(input.proposedBy, "proposedBy"), checker = ref(input.approvedBy, "approvedBy"); independent(maker, checker); ref(input.approvalRef, "approvalRef"); text(input.reason, "reason");
-    const record = { proposedBy: maker, approvedBy: checker, approvalRef: input.approvalRef, reason: input.reason.trim(), at: iso(now) };
-    const product = { ...current, status: target, [target === "suspended" ? "suspension" : "retirement"]: record };
+    const at = iso(now);
+    const record = { proposedBy: maker, approvedBy: checker, approvalRef: input.approvalRef, reason: input.reason.trim(), at };
+    const product = { ...current, status: target, lifecycleHistory: appendLifecycle(current, lifecycle(target, checker, at, { proposedBy: maker, approvalRef: input.approvalRef, reason: input.reason.trim(), configurationVersion: current.configurationVersion })), [target === "suspended" ? "suspension" : "retirement"]: record };
     return output(replaceProduct(state, product), { product });
   });
 }
@@ -159,6 +251,11 @@ function output(state, payload) { return { state, ...payload }; }
 function replaceProduct(state, product) { return { ...state, products: { ...state.products, [productKey(product.tenantId, product.productType)]: product } }; }
 function localProduct(state, input) { tenant(input); canonical(input.productType); const p = state.products[productKey(input.tenantId, input.productType)]; if (!p) fail("product_admin_product_not_found", "Tenant-local product was not found."); return p; }
 function snapshot(p) { return { configurationVersion: p.configurationVersion, configuration: structuredClone(p.configuration), configurationChecksumSha256: p.configurationChecksumSha256 }; }
+function appendLifecycle(product, record) { const history = projectTenantProductLifecycleHistory(product); return [...history, { ...record, sequence: history.length }]; }
+function lifecycle(action, actor, at, details) { return { sequence: 0, action, actor, at, details: structuredClone(details) }; }
+function document(category, key, reference, configurationVersion) { return { category, key, reference, configurationVersion }; }
+function nextAction(action, blockers) { return { action, enabled: blockers.length === 0, blockers: [...new Set(blockers)].sort() }; }
+function field(name, inputType, required = true, extra = {}) { return Object.freeze({ name, inputType, required, ...extra }); }
 function evidence(value) { const o = object(value, "readinessEvidence"); return Object.fromEntries(PRODUCT_READINESS_GATES.map((g) => [g, ref(o[g], `readinessEvidence.${g}`)])); }
 function diffValues(a, b, path = "") { if (stable(a) === stable(b)) return []; if (!plain(a) || !plain(b)) return [{ path: path || "$", before: a ?? null, after: b ?? null }]; const keys = [...new Set([...Object.keys(a), ...Object.keys(b)])].sort(); return keys.flatMap((k) => diffValues(a[k], b[k], path ? `${path}.${k}` : k)); }
 function validState(s) { if (!s || !plain(s.templates) || !plain(s.products) || !plain(s.programmes) || !plain(s.commands)) invalid("Valid administration state is required."); }

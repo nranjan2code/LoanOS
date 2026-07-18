@@ -9,6 +9,10 @@ import {
   assessTenantProductReadiness,
   createProductPlatformAdministrationState,
   diffTenantProductConfigurations,
+  getProductAdministrationFormSchema,
+  projectTenantProductDocuments,
+  projectTenantProductLifecycleHistory,
+  projectTenantProductNextActions,
   proposePlatformTemplateVersion,
   proposeTenantProductConfiguration,
   publishPlatformTemplateVersion,
@@ -143,4 +147,23 @@ test("active products suspend and retire only with maker-checker evidence", () =
   assert.equal(result.product.status, "suspended");
   result = retireTenantProduct(result.state, cmd("retire", { tenantId: "tenant-a", productType: "education_loan", proposedBy: "product-maker", approvedBy: "product-checker", approvalRef: "approval://retire", reason: "Product withdrawn" }), NOW);
   assert.equal(result.product.status, "retired");
+});
+
+test("administration projections expose versioned forms, blockers, lifecycle history and evidence documents", () => {
+  let state = publish(createProductPlatformAdministrationState(), "personal_loan").state;
+  state = subscribe(state, "tenant-a", "personal_loan").state;
+  let product = state.products["tenant-a:personal_loan"];
+  assert.equal(getProductAdministrationFormSchema("personal_loan", "configuration").schemaVersion, 1);
+  assert.deepEqual(projectTenantProductNextActions(product, state).filter((item) => item.enabled).map((item) => item.action), ["configuration"]);
+
+  state = proposeTenantProductConfiguration(state, cmd("personal-config", { tenantId: "tenant-a", productType: "personal_loan", configuration: configuration("personal_loan"), proposedBy: "maker" }), NOW).state;
+  product = state.products["tenant-a:personal_loan"];
+  assert.deepEqual(projectTenantProductLifecycleHistory(product).map((item) => item.action), ["subscribed", "configuration_proposed"]);
+  assert.deepEqual(projectTenantProductLifecycleHistory(product).map((item) => item.sequence), [0, 1]);
+  const documents = projectTenantProductDocuments(product);
+  assert.ok(documents.some((item) => item.category === "staffing" && item.reference === "evidence://staffing/1"));
+  assert.ok(documents.some((item) => item.category === "readiness" && item.key === "rollback_plan"));
+  assert.deepEqual(projectTenantProductNextActions(product, state).filter((item) => item.enabled).map((item) => item.action), ["configuration", "approval"]);
+  assert.throws(() => getProductAdministrationFormSchema("legacy_personal", "configuration"), (error) => error.code === "product_admin_unknown_product");
+  assert.throws(() => getProductAdministrationFormSchema("personal_loan", "invented"), (error) => error.code === "product_admin_form_not_found");
 });

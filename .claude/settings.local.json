@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm test *)",
+      "Bash(grep -n \"external-services\\\\|data-retention\\\\|erasure-requests\\\\|loan-account.js\\\\|## \\\\|### \\\\|\\\\.js\\\\`\\\\|/complaints\\\\`\" docs/architecture/current-implementation.md)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(grep -nE 'function |const [A-Z_]+ *=|=> *\\\\{$' /Users/nisheethranjan/Projects/AIBank/apps/api/src/dashboard/index.js)",
+      "Bash(curl -s -c officer.jar -X POST http://localhost:3040/auth/login -H 'Content-Type: application/json' -d '{\"scope\":\"tenant\",\"tenantId\":\"dev\",\"email\":\"officer@dev.local\",\"password\":\"officer-pass-123\"}')",
+      "Bash(curl -s -b officer.jar http://localhost:3040/auth/me)",
+      "Bash(curl -s -X POST http://localhost:3040/auth/login -H 'Content-Type: application/json' -d '{\"scope\":\"tenant\",\"tenantId\":\"dev\",\"email\":\"officer@dev.local\",\"password\":\"officer-pass-123\"}')",
+      "Bash(curl -s -X POST http://localhost:3040/admin/users/tenant_admin_1/status -H 'x-api-key: dev-service-key' -H 'Content-Type: application/json' -d '{\"status\":\"suspended\"}')",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(d.get\\('user',{}\\).get\\('status'\\) or d\\)\")",
+      "Bash(curl -s -X POST http://localhost:3040/admin/users/tenant_admin_1/status -H 'x-api-key: dev-service-key' -H 'Content-Type: application/json' -d '{\"status\":\"active\"}')",
+      "Bash(git -C /Users/nisheethranjan/Projects/AIBank log --oneline -30)",
+      "Bash(git -C /Users/nisheethranjan/Projects/AIBank log -1 --format=%ci)",
+      "mcp__visualize__read_me",
+      "Read(//Users/nisheethranjan/Projects/**)",
+      "Bash(rustc --version)",
+      "Bash(cargo --version)",
+      "Bash(git checkout *)"
+    ]
+  }
+}

@@ -1,0 +1,55 @@
+.action-grid,
+.document-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: .7rem;
+}
+
+.contract-card { margin-top: .8rem; }
+
+.next-action,
+.metadata-row,
+.diff-row,
+.document-card {
+  display: grid;
+  gap: .28rem;
+  padding: .7rem;
+  border: 1px solid var(--admin-border);
+  border-radius: 9px;
+  margin-top: .5rem;
+}
+
+.next-action small,
+.metadata-row small,
+.diff-row small,
+.document-card small { color: var(--admin-muted); }
+.next-action.ready { border-left: 4px solid var(--admin-primary); }
+.next-action.blocked { border-left: 4px solid var(--admin-danger); }
+.document-card code { overflow-wrap: anywhere; font-size: .75rem; }
+.form-actions { flex-wrap: wrap; }
+.empty.compact { padding: .5rem; text-align: left; }
+.field-help { grid-column: 1 / -1; color: var(--admin-muted); font-size: .82rem; }
+.staffing-grants { grid-column: 1 / -1; display: grid; gap: .7rem; }
+
+.staffing-grant {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: .6rem;
+  padding: .7rem;
+  background: #f7f9f7;
+  border-radius: 9px;
+}
+
+.action-fields { display: grid; gap: .7rem; }
+.governed-form select,
+.governed-form textarea { padding: .65rem; border: 1px solid #aebbb4; border-radius: 8px; font: inherit; }
+
+dialog {
+  width: min(580px, calc(100% - 2rem));
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  padding: 1.2rem;
+  color: var(--admin-text);
+}
+
+dialog::backdrop { background: #0c211bbb; }

@@ -17,9 +17,16 @@ test("tenant administration app renders all products from governed APIs without 
 test("administration app exposes structured readiness, staffing, branding and maker-checker controls", async () => {
   const [html, js] = await Promise.all([readFile(new URL("index.html", root), "utf8"), readFile(new URL("administration.js", root), "utf8")]);
   for (const label of ["Governed product bindings", "Staffing grant", "White-label binding", "Release evidence", "Pending approvals"]) assert.match(html, new RegExp(label));
-  assert.match(js, /\$\{target\}-proposal/);
-  assert.match(js, /approvalRef/);
+  assert.match(js, /openActionForm\(next\.action\)/);
+  assert.match(js, /formSchema\.fields/);
   assert.match(js, /readinessEvidence/);
-  assert.match(js, /cache:"no-store"/);
+  assert.match(js, /cache:\s*"no-store"/);
   assert.doesNotMatch(js, /localStorage|sessionStorage|indexedDB/);
+});
+
+test("administration workspace consumes server-versioned forms and renders blockers, history, documents and repeatable staffing", async () => {
+  const [html, js] = await Promise.all([readFile(new URL("index.html", root), "utf8"), readFile(new URL("administration.js", root), "utf8")]);
+  for (const label of ["staffing-grant-template", "action-dialog", "Add staffing grant"]) assert.match(html, new RegExp(label));
+  for (const contract of ["form-schema", "formSchemaVersion", "configurationDiffs", "detail.documents", "detail.nextActions", "staffingGrants"]) assert.match(js, new RegExp(contract));
+  assert.doesNotMatch(js, /\bprompt\s*\(/);
 });

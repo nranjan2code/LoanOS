@@ -4,6 +4,8 @@ This is the public-claim source of truth for the 21 product journeys shown on th
 
 Support levels are `planned`, `orchestration_only`, `configurable_pattern`, `controlled_first_slice`, and `production_ready`. Tenant activation additionally requires an approved journey configuration, regulated-entity and product-policy bindings, operating owners, tenant UAT, and live-provider readiness where applicable.
 
+The platform persists maker-checker support certification, governed suspension, and independently approved provider, deployment and institution evidence registries. Its production-assessment contract requires eleven current evidence domains and every provider family declared by the exact template/configuration version. Production proposals accept registry identifiers only; request-body evidence/provider claims are rejected, and approval plus live activation re-resolve current records. The registry control does not upgrade this matrix by itself: real external and institution-witnessed evidence is still required.
+
 | Public journey | Platform support | Implemented system boundary | Remaining before production-ready |
 | --- | --- | --- | --- |
 | Personal loan | Controlled first slice | Connected LOS, underwriting, KFS, contracting, disbursement, LMS and servicing tests | Tenant policy/UAT and live providers |

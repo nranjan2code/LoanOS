@@ -37,7 +37,7 @@ export const MUTATION_STAFFING_ROUTE_RULES = Object.freeze([
   rule("FST-027", /^\/(continuity|disaster-recovery|dr-exercises|failover)/),
   rule("FST-028", /^\/(implementation|migrations|cutovers)/),
   rule("FST-029", /^\/(assurance|internal-audit|governance|institution|regulated-entities)/),
-  rule("FST-030", /^\/(subscriptions|tenant-products|admin\/products)/),
+  rule("FST-030", /^\/(subscriptions|tenant-products|admin\/(products|product-platform))/),
   rule("FST-031", /^\/(tenant-provisioning|onboarding|handover|activation|admin\/tenant-activation|sandbox-environments|workflow|completion\/operations)/),
   rule("FST-032", /^\/(co-lending|co-lending-arrangements)/),
   rule("FST-033", /^\/(fraud|fraud-cases|fraud-signals)/),

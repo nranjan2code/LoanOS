@@ -6,6 +6,11 @@ import {
   recordProductJourneyConformanceResult,
   registerProductJourneyConformanceCampaign
 } from "@loanos/core";
+import {
+  buildProductJourneyGeneratedConformanceMatrix,
+  createProductJourneyDownstreamConformanceExecutor,
+  runProductJourneyGeneratedConformance
+} from "@loanos/core/journeys/product-journey-generated-conformance.js";
 
 const PREFIX = "/admin/product-journey-conformance";
 
@@ -39,6 +44,48 @@ export async function routeProductJourneyConformance(context) {
       if (!result.idempotent) await save(store, appendEvent, state, result.registry, "product_journey.conformance_result_recorded", actor, { campaignId: resultPath, scenarioId: result.result.scenarioId, outcome: result.result.outcome, resultChecksumSha256: result.result.resultChecksumSha256 });
       sendJson(res, result.idempotent ? 200 : 201, { result: result.result, idempotent: result.idempotent }); return true;
     }
+    const generatedExecution = match(path, `${PREFIX}/campaigns/`, "/generated-execution");
+    if (method === "POST" && generatedExecution) {
+      const key = `${tenant.tenantId}:${generatedExecution}`;
+      const campaign = registry[key];
+      if (!campaign || !["approved", "executing"].includes(campaign.status) || campaign.tenantId !== tenant.tenantId) throw coded("journey_conformance_campaign_invalid", "An approved same-tenant campaign is required.");
+      if (campaign.executionMode === "live" || campaign.commerciallyLive === true) throw coded("journey_generated_conformance_live_claim_forbidden", "Repository-generated execution is non-production evidence only.");
+      const matrix = buildProductJourneyGeneratedConformanceMatrix({
+        tenantId: tenant.tenantId,
+        journeyTypes: [campaign.journeyType],
+        lanes: ["api_file"],
+        templateVersions: { [campaign.journeyType]: campaign.templateVersion },
+        templateChecksums: { [campaign.journeyType]: campaign.templateChecksumSha256 }
+      });
+      const run = await runProductJourneyGeneratedConformance({
+        matrix,
+        executors: {
+          api_file: createProductJourneyDownstreamConformanceExecutor({
+            now: campaign.approvedAt,
+            evidencePrefix: `repository://jd05/${campaign.manifestChecksumSha256}`
+          })
+        }
+      });
+      if (!run.summary.allPassed || run.summary.productionReady !== false) throw coded("journey_generated_conformance_execution_incomplete", "Every generated non-production scenario must pass with evidence before persistence.");
+      let nextRegistry = registry;
+      let createdCount = 0;
+      for (const observed of run.results) {
+        const recorded = recordProductJourneyConformanceResult(nextRegistry, {
+          tenantId: tenant.tenantId,
+          campaignId: generatedExecution,
+          scenarioId: observed.scenarioId,
+          outcome: observed.outcome,
+          executedBy: actor,
+          evidenceRef: observed.evidenceRef,
+          evidenceChecksumSha256: observed.observation.evidenceChecksumSha256,
+          sourceRunRef: `repository://jd05/run/${run.matrixChecksumSha256}`
+        }, new Date(campaign.approvedAt));
+        nextRegistry = recorded.registry;
+        if (!recorded.idempotent) createdCount += 1;
+      }
+      if (createdCount > 0) await save(store, appendEvent, state, nextRegistry, "product_journey.generated_conformance_executed", actor, { campaignId: generatedExecution, journeyType: campaign.journeyType, matrixChecksumSha256: run.matrixChecksumSha256, resultCount: run.results.length });
+      sendJson(res, createdCount > 0 ? 201 : 200, { run, createdCount, idempotent: createdCount === 0 }); return true;
+    }
     const assessment = match(path, `${PREFIX}/campaigns/`, "/assessment");
     if (method === "POST" && assessment) {
       const body = await readJson(req); const result = assessProductJourneyConformanceCampaign(registry, { ...body, tenantId: tenant.tenantId, campaignId: assessment, assessedBy: actor });
@@ -53,3 +100,4 @@ export async function routeProductJourneyConformance(context) {
 
 async function save(store, appendEvent, state, registry, type, actor, data) { await store.save(appendEvent({ ...state, productJourneyConformanceCampaigns: registry }, { type, actor, ...data })); }
 function match(path, prefix, suffix) { if (!path.startsWith(prefix) || !path.endsWith(suffix)) return null; const value = path.slice(prefix.length, -suffix.length); return value && !value.includes("/") ? decodeURIComponent(value) : null; }
+function coded(code, message) { return Object.assign(new Error(message), { code }); }

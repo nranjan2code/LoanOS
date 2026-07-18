@@ -6,8 +6,9 @@
   <meta name="description" content="Governed tenant product administration for all lending journeys.">
   <title>Product administration</title>
   <link rel="stylesheet" href="/shared/design-tokens.css">
-  <link rel="stylesheet" href="/administration/administration.css?v=1">
-  <script src="/administration/administration.js?v=1" defer></script>
+  <link rel="stylesheet" href="/administration/administration.css?v=2">
+  <link rel="stylesheet" href="/administration/administration-workspace.css?v=2">
+  <script src="/administration/administration.js?v=2" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to main content</a>
@@ -26,11 +27,13 @@
     <form id="configuration-form" class="governed-form">
       <fieldset><legend>Authority and availability</legend><label>Regulated entity references<input name="regulatedEntityRefs" required placeholder="re_primary"></label><fieldset class="checks"><legend>Channels</legend><label><input type="checkbox" name="channels" value="borrower">Customer</label><label><input type="checkbox" name="channels" value="partner">Partner</label><label><input type="checkbox" name="channels" value="branch">Branch</label><label><input type="checkbox" name="channels" value="field">Field</label><label><input type="checkbox" name="channels" value="credit">Credit</label><label><input type="checkbox" name="channels" value="operations">Operations</label><label><input type="checkbox" name="channels" value="control">Control</label></fieldset><label>Effective from<input name="effectiveFrom" type="datetime-local" required></label><label>Effective to<input name="effectiveTo" type="datetime-local"></label></fieldset>
       <fieldset><legend>Governed product bindings</legend><label>Product policy<input name="productPolicyRef" required></label><label>Decision bundle<input name="decisionBundleRef" required></label><label>Accounting profile<input name="accountingProfileRef" required></label><label>Compliance profile<input name="complianceProfileRef" required></label><label>Provider profiles<input name="providerProfileRefs" required placeholder="provider/kyc, provider/payments"></label><label>Document pack<input name="documentPackRef" required></label><label>Programme references<input name="programmeRefs"></label></fieldset>
-      <fieldset><legend>Staffing grant</legend><label>Grant ID<input name="grantId" required></label><label>Principal ID<input name="principalId" required></label><label>Roles<input name="roles" required placeholder="credit_maker, credit_checker"></label><label>Scope references<input name="scopeRefs" required placeholder="branch/all"></label><label>Staffing evidence<input name="staffingEvidenceRef" required></label></fieldset>
+      <fieldset><legend>Staffing grants</legend><p class="field-help">Every grant is tenant-scoped and requires explicit roles, scopes and evidence.</p><div id="staffing-grants" class="staffing-grants"></div><button id="add-staffing-grant" type="button" class="secondary">Add staffing grant</button></fieldset>
       <fieldset><legend>White-label binding</legend><label>Brand release<input name="brandVersionRef" required></label><label>Legal-entity disclosure<input name="legalEntityDisclosureRef" required></label><label>Locales<input name="localeRefs" required placeholder="en, hi"></label><label>Communication templates<input name="communicationTemplateSetRef" required></label><label>Document templates<input name="documentTemplateSetRef" required></label></fieldset>
       <fieldset><legend>Release evidence</legend><div id="readiness-fields" class="evidence-grid"></div></fieldset>
       <div class="form-actions"><button type="submit">Propose configuration</button><button type="button" class="secondary" data-close>Cancel</button></div>
     </form>
   </template>
+  <template id="staffing-grant-template"><div class="staffing-grant"><label>Grant ID<input name="grantId" required></label><label>Principal ID<input name="principalId" required></label><label>Roles<input name="roles" required placeholder="credit_maker, credit_checker"></label><label>Scope references<input name="scopeRefs" required placeholder="product/personal_loan, branch/all"></label><label>Staffing evidence<input name="evidenceRef" required></label><button type="button" class="secondary" data-remove-grant>Remove grant</button></div></template>
+  <dialog id="action-dialog" aria-labelledby="action-title"><form id="action-form" class="governed-form"><h2 id="action-title">Governed action</h2><p class="field-help">This form contract is supplied and versioned by the server. Approval actions require an independently authenticated checker.</p><div id="action-fields" class="action-fields"></div><div class="form-actions"><button type="submit">Submit</button><button type="button" class="secondary" data-close>Cancel</button></div></form></dialog>
 </body>
 </html>

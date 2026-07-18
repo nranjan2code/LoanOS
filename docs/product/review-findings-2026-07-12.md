@@ -283,9 +283,9 @@ provider per category behind the existing `ExternalServiceManager` boundary. The
 ## WS-H — Architecture and scale
 
 ### REV-70 — Split `server.js` · P2 · PARTIAL
-`server.js` is 20,415 lines with 212 hand-rolled route handlers in one file. Split into per-resource
+`server.js` started at 20,415 lines with 212 hand-rolled route handlers in one file. Split into per-resource
 routers behind the existing dispatch seam — no framework dependency (preserves the one-dep posture).
-The integration-control router is now extracted into `apps/api/src/routes/integration-controls.js`, covering provider readiness and signed callback reconciliation behind an explicit context contract; its CERSAI/FIU suites remain green. The remaining domain-resource handlers still require extraction. **Acceptance:** routing is modular; no single router file exceeds a few hundred lines.
+The composition seam is now 9,162 lines. Extracted modules include integration controls, workflow and loan-application families, product/journey administration, payment operations and fraud cases. The payment extraction moved 17 rail, reconciliation, suspense, settlement-file, NACH, UPI and bank-statement patterns; the subsequent fraud extraction moved six reporting, read, committee-pack and natural-justice action patterns and removed another 127 lines while preserving focused API behavior. Remaining inline domain-resource handlers still require extraction. **Acceptance:** routing is modular; no single router file exceeds a few hundred lines.
 
 ### REV-71 — Storage scale · P2 · DONE
 Three missing control-plane tables (`organisation_signups`, `organisation_signup_rate_limits`,

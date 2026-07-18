@@ -15,6 +15,10 @@ if (JSON.stringify(expected) !== JSON.stringify(actual)) errors.push("audit jour
 if (new Set(actual).size !== actual.length) errors.push("journey types must be unique");
 if (!Array.isArray(audit.dimensions) || audit.dimensions.length < 12) errors.push("deep audit dimensions are incomplete");
 const persistentSpecialist = audit.journeys.filter((item) => PERSISTENT_SPECIALIST_JOURNEY_TYPES.includes(item.journeyType)).map((item) => item.journeyType).sort();
+for (const ref of audit.completedBatchEvidence?.["JD-01"] ?? []) {
+  try { await access(resolve(root, ref)); } catch { errors.push(`JD-01 evidence does not exist: ${ref}`); }
+}
+if ((audit.completedBatchEvidence?.["JD-01"] ?? []).length < 7) errors.push("JD-01 requires domain, API, UI, staffing, provisioning and architecture evidence");
 if (JSON.stringify(persistentSpecialist) !== JSON.stringify([...PERSISTENT_SPECIALIST_JOURNEY_TYPES].sort())) errors.push("JD-02 persistent service evidence must exactly cover the 17 specialist/trade journeys");
 for (const ref of audit.completedBatchEvidence?.["JD-02"] ?? []) {
   try { await access(resolve(root, ref)); } catch { errors.push(`JD-02 evidence does not exist: ${ref}`); }
@@ -42,10 +46,11 @@ for (const journey of audit.journeys) {
     try { await access(resolve(root, ref)); } catch { errors.push(`${journey.journeyType} evidence does not exist: ${ref}`); }
   }
   for (const gap of journey.gaps ?? []) if (!audit.batches[gap]) errors.push(`${journey.journeyType} references unknown batch ${gap}`);
+  if (journey.gaps?.includes("JD-01")) errors.push(`${journey.journeyType} must not retain JD-01 after authoritative saga and staffing integration exists`);
   if (journey.gaps?.includes("JD-04")) errors.push(`${journey.journeyType} must not retain JD-04 after composed-lifecycle evidence exists`);
   if (journey.apiDepth !== "composed_lifecycle_partial") errors.push(`${journey.journeyType} must use the truthful JD-04 API depth`);
   if (journey.testDepth !== "composed_lifecycle_partial") errors.push(`${journey.journeyType} must use the truthful JD-04 test depth`);
-  for (const openBatch of ["JD-01", "JD-05", "JD-06"]) if (!journey.gaps?.includes(openBatch)) errors.push(`${journey.journeyType} must retain open production boundary ${openBatch}`);
+  for (const openBatch of ["JD-05", "JD-06"]) if (!journey.gaps?.includes(openBatch)) errors.push(`${journey.journeyType} must retain open production boundary ${openBatch}`);
 }
 
 const batches = Object.entries(audit.batches).map(([batchId, batch]) => ({

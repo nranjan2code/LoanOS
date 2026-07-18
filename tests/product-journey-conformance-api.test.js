@@ -5,7 +5,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
+import { PRODUCT_TEMPLATE_CATALOGUE } from "@loanos/core/platform/product-template-catalogue.js";
 import { createLoanOsServer } from "../apps/api/src/server.js";
+import { loadState } from "../apps/api/src/file-store.js";
 import { totpCode } from "../apps/api/src/identity.js";
 
 const PASSWORD = "TenantAccessPass1!";
@@ -85,6 +87,35 @@ test("product journey conformance API persists independent proposal, execution a
   assert.equal(assessed.assessment.status, "controlled_first_slice");
   assert.equal(assessed.assessment.allPassed, true);
 
+  const template = PRODUCT_TEMPLATE_CATALOGUE.personal_loan;
+  response = await request("/admin/product-journey-conformance/campaigns", cookies.maker, {
+    campaignId: "campaign-generated-1",
+    journeyType: "personal_loan",
+    templateVersion: template.version,
+    templateChecksumSha256: template.templateChecksumSha256,
+    executionMode: "simulated",
+    commerciallyLive: false,
+    environmentRef: "repository://jd05/api-file",
+    tenantConfigurationRef: "tenant-config://tenant_journey_api/v1"
+  });
+  assert.equal(response.status, 201, await response.clone().text());
+  response = await request("/admin/product-journey-conformance/campaigns/campaign-generated-1/approval", cookies.checker, { approvalRef: "approval://checker/campaign-generated-1" });
+  assert.equal(response.status, 200, await response.clone().text());
+  response = await request("/admin/product-journey-conformance/campaigns/campaign-generated-1/generated-execution", cookies.executor, {});
+  assert.equal(response.status, 201, await response.clone().text());
+  const generated = await response.json();
+  assert.equal(generated.run.summary.selectedCaseCount, 17);
+  assert.equal(generated.run.summary.passedCount, 17);
+  assert.equal(generated.run.summary.productionReady, false);
+  assert.equal(generated.createdCount, 17);
+  response = await request("/admin/product-journey-conformance/campaigns/campaign-generated-1/generated-execution", cookies.executor, {});
+  assert.equal(response.status, 200, await response.clone().text());
+  assert.equal((await response.json()).idempotent, true);
+  const persisted = await loadState(dataDir);
+  const persistedCampaign = persisted.tenants[tenant.tenantId].productJourneyConformanceCampaigns[`${tenant.tenantId}:campaign-generated-1`];
+  assert.equal(Object.keys(persistedCampaign.results).length, 17);
+  assert.equal(Object.values(persistedCampaign.results).every((item) => item.sourceRunRef.startsWith("repository://jd05/run/")), true);
+
   response = await fetch(`${base}/admin/product-journey-conformance`, { headers: { cookie: cookies.assessor } });
   assert.equal(response.status, 200, await response.clone().text());
   const projection = await response.json();
@@ -92,5 +123,5 @@ test("product journey conformance API persists independent proposal, execution a
   assert.equal(projection.coverage.assessedCount, 1);
   assert.equal(projection.coverage.activationCandidateCount, 0);
   assert.equal(projection.coverage.productionReadyCount, 0);
-  assert.equal(projection.campaigns.length, 1);
+  assert.equal(projection.campaigns.length, 2);
 });

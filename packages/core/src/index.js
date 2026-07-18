@@ -65,6 +65,7 @@ export {
 
 export {
   PRODUCT_READINESS_GATES,
+  PRODUCT_ADMINISTRATION_FORM_SCHEMA_VERSION,
   TEMPLATE_STATUSES as PRODUCT_PLATFORM_TEMPLATE_STATUSES,
   PRODUCT_STATUSES as TENANT_PRODUCT_STATUSES,
   createProductPlatformAdministrationState,
@@ -78,7 +79,11 @@ export {
   retireTenantProduct,
   administerTenantProgramme,
   assessTenantProductReadiness,
-  diffTenantProductConfigurations
+  diffTenantProductConfigurations,
+  getProductAdministrationFormSchema,
+  projectTenantProductNextActions,
+  projectTenantProductLifecycleHistory,
+  projectTenantProductDocuments
 } from "./platform/product-platform-administration.js";
 
 export {
@@ -763,7 +768,7 @@ export { PRODUCT_JOURNEY_CONFORMANCE_LANES, buildProductJourneyGeneratedConforma
 
 export { JOURNEY_WORKSPACE_ARCHETYPES, JOURNEY_WORKSPACE_CHANNELS, JOURNEY_WORKSPACE_SCHEMAS, PRODUCT_TO_WORKSPACE_ARCHETYPE, listJourneyWorkspaceDrafts, projectJourneyWorkspaceCatalogue, projectJourneyWorkspaceSchema, resolveEntitledJourneyTypes, saveJourneyWorkspaceDraft, validateJourneyWorkspaceCatalogue } from "./journeys/journey-workspace.js";
 export { COMPOSED_JOURNEY_STAGES, COMPOSED_JOURNEY_STAGE_DEFINITIONS, validateComposedJourneyLifecycleCatalogue, createComposedJourneyInstance, proposeComposedJourneyTransition, approveComposedJourneyTransition, pauseComposedJourneyInstance, pauseComposedJourneysForPrincipal, pauseComposedJourneysForProduct, recordComposedJourneyFailure, resumeComposedJourneyInstance, projectComposedJourneyInstance, projectComposedJourneyPortfolio } from "./journeys/composed-journey-lifecycle.js";
-export { JOURNEY_SUPPORT_LEVELS, certifyProductJourneySupport, suspendProductJourneySupport, projectProductJourneySupport, assessTenantJourneyActivation } from "./journeys/product-journey-certification.js";
+export { JOURNEY_SUPPORT_LEVELS, JOURNEY_PRODUCTION_EVIDENCE_DOMAINS, JOURNEY_PRODUCTION_EVIDENCE_REGISTRY_TYPES, JOURNEY_PRODUCTION_EVIDENCE_DOMAIN_GROUPS, assessProductJourneyProductionReadiness, registerProductJourneyProductionEvidence, resolveProductJourneyProductionEvidence, certifyProductJourneySupport, suspendProductJourneySupport, projectProductJourneySupport, assessTenantJourneyActivation } from "./journeys/product-journey-certification.js";
 export { SPECIALISED_JOURNEY_FAMILIES, registerSpecialisedJourney, assessSpecialisedJourney } from "./lending/specialised-lending-journeys.js";
 export { TRADE_JOURNEY_TYPES, configureTradeJourneyPack, registerTradeParty, registerTradeAsset, approveTradeFacilityTransaction, drawTradeFacility, settleTradeProceeds } from "./lending/working-capital-trade-journeys.js";
 export { SPECIALIST_JOURNEY_TYPE_TO_FAMILY, PERSISTENT_SPECIALIST_JOURNEY_TYPES, proposeSpecialistJourneyConfiguration, approveSpecialistJourneyConfiguration, openSpecialistJourneyCase, proposeSpecialistJourneyAction, approveSpecialistJourneyAction, suspendSpecialistJourneyConfiguration, pauseSpecialistCasesForPrincipal, projectSpecialistJourneyWorkspace, projectSpecialistJourneyTasks } from "./journeys/specialist-journey-service.js";

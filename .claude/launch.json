@@ -1,0 +1,18 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "loanos-api",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "LOANOS_DEV_TENANT_KEY=dev-service-key",
+        "LOANOS_PLATFORM_ADMIN_KEY=platform-secret",
+        "LOANOS_DATA_DIR=/private/tmp/claude-501/-Users-nisheethranjan-Projects-AIBank/1a26472d-661b-4dac-9edf-39101ec60a9b/scratchpad/loanos-preview-data",
+        "PORT=3040",
+        "node",
+        "apps/api/src/server.js"
+      ],
+      "port": 3040
+    }
+  ]
+}

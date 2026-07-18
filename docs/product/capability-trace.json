@@ -5539,6 +5539,26 @@
         "type": "test",
         "ref": "tests/implementation-governance.test.js",
         "note": "Executable coverage for the IMP capability family."
+      },
+      {
+        "type": "code",
+        "ref": "packages/core/src/journeys/product-journey-generated-conformance.js",
+        "note": "Tenant-bound non-production 21-by-17 scenario executor with deterministic evidence, governed specialist/composed archetype execution and fail-closed lineage."
+      },
+      {
+        "type": "test",
+        "ref": "tests/product-journey-downstream-conformance.test.js",
+        "note": "Executable coverage for all 357 generated journey/scenario contracts, exact replay and all persistent specialist/composed archetype paths without a production claim."
+      },
+      {
+        "type": "test",
+        "ref": "tests/product-journey-conformance-api.test.js",
+        "note": "Authenticated server-generated campaign execution persists all mandatory results with maker-checker and assessor independence."
+      },
+      {
+        "type": "test",
+        "ref": "tests/product-journey-generated-conformance-postgres.test.js",
+        "note": "Environment-gated PostgreSQL lane persists 21 by 17 evidence records and verifies tenant RLS isolation."
       }
     ],
     "acceptance": "The cited implementation and tests demonstrate a controlled first slice of uat packs by product, role, exception, and regulatory control.",
@@ -5547,7 +5567,7 @@
       "Institution operating model"
     ],
     "notes": "Institution-approved content, assisted-channel certification, production rollout, and observed adoption evidence remain outstanding.",
-    "lastReviewed": "2026-07-15"
+    "lastReviewed": "2026-07-18"
   },
   "IMP-010": {
     "capability": "Training, role certification, SOPs, and operating manuals",
@@ -5593,6 +5613,16 @@
         "type": "test",
         "ref": "tests/implementation-governance.test.js",
         "note": "Executable coverage for the IMP capability family."
+      },
+      {
+        "type": "code",
+        "ref": "packages/core/src/journeys/product-journey-certification.js",
+        "note": "Journey-specific production control independently registers provider, deployment and institution evidence, then re-resolves exact scope, versions, provider-family coverage and lineage."
+      },
+      {
+        "type": "test",
+        "ref": "tests/product-journey-certification-api.test.js",
+        "note": "Evidence registration, support certification and suspension are maker-checker; production proposals reject request-body evidence and live assessment re-resolves registry records."
       }
     ],
     "acceptance": "The cited implementation and tests demonstrate a controlled first slice of go-live readiness, hypercare, issue triage, and exit criteria.",
@@ -5601,7 +5631,7 @@
       "Institution operating model"
     ],
     "notes": "Institution-approved content, assisted-channel certification, production rollout, and observed adoption evidence remain outstanding.",
-    "lastReviewed": "2026-07-15"
+    "lastReviewed": "2026-07-18"
   },
   "IMP-012": {
     "capability": "Tenant due-diligence pack, audit rights, contracts, and certifications",
@@ -7688,6 +7718,16 @@
         "type": "test",
         "ref": "tests/service-operations.test.js",
         "note": "executable acceptance evidence for the currently tracked capability slice"
+      },
+      {
+        "type": "code",
+        "ref": "packages/core/src/journeys/product-journey-certification.js",
+        "note": "Production journey control requires independently registered current deployment, operations, resilience, support and exit evidence."
+      },
+      {
+        "type": "test",
+        "ref": "tests/product-journey-certification.test.js",
+        "note": "Exact-version, registry status and evidence-currentness failures block live journey activation."
       }
     ],
     "acceptance": "Repository evidence must demonstrate the current controlled slice of production deployment topology and india hosting; production acceptance additionally requires closure of the stated remaining gap.",
@@ -7696,7 +7736,7 @@
       "SEC-014"
     ],
     "notes": "Remaining gap: deploy and independently exercise managed production infrastructure, 24x7 operations, failover and capacity controls beyond the evidenced governance workflows.",
-    "lastReviewed": "2026-07-15"
+    "lastReviewed": "2026-07-18"
   },
   "OPS-002": {
     "capability": "Horizontal scale, stateless API, background workers, and schedulers",
@@ -8862,6 +8902,16 @@
         "type": "test",
         "ref": "tests/payment-callback-security.test.js",
         "note": "executable acceptance evidence for the currently tracked capability slice"
+      },
+      {
+        "type": "code",
+        "ref": "apps/api/src/routes/payment-operations.js",
+        "note": "Extracted tenant-scoped payment, reconciliation, suspense and write-off HTTP boundary."
+      },
+      {
+        "type": "test",
+        "ref": "tests/compliance.test.js",
+        "note": "Focused payment operation scenarios retain reconciliation, suspense and fail-closed API behavior after extraction."
       }
     ],
     "acceptance": "Repository evidence must demonstrate the current controlled slice of reconciliation break queue, ageing, approval, and write-off; production acceptance additionally requires closure of the stated remaining gap.",
@@ -8869,7 +8919,7 @@
       "INT-004"
     ],
     "notes": "Remaining gap: complete product and servicing configuration breadth plus production operational integration beyond the evidenced controlled workflow.",
-    "lastReviewed": "2026-07-15"
+    "lastReviewed": "2026-07-18"
   },
   "PAY-015": {
     "capability": "Payment data residency, masking, and tokenisation",
@@ -9109,6 +9159,16 @@
         "type": "test",
         "ref": "tests/platform-product-completion.test.js",
         "note": "Executable coverage for the PLT capability family."
+      },
+      {
+        "type": "code",
+        "ref": "packages/core/src/platform/product-platform-administration.js",
+        "note": "Canonical tenant subscription and governed product-administration projection."
+      },
+      {
+        "type": "test",
+        "ref": "tests/greenfield-product-platform-routes.test.js",
+        "note": "Tenant-local canonical product detail and administration API isolation coverage."
       }
     ],
     "acceptance": "The cited implementation and tests demonstrate a controlled first slice of entitlements, subscribed modules, limits, and commercial plan controls.",
@@ -9117,7 +9177,7 @@
       "Tenant registry"
     ],
     "notes": "Managed production infrastructure, institution-specific configuration, and independently witnessed operational evidence remain outstanding.",
-    "lastReviewed": "2026-07-15"
+    "lastReviewed": "2026-07-18"
   },
   "PLT-009": {
     "capability": "Tenant configuration promotion across dev/test/UAT/production",
@@ -9136,6 +9196,16 @@
         "type": "test",
         "ref": "tests/platform-product-completion.test.js",
         "note": "Executable coverage for the PLT capability family."
+      },
+      {
+        "type": "code",
+        "ref": "apps/api/src/routes/product-platform-administration.js",
+        "note": "Versioned forms, configuration diffs, lifecycle history and maker-checker next-action API projection."
+      },
+      {
+        "type": "test",
+        "ref": "tests/product-platform-administration.test.js",
+        "note": "Configuration version, blocker, history and evidence-reference behavior is executable."
       }
     ],
     "acceptance": "The cited implementation and tests demonstrate a controlled first slice of tenant configuration promotion across dev/test/uat/production.",
@@ -9144,7 +9214,7 @@
       "Tenant registry"
     ],
     "notes": "Managed production infrastructure, institution-specific configuration, and independently witnessed operational evidence remain outstanding.",
-    "lastReviewed": "2026-07-15"
+    "lastReviewed": "2026-07-18"
   },
   "PLT-010": {
     "capability": "Tenant portability export and evidenced offboarding",
@@ -9619,6 +9689,26 @@
         "type": "test",
         "ref": "tests/specialist-journey-service.test.js",
         "note": "Executable maker-checker, idempotency, tamper, version and suspension evidence for JD-02."
+      },
+      {
+        "type": "code",
+        "ref": "packages/core/src/platform/product-platform-administration.js",
+        "note": "Tenant product publication, approval, activation, suspension and retirement retain lifecycle lineage and four eyes."
+      },
+      {
+        "type": "test",
+        "ref": "tests/product-platform-administration.test.js",
+        "note": "Executable canonical product maker-checker, rollback blocker and lifecycle history coverage."
+      },
+      {
+        "type": "code",
+        "ref": "apps/api/src/routes/product-platform-administration.js",
+        "note": "Later-product approval binds completed same-tenant add-product handover lineage and revalidates authoritative FST-002/FST-030 verified-human staffing."
+      },
+      {
+        "type": "test",
+        "ref": "tests/greenfield-product-platform-routes.test.js",
+        "note": "Focused evidence for compensated-saga scope, tenant isolation, independent approval, IAM grant binding and stale-lineage denial."
       }
     ],
     "acceptance": "Product approval, maker-checker publication, and rollback is accepted when tenant-scoped execution fails closed on invalid authority or evidence, retains auditable lineage, and the cited automated control-family tests pass.",
@@ -9626,7 +9716,7 @@
       "REG-002"
     ],
     "notes": "Remaining gap for PRD-010: production-grade institutional configuration, external-provider or assessor evidence where applicable, and witnessed operating-effectiveness validation are not yet complete.",
-    "lastReviewed": "2026-07-15"
+    "lastReviewed": "2026-07-18"
   },
   "PRD-011": {
     "capability": "Product simulation and golden-case regression corpus",
@@ -9650,6 +9740,16 @@
         "type": "doc",
         "ref": "docs/architecture/current-implementation.md",
         "note": "Documented architecture or regulatory boundary for PRD-011."
+      },
+      {
+        "type": "code",
+        "ref": "packages/core/src/journeys/product-journey-generated-conformance.js",
+        "note": "Exact generated matrix and non-production repository-domain executor for all 21 journey contracts."
+      },
+      {
+        "type": "test",
+        "ref": "tests/product-journey-downstream-conformance.test.js",
+        "note": "All 357 generated domain scenario contracts execute without creating a production claim."
       }
     ],
     "acceptance": "Product simulation and golden-case regression corpus is accepted when tenant-scoped execution fails closed on invalid authority or evidence, retains auditable lineage, and the cited automated control-family tests pass.",
@@ -9657,7 +9757,7 @@
       "REG-002"
     ],
     "notes": "Remaining gap for PRD-011: production-grade institutional configuration, external-provider or assessor evidence where applicable, and witnessed operating-effectiveness validation are not yet complete.",
-    "lastReviewed": "2026-07-15"
+    "lastReviewed": "2026-07-18"
   },
   "PRD-012": {
     "capability": "Product authoring UI with version diff and impact analysis",
@@ -9681,6 +9781,16 @@
         "type": "doc",
         "ref": "docs/architecture/current-implementation.md",
         "note": "Documented architecture or regulatory boundary for PRD-012."
+      },
+      {
+        "type": "code",
+        "ref": "apps/administration/administration.js",
+        "note": "Tenant product administration renders server-versioned forms, diffs, blockers, history, documents and repeatable staffing."
+      },
+      {
+        "type": "test",
+        "ref": "tests/administration-app.test.js",
+        "note": "Static UI contract verifies governed form consumption and prompt-free structured administration."
       }
     ],
     "acceptance": "Product authoring UI with version diff and impact analysis is accepted when tenant-scoped execution fails closed on invalid authority or evidence, retains auditable lineage, and the cited automated control-family tests pass.",
@@ -9688,7 +9798,7 @@
       "REG-002"
     ],
     "notes": "Remaining gap for PRD-012: production-grade institutional configuration, external-provider or assessor evidence where applicable, and witnessed operating-effectiveness validation are not yet complete.",
-    "lastReviewed": "2026-07-15"
+    "lastReviewed": "2026-07-18"
   },
   "PRD-013": {
     "capability": "Sanction validity, renewal, review, and expiry policy",
