@@ -41,7 +41,7 @@ test("technical academy pages are generated, visual and current", async () => {
   assert.match(html,/The Rules Engine/);
   assert.match(html,/Explore the enterprise architecture/);
   assert.match(html,/<strong>463<\/strong> (?:capability records|capabilities)/);
-  assert.match(lesson,/<svg/);
+  assert.match(lesson,/class="flow-track/, "each session renders the visual technical flow");
   assert.match(lesson,/System sources/);
   assert.match(lesson,/Active recall/);
   assert.match(lesson,/learning-experience\.js/);

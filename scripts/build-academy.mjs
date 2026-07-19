@@ -213,7 +213,7 @@ function page(title, description, body, { crumbs = [] } = {}) {
 <a class="skip-link" href="#main">Skip to content</a>
 <header class="topbar">
   <a class="brand" href="/help/" aria-label="LoanOS Guide and Academy"><span class="brand-mark">L</span><span><strong>LoanOS</strong><small>BA Lending Academy</small></span></a>
-  <nav aria-label="Academy"><a href="${BASE}/">Course home</a><a href="${BASE}/glossary.html">Glossary</a><a href="/help/">Guide</a></nav>
+  <nav aria-label="Academy"><a href="${BASE}/">Course home</a><a href="${BASE}/glossary.html">Glossary</a><a href="/help/technical-academy/">Technical Academy</a><a href="/help/">Guide</a></nav>
 </header>
 <nav class="crumbs" aria-label="Breadcrumb"><button type="button" class="context-back" data-context-back data-fallback="${backFallback}">← Back</button><span class="crumb-trail">${trail.map(([label, href], index) => index === trail.length - 1 && !href ? `<span aria-current="page">${esc(label)}</span>` : `<a href="${href}">${esc(label)}</a>`).join('<span class="crumb-sep">/</span>')}</span></nav>
 <main id="main">
