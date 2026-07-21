@@ -7,6 +7,7 @@ import {
 } from "@loanos/core/ai/ai-agent-platform.js";
 import { invokeDigitalWorkerProvider } from "@loanos/core/ai/digital-worker-provider.js";
 import { createDemoDigitalWorkerProvider } from "@loanos/core/ai/digital-worker-demo-provider.js";
+import { approveAgentKnowledgePack, approveAgentMemoryStore, approveAgentProviderEvidence, approveAgentRollback, assessAgentProductionAdmission, compareAgentInstallations, containExpiredAgentKnowledge, createAgentKnowledgePack, createAgentMemoryStore, createAgentTestSuite, createAgentWorkflowDraft, projectAgentConfigurationExport, projectAgentOperationsQueue, proposeAgentProviderEvidence, proposeAgentRollback, publishAgentVersion, recordAgentTestRun, retireAgentInstallation } from "@loanos/core/ai/agent-studio-governance.js";
 import { authorizeStaffedFeatureAction, projectTenantFeatureStaffing } from "@loanos/core/identity/saas-identity-governance.js";
 import { decidePlatformControlStaffing } from "../control-rules-engine.js";
 import { decideAiAgentAction, decideAiModelConsumption } from "../rules-engine.js";
@@ -20,7 +21,10 @@ export async function routeAiAgentPlatform(context) {
   let state = await store.load();
   const tenantId = authContext.tenantId;
   if (method === "GET" && path === "/ai/marketplace") { sendJson(res, 200, projectAiAgentMarketplace()); return true; }
-  if (method === "GET" && path === "/ai/agents") { sendJson(res, 200, workspace(state.aiAgentPlatform, tenantId)); return true; }
+  if (method === "GET" && path === "/ai/agents") { sendJson(res, 200, workspace(state, tenantId)); return true; }
+  if (method === "GET" && path === "/ai/agents/operations-queue") { sendJson(res, 200, { items: projectAgentOperationsQueue(state.aiAgentPlatform, tenantId) }); return true; }
+  if (method === "GET" && match(path, "/ai/agents/installations/:id/production-admission")) { try { sendJson(res, 200, assessAgentProductionAdmission(state.aiAgentPlatform, { tenantId, installationId: idOf(path, 4) })); } catch (cause) { sendJson(res, cause.status ?? 422, { error: { code: cause.code, message: cause.message } }); } return true; }
+  if (method === "GET" && match(path, "/ai/agents/installations/:id/export")) { try { sendJson(res, 200, projectAgentConfigurationExport(state.aiAgentPlatform, { tenantId, installationId: idOf(path, 4) })); } catch (cause) { sendJson(res, cause.status ?? 422, { error: { code: cause.code, message: cause.message } }); } return true; }
   if (method === "GET" && path === "/ai/agents/governance-report") {
     const url = new URL(req.url, "http://localhost");
     try { sendJson(res, 200, buildAiAgentGovernanceReport(state.aiAgentPlatform, tenantId, { from: url.searchParams.get("from") ?? undefined, to: url.searchParams.get("to") ?? undefined })); }
@@ -39,7 +43,22 @@ export async function routeAiAgentPlatform(context) {
     else if (path === "/ai/usage-budgets/reservations") outcome = reserveAiAgentUsageBudget(state.aiAgentPlatform, { ...body, tenantId });
     else if (path === "/ai/invoices") outcome = proposeAiAgentInvoice(state.aiAgentPlatform, { ...body, tenantId, proposedBy: actor });
     else if (match(path, "/ai/invoices/:id/approve")) outcome = approveAiAgentInvoice(state.aiAgentPlatform, { ...body, invoiceId: idOf(path, 3), tenantId, approvedBy: actor });
-    else if (path === "/ai/agents/installations") outcome = installTenantAiAgent(state.aiAgentPlatform, state.modelRegistry, { ...body, tenantId, proposedBy: actor });
+    else if (path === "/ai/agents/installations") outcome = installTenantAiAgent(state.aiAgentPlatform, state.modelRegistry, { ...body, tenantId, proposedBy: actor, allowedProductTypes: enabledProductTypes(state, tenantId) });
+    else if (path === "/ai/agents/knowledge-packs") outcome = createAgentKnowledgePack(state.aiAgentPlatform, { ...body, tenantId, proposedBy: actor });
+    else if (match(path, "/ai/agents/knowledge-packs/:id/approve")) outcome = approveAgentKnowledgePack(state.aiAgentPlatform, { ...body, packId: idOf(path, 4), tenantId, approvedBy: actor });
+    else if (path === "/ai/agents/knowledge-packs/contain-expired") outcome = containExpiredAgentKnowledge(state.aiAgentPlatform, { tenantId, actor });
+    else if (path === "/ai/agents/memory-stores") outcome = createAgentMemoryStore(state.aiAgentPlatform, { ...body, tenantId, proposedBy: actor });
+    else if (match(path, "/ai/agents/memory-stores/:id/approve")) outcome = approveAgentMemoryStore(state.aiAgentPlatform, { ...body, memoryStoreId: idOf(path, 4), tenantId, approvedBy: actor });
+    else if (path === "/ai/agents/provider-evidence") outcome = proposeAgentProviderEvidence(state.aiAgentPlatform, { ...body, tenantId, proposedBy: actor });
+    else if (match(path, "/ai/agents/provider-evidence/:id/approve")) outcome = approveAgentProviderEvidence(state.aiAgentPlatform, { ...body, evidenceId: idOf(path, 4), tenantId, approvedBy: actor });
+    else if (path === "/ai/agents/workflows") outcome = createAgentWorkflowDraft(state.aiAgentPlatform, { ...body, tenantId, proposedBy: actor, allowedProductTypes: enabledProductTypes(state, tenantId) });
+    else if (path === "/ai/agents/test-suites") outcome = createAgentTestSuite(state.aiAgentPlatform, { ...body, tenantId, proposedBy: actor });
+    else if (match(path, "/ai/agents/test-suites/:id/runs")) outcome = recordAgentTestRun(state.aiAgentPlatform, { ...body, suiteId: idOf(path, 4), tenantId, source: "synthetic_harness", runBy: actor });
+    else if (path === "/ai/agents/versions") outcome = publishAgentVersion(state.aiAgentPlatform, { ...body, tenantId, publishedBy: actor });
+    else if (path === "/ai/agents/rollbacks") outcome = proposeAgentRollback(state.aiAgentPlatform, { ...body, tenantId, proposedBy: actor });
+    else if (match(path, "/ai/agents/rollbacks/:id/approve")) outcome = approveAgentRollback(state.aiAgentPlatform, { ...body, rollbackId: idOf(path, 4), tenantId, approvedBy: actor });
+    else if (path === "/ai/agents/compare") outcome = { state: state.aiAgentPlatform, record: compareAgentInstallations(state.aiAgentPlatform, { ...body, tenantId }) };
+    else if (match(path, "/ai/agents/installations/:id/retire")) outcome = retireAgentInstallation(state.aiAgentPlatform, { ...body, tenantId, installationId: idOf(path, 4), actor });
     else if (match(path, "/ai/agents/installations/:id/approvals/:role")) {
       const role = idOf(path, 6);
       const local = authorizeStaffedFeatureAction(state, { tenantId, featureId: "FST-034", principalId: actor, requiredRoleId: role });
@@ -79,8 +98,9 @@ export async function routeAiAgentPlatform(context) {
   }
 }
 
-function workspace(platform = {}, tenantId) { const own = (values) => Object.values(values ?? {}).filter((x) => x.tenantId === tenantId); return { marketplace: projectAiAgentMarketplace(), pricingContracts: own(platform.pricingContracts), usageBudgets: own(platform.usageBudgets), budgetReservations: own(platform.budgetReservations), invoices: own(platform.invoices), installations: own(platform.installations), executions: own(platform.executions), usage: own(platform.usageLedger) }; }
-function resourceId(record) { return record.installationId ?? record.executionId ?? record.usageId ?? record.contractId ?? record.budgetId ?? record.reservationId ?? record.invoiceId; }
+function workspace(state = {}, tenantId) { const platform = state.aiAgentPlatform ?? {}; const own = (values) => Object.values(values ?? {}).filter((x) => x.tenantId === tenantId); const installations = own(platform.installations); return { marketplace: projectAiAgentMarketplace(), enabledProductTypes: enabledProductTypes(state, tenantId), pricingContracts: own(platform.pricingContracts), usageBudgets: own(platform.usageBudgets), budgetReservations: own(platform.budgetReservations), invoices: own(platform.invoices), installations, knowledgePacks: own(platform.knowledgePacks), memoryStores: own(platform.memoryStores), providerEvidence: own(platform.providerEvidence), productionAdmission: installations.map((item) => assessAgentProductionAdmission(platform, { tenantId, installationId: item.installationId })), workflowDrafts: own(platform.workflowDrafts), testSuites: own(platform.testSuites), testRuns: own(platform.testRuns), agentVersions: own(platform.agentVersions), rollbackRequests: own(platform.rollbackRequests), operationsQueue: projectAgentOperationsQueue(platform, tenantId), executions: own(platform.executions), usage: own(platform.usageLedger) }; }
+function enabledProductTypes(state, tenantId, now = new Date()) { return [...new Set(Object.values(state.tenantProductSubscriptions ?? {}).filter((item) => item.tenantId === tenantId && item.status === "active" && Date.parse(item.effectiveFrom) <= now.getTime() && Date.parse(item.validUntil) > now.getTime()).flatMap((item) => item.productTypes ?? []))].sort(); }
+function resourceId(record) { return record.versionId ?? record.memoryStoreId ?? record.containmentId ?? record.rollbackId ?? record.runId ?? record.installationId ?? record.workflowId ?? record.packId ?? record.suiteId ?? record.executionId ?? record.usageId ?? record.contractId ?? record.budgetId ?? record.reservationId ?? record.invoiceId ?? record.toInstallationId; }
 function match(path, pattern) { const a = path.split("/"), b = pattern.split("/"); return a.length === b.length && b.every((x, i) => x.startsWith(":") || x === a[i]); }
 function idOf(path, index) { return decodeURIComponent(path.split("/")[index]); }
 

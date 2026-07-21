@@ -29,9 +29,9 @@ function active(state) {
   return activateTenantAiAgent(state, registry(), { installationId: "agent1", tenantId: "re1", governanceEvidence, controlDecision: { ...decision("guardrail.platform_control.staffing"), source: "isolated_control_engine" } }, NOW).state;
 }
 
-test("minimum marketplace publishes four proposal-only digital workers and INR pricing dimensions", () => {
+test("marketplace publishes governed banking assistants and INR pricing dimensions", () => {
   const market = projectAiAgentMarketplace();
-  assert.equal(market.templates.length, 4);
+  assert.equal(market.templates.length, 11);
   assert.ok(market.templates.every((x) => x.decisionAuthority === "none" && x.outputType === "proposal_only"));
   assert.equal(market.currency, "INR");
 });
@@ -68,6 +68,19 @@ test("tenant customization cannot expand template tools and activation needs fou
   let pending = proposed(state);
   pending = recordTenantAiAgentApproval(pending, { installationId: "agent1", tenantId: "re1", role: "model_owner", principalId: "one_human", principalType: "human", approvalRef: "a/1" }, NOW).state;
   assert.throws(() => recordTenantAiAgentApproval(pending, { installationId: "agent1", tenantId: "re1", role: "model_validator", principalId: "one_human", principalType: "human", approvalRef: "a/2" }, NOW), (e) => e.code === "ai_agent_approval_independence_required");
+});
+
+test("staff assistants stay within tenant journeys and use only bounded memory", () => {
+  const state = contracted();
+  const base = { installationId: "bounded", tenantId: "re1", templateId: "credit.cam", contractId: "price1", modelId: "fm1", modelVersion: "2026-07", workloadPrincipalId: "agent", humanSponsorPrincipalId: "owner", promptRef: "p", promptHash: H, configurationRef: "c", proposedBy: "staff", allowedProductTypes: ["personal_loan"] };
+  assert.throws(() => installTenantAiAgent(state, registry(), { ...base, productTypes: ["gold_loan"] }, NOW), (error) => error.code === "ai_agent_product_scope_not_entitled");
+  assert.throws(() => installTenantAiAgent(state, registry(), { ...base, memoryMode: "persistent" }, NOW), (error) => error.code === "ai_agent_memory_mode_invalid");
+  const result = installTenantAiAgent(state, registry(), { ...base, memoryMode: "none", productTypes: ["personal_loan"] }, NOW);
+  assert.equal(result.record.memoryMode, "none");
+  const governedState = { ...state, memoryStores: { mem1: { memoryStoreId: "mem1", tenantId: "re1", status: "active", region: "ap-south-1" } } };
+  const governed = installTenantAiAgent(governedState, registry(), { ...base, installationId: "with-memory", memoryMode: "governed_persistent", memoryStoreId: "mem1", productTypes: ["personal_loan"] }, NOW);
+  assert.equal(governed.record.memoryStoreId, "mem1");
+  assert.throws(() => installTenantAiAgent(state, registry(), { ...base, installationId: "missing-memory", memoryMode: "governed_persistent", memoryStoreId: "missing", productTypes: ["personal_loan"] }, NOW), (error) => error.code === "ai_agent_memory_store_invalid");
 });
 
 test("execution is fail-closed, traceable and bills exact integer paise", () => {

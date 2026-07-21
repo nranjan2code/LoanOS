@@ -40,7 +40,14 @@ export const AI_AGENT_MARKETPLACE_TEMPLATES = Object.freeze({
   "credit.cam": template("credit.cam", "CAM preparation worker", "credit", "A1", ["cam.draft", "evidence.gap_list"], ["guardrail.model_consumption", "guardrail.agent_action"], false),
   "credit.underwriting_review": template("credit.underwriting_review", "Underwriting review worker", "credit", "A1", ["underwriting.memo_draft", "policy.exception_list"], ["guardrail.model_consumption", "guardrail.agent_action"], false),
   "operations.loan_fulfilment": template("operations.loan_fulfilment", "Loan fulfilment worker", "operations", "A2", ["document.request_draft", "workflow.task_draft", "checklist.update_draft"], ["guardrail.model_consumption", "guardrail.agent_action"], false),
-  "service.borrower_support": template("service.borrower_support", "Borrower support worker", "service", "A2", ["response.draft", "handoff.create"], ["guardrail.model_consumption", "guardrail.agent_action"], true)
+  "service.borrower_support": template("service.borrower_support", "Borrower support worker", "service", "A2", ["response.draft", "handoff.create"], ["guardrail.model_consumption", "guardrail.agent_action"], true),
+  "kyc.document_review": template("kyc.document_review", "KYC and document review assistant", "operations", "A1", ["kyc.gap_list", "document.review_draft"], ["guardrail.model_consumption", "guardrail.agent_action"], false),
+  "servicing.request_review": template("servicing.request_review", "Servicing request assistant", "service", "A1", ["servicing.response_draft", "handoff.create"], ["guardrail.model_consumption", "guardrail.agent_action"], true),
+  "collections.preparation": template("collections.preparation", "Collections preparation assistant", "operations", "A1", ["collections.case_summary", "communication.draft"], ["guardrail.model_consumption", "guardrail.agent_action"], false),
+  "complaints.triage": template("complaints.triage", "Complaint and grievance triage assistant", "service", "A1", ["complaint.classify_draft", "handoff.create"], ["guardrail.model_consumption", "guardrail.agent_action"], true),
+  "fraud.referral": template("fraud.referral", "Fraud referral assistant", "credit", "A1", ["fraud.signal_summary", "fraud.referral_draft"], ["guardrail.model_consumption", "guardrail.agent_action"], false),
+  "field.operations": template("field.operations", "Field operations assistant", "operations", "A1", ["field.visit_summary", "evidence.gap_list"], ["guardrail.model_consumption", "guardrail.agent_action"], false),
+  "regulatory.reporting": template("regulatory.reporting", "Regulatory reporting assistant", "operations", "A1", ["report.validation_draft", "reconciliation.gap_list"], ["guardrail.model_consumption", "guardrail.agent_action"], false)
 });
 
 export const AI_AGENT_PRICING_DIMENSIONS = Object.freeze([
@@ -53,7 +60,7 @@ export const AI_AGENT_PRICING_DIMENSIONS = Object.freeze([
  *   contracts, installations, executions, usage, budgets, invoices, events).
  */
 export function createAiAgentPlatformState() {
-  return { pricingContracts: {}, installations: {}, executions: {}, usageLedger: {}, usageBudgets: {}, budgetReservations: {}, invoices: {}, events: [] };
+  return { pricingContracts: {}, installations: {}, executions: {}, usageLedger: {}, usageBudgets: {}, budgetReservations: {}, invoices: {}, knowledgePacks: {}, memoryStores: {}, providerEvidence: {}, workflowDrafts: {}, testSuites: {}, testRuns: {}, agentVersions: {}, rollbackRequests: {}, events: [] };
 }
 
 /**
@@ -67,7 +74,7 @@ export function normalizeAiAgentPlatformState(state) {
   return state && typeof state === "object" ? {
     pricingContracts: state.pricingContracts ?? {}, installations: state.installations ?? {},
     executions: state.executions ?? {}, usageLedger: state.usageLedger ?? {}, usageBudgets: state.usageBudgets ?? {},
-    budgetReservations: state.budgetReservations ?? {}, invoices: state.invoices ?? {},
+    budgetReservations: state.budgetReservations ?? {}, invoices: state.invoices ?? {}, knowledgePacks: state.knowledgePacks ?? {}, memoryStores: state.memoryStores ?? {}, providerEvidence: state.providerEvidence ?? {}, workflowDrafts: state.workflowDrafts ?? {}, testSuites: state.testSuites ?? {}, testRuns: state.testRuns ?? {}, agentVersions: state.agentVersions ?? {}, rollbackRequests: state.rollbackRequests ?? {},
     events: Array.isArray(state.events) ? state.events : []
   } : empty;
 }
@@ -226,13 +233,18 @@ export function installTenantAiAgent(state, modelRegistry, input, now = new Date
   if (String(modelUse.model.version) !== String(input.modelVersion)) fail("ai_agent_model_version_mismatch", "Installation must pin the exact registered model version.", 409);
   const actions = unique(input.allowedActions ?? templateDef.allowedActions);
   if (actions.some((action) => !templateDef.allowedActions.includes(action))) fail("ai_agent_action_scope_expanded", "Tenant customization cannot expand marketplace action scope.");
+  const productTypes = unique(input.productTypes ?? []);
+  if (Array.isArray(input.allowedProductTypes) && productTypes.some((productType) => !input.allowedProductTypes.includes(productType))) fail("ai_agent_product_scope_not_entitled", "Assistant journeys must stay within the tenant's active product subscriptions.", 403);
+  const memoryMode = input.memoryMode ?? "execution_scoped";
+  if (!["none", "execution_scoped", "governed_persistent"].includes(memoryMode)) fail("ai_agent_memory_mode_invalid", "Memory mode is not permitted.");
+  let memoryStoreId = null; if (memoryMode === "governed_persistent") { const memoryStore = platform.memoryStores[input.memoryStoreId]; tenantRecord(memoryStore, input.tenantId, "ai_agent_memory_store_invalid"); if (memoryStore.status !== "active" || memoryStore.region !== IST_REGION) fail("ai_agent_memory_store_inactive", "Persistent memory requires an active approved India-resident memory store.", 403); memoryStoreId = memoryStore.memoryStoreId; }
   const installation = seal({
     installationId: input.installationId, tenantId: input.tenantId, templateId: input.templateId, templateVersion: templateDef.version,
     contractId: input.contractId, modelId: input.modelId, modelVersion: String(input.modelVersion), workloadPrincipalId: input.workloadPrincipalId,
     humanSponsorPrincipalId: input.humanSponsorPrincipalId, autonomy: templateDef.maximumAutonomy, allowedActions: actions,
-    languages: unique(input.languages ?? ["en-IN"]), productTypes: unique(input.productTypes ?? []), dataScopes: unique(input.dataScopes ?? []),
+    languages: unique(input.languages ?? ["en-IN"]), productTypes, dataScopes: unique(input.dataScopes ?? []),
     promptRef: input.promptRef, promptHash: input.promptHash.toLowerCase(), configurationRef: input.configurationRef,
-    knowledgeSources: normalizeKnowledge(input.knowledgeSources), memoryMode: "execution_scoped", dataRegion: IST_REGION,
+    knowledgeSources: normalizeKnowledge(input.knowledgeSources), memoryMode, memoryStoreId, dataRegion: IST_REGION,
     requiredGuardrails: templateDef.requiredGuardrails, customerFacing: templateDef.customerFacing, status: "pending_approval",
     proposedBy: input.proposedBy, approvedByRole: {}, governanceEvidence: {}, activationControl: null, createdAt: now.toISOString(), activatedAt: null
   });

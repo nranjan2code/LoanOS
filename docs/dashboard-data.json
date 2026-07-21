@@ -1,8 +1,8 @@
 {
   "schemaVersion": 2,
-  "generated": "2026-07-21T02:48:01.489Z",
-  "sourceDigest": "3b5dda887838f2fe",
-  "snapshotId": "d2844c98a5cc128f",
+  "generated": "2026-07-21T19:04:25.698Z",
+  "sourceDigest": "85c357ee97ba6e7d",
+  "snapshotId": "76ebb22a4d028db2",
   "sources": {
     "catalogue": "docs/product/complete-system-capability-catalog.md",
     "trace": "docs/product/capability-trace.json",
@@ -12,11 +12,16 @@
   },
   "git": {
     "branch": "main",
-    "sha": "6d9fd6daf230",
-    "count": 231,
+    "sha": "ba05f91242ab",
+    "count": 232,
     "dirty": true,
-    "changeCount": 39,
+    "changeCount": 30,
     "commits": [
+      {
+        "hash": "ba05f91",
+        "subject": "feat(metering): implement usage metering and tenant cost-recovery model",
+        "when": "81 minutes ago"
+      },
       {
         "hash": "6d9fd6d",
         "subject": "feat(help): converge Guide, BA Academy and Technical Academy on one design system",
@@ -50,52 +55,47 @@
       {
         "hash": "3e38e32",
         "subject": "feat(platform): complete operational UI and status surfaces",
-        "when": "3 days ago"
+        "when": "4 days ago"
       },
       {
         "hash": "daec00d",
         "subject": "feat(workspaces): ship role-specific operational desks",
-        "when": "3 days ago"
+        "when": "4 days ago"
       },
       {
         "hash": "207bfea",
         "subject": "refactor(api): extract route modules and add documentation governance",
-        "when": "3 days ago"
+        "when": "4 days ago"
       },
       {
         "hash": "edb1a8b",
         "subject": "docs: deep documentation pass for the @loanos/core package boundary",
-        "when": "3 days ago"
+        "when": "4 days ago"
       },
       {
         "hash": "4a9ef90",
         "subject": "refactor(core): group domain kernel into @loanos/core package domains",
-        "when": "3 days ago"
-      },
-      {
-        "hash": "8b1c3bd",
-        "subject": "docs(core): add JSDoc/rustdoc documentation pass for humans and AI agents",
-        "when": "3 days ago"
+        "when": "4 days ago"
       }
     ]
   },
   "overall": {
     "counts": {
       "Implemented": 93,
-      "Partial": 344,
+      "Partial": 345,
       "Partial/Mock": 11,
       "Mock": 7,
       "Missing": 0,
       "Partner": 3,
       "External": 6
     },
-    "total": 464,
-    "scored": 455,
+    "total": 465,
+    "scored": 456,
     "excluded": 9,
     "maturityPct": 52,
-    "evidenceCount": 464,
+    "evidenceCount": 465,
     "evidencePct": 100,
-    "evidenceQualifiedCount": 464,
+    "evidenceQualifiedCount": 465,
     "evidenceQualifiedPct": 100,
     "pct": 52
   },
@@ -371,28 +371,28 @@
         {
           "n": 27,
           "name": "AI, Model Risk, and Decision Governance",
-          "pct": 68,
-          "total": 24
+          "pct": 66,
+          "total": 25
         }
       ],
       "counts": {
         "Implemented": 11,
-        "Partial": 13,
+        "Partial": 14,
         "Partial/Mock": 0,
         "Mock": 0,
         "Missing": 0,
         "Partner": 0,
         "External": 0
       },
-      "total": 24,
-      "scored": 24,
+      "total": 25,
+      "scored": 25,
       "excluded": 0,
-      "maturityPct": 68,
-      "evidenceCount": 24,
+      "maturityPct": 66,
+      "evidenceCount": 25,
       "evidencePct": 100,
-      "evidenceQualifiedCount": 24,
+      "evidenceQualifiedCount": 25,
       "evidenceQualifiedPct": 100,
-      "pct": 68
+      "pct": 66
     },
     {
       "name": "Risk & Portfolio",
@@ -11832,26 +11832,75 @@
           ],
           "notes": "First policy-bundle slice is implemented and directly callable. Remaining gap: a live model/agent runtime and domain workflows must invoke the applicable guardrail before retrieval, dispatch, credit workflow handoff or case mutation.",
           "lastReviewed": "2026-07-15"
+        },
+        {
+          "id": "AIG-025",
+          "name": "Governed no-code Agent Studio for banking templates, visual workflows, knowledge, testing and lifecycle control",
+          "applicability": "Core",
+          "status": "Partial",
+          "raw": "Partial",
+          "evidence": [
+            {
+              "type": "code",
+              "ref": "apps/agent-studio/agent-studio.js",
+              "note": "Business-language creation, visual work plans, knowledge, tests, comparison and lifecycle client."
+            },
+            {
+              "type": "code",
+              "ref": "packages/core/src/ai/agent-studio-governance.js",
+              "note": "Fail-closed tenant-scoped workflow, knowledge expiry containment, governed memory, budgets, queues, provider admission, version, rollback, export and retirement controls."
+            },
+            {
+              "type": "code",
+              "ref": "apps/api/src/server.js",
+              "note": "Tenant staff route that serves the isolated Agent Studio surface."
+            },
+            {
+              "type": "test",
+              "ref": "tests/agent-studio-ui.test.js",
+              "note": "Executable static route, governed affordance and accessibility-token coverage."
+            },
+            {
+              "type": "test",
+              "ref": "tests/agent-studio-governance.test.js",
+              "note": "Adverse domain and API coverage for purpose/retention/residency memory, knowledge expiry suspension, queues, provider evidence denial, scored rehearsals, publication, rollback, export and retirement."
+            },
+            {
+              "type": "doc",
+              "ref": "docs/architecture/ai-agent-platform-operations.md",
+              "note": "Canonical installation, approval and activation controls rendered by the Studio."
+            }
+          ],
+          "owner": "AI Platform and Tenant Administration",
+          "acceptance": "Tenant staff can configure journey-entitled banking assistants, independently approve knowledge, memory, budgets, versions, rollback and provider evidence, receive role-owned attention work, and obtain a fail-closed production-admission projection; expired knowledge suspends dependants and repository evidence never claims external certification.",
+          "dependencies": [
+            "AIG-016",
+            "AIG-018",
+            "AIG-019",
+            "AIG-020"
+          ],
+          "notes": "Strengthened no-code governance slice. Live-provider evaluation execution, scheduled expiry/notification delivery, external evidence authenticity and institution production authorization remain outside this capability.",
+          "lastReviewed": "2026-07-22"
         }
       ],
       "counts": {
         "Implemented": 11,
-        "Partial": 13,
+        "Partial": 14,
         "Partial/Mock": 0,
         "Mock": 0,
         "Missing": 0,
         "Partner": 0,
         "External": 0
       },
-      "total": 24,
-      "scored": 24,
+      "total": 25,
+      "scored": 25,
       "excluded": 0,
-      "maturityPct": 68,
-      "evidenceCount": 24,
+      "maturityPct": 66,
+      "evidenceCount": 25,
       "evidencePct": 100,
-      "evidenceQualifiedCount": 24,
+      "evidenceQualifiedCount": 25,
       "evidenceQualifiedPct": 100,
-      "pct": 68
+      "pct": 66
     },
     {
       "n": 28,
@@ -15266,6 +15315,28 @@
       "open": 8
     },
     {
+      "name": "AI Platform and Tenant Administration",
+      "counts": {
+        "Implemented": 1,
+        "Partial": 1,
+        "Partial/Mock": 0,
+        "Mock": 0,
+        "Missing": 0,
+        "Partner": 0,
+        "External": 0
+      },
+      "total": 2,
+      "scored": 2,
+      "excluded": 0,
+      "maturityPct": 70,
+      "evidenceCount": 2,
+      "evidencePct": 100,
+      "evidenceQualifiedCount": 2,
+      "evidenceQualifiedPct": 100,
+      "pct": 70,
+      "open": 1
+    },
+    {
       "name": "AI Platform and Commercial Operations",
       "counts": {
         "Implemented": 0,
@@ -15289,28 +15360,6 @@
     },
     {
       "name": "AI Platform and Model Risk",
-      "counts": {
-        "Implemented": 1,
-        "Partial": 0,
-        "Partial/Mock": 0,
-        "Mock": 0,
-        "Missing": 0,
-        "Partner": 0,
-        "External": 0
-      },
-      "total": 1,
-      "scored": 1,
-      "excluded": 0,
-      "maturityPct": 100,
-      "evidenceCount": 1,
-      "evidencePct": 100,
-      "evidenceQualifiedCount": 1,
-      "evidenceQualifiedPct": 100,
-      "pct": 100,
-      "open": 0
-    },
-    {
-      "name": "AI Platform and Tenant Administration",
       "counts": {
         "Implemented": 1,
         "Partial": 0,
@@ -16766,6 +16815,54 @@
           "type": "doc",
           "ref": "docs/architecture/agentic-ai-digital-workers.md",
           "note": "Required domain guardrail catalogue and proposal-only boundary."
+        }
+      ]
+    },
+    {
+      "id": "AIG-025",
+      "name": "Governed no-code Agent Studio for banking templates, visual workflows, knowledge, testing and lifecycle control",
+      "status": "Partial",
+      "owner": "AI Platform and Tenant Administration",
+      "plane": "AI & Model Governance",
+      "category": "27. AI, Model Risk, and Decision Governance",
+      "acceptance": "Tenant staff can configure journey-entitled banking assistants, independently approve knowledge, memory, budgets, versions, rollback and provider evidence, receive role-owned attention work, and obtain a fail-closed production-admission projection; expired knowledge suspends dependants and repository evidence never claims external certification.",
+      "notes": "Strengthened no-code governance slice. Live-provider evaluation execution, scheduled expiry/notification delivery, external evidence authenticity and institution production authorization remain outside this capability.",
+      "dependencies": [
+        "AIG-016",
+        "AIG-018",
+        "AIG-019",
+        "AIG-020"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "apps/agent-studio/agent-studio.js",
+          "note": "Business-language creation, visual work plans, knowledge, tests, comparison and lifecycle client."
+        },
+        {
+          "type": "code",
+          "ref": "packages/core/src/ai/agent-studio-governance.js",
+          "note": "Fail-closed tenant-scoped workflow, knowledge expiry containment, governed memory, budgets, queues, provider admission, version, rollback, export and retirement controls."
+        },
+        {
+          "type": "code",
+          "ref": "apps/api/src/server.js",
+          "note": "Tenant staff route that serves the isolated Agent Studio surface."
+        },
+        {
+          "type": "test",
+          "ref": "tests/agent-studio-ui.test.js",
+          "note": "Executable static route, governed affordance and accessibility-token coverage."
+        },
+        {
+          "type": "test",
+          "ref": "tests/agent-studio-governance.test.js",
+          "note": "Adverse domain and API coverage for purpose/retention/residency memory, knowledge expiry suspension, queues, provider evidence denial, scored rehearsals, publication, rollback, export and retirement."
+        },
+        {
+          "type": "doc",
+          "ref": "docs/architecture/ai-agent-platform-operations.md",
+          "note": "Canonical installation, approval and activation controls rendered by the Studio."
         }
       ]
     },
@@ -25809,13 +25906,13 @@
     }
   ],
   "tests": {
-    "pass": 760,
+    "pass": 768,
     "fail": 0,
     "skipped": 12,
     "cancelled": 0,
     "todo": 0,
-    "total": 772,
-    "durationMs": 22518.065708,
+    "total": 780,
+    "durationMs": 23800.811083,
     "ran": true,
     "source": "provided-log",
     "error": ""

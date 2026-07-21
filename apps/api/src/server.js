@@ -741,6 +741,9 @@ async function route(req, res, dataDir, platformAdminKey, observability, allowDi
   if (method === "GET" && path.startsWith("/administration/")) {
     return serveStaticFile(res, appsRoot, "administration", path, "/administration/");
   }
+  if (method === "GET" && path.startsWith("/agent-studio/")) {
+    return serveStaticFile(res, appsRoot, "agent-studio", path, "/agent-studio/");
+  }
   if (method === "GET" && path.startsWith("/platform-administration/")) {
     return serveStaticFile(res, appsRoot, "platform-administration", path, "/platform-administration/");
   }
@@ -867,6 +870,13 @@ async function route(req, res, dataDir, platformAdminKey, observability, allowDi
     }
     if (subPath === "/staff/journeys" || subPath === "/staff/journeys/") {
       return serveStaticFile(res, appsRoot, "journey-workspace", "/index.html", "/");
+    }
+    if (subPath === "/staff/agents" || subPath === "/staff/agents/") {
+      return serveStaticFile(res, appsRoot, "agent-studio", "/index.html", "/");
+    }
+    if (subPath.startsWith("/staff/agents/")) {
+      const assetPath = subPath.slice("/staff/agents".length);
+      return serveStaticFile(res, appsRoot, "agent-studio", assetPath, "/");
     }
     if (subPath === "/staff/workspaces/") {
       res.writeHead(308, { Location: `/t/${encodeURIComponent(tenantSlug)}/staff/workspaces` });

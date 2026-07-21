@@ -29,14 +29,14 @@ This is a framework choice, not approval to add a dependency or deploy AWS servi
 
 The repository now implements the provider-neutral governance and commercial boundary that must exist before an SDK or Bedrock model is connected:
 
-- four versioned marketplace templates: CAM preparation, underwriting review, loan fulfilment, and borrower support;
+- eleven versioned marketplace templates spanning CAM preparation, underwriting, fulfilment, borrower support, KYC/documents, servicing, collections, complaints, fraud referral, field operations and regulatory reporting;
 - per-tenant pricing contracts in INR using exact non-negative integer paise/token/execution dimensions;
-- tenant-specific installation records with pinned model/prompt/configuration/knowledge versions, India region, workload identity, human sponsor, action allow-list, product/data scopes, and execution-scoped memory;
+- tenant-specific installation records with pinned model/prompt/configuration/knowledge versions, India region, workload identity, human sponsor, action allow-list, server-enforced active product-journey scope, data scopes, and either no memory or execution-scoped memory;
 - FST-034 activation requiring distinct human model owner, model validator, human reviewer, and model-risk manager approvals, governance evidence, and an isolated control-engine trace;
 - local model-registry and global/model kill-switch checks plus isolated business-engine decisions for `guardrail.model_consumption` and `guardrail.agent_action` before every execution;
 - hash-sealed input/output/configuration lineage, proposal-only outcomes, append-only audit events, usage/cost records, emergency suspension, and tenant governance reports.
 
-The implementation anchors are `packages/core/src/ai/ai-agent-platform.js`, `apps/api/src/routes/ai-agent-platform.js`, `packages/core/src/ai/digital-worker-provider.js`, and the domain guardrail fixtures. It intentionally does **not** call an LLM yet. The injected Bedrock/Strands-compatible provider boundary, commercial budgets and invoice-ready records are implemented; durable worker, India-region AWS infrastructure, evaluation service, tenant UI, legal invoice integration, and live-provider conformance remain production gaps.
+The implementation anchors are `packages/core/src/ai/ai-agent-platform.js`, `apps/api/src/routes/ai-agent-platform.js`, `packages/core/src/ai/digital-worker-provider.js`, `apps/agent-studio/`, and the domain guardrail fixtures. It intentionally does **not** call an LLM yet. The injected Bedrock/Strands-compatible provider boundary, commercial budgets, invoice-ready records, and the first visual tenant Agent Studio slice are implemented; durable worker, India-region AWS infrastructure, evaluation service, completed administration journeys, legal invoice integration, and live-provider conformance remain production gaps.
 
 Operational lifecycle, API sequence, pricing semantics, incident procedure and production-admission evidence are maintained in [AI-Agent Platform Operations](ai-agent-platform-operations.md). The injected, fail-closed live-provider boundary is specified in [Digital Worker Provider Contract](digital-worker-provider-contract.md); it is not a live Bedrock/Strands integration.
 

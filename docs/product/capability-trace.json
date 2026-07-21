@@ -1201,6 +1201,55 @@
     "notes": "First policy-bundle slice is implemented and directly callable. Remaining gap: a live model/agent runtime and domain workflows must invoke the applicable guardrail before retrieval, dispatch, credit workflow handoff or case mutation.",
     "lastReviewed": "2026-07-15"
   },
+  "AIG-025": {
+    "capability": "Governed no-code Agent Studio for banking templates, visual workflows, knowledge, testing and lifecycle control",
+    "category": "27. AI, Model Risk, and Decision Governance",
+    "plane": "AI & Model Governance",
+    "applicability": "Core",
+    "status": "Partial",
+    "owner": "AI Platform and Tenant Administration",
+    "evidence": [
+      {
+        "type": "code",
+        "ref": "apps/agent-studio/agent-studio.js",
+        "note": "Business-language creation, visual work plans, knowledge, tests, comparison and lifecycle client."
+      },
+      {
+        "type": "code",
+        "ref": "packages/core/src/ai/agent-studio-governance.js",
+        "note": "Fail-closed tenant-scoped workflow, knowledge expiry containment, governed memory, budgets, queues, provider admission, version, rollback, export and retirement controls."
+      },
+      {
+        "type": "code",
+        "ref": "apps/api/src/server.js",
+        "note": "Tenant staff route that serves the isolated Agent Studio surface."
+      },
+      {
+        "type": "test",
+        "ref": "tests/agent-studio-ui.test.js",
+        "note": "Executable static route, governed affordance and accessibility-token coverage."
+      },
+      {
+        "type": "test",
+        "ref": "tests/agent-studio-governance.test.js",
+        "note": "Adverse domain and API coverage for purpose/retention/residency memory, knowledge expiry suspension, queues, provider evidence denial, scored rehearsals, publication, rollback, export and retirement."
+      },
+      {
+        "type": "doc",
+        "ref": "docs/architecture/ai-agent-platform-operations.md",
+        "note": "Canonical installation, approval and activation controls rendered by the Studio."
+      }
+    ],
+    "acceptance": "Tenant staff can configure journey-entitled banking assistants, independently approve knowledge, memory, budgets, versions, rollback and provider evidence, receive role-owned attention work, and obtain a fail-closed production-admission projection; expired knowledge suspends dependants and repository evidence never claims external certification.",
+    "dependencies": [
+      "AIG-016",
+      "AIG-018",
+      "AIG-019",
+      "AIG-020"
+    ],
+    "notes": "Strengthened no-code governance slice. Live-provider evaluation execution, scheduled expiry/notification delivery, external evidence authenticity and institution production authorization remain outside this capability.",
+    "lastReviewed": "2026-07-22"
+  },
   "AUD-001": {
     "capability": "Tenant-scoped append-only hash-chained audit events",
     "category": "28. Audit, Compliance Assurance, and Evidence",
