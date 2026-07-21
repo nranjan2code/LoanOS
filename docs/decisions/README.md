@@ -8,5 +8,6 @@
 - [ADR 0006 — Strategic remediation decisions](0006-strategic-remediation-decisions-2026-07.md)
 - [ADR 0007 — Greenfield product applications and administration](0007-greenfield-product-applications-and-administration.md)
 - [ADR 0008 — Domain-grouped core kernel behind an explicit package boundary](0008-core-domain-package-boundary.md)
+- [ADR 0009 — Usage metering is fail-open](0009-usage-metering-is-fail-open.md)
 
 Accepted ADRs are immutable decision history. Material reversals require a new ADR that supersedes the earlier record.

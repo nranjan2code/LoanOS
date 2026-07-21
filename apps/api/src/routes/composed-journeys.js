@@ -1,5 +1,6 @@
 import {
   approveComposedJourneyTransition,
+  captureLifecycleMeterEvents,
   createComposedJourneyInstance,
   pauseComposedJourneyInstance,
   projectComposedJourneyPortfolio,
@@ -103,7 +104,17 @@ export async function routeComposedJourneys(context) {
       } else return false;
     }
 
-    await store.save(appendEvent(result.state, auditEvent(eventType, actor, result)));
+    // Usage metering rides behind the lifecycle, never in front of it. This call
+    // cannot throw (ADR 0009): a metering fault is recorded on the audit event
+    // and the transition still stands, because billing must never be able to
+    // deny a borrower credit. Anything missed here is rebuilt later by
+    // `replayMeterEventsFromLifecycles` from this same transition history.
+    const metered = captureLifecycleMeterEvents(result.state, {
+      tenantId: tenant.tenantId,
+      lifecycle: result.lifecycle,
+      transition: result.transition
+    });
+    await store.save(appendEvent(metered.state, auditEvent(eventType, actor, result, metered)));
     sendJson(res, status, response(result));
     return true;
   } catch (cause) {
@@ -114,7 +125,7 @@ export async function routeComposedJourneys(context) {
   }
 }
 
-function auditEvent(type, actor, result) {
+function auditEvent(type, actor, result, metered = null) {
   const instance = result.lifecycle ?? result.instance ?? result.journey ?? null;
   const transition = result.transition ?? result.request ?? null;
   const failure = result.failure ?? null;
@@ -127,7 +138,11 @@ function auditEvent(type, actor, result) {
     status: transition?.status ?? failure?.status ?? instance?.status,
     stage: instance?.currentStage ?? instance?.stage,
     revision: instance?.revision,
-    evidenceChecksumSha256: transition?.transitionChecksumSha256 ?? failure?.failureChecksumSha256 ?? instance?.stateChecksumSha256
+    evidenceChecksumSha256: transition?.transitionChecksumSha256 ?? failure?.failureChecksumSha256 ?? instance?.stateChecksumSha256,
+    // Metering outcome is observable without being able to block: a non-zero
+    // rejected count is the signal to run a replay, not a reason to fail the call.
+    meteredEventCount: metered ? metered.accepted.length : 0,
+    meterRejectedCount: metered ? metered.rejected.length : 0
   };
 }
 

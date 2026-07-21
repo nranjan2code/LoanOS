@@ -7,6 +7,10 @@ import { createHash } from "node:crypto";
 import { createLoanOsServer } from "../apps/api/src/server.js";
 
 const sum = (value) => createHash("sha256").update(value).digest("hex");
+// Expiries must be relative to the run, never hardcoded: an absolute future date
+// silently becomes a past date and turns a passing test into a time bomb that
+// fails on a clean checkout for reasons unrelated to any change being made.
+const inDays = (days) => new Date(Date.now() + days * 86_400_000).toISOString();
 
 test("customer experience completion API handles device certification, offline work and reconciliation", async (t) => {
   const dataDir = await mkdtemp(join(tmpdir(), "loanos-experience-"));
@@ -43,7 +47,7 @@ test("customer experience completion API handles device certification, offline w
     testedBy: "device-tester",
     approvedBy: "security-checker",
     approvalRef: "approval://device-xyz",
-    expiresAt: "2027-01-15T00:00:00.000Z"
+    expiresAt: inDays(180)
   };
 
   response = await fetch(`${base}/experience/devices/certify`, {
@@ -103,7 +107,7 @@ test("customer experience completion API handles device certification, offline w
     algorithm: "AES-256-GCM",
     nonce: "nonce-xyz",
     authTag: "auth-tag-xyz",
-    expiresAt: "2026-07-20T10:00:00.000Z"
+    expiresAt: inDays(1)
   };
 
   response = await fetch(`${base}/experience/offline-work/enqueue`, {

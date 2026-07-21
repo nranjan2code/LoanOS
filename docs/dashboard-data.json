@@ -1,8 +1,8 @@
 {
   "schemaVersion": 2,
-  "generated": "2026-07-18T12:33:20.953Z",
-  "sourceDigest": "d327c1de1e7dbd1b",
-  "snapshotId": "b91bc21765079800",
+  "generated": "2026-07-21T02:48:01.489Z",
+  "sourceDigest": "3b5dda887838f2fe",
+  "snapshotId": "d2844c98a5cc128f",
   "sources": {
     "catalogue": "docs/product/complete-system-capability-catalog.md",
     "trace": "docs/product/capability-trace.json",
@@ -12,90 +12,90 @@
   },
   "git": {
     "branch": "main",
-    "sha": "5b96f2e41a48",
-    "count": 229,
+    "sha": "6d9fd6daf230",
+    "count": 231,
     "dirty": true,
-    "changeCount": 41,
+    "changeCount": 39,
     "commits": [
+      {
+        "hash": "6d9fd6d",
+        "subject": "feat(help): converge Guide, BA Academy and Technical Academy on one design system",
+        "when": "2 days ago"
+      },
+      {
+        "hash": "00b1dc5",
+        "subject": "feat(journeys): execute browser and production evidence controls",
+        "when": "3 days ago"
+      },
       {
         "hash": "5b96f2e",
         "subject": "feat(platform): implement journey certifications, payment operations, fraud cases, and workspace administration updates",
-        "when": "4 hours ago"
+        "when": "3 days ago"
       },
       {
         "hash": "711caa5",
         "subject": "docs(architecture): canonical testing strategy and design system standards",
-        "when": "4 hours ago"
+        "when": "3 days ago"
       },
       {
         "hash": "1dca57c",
         "subject": "feat(governance): add task-type entry skills and scenario routing",
-        "when": "5 hours ago"
+        "when": "3 days ago"
       },
       {
         "hash": "e1a3258",
         "subject": "feat(governance): make the agent-execution layer executable",
-        "when": "5 hours ago"
+        "when": "3 days ago"
       },
       {
         "hash": "3e38e32",
         "subject": "feat(platform): complete operational UI and status surfaces",
-        "when": "8 hours ago"
+        "when": "3 days ago"
       },
       {
         "hash": "daec00d",
         "subject": "feat(workspaces): ship role-specific operational desks",
-        "when": "9 hours ago"
+        "when": "3 days ago"
       },
       {
         "hash": "207bfea",
         "subject": "refactor(api): extract route modules and add documentation governance",
-        "when": "11 hours ago"
+        "when": "3 days ago"
       },
       {
         "hash": "edb1a8b",
         "subject": "docs: deep documentation pass for the @loanos/core package boundary",
-        "when": "12 hours ago"
+        "when": "3 days ago"
       },
       {
         "hash": "4a9ef90",
         "subject": "refactor(core): group domain kernel into @loanos/core package domains",
-        "when": "12 hours ago"
+        "when": "3 days ago"
       },
       {
         "hash": "8b1c3bd",
         "subject": "docs(core): add JSDoc/rustdoc documentation pass for humans and AI agents",
-        "when": "13 hours ago"
-      },
-      {
-        "hash": "bce5d2f",
-        "subject": "feat(academy): implement technical academy and update compliance controls",
-        "when": "19 hours ago"
-      },
-      {
-        "hash": "3aa511b",
-        "subject": "fix(aws): return successful status without domains",
-        "when": "22 hours ago"
+        "when": "3 days ago"
       }
     ]
   },
   "overall": {
     "counts": {
       "Implemented": 93,
-      "Partial": 343,
+      "Partial": 344,
       "Partial/Mock": 11,
       "Mock": 7,
       "Missing": 0,
       "Partner": 3,
       "External": 6
     },
-    "total": 463,
-    "scored": 454,
+    "total": 464,
+    "scored": 455,
     "excluded": 9,
     "maturityPct": 52,
-    "evidenceCount": 463,
+    "evidenceCount": 464,
     "evidencePct": 100,
-    "evidenceQualifiedCount": 463,
+    "evidenceQualifiedCount": 464,
     "evidenceQualifiedPct": 100,
     "pct": 52
   },
@@ -342,28 +342,28 @@
         {
           "n": 1,
           "name": "Platform, Tenancy, and SaaS Control Plane",
-          "pct": 64,
-          "total": 15
+          "pct": 63,
+          "total": 16
         }
       ],
       "counts": {
         "Implemented": 6,
-        "Partial": 9,
+        "Partial": 10,
         "Partial/Mock": 0,
         "Mock": 0,
         "Missing": 0,
         "Partner": 0,
         "External": 0
       },
-      "total": 15,
-      "scored": 15,
+      "total": 16,
+      "scored": 16,
       "excluded": 0,
-      "maturityPct": 64,
-      "evidenceCount": 15,
+      "maturityPct": 63,
+      "evidenceCount": 16,
       "evidencePct": 100,
-      "evidenceQualifiedCount": 15,
+      "evidenceQualifiedCount": 16,
       "evidenceQualifiedPct": 100,
-      "pct": 64
+      "pct": 63
     },
     {
       "name": "AI & Model Governance",
@@ -1021,26 +1021,70 @@
           ],
           "notes": "Managed production infrastructure, institution-specific configuration, and independently witnessed operational evidence remain outstanding.",
           "lastReviewed": "2026-07-15"
+        },
+        {
+          "id": "PLT-016",
+          "name": "Tenant usage metering ledger, lifecycle replay, and provider reconciliation",
+          "applicability": "Core",
+          "status": "Partial",
+          "raw": "Partial",
+          "evidence": [
+            {
+              "type": "code",
+              "ref": "packages/core/src/platform/usage-metering.js",
+              "note": "Append-only, tenant-bound hash-chained meter ledger with deterministic event identity, fail-open capture seam, lifecycle replay and provider reconciliation."
+            },
+            {
+              "type": "code",
+              "ref": "apps/api/src/routes/usage-metering.js",
+              "note": "Tenant-scoped HTTP surface: ledger read, batch emission with partial acceptance, replay and provider reconciliation."
+            },
+            {
+              "type": "test",
+              "ref": "tests/usage-metering.test.js",
+              "note": "Kernel acceptance: fail-open on malformed input and corrupt ledger, idempotency, chain tamper detection, tenant non-transplantability, replay convergence, exact quantity aggregation, reconciliation variance thresholds."
+            },
+            {
+              "type": "test",
+              "ref": "tests/usage-metering-route.test.js",
+              "note": "Route acceptance through the real server composition: fail-closed access control, HTTP 207 partial acceptance, idempotent retry, cross-tenant isolation, persisted chain and audit visibility of metering faults."
+            },
+            {
+              "type": "doc",
+              "ref": "docs/decisions/0009-usage-metering-is-fail-open.md",
+              "note": "ADR 0009 records metering as the single deliberate exception to fail-closed and scopes it away from lending decisions."
+            }
+          ],
+          "owner": "Platform Engineering & Commercial Operations",
+          "acceptance": "Meter events are appended to a tenant-bound hash chain with identity derived from the underlying occurrence, so a retried callback cannot double-bill; the capture seam used on lending hot paths never throws (ADR 0009) and a metering fault is reported rather than blocking origination, disbursement or collections; missing events are reconstructed idempotently from composed-journey transition history; and provider usage reconciles to an invoice with variance beyond the declared threshold raised as an exception. Rating, pricing and invoicing are explicitly out of scope at this maturity.",
+          "dependencies": [
+            "PLT-001",
+            "PLT-002",
+            "PLT-008",
+            "AIG-017"
+          ],
+          "notes": "Step 1 of INT-ADM-08 / INT-PLT-12: emission and persistence only. Deliberately carries no money — a meter event has a quantity and a unit, never a price, so the ledger stays re-rateable. Remains Partial until rating, invoicing and tax are built and the meter has run against real traffic; the commercial model in docs/commercial/ depends on this ledger to replace its unmeasured funnel, lifetime and delinquency assumptions. Agent usage reuses the exact-paise ledger in packages/core/src/ai/ai-agent-platform.js (AIG-017) rather than duplicating it.",
+          "lastReviewed": "2026-07-21"
         }
       ],
       "counts": {
         "Implemented": 6,
-        "Partial": 9,
+        "Partial": 10,
         "Partial/Mock": 0,
         "Mock": 0,
         "Missing": 0,
         "Partner": 0,
         "External": 0
       },
-      "total": 15,
-      "scored": 15,
+      "total": 16,
+      "scored": 16,
       "excluded": 0,
-      "maturityPct": 64,
-      "evidenceCount": 15,
+      "maturityPct": 63,
+      "evidenceCount": 16,
       "evidencePct": 100,
-      "evidenceQualifiedCount": 15,
+      "evidenceQualifiedCount": 16,
       "evidenceQualifiedPct": 100,
-      "pct": 64
+      "pct": 63
     },
     {
       "n": 2,
@@ -15420,6 +15464,28 @@
       "open": 0
     },
     {
+      "name": "Platform Engineering & Commercial Operations",
+      "counts": {
+        "Implemented": 0,
+        "Partial": 1,
+        "Partial/Mock": 0,
+        "Mock": 0,
+        "Missing": 0,
+        "Partner": 0,
+        "External": 0
+      },
+      "total": 1,
+      "scored": 1,
+      "excluded": 0,
+      "maturityPct": 40,
+      "evidenceCount": 1,
+      "evidencePct": 100,
+      "evidenceQualifiedCount": 1,
+      "evidenceQualifiedPct": 100,
+      "pct": 40,
+      "open": 1
+    },
+    {
       "name": "Product Enablement",
       "counts": {
         "Implemented": 1,
@@ -22427,6 +22493,49 @@
       ]
     },
     {
+      "id": "PLT-016",
+      "name": "Tenant usage metering ledger, lifecycle replay, and provider reconciliation",
+      "status": "Partial",
+      "owner": "Platform Engineering & Commercial Operations",
+      "plane": "Platform & Tenancy",
+      "category": "1. Platform, Tenancy, and SaaS Control Plane",
+      "acceptance": "Meter events are appended to a tenant-bound hash chain with identity derived from the underlying occurrence, so a retried callback cannot double-bill; the capture seam used on lending hot paths never throws (ADR 0009) and a metering fault is reported rather than blocking origination, disbursement or collections; missing events are reconstructed idempotently from composed-journey transition history; and provider usage reconciles to an invoice with variance beyond the declared threshold raised as an exception. Rating, pricing and invoicing are explicitly out of scope at this maturity.",
+      "notes": "Step 1 of INT-ADM-08 / INT-PLT-12: emission and persistence only. Deliberately carries no money — a meter event has a quantity and a unit, never a price, so the ledger stays re-rateable. Remains Partial until rating, invoicing and tax are built and the meter has run against real traffic; the commercial model in docs/commercial/ depends on this ledger to replace its unmeasured funnel, lifetime and delinquency assumptions. Agent usage reuses the exact-paise ledger in packages/core/src/ai/ai-agent-platform.js (AIG-017) rather than duplicating it.",
+      "dependencies": [
+        "PLT-001",
+        "PLT-002",
+        "PLT-008",
+        "AIG-017"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "packages/core/src/platform/usage-metering.js",
+          "note": "Append-only, tenant-bound hash-chained meter ledger with deterministic event identity, fail-open capture seam, lifecycle replay and provider reconciliation."
+        },
+        {
+          "type": "code",
+          "ref": "apps/api/src/routes/usage-metering.js",
+          "note": "Tenant-scoped HTTP surface: ledger read, batch emission with partial acceptance, replay and provider reconciliation."
+        },
+        {
+          "type": "test",
+          "ref": "tests/usage-metering.test.js",
+          "note": "Kernel acceptance: fail-open on malformed input and corrupt ledger, idempotency, chain tamper detection, tenant non-transplantability, replay convergence, exact quantity aggregation, reconciliation variance thresholds."
+        },
+        {
+          "type": "test",
+          "ref": "tests/usage-metering-route.test.js",
+          "note": "Route acceptance through the real server composition: fail-closed access control, HTTP 207 partial acceptance, idempotent retry, cross-tenant isolation, persisted chain and audit visibility of metering faults."
+        },
+        {
+          "type": "doc",
+          "ref": "docs/decisions/0009-usage-metering-is-fail-open.md",
+          "note": "ADR 0009 records metering as the single deliberate exception to fail-closed and scopes it away from lending decisions."
+        }
+      ]
+    },
+    {
       "id": "PRD-003",
       "name": "Fixed, floating, flat, and reducing-balance interest configuration",
       "status": "Partial",
@@ -25700,13 +25809,13 @@
     }
   ],
   "tests": {
-    "pass": 739,
+    "pass": 760,
     "fail": 0,
     "skipped": 12,
     "cancelled": 0,
     "todo": 0,
-    "total": 751,
-    "durationMs": 23040.078333,
+    "total": 772,
+    "durationMs": 22518.065708,
     "ran": true,
     "source": "provided-log",
     "error": ""

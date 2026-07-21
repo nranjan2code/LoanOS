@@ -9413,6 +9413,50 @@
     "notes": "Managed production infrastructure, institution-specific configuration, and independently witnessed operational evidence remain outstanding.",
     "lastReviewed": "2026-07-15"
   },
+  "PLT-016": {
+    "capability": "Tenant usage metering ledger, lifecycle replay, and provider reconciliation",
+    "category": "1. Platform, Tenancy, and SaaS Control Plane",
+    "plane": "Platform & Tenancy",
+    "applicability": "Core",
+    "status": "Partial",
+    "owner": "Platform Engineering & Commercial Operations",
+    "evidence": [
+      {
+        "type": "code",
+        "ref": "packages/core/src/platform/usage-metering.js",
+        "note": "Append-only, tenant-bound hash-chained meter ledger with deterministic event identity, fail-open capture seam, lifecycle replay and provider reconciliation."
+      },
+      {
+        "type": "code",
+        "ref": "apps/api/src/routes/usage-metering.js",
+        "note": "Tenant-scoped HTTP surface: ledger read, batch emission with partial acceptance, replay and provider reconciliation."
+      },
+      {
+        "type": "test",
+        "ref": "tests/usage-metering.test.js",
+        "note": "Kernel acceptance: fail-open on malformed input and corrupt ledger, idempotency, chain tamper detection, tenant non-transplantability, replay convergence, exact quantity aggregation, reconciliation variance thresholds."
+      },
+      {
+        "type": "test",
+        "ref": "tests/usage-metering-route.test.js",
+        "note": "Route acceptance through the real server composition: fail-closed access control, HTTP 207 partial acceptance, idempotent retry, cross-tenant isolation, persisted chain and audit visibility of metering faults."
+      },
+      {
+        "type": "doc",
+        "ref": "docs/decisions/0009-usage-metering-is-fail-open.md",
+        "note": "ADR 0009 records metering as the single deliberate exception to fail-closed and scopes it away from lending decisions."
+      }
+    ],
+    "acceptance": "Meter events are appended to a tenant-bound hash chain with identity derived from the underlying occurrence, so a retried callback cannot double-bill; the capture seam used on lending hot paths never throws (ADR 0009) and a metering fault is reported rather than blocking origination, disbursement or collections; missing events are reconstructed idempotently from composed-journey transition history; and provider usage reconciles to an invoice with variance beyond the declared threshold raised as an exception. Rating, pricing and invoicing are explicitly out of scope at this maturity.",
+    "dependencies": [
+      "PLT-001",
+      "PLT-002",
+      "PLT-008",
+      "AIG-017"
+    ],
+    "notes": "Step 1 of INT-ADM-08 / INT-PLT-12: emission and persistence only. Deliberately carries no money — a meter event has a quantity and a unit, never a price, so the ledger stays re-rateable. Remains Partial until rating, invoicing and tax are built and the meter has run against real traffic; the commercial model in docs/commercial/ depends on this ledger to replace its unmeasured funnel, lifetime and delinquency assumptions. Agent usage reuses the exact-paise ledger in packages/core/src/ai/ai-agent-platform.js (AIG-017) rather than duplicating it.",
+    "lastReviewed": "2026-07-21"
+  },
   "PRD-001": {
     "capability": "Product family, borrower segment, amount, tenor, and currency",
     "category": "3. Product, Pricing, and Policy Configuration",

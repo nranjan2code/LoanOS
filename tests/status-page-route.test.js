@@ -51,7 +51,7 @@ test("canonical build status serves only generated dashboard artifacts and is li
   assert.match(dataResponse.headers.get("content-type") ?? "", /^application\/json/);
   const snapshot = await dataResponse.json();
   assert.equal(snapshot.schemaVersion, 2);
-  assert.equal(snapshot.overall.total, 463);
+  assert.equal(snapshot.overall.total, 464);
 
   const blocked = await fetch(`${base}/status/README.md`);
   assert.equal(blocked.status, 404, "the status mount must not expose the documentation tree");

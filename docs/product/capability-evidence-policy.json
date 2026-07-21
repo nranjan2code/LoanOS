@@ -1,5 +1,5 @@
 {
-  "minimumLinkedCapabilities": 463,
+  "minimumLinkedCapabilities": 464,
   "minimumVerifiedImplemented": 93,
   "policy": "Floors may only increase. Linked evidence must resolve to repository files or a well-formed endpoint; Implemented verification requires both executable test evidence and code or endpoint evidence."
 }

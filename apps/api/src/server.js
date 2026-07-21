@@ -25,6 +25,7 @@ import { routeLoanApplicationUnderwriting } from "./routes/loan-application-unde
 import { routeLoanApplicationContracting } from "./routes/loan-application-contracting.js";
 import { routeLoanOriginationChannels } from "./routes/loan-origination-channels.js";
 import { routeComposedJourneys } from "./routes/composed-journeys.js";
+import { routeUsageMetering } from "./routes/usage-metering.js";
 import { routeProductPlatformAdministration } from "./routes/product-platform-administration.js";
 import { routeBrandGovernance } from "./routes/brand-governance.js";
 import { routeJourneyApplications } from "./routes/journey-applications.js";
@@ -1300,6 +1301,7 @@ async function route(req, res, dataDir, platformAdminKey, observability, allowDi
   if (await routeLoanApplicationContracting({ method, path, req, res, tenant, store, readJson, sendJson, appendEvent, authContext, resolveSessionActorId })) return;
   if (await routeLoanOriginationChannels({ method, path, req, res, store, readJson, sendJson, appendEvent, authContext })) return;
   if (await routeComposedJourneys({ method, path, req, res, tenant, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
+  if (await routeUsageMetering({ method, path, url, req, res, tenant, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
   if (await routeProductPlatformAdministration({ method, path, req, res, tenant, store, stateRef, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
   if (await routeBrandGovernance({ method, path, req, res, tenant, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;
   if (await routeJourneyApplications({ method, path, req, res, tenant, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor })) return;

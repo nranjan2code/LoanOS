@@ -40,7 +40,7 @@ test("technical academy pages are generated, visual and current", async () => {
   assert.match(html,/data-context-back/, "course pages provide an explicit return path");
   assert.match(html,/The Rules Engine/);
   assert.match(html,/Explore the enterprise architecture/);
-  assert.match(html,/<strong>463<\/strong> (?:capability records|capabilities)/);
+  assert.match(html,/<strong>464<\/strong> (?:capability records|capabilities)/);
   assert.match(lesson,/class="flow-track/, "each session renders the visual technical flow");
   assert.match(lesson,/System sources/);
   assert.match(lesson,/Active recall/);
@@ -77,7 +77,7 @@ test("capability atlas renders every individual catalogue record", async () => {
     assert.match(page,/Current maturity and gap/);
     assert.match(page,/Implementation and verification evidence/);
   }
-  assert.equal(records,463);
+  assert.equal(records,464);
 });
 
 test("integration atlas renders every external boundary with safe-failure guidance", async () => {
