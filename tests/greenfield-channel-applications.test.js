@@ -38,7 +38,7 @@ test("partner application relies on authenticated server attribution", async () 
   const [html, js] = await source("partner-application");
   assert.match(js, /journey-workspaces\/partner\/catalogue/);
   assert.match(js, /journey-workspaces\/partner\/drafts/);
-  assert.match(html, /attributed by the service to your authenticated principal/);
+  assert.match(html, /recorded under your signed-in account and authorised partner scope/);
   assert.doesNotMatch(html, /name="(?:partner|principal|actor)/i);
 });
 

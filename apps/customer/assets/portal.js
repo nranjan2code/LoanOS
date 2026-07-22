@@ -446,7 +446,7 @@ function showSignedInPortal(borrower) {
   document.getElementById("esign-name").value = name;
   dom.authPanel.hidden = true;
   dom.mainPortal.hidden = false;
-  dom.headerStatus.innerHTML = `<span class="secure-label"><span class="secure-dot"></span> Secure session</span><a class="text-button" href="/status/">Build status</a><button class="text-button" id="btn-header-logout" type="button">Sign out</button>`;
+  dom.headerStatus.innerHTML = `<span class="secure-label"><span class="secure-dot"></span> Secure session</span><button class="text-button" id="btn-header-logout" type="button">Sign out</button>`;
   document.getElementById("btn-header-logout").addEventListener("click", disconnect);
   updateCurrentCorrectionValue();
   openPanel("home", false);
@@ -504,7 +504,7 @@ async function disconnect() {
   dom.authSubmit.dataset.originalLabel = dom.authSubmit.innerHTML;
   dom.authPanel.hidden = false;
   dom.mainPortal.hidden = true;
-  dom.headerStatus.innerHTML = `<span class="secure-label"><span class="secure-dot"></span> Secure access</span><a class="text-button" href="/status/">Build status</a><a class="text-button" href="/t/${encodeURIComponent(urlTenantId)}/">Lender home</a>`;
+  dom.headerStatus.innerHTML = `<span class="secure-label"><span class="secure-dot"></span> Secure access</span><a class="text-button" href="/t/${encodeURIComponent(urlTenantId)}/">Lender home</a>`;
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 

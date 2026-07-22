@@ -1,0 +1,139 @@
+/* Shared shell for customer, employee and partner application hubs. */
+body {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+}
+
+.topbar {
+  min-height: 72px;
+  padding: var(--space-3) max(var(--space-4), calc((100% - var(--content-max)) / 2));
+  border-bottom: 1px solid rgba(255, 255, 255, .14);
+  background: var(--accent-primary);
+  color: white;
+}
+
+.brand { gap: var(--space-3); }
+.brand span:first-child {
+  width: 38px;
+  height: 38px;
+  border-radius: 50% 50% 50% 10px;
+  background: var(--bg-surface-1);
+  color: var(--accent-primary);
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 400;
+}
+.brand span:first-child:empty::before { content: "L"; }
+.topbar nav { display: flex; align-items: center; gap: var(--space-5); }
+.topbar nav a { color: white; font-size: var(--text-sm); font-weight: 700; text-decoration: none; }
+.topbar nav a:hover { text-decoration: underline; text-underline-offset: 4px; }
+
+.topbar button,
+.button {
+  min-height: 42px;
+  border-radius: var(--radius-full);
+  padding: var(--space-2) var(--space-5);
+  font-family: var(--font-sans);
+  font-weight: 700;
+}
+.topbar button { border: 1px solid rgba(255,255,255,.22); background: rgba(255,255,255,.1); color: white; }
+.topbar button:hover { background: rgba(255,255,255,.18); }
+
+main {
+  width: min(var(--content-max), calc(100% - 2 * var(--space-5)));
+  flex: 1;
+  padding: var(--space-8) 0 calc(var(--space-8) * 2);
+}
+.hero { padding: var(--space-7) 0 var(--space-6); }
+.hero h1 {
+  max-width: 760px;
+  margin: var(--space-2) 0;
+  color: var(--accent-primary);
+  font-family: var(--font-display);
+  font-size: clamp(2.7rem, 6vw, 4.8rem);
+  font-weight: 400;
+  letter-spacing: -.035em;
+  line-height: .98;
+}
+.hero > p:last-child { max-width: 720px; color: var(--text-secondary); font-size: var(--text-md); }
+.eyebrow { color: var(--accent-cyan); }
+
+.tabs,
+.channel-navigation {
+  display: flex;
+  gap: var(--space-2);
+  margin: var(--space-5) 0;
+  padding: var(--space-1);
+  overflow-x: auto;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface-3);
+}
+.tabs a,
+.channel-navigation .channel {
+  min-height: 44px;
+  display: inline-flex;
+  flex: 1 0 max-content;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2) var(--space-4);
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--accent-primary);
+  font-weight: 700;
+  text-decoration: none;
+}
+.tabs a:hover,
+.channel-navigation .channel:hover { background: var(--bg-surface-1); }
+.channel-navigation .channel[aria-current="true"] { background: var(--accent-primary); color: white; }
+
+.panel,
+.notice {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface-1);
+  box-shadow: var(--shadow-sm);
+}
+.notice { margin: var(--space-4) 0; padding: var(--space-5); border-left: 4px solid var(--accent-cyan); }
+.panel h2,
+.notice h2 { color: var(--accent-primary); }
+
+#status.error,
+.error {
+  max-width: 760px;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid rgba(239,68,68,.22);
+  border-radius: var(--radius-sm);
+  background: var(--status-danger-subtle);
+  color: #9b2c2c;
+}
+
+.app-footer {
+  width: 100%;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-3) max(var(--space-5), calc((100% - var(--content-max)) / 2));
+  border-top: 1px solid var(--border-default);
+  background: var(--bg-surface-1);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+.app-footer a { color: var(--accent-primary); font-weight: 700; }
+
+@media (max-width: 700px) {
+  .topbar { align-items: flex-start; flex-direction: column; }
+  .topbar nav { width: 100%; gap: var(--space-3); overflow-x: auto; }
+  .topbar nav button { margin-left: auto; }
+  main { width: min(100% - 2 * var(--space-4), var(--content-max)); padding-top: var(--space-5); }
+  .app-footer { align-items: flex-start; flex-direction: column; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
+}

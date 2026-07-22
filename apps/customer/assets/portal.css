@@ -1,16 +1,16 @@
 :root {
-  --portal-forest: #173f35;
+  --portal-forest: var(--accent-primary);
   --portal-forest-deep: #0d2e27;
-  --portal-leaf: #28705c;
+  --portal-leaf: var(--accent-cyan);
   --portal-lime: #d8ef88;
   --portal-saffron: #f4b860;
   --portal-sky: #b7dce4;
-  --portal-cream: #f7f4ec;
-  --portal-paper: #fffdf8;
-  --portal-ink: #17201d;
-  --portal-muted: #66716d;
-  --portal-line: rgba(23, 63, 53, .14);
-  --portal-display: "DM Serif Display", Georgia, serif;
+  --portal-cream: var(--bg-base);
+  --portal-paper: var(--bg-surface-2);
+  --portal-ink: var(--text-primary);
+  --portal-muted: var(--text-muted);
+  --portal-line: var(--border-default);
+  --portal-display: var(--font-display);
 }
 
 html { scroll-behavior: smooth; }

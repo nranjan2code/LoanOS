@@ -1,9 +1,10 @@
-const ui = Object.fromEntries(["brand-home", "brand-mark", "brand-name", "refresh", "network-warning", "status", "catalogue", "draft-list"].map((id) => [id.replaceAll("-", "_"), document.querySelector(`#${id}`)]));
+const ui = Object.fromEntries(["brand-home", "brand-mark", "brand-name", "footer-home", "refresh", "network-warning", "status", "catalogue", "draft-list"].map((id) => [id.replaceAll("-", "_"), document.querySelector(`#${id}`)]));
 const tenantId = decodeURIComponent(location.pathname.match(/^\/t\/([^/]+)/)?.[1] ?? "");
 const tenantBase = `/t/${encodeURIComponent(tenantId)}`;
 const workspace = `${tenantBase}/portal/journeys`;
 
 ui.brand_home.href = `${tenantBase}/portal/`;
+ui.footer_home.href = `${tenantBase}/`;
 ui.refresh.addEventListener("click", () => void load());
 addEventListener("online", networkState);
 addEventListener("offline", networkState);
@@ -14,7 +15,7 @@ async function load() {
   state("Loading your authorised journeys…");
   try {
     const [brand, catalogue, drafts] = await Promise.all([
-      request(`${tenantBase}/brand-experience?channel=borrower&locale=${encodeURIComponent(document.documentElement.lang)}`),
+      loadBrandExperience(),
       request("/journey-workspaces/borrower/catalogue"),
       request("/journey-workspaces/borrower/drafts")
     ]);
@@ -23,6 +24,16 @@ async function load() {
     renderDrafts(drafts.drafts ?? []);
     state("Application information is current.");
   } catch (error) { state(error.message, true); }
+}
+
+async function loadBrandExperience() {
+  try {
+    return await request(`/brand-experience?channel=borrower&locale=${encodeURIComponent(document.documentElement.lang)}`);
+  } catch {
+    const identity = await request(`${tenantBase}/branding`);
+    const name = identity.regulatedEntity?.name || identity.name || "Customer applications";
+    return { experience: { theme: { brandName: name }, legalIdentity: { regulatedEntityName: name } } };
+  }
 }
 
 function renderBrand(experience) {
@@ -59,7 +70,13 @@ function renderDrafts(drafts) {
   }
 }
 
-async function request(url) { const response = await fetch(url, { credentials: "same-origin", cache: "no-store", headers: { accept: "application/json" } }); const body = await response.json().catch(() => ({})); if (!response.ok) throw new Error(body.error?.message ?? `Request failed (${response.status}).`); return body; }
+async function request(url) {
+  const response = await fetch(url, { credentials: "same-origin", cache: "no-store", headers: { accept: "application/json" } });
+  const body = await response.json().catch(() => ({}));
+  if (response.status === 401 || response.status === 403) throw new Error("Please sign in through your lender’s customer portal to continue.");
+  if (!response.ok) throw new Error("We could not load your applications. Please try again or return to your lender home.");
+  return body;
+}
 function networkState() { ui.network_warning.hidden = navigator.onLine; }
 function state(value, error = false) { ui.status.textContent = value; ui.status.classList.toggle("error", error); }
 function fieldCount(item) { return (item.sections ?? []).reduce((sum, section) => sum + (section.fields?.length ?? 0), 0); }

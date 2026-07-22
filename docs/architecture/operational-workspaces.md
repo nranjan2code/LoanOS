@@ -41,7 +41,7 @@ The inspector also renders a task timeline from authoritative timestamps, allow-
 - `apps/api/src/routes/workflow-tasks.js` owns role/queue-filtered task list/read and lifecycle HTTP behavior extracted from `server.js`.
 - `packages/core/src/journeys/workflow-tasks.js` remains the domain source for derived tasks, SLA state and lifecycle transitions.
 - `apps/dashboard/workspaces.*` owns the accessible browser experience.
-- `/status/` exposes the generated repository capability/build dashboard and is linked from staff, borrower, partner and tenant portal headers; it must not be described as production uptime or tenant-readiness evidence.
+- `/status/` exposes the generated repository capability/build dashboard as a direct evidence route. It is deliberately absent from staff, borrower, partner and tenant operating navigation because repository evidence is not a bank workflow, uptime view or tenant-readiness claim.
 - `apps/api/src/server.js` retains authentication, tenant resolution, mutation staffing enforcement and route dispatch; it must not regain domain handlers extracted into route modules.
 
 Remaining inline LMS/compliance handlers in `server.js` are migration debt; the loan-origination handlers are now fully extracted across intake, underwriting, contracting and channel route modules. Because no compatibility period is required, each extraction deletes the old handler in the same change and tests only the canonical route. Aliases, duplicate-read periods and fallback dispatch are prohibited.

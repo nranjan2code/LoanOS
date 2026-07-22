@@ -200,9 +200,13 @@ const dom = {
 // ─── Init ───────────────────────────────────────────────────────────────────
 async function initConfig() {
   apiState.apiKey = '';
-  apiState.currentActorId = localStorage.getItem('loanos_actor_id') || '';
+  apiState.currentActorId = '';
+  const tenantPath = location.pathname.match(/^\/t\/([^/]+)\/staff(?:\/|$)/);
+  if (tenantPath) {
+    document.getElementById('login-tenant-id').value = decodeURIComponent(tenantPath[1]);
+  }
   
-  // Default simulation date to now
+  // Bind request timestamps to the current processing time.
   const now = new Date();
   now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
   apiState.simulationDate = now.toISOString().slice(0, 16);
@@ -251,9 +255,6 @@ function applyAuthenticatedContext(context) {
     // The login user's own userId is the acting identity — there is no
     // separate staff-actor id to look up.
     apiState.currentActorId = context.user?.userId || apiState.currentActorId || '';
-    if (apiState.currentActorId) {
-      localStorage.setItem('loanos_actor_id', apiState.currentActorId);
-    }
     dom.footerTenantLabel.textContent = `Tenant: ${context.tenant?.tenantId || 'unknown'} · ${context.user?.email || ''}`;
     document.title = `${context.tenant?.name || context.tenant?.tenantId || 'LoanOS India'} — Loan Officer Workspace`;
   } else {
@@ -261,12 +262,6 @@ function applyAuthenticatedContext(context) {
     document.title = 'LoanOS India — Platform Console';
   }
   document.body.classList.toggle('platform-mode', context.scope === 'platform');
-  // The simulation-date control is a dev/QA time-travel tool; showing it to
-  // every operator invites confusion about why "today" looks wrong. Restrict
-  // it to identities that can actually reason about it: tenant admins and
-  // service/platform principals.
-  const canSeeSimDate = context.scope !== 'tenant' || (context.user?.adminRoles || []).some(role => TENANT_ADMIN_FAMILY_ROLES.includes(role));
-  dom.timeAsOfInput.closest('.control-group').classList.toggle('hidden', !canSeeSimDate);
   updateAdminButtonVisibility();
 }
 
@@ -477,55 +472,18 @@ async function loadTenantWorkspace(label) {
 
   dom.actorSelect.innerHTML = '';
 
-  // A real human login is bound to its own identity everywhere it matters —
-  // the server ignores/overrides any other actor a session claims to act as
-  // (see resolveSessionActorId in server.js), so letting the dropdown offer
-  // every actor here would just be misleading UI. Only a service-key
-  // connection (no personal login identity) gets free actor selection, which
-  // mirrors how the server actually treats that principal type.
-  if (apiState.authScope === 'tenant') {
-    renderBoundActorSelect();
-  } else if (apiState.actors.length === 0) {
-    dom.actorSelect.innerHTML = '<option value="">No staff users yet — create one in Admin</option>';
-    dom.actorSelect.disabled = true;
-  } else {
-    apiState.actors.forEach(actor => {
-      const opt = document.createElement('option');
-      opt.value = actor.actorId;
-      opt.textContent = `${actor.displayName} (${actor.roles.join(', ')})`;
-      if (actor.actorId === apiState.currentActorId) {
-        opt.selected = true;
-      }
-      dom.actorSelect.appendChild(opt);
-    });
+  renderBoundActorSelect();
 
-    if (!apiState.currentActorId && apiState.actors.length > 0) {
-      apiState.currentActorId = apiState.actors[0].actorId;
-      localStorage.setItem('loanos_actor_id', apiState.currentActorId);
-    }
-
-    if (apiState.currentActorId) {
-      dom.actorSelect.value = apiState.currentActorId;
-    }
-    dom.actorSelect.disabled = false;
-  }
-
-  showToast('Connected and loaded staff actors.', 'success');
+  showToast('Workspace ready.', 'success');
   loadTasks();
 }
 
-// Locks the "Acting User" control to the logged-in session's own identity.
+// Binds work to the logged-in session's own employee identity.
 // If the account has no workflow roles, it's shown as unlinked rather than
 // falling back to picking someone else's identity.
 function renderBoundActorSelect() {
   const boundActorId = apiState.currentUser?.userId || '';
   apiState.currentActorId = boundActorId;
-  if (boundActorId) {
-    localStorage.setItem('loanos_actor_id', boundActorId);
-  } else {
-    localStorage.removeItem('loanos_actor_id');
-  }
-
   const boundActor = apiState.actors.find(actor => actor.actorId === boundActorId);
   const opt = document.createElement('option');
   if (boundActor) {
@@ -540,6 +498,10 @@ function renderBoundActorSelect() {
   dom.actorSelect.appendChild(opt);
   dom.actorSelect.disabled = true;
   dom.actorSelect.title = 'Actions are recorded under your own signed-in identity and cannot be changed here.';
+  const actorLabel = document.getElementById('current-actor-label');
+  if (actorLabel) {
+    actorLabel.textContent = boundActor?.displayName || apiState.currentUser?.displayName || apiState.currentUser?.email || 'Authorised employee';
+  }
 }
 
 // ─── Load Tasks ─────────────────────────────────────────────────────────────
@@ -938,7 +900,7 @@ dom.btnOpAssign.addEventListener('click', async () => {
 // Start
 dom.btnOpStart.addEventListener('click', async () => {
   if (!apiState.currentActorId) {
-    showToast('Configure an Acting User in the header first.', 'warning');
+    showToast('Your signed-in account is not linked to a workflow role.', 'warning');
     return;
   }
   
@@ -960,7 +922,7 @@ dom.btnOpStart.addEventListener('click', async () => {
 // Release — uses dialog instead of prompt()
 dom.btnOpRelease.addEventListener('click', () => {
   if (!apiState.currentActorId) {
-    showToast('Configure an Acting User in the header first.', 'warning');
+    showToast('Your signed-in account is not linked to a workflow role.', 'warning');
     return;
   }
   document.getElementById('release-reason').value = '';
@@ -1012,7 +974,7 @@ dom.btnOpComment.addEventListener('click', async () => {
   }
   
   if (!apiState.currentActorId) {
-    showToast('Configure an Acting User in the header first.', 'warning');
+    showToast('Your signed-in account is not linked to a workflow role.', 'warning');
     return;
   }
   
@@ -3359,18 +3321,6 @@ dom.platformTenantForm.addEventListener('submit', async (event) => {
   } catch (err) {
     showToast(`Tenant provisioning failed: ${err.message}`, 'error');
   }
-});
-
-dom.actorSelect.addEventListener('change', () => {
-  apiState.currentActorId = dom.actorSelect.value;
-  localStorage.setItem('loanos_actor_id', apiState.currentActorId);
-  showToast(`Switched to ${apiState.currentActorId}`, 'info');
-});
-
-dom.timeAsOfInput.addEventListener('change', () => {
-  apiState.simulationDate = dom.timeAsOfInput.value;
-  showToast('Simulation date updated. Refreshing…', 'info');
-  loadTasks();
 });
 
 dom.btnRefresh.addEventListener('click', () => {

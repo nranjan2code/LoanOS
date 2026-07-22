@@ -24,6 +24,12 @@ any human or agent touching a frontend knows the rules without excavating CSS.
 - **App stylesheets layer on top, they do not fork.** Per-app CSS
   (`help.css`, `administration-workspace.css`, …) may compose and extend
   tokens for its layout, but never redefines the base palette or scales.
+- **Operating shells look like bank software, not repository demos.** Headers
+  identify the institution, current secure session and task utilities; footers
+  carry customer-support, authority or privacy context. Build-evidence links,
+  simulation clocks, version labels and persona-switch controls do not appear
+  in borrower, employee or partner navigation. A signed-in human is always
+  bound to their authenticated identity.
 - **Status colors carry meaning.** Restrictive outcomes (`deny`/`refer`/
   `hold`/error) must be visually distinct from success and never rendered in a
   reassuring color; this is the UI face of the fail-closed rule.
@@ -43,10 +49,9 @@ but apply to every surface:
 
 ## Known boundaries (honest gaps)
 
-- `apps/dashboard/index.css` predates the shared file and carries its own
-  duplicated token block, which has already drifted (Inter vs DM Sans). It
-  should converge on importing `apps/shared/design-tokens.css`; until then,
-  dashboard styling changes must be checked against the shared tokens by hand.
+- The dashboard now consumes `apps/shared/design-tokens.css`; older per-app
+  component rules still need gradual semantic-token replacement as those
+  components are touched.
 - There is no visual-regression tooling; conformance is enforced by review
   and by this document.
 - Brand marks and public-site imagery are governed separately by the GTM

@@ -6,8 +6,9 @@
   <meta name="description" content="A secure place for customers and lending teams.">
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/shared/design-tokens.css">
   <style>
-    :root { --forest:#173f35; --deep:#0c2d26; --leaf:#28705c; --lime:#d8ef88; --paper:#fbfaf6; --sand:#f1ecdf; --ink:#17201d; --muted:#5c6662; --line:rgba(23,63,53,.15); --serif:"DM Serif Display",Georgia,serif; --sans:"DM Sans",system-ui,sans-serif; }
+    :root { --forest:var(--accent-primary); --deep:#0c2d26; --leaf:var(--accent-cyan); --lime:#d8ef88; --paper:var(--bg-surface-2); --sand:var(--bg-surface-3); --ink:var(--text-primary); --muted:var(--text-muted); --line:var(--border-default); --serif:var(--font-display); --sans:var(--font-sans); }
     * { box-sizing:border-box; } body { margin:0; min-height:100vh; background:var(--paper); color:var(--ink); font-family:var(--sans); -webkit-font-smoothing:antialiased; } a { color:inherit; } :focus-visible { outline:3px solid var(--lime); outline-offset:3px; }
     .shell { min-height:100vh; display:flex; flex-direction:column; }
     .wrap { width:min(1180px,calc(100% - 48px)); margin:auto; }
@@ -50,7 +51,7 @@
   <div id="loading" class="loading">Preparing your secure lending portal…</div>
   <div id="error" class="error"><div><p class="eyebrow">We could not find this organisation</p><h1>Please check the link.</h1><a class="back" href="/">Return to LoanOS</a></div></div>
   <div id="main" class="shell" hidden>
-    <header><div class="wrap nav"><div class="brand"><div class="mark" id="brand-mark"><span>L</span></div><div><div class="name" id="brand-name">Lending partner</div><div class="type" id="brand-type">Regulated lending institution</div></div></div><div class="header-links"><a class="powered" href="/status/">Build status</a><a class="powered" href="/help/">Guide &amp; Academy</a><a class="powered" href="/">Experience powered by <strong>LoanOS</strong></a></div></div></header>
+    <header><div class="wrap nav"><div class="brand"><div class="mark" id="brand-mark"><span>L</span></div><div><div class="name" id="brand-name">Lending partner</div><div class="type" id="brand-type">Regulated lending institution</div></div></div><div class="header-links"><a class="powered" href="/help/">Help &amp; guidance</a></div></div></header>
     <main><div class="wrap"><section class="hero">
       <div class="copy"><p class="eyebrow">Welcome to your lending services</p><h1 id="hero-title">How can we help today?</h1><p class="intro" id="hero-subtitle">A secure place to manage your loan or continue to your team workspace.</p><div class="choices">
         <a class="choice" id="cta-customer" href="#"><span class="choice-icon">₹</span><span><strong>I’m a customer</strong><small>Applications, repayments, documents and support</small></span><b>→</b></a>
@@ -58,7 +59,7 @@
       </div></div>
       <div class="visual"><img src="/shared/images/loanos-india-customer-home.jpg" alt="Indian couple reviewing their loan information at home"><div class="promise"><span>Our service promise</span><p>Clear information, respectful support and a secure record of every important step in your lending journey.</p></div></div>
     </section></div></main>
-    <footer><div class="wrap footer-grid"><div><h2>Here when you need us</h2><p>Your loan information and important documents stay together in one secure place.<br><a href="/status/">Build status</a></p></div><div><h2>Grievance support</h2><p id="footer-grievance">Contact details will appear here.</p></div><div><h2>Privacy & regulation</h2><p id="footer-regulatory">Lending services are governed by applicable RBI directions.</p></div></div></footer>
+    <footer><div class="wrap footer-grid"><div><h2>Here when you need us</h2><p>Your loan information and important documents stay together in one secure place.</p></div><div><h2>Grievance support</h2><p id="footer-grievance">Contact details will appear here.</p></div><div><h2>Privacy & regulation</h2><p id="footer-regulatory">Lending services are governed by applicable RBI directions.</p></div></div></footer>
   </div>
   <script>
     const parts=location.pathname.split('/'), tenantId=parts[2];

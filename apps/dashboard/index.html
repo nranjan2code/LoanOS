@@ -15,6 +15,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   
+  <link rel="stylesheet" href="/shared/design-tokens.css">
   <link rel="stylesheet" href="./index.css">
 </head>
 <body>
@@ -28,23 +29,23 @@
         </div>
       </div>
 
-      <div class="login-tabs" role="tablist" aria-label="Login scope">
+      <div class="login-tabs hidden" role="tablist" aria-label="Login scope" aria-hidden="true">
         <button class="login-tab active" type="button" data-login-scope="tenant">Team workspace</button>
         <button class="login-tab" type="button" data-login-scope="platform">Platform administration</button>
       </div>
 
       <form id="tenant-login-form" class="login-form">
-        <div class="field-group">
+        <div class="field-group" hidden>
           <label for="login-tenant-id">Tenant ID</label>
-          <input id="login-tenant-id" autocomplete="organization" placeholder="dev" value="dev" required>
+          <input id="login-tenant-id" autocomplete="organization" required>
         </div>
         <div class="field-group">
           <label for="login-email">Email</label>
-          <input id="login-email" type="email" autocomplete="username" placeholder="admin@dev.local" value="admin@dev.local" required>
+          <input id="login-email" type="email" autocomplete="username" placeholder="name@yourbank.in" required>
         </div>
         <div class="field-group">
           <label for="login-password">Password</label>
-          <input id="login-password" type="password" autocomplete="current-password" placeholder="dev-admin-password" required>
+          <input id="login-password" type="password" autocomplete="current-password" placeholder="Your password" required>
         </div>
         <div class="field-group hidden" id="tenant-login-mfa-group">
           <label for="login-mfa-code">Authenticator Code</label>
@@ -72,7 +73,6 @@
         <button class="btn btn-primary login-submit" type="submit">Open Administration</button>
       </form>
 
-      <p class="login-scope-note">Service API keys are integration credentials and are not accepted by the browser workspace.</p>
       <input type="hidden" id="config-api-key" value="">
       <button id="btn-service-key-login" type="button" hidden disabled>Service-key login disabled</button>
 
@@ -172,23 +172,22 @@
           <span id="status-label">No Key</span>
         </div>
 
-        <div class="control-group">
-          <label for="current-actor-select">Acting User</label>
-          <select id="current-actor-select" aria-label="Select acting user">
+        <div class="session-identity">
+          <span class="session-identity-label">Signed in as</span>
+          <strong id="current-actor-label">Authorised employee</strong>
+          <select id="current-actor-select" aria-label="Session-bound employee" hidden>
             <option value="">— Sign In First —</option>
           </select>
         </div>
 
-        <div class="control-group">
-          <label for="time-as-of">Simulation Date</label>
-          <input type="datetime-local" id="time-as-of" aria-label="Simulation date and time">
+        <div class="control-group" hidden>
+          <input type="hidden" id="time-as-of">
         </div>
 
         <button id="btn-refresh" class="btn btn-secondary" aria-label="Refresh tasks">
           <span class="btn-icon">⟳</span> Refresh
         </button>
         <a class="btn btn-secondary" href="workspaces" aria-label="Open role-specific operational workspaces">Workspaces</a>
-        <a class="btn btn-secondary" href="/status/" aria-label="Open repository-backed capability and build status">Build Status</a>
         <a class="btn btn-secondary" href="/help/" aria-label="Open LoanOS Guide and Academy">Guide</a>
         <button id="btn-admin-open" class="btn btn-secondary" aria-label="Open administration console">Admin</button>
         <button id="btn-account-open" class="btn btn-secondary" aria-label="Open account security settings">Account</button>
@@ -462,11 +461,9 @@
         <span id="footer-task-count">0 tasks</span>
       </div>
       <div class="footer-right">
-        <a href="/status/">Build status</a>
-        <span class="footer-sep"></span>
         <span id="footer-tenant-label">No tenant</span>
         <span class="footer-sep"></span>
-        <span>LoanOS India v0.1</span>
+        <span>Secure employee workspace</span>
       </div>
     </footer>
   </div>

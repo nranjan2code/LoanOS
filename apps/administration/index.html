@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="/shared/design-tokens.css">
   <link rel="stylesheet" href="/administration/administration.css?v=2">
   <link rel="stylesheet" href="/administration/administration-workspace.css?v=2">
+  <link rel="stylesheet" href="/shared/application-shell.css">
   <script src="/administration/administration.js?v=2" defer></script>
 </head>
 <body>
@@ -23,6 +24,7 @@
     <section class="panel" aria-labelledby="approvals-title"><div class="section-head"><div><p class="eyebrow">Four eyes</p><h2 id="approvals-title">Pending approvals</h2></div></div><div id="approval-list" class="approval-list"></div></section>
     <section class="panel" aria-labelledby="brand-title"><div class="section-head"><div><p class="eyebrow">White-label control plane</p><h2 id="brand-title">Published brand releases</h2></div><a href="#brand-list">Legal identity remains separate from product presentation</a></div><div id="brand-list" class="brand-list"></div></section>
   </main>
+  <footer class="app-footer"><span>Tenant product administration</span><span>Independent approval required for governed changes</span></footer>
   <template id="configuration-template">
     <form id="configuration-form" class="governed-form">
       <fieldset><legend>Authority and availability</legend><label>Regulated entity references<input name="regulatedEntityRefs" required placeholder="re_primary"></label><fieldset class="checks"><legend>Channels</legend><label><input type="checkbox" name="channels" value="borrower">Customer</label><label><input type="checkbox" name="channels" value="partner">Partner</label><label><input type="checkbox" name="channels" value="branch">Branch</label><label><input type="checkbox" name="channels" value="field">Field</label><label><input type="checkbox" name="channels" value="credit">Credit</label><label><input type="checkbox" name="channels" value="operations">Operations</label><label><input type="checkbox" name="channels" value="control">Control</label></fieldset><label>Effective from<input name="effectiveFrom" type="datetime-local" required></label><label>Effective to<input name="effectiveTo" type="datetime-local"></label></fieldset>

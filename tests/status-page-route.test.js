@@ -6,7 +6,7 @@ import test from "node:test";
 
 import { createLoanOsServer } from "../apps/api/src/server.js";
 
-test("canonical build status serves only generated dashboard artifacts and is linked from portals", async (t) => {
+test("canonical build status remains a direct evidence route and is absent from operating portals", async (t) => {
   const portalSources = await Promise.all([
     readFile(new URL("../apps/tenant/index.html", import.meta.url), "utf8"),
     readFile(new URL("../apps/customer/index.html", import.meta.url), "utf8"),
@@ -16,10 +16,7 @@ test("canonical build status serves only generated dashboard artifacts and is li
     readFile(new URL("../apps/partner/index.html", import.meta.url), "utf8")
   ]);
   for (const source of portalSources) {
-    assert.match(source, /href=["'`]\/status\//, "each portal surface should link to the canonical build status");
-  }
-  for (const html of [portalSources[0], portalSources[1], portalSources[3], portalSources[4], portalSources[5]]) {
-    assert.match(html, /<footer[\s\S]*href=["']\/status\//, "each rendered portal should repeat build status in its footer");
+    assert.doesNotMatch(source, /href=["'`]\/status\//, "bank and customer operating surfaces should not expose repository build evidence");
   }
 
   const dataDir = await mkdtemp(join(tmpdir(), "loanos-status-page-"));

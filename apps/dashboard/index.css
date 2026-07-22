@@ -1,131 +1,4 @@
-/* ═══════════════════════════════════════════════════════════════════════════
-   LoanOS India — Loan Officer Workspace  ·  Design System v2
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-/* ─── Design Tokens ──────────────────────────────────────────────────────── */
-:root {
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
-
-  /* Spacing scale (4px base) */
-  --space-1: 0.25rem;   /* 4px  */
-  --space-2: 0.5rem;    /* 8px  */
-  --space-3: 0.75rem;   /* 12px */
-  --space-4: 1rem;      /* 16px */
-  --space-5: 1.25rem;   /* 20px */
-  --space-6: 1.5rem;    /* 24px */
-  --space-7: 2rem;      /* 32px */
-  --space-8: 2.5rem;    /* 40px */
-
-  /* Typography scale */
-  --text-2xs: 0.65rem;  /* 10.4px */
-  --text-xs: 0.75rem;   /* 12px   */
-  --text-sm: 0.8125rem; /* 13px   */
-  --text-base: 0.875rem;/* 14px   */
-  --text-md: 0.9375rem; /* 15px   */
-  --text-lg: 1.125rem;  /* 18px   */
-  --text-xl: 1.375rem;  /* 22px   */
-  --text-2xl: 1.625rem; /* 26px   */
-
-  /* Surface layers — warm-paper light (vakyartha.com) */
-  --bg-base: #f2efe0;              /* warm cream canvas */
-  --bg-surface-1: #ffffff;         /* white panels & cards */
-  --bg-surface-2: #faf9f1;         /* subtle raised card */
-  --bg-surface-3: #f0ece0;         /* hover / recessed */
-  --bg-elevated: #e8e5d6;          /* pressed / active tint */
-  --bg-input: #ffffff;             /* form fields */
-
-  /* Border & surface effects (ink on paper) */
-  --border-subtle: rgba(0, 0, 0, 0.06);
-  --border-default: rgba(0, 0, 0, 0.1);
-  --border-hover: rgba(0, 0, 0, 0.22);
-  --border-active: #0a1018;
-  --glow-inner: 0 0 #0000;         /* no-op: keeps existing box-shadow lists valid on light */
-
-  /* Text colors */
-  --text-primary: #0a1018;         /* ink */
-  --text-secondary: #414853;       /* muted-foreground */
-  --text-muted: #6b7280;           /* light warm gray */
-  --text-inverse: #0a1018;         /* dark text on amber/light accents */
-
-  /* Accent — monochrome ink primary + functional hues */
-  --accent-primary: #0a1018;
-  --accent-indigo: #0a1018;        /* primary interactive → ink */
-  --accent-violet: #7c3aed;        /* task-type accent */
-  --accent-cyan: #1447e6;          /* functional blue (links/info) */
-  --accent-gradient: #0a1018;      /* solid ink (was indigo→violet gradient) */
-
-  /* Status palette (vakyartha Tailwind hues, tuned for cream) */
-  --status-success: #008138;
-  --status-success-subtle: rgba(0, 129, 56, 0.12);
-  --status-warning: #f59e0b;
-  --status-warning-subtle: rgba(245, 158, 11, 0.16);
-  --status-danger: #ef4444;
-  --status-danger-subtle: rgba(239, 68, 68, 0.12);
-  --status-info: #1447e6;
-  --status-info-subtle: rgba(20, 71, 230, 0.12);
-
-  /* Shadows — hard offset (neobrutalist) */
-  --shadow-sm: 2px 2px 0 rgba(0, 0, 0, 0.1);
-  --shadow-md: 4px 4px 0 rgba(0, 0, 0, 0.1);
-  --shadow-lg: 8px 8px 0 rgba(0, 0, 0, 0.1);
-  --shadow-glow-indigo: 3px 3px 0 rgba(10, 16, 24, 0.22);
-  --shadow-glow-danger: 0 0 15px 2px rgba(239, 68, 68, 0.35);
-
-  /* Radius */
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 14px;
-  --radius-full: 9999px;
-
-  /* Transitions */
-  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
-  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
-  --duration-fast: 150ms;
-  --duration-normal: 250ms;
-  --duration-slow: 400ms;
-
-  /* Layout */
-  --sidebar-width: 280px;
-  --sidebar-collapsed: 64px;
-  --detail-width: 460px;
-  --header-height: 64px;
-  --footer-height: 36px;
-}
-
-/* ─── Reset ──────────────────────────────────────────────────────────────── */
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-body {
-  font-family: var(--font-sans);
-  background-color: var(--bg-base);
-  color: var(--text-primary);
-  color-scheme: light;
-  min-height: 100vh;
-  overflow-x: hidden;
-  line-height: 1.5;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  background-image:
-    radial-gradient(ellipse at 12% 0%, rgba(10, 16, 24, 0.03) 0, transparent 55%),
-    radial-gradient(ellipse at 90% 100%, rgba(124, 58, 237, 0.03) 0, transparent 55%);
-}
-
-/* Custom scrollbar */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.16);
-  border-radius: var(--radius-full);
-}
-::-webkit-scrollbar-thumb:hover { background: rgba(0, 0, 0, 0.28); }
+/* Loan Officer Workspace — app composition on the shared design system. */
 
 /* ─── App Shell ──────────────────────────────────────────────────────────── */
 .auth-hidden {
@@ -1504,6 +1377,10 @@ dialog {
   animation: dialogSlideIn var(--duration-normal) var(--ease-spring);
 }
 
+dialog:not([open]) {
+  display: none !important;
+}
+
 dialog::backdrop {
   background: rgba(10, 16, 24, 0.35);
   backdrop-filter: blur(4px);
@@ -2297,10 +2174,14 @@ body { background-image: none; }
 .login-scope-note { margin: -2px 0 2px; color: var(--text-muted); font-size: var(--text-xs); line-height: 1.45; }
 .btn { border-radius: 100px; }
 .app-header { background: #173f35; border-bottom: 0; color: white; box-shadow: 0 5px 24px rgba(12,45,38,.16); }
-.app-header .brand h1, .app-header .sub-brand, .app-header .control-group label, .app-header .connection-status { color: white; }
+.app-header .brand h1, .app-header .sub-brand, .app-header .control-group label { color: white; }
+.app-header .connection-status { background: rgba(255,255,255,.94); color: var(--accent-primary); }
 .app-header .sub-brand, .app-header .control-group label { opacity: .68; }
 .app-header .btn-secondary { border-color: rgba(255,255,255,.2); background: rgba(255,255,255,.1); color: white; }
 .app-header .btn-secondary:hover { background: rgba(255,255,255,.18); }
+.session-identity { display: grid; min-width: 9rem; gap: 1px; color: white; }
+.session-identity-label { color: rgba(255,255,255,.68); font-size: var(--text-2xs); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.session-identity strong { max-width: 12rem; overflow: hidden; font-size: var(--text-xs); text-overflow: ellipsis; white-space: nowrap; }
 .workspace-layout { background: #f7f4ec; }
 .sidebar { background: #fbfaf6; }
 .metric-card, .task-card, .op-card { box-shadow: none; }
@@ -2505,6 +2386,9 @@ body.platform-mode .workspace-layout::before { content: 'Platform administration
   .detail-header { position: relative; padding-right: 42px; }
 }
 @media (max-width: 700px) {
+  .footer-bar .footer-left { display: none; }
+  .footer-bar .footer-right { width: 100%; justify-content: space-between; gap: var(--space-2); }
+  .footer-bar .footer-sep { display: none; }
   .tasks-heading { align-items: flex-start; padding: var(--space-5) var(--space-4) var(--space-3); }
   .tasks-heading p { display: none; }
   .search-bar-container { grid-template-columns: 1fr 1fr; padding-inline: var(--space-4); }

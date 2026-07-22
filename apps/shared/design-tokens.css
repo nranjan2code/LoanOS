@@ -8,6 +8,7 @@
 /* ─── Design Tokens ──────────────────────────────────────────────────────── */
 :root {
   --font-sans: 'DM Sans', system-ui, -apple-system, sans-serif;
+  --font-display: 'DM Serif Display', Georgia, serif;
   --font-mono: 'JetBrains Mono', monospace;
 
   /* Spacing scale (4px base) */
@@ -95,6 +96,9 @@
   --detail-width: 460px;
   --header-height: 64px;
   --footer-height: 36px;
+  --content-max: 1180px;
+  --content-wide: 1440px;
+  --focus-ring: #83a926;
 }
 
 /* ─── Reset ──────────────────────────────────────────────────────────────── */
