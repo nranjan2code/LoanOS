@@ -129,6 +129,10 @@ the API and checks both health endpoints. A failed post-switch gate restores
 the previous release. A `db/schema.sql` difference fails with
 `REQUIRES_FRESH_STACK`; it is never applied as an unreviewed migration.
 
+Both first boot and ordinary updates install production dependencies with npm
+lifecycle scripts disabled. The selective artifact deliberately has no Git
+metadata, so repository-only developer hooks must never run on the host.
+
 ### 4.3 Replacement stack for infrastructure/schema change
 
 Create a second stack name, accept it on the CloudFront hostname, then cut DNS
@@ -412,6 +416,7 @@ one.
 | CloudFormation `ROLLBACK_COMPLETE` | Open Events and capture the first `CREATE_FAILED`; delete the disposable failed stack after fixing the template |
 | CloudFront says cache policy does not exist | Template referenced an invalid managed policy; use the current reviewed template rather than editing the distribution manually |
 | SSM status `FAILED at bootstrap line ... (exit 22)` | A `curl -f` health gate failed; inspect `/var/log/loanos-bootstrap.log` and the service journal, not just the line number |
+| Bootstrap `npm ci` reports `fatal: not in a git directory` | The release predates lifecycle-script isolation; deploy a newer committed artifact and do not add `.git` to the allowlist |
 | `schema.sql: Permission denied` | File ownership/mode prevents the database user reading it; use the current bootstrap permissions and run schema as the database owner—never disable RLS |
 | Rules health has `kill_switch_fresh: false` | Run `sudo /usr/local/sbin/loanos-refresh-kill-switch`, then recheck; do not bypass the gate |
 | API `Unsupported state or unable to authenticate data` | Active encryption material does not match stored envelopes; never rotate/discard the key ring in place—replace the synthetic stack |

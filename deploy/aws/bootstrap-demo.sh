@@ -77,7 +77,7 @@ install -d -m 0750 "$STATE_DIR" "$STATE_DIR/audit"
 }
 
 cd "$APP_DIR"
-npm ci --omit=dev
+npm ci --omit=dev --ignore-scripts
 cargo build --manifest-path rules/Cargo.toml --release \
   --package rules-service --package rules-fleet
 

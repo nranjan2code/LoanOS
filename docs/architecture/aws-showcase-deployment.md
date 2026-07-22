@@ -3,7 +3,7 @@
 Status: Implemented generation-2 synthetic-showcase architecture; not approved
 for production or real borrower data.
 
-Last verified: 2026-07-16
+Last verified: 2026-07-22
 
 ## Purpose and document relationships
 
@@ -135,8 +135,9 @@ For a new stack, `release-demo.sh deploy`:
 5. EC2 user data runs
    [`bootstrap-demo.sh`](../../deploy/aws/bootstrap-demo.sh) exactly once;
 6. bootstrap installs system dependencies, PostgreSQL, Node and Rust release
-   binaries, generates demo-only secrets, seeds the deterministic showcase,
-   and starts services;
+   binaries without running repository-only package lifecycle scripts,
+   generates demo-only secrets, seeds the deterministic showcase, and starts
+   services;
 7. bootstrap records `STARTED`, `COMPLETE`, or `FAILED` in SSM; and
 8. the controller waits for application completion and runs public smoke
    checks. `CREATE_COMPLETE` alone is not acceptance.
@@ -151,8 +152,9 @@ For an existing generation-2 stack, the same `deploy` command:
 1. packages and uploads a new immutable release;
 2. invokes [`update-demo.sh`](../../deploy/aws/update-demo.sh) through SSM;
 3. downloads and verifies the release under `/opt/loanos/releases/<release-id>`;
-4. installs dependencies and builds the Node/Rust runtime without mutating the
-   currently active release;
+4. installs dependencies without repository-only package lifecycle scripts
+   and builds the Node/Rust runtime without mutating the currently active
+   release;
 5. refuses a database-schema difference with `REQUIRES_FRESH_STACK`;
 6. atomically moves `/opt/loanos/current` to the new release;
 7. restarts the rules runtime first, refreshes the model kill switch, and then

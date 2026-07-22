@@ -222,6 +222,9 @@ The host builds into `/opt/loanos/releases/<release-id>`, atomically changes
 `/opt/loanos/current`, restarts rules first, refreshes the kill switch, then
 restarts the API/Nginx. API and rules health must pass. On a post-switch error,
 the installer restores the previous symlink and services automatically.
+Dependency installation uses `npm ci --omit=dev --ignore-scripts`: repository
+developer hooks such as Git hook configuration are not valid inside the
+selective archive, which intentionally contains no `.git` directory.
 
 If `db/schema.sql` changed, the installer reports `REQUIRES_FRESH_STACK` and
 does not apply it. Database migrations require an explicit reviewed migration
@@ -294,6 +297,7 @@ stale decision infrastructure remains fail-closed.
 | --- | --- |
 | CloudFormation rolls back | Find the first `CREATE_FAILED` event; fix it and use a fresh stack name if rollback completed |
 | Bootstrap reports `FAILED` | Inspect `/var/log/loanos-bootstrap.log` and relevant systemd journals through SSM |
+| Bootstrap fails during `npm ci` with `fatal: not in a git directory` | Release code predates the lifecycle-script isolation fix; package and deploy a newer committed release rather than adding Git metadata to the archive |
 | Release reports `FAILED ... previous release restored` | Verify old public health, inspect SSM command output, fix code, and release a new commit |
 | Release reports `REQUIRES_FRESH_STACK` | Do not force the schema; create a new rehearsal stack |
 | CloudFront alias conflict | Remove the hostname from the old distribution and wait until deployed before attaching it here |

@@ -117,7 +117,7 @@ if ! cmp -s "$PREVIOUS_TARGET/db/schema.sql" "$STAGING_DIR/db/schema.sql"; then
 fi
 
 cd "$STAGING_DIR"
-npm ci --omit=dev
+npm ci --omit=dev --ignore-scripts
 cargo build --manifest-path rules/Cargo.toml --release \
   --package rules-service --package rules-fleet
 
