@@ -28,6 +28,9 @@ test("technical academy contract covers the platform and all journey archetypes"
     assert.ok(lesson.flow.length >= 4);
     assert.ok(lesson.sources.length >= 2);
   }
+  for (const module of course.modules) {
+    assert.equal(module.image.length, 2, `${module.id} has a visual and useful alternative text`);
+  }
   const matrix=await readFile(new URL("docs/product/product-journey-support-matrix.md",root),"utf8");
   assert.equal([...matrix.matchAll(/^\| [^|]+ \| (?:Controlled first slice|Configurable pattern|Planned|Orchestration only)/gm)].length,21);
 });
@@ -40,8 +43,11 @@ test("technical academy pages are generated, visual and current", async () => {
   assert.match(html,/data-context-back/, "course pages provide an explicit return path");
   assert.match(html,/The Rules Engine/);
   assert.match(html,/Explore the enterprise architecture/);
+  assert.equal((html.match(/class="module-card-visual"/g)??[]).length, 12, "every module is visually oriented");
+  assert.match(html,/alt="Indian engineering team mapping the LoanOS system architecture together"/);
   assert.match(html,/<strong>465<\/strong> (?:capability records|capabilities)/);
   assert.match(lesson,/class="flow-track/, "each session renders the visual technical flow");
+  assert.match(lesson,/class="hero-visual"/, "each ordinary session has a subject-relevant orientation image");
   assert.match(lesson,/System sources/);
   assert.match(lesson,/Active recall/);
   assert.match(lesson,/learning-experience\.js/);
@@ -100,6 +106,7 @@ test("all 21 journeys render the complete visual and regulatory blueprint", asyn
   for (const lesson of journeyModule.lessons.filter((item)=>item.journeyType)) {
     const html=await readFile(new URL(`apps/help/technical-academy/t05-journeys/${lesson.id}.html`,root),"utf8");
     assert.match(html,/class="journey-hero"/,`${lesson.journeyType}: visual hero`);
+    assert.match(html,/class="lesson-visual"/,`${lesson.journeyType}: subject-relevant orientation image`);
     assert.match(html,/class="journey-nav"/,`${lesson.journeyType}: compact navigation`);
     assert.match(html,/class="blueprint-grid"/,`${lesson.journeyType}: blueprint summary`);
     assert.match(html,/class="requirements-grid"/,`${lesson.journeyType}: facts and evidence`);

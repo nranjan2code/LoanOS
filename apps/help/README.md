@@ -42,7 +42,7 @@ Every Academy page also exposes an explicit **Back** control. Academy cross-link
 
 Course counts shown outside generated course homes must match the curriculum source and its contract tests. Avoid introducing another hand-maintained count; when duplication is unavoidable, update the associated assertion in `tests/help-centre.test.js`.
 
-BA images are part of the validated content contract. Use an existing subject-relevant image from `/assets/images/`, `/shared/images/` or `/help/academy/assets/images/` before creating another asset. Every image needs accurate alternative text. The BA build fails when a mapped module or journey image is absent. Technical flows and the Enterprise Architecture Explorer use generated, accessible system visuals; do not add decorative photography where a diagram communicates the concept better.
+Images are part of both Academy content contracts. Use an existing subject-relevant image before creating another asset, and give every image accurate alternative text. BA assets resolve from the shared/public or BA-owned image sets. Technical Academy orientation photography lives under `/help/technical-academy/assets/images/`, is mapped once per module and is reused across its sessions; the build fails when a mapped asset or alternative text is absent. Technical flows and the Enterprise Architecture Explorer remain the accessible explanation of system relationships—photography supplies human and operating context, never a decorative substitute for a diagram.
 
 ## Review and verification
 

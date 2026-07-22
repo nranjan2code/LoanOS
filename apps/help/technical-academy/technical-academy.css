@@ -24,7 +24,7 @@ main{padding-top:16px;padding-bottom:56px}
 .hero{padding:28px 0 24px;border-bottom:1px solid var(--line);margin-bottom:26px;display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,.72fr);gap:32px;align-items:center}
 .hero-copy{min-width:0}
 .hero-visual{margin:0;overflow:hidden;border-radius:20px;aspect-ratio:4/3;grid-column:2;grid-row:1;background:var(--deep)}
-.hero-visual svg{display:block;width:100%;height:100%}
+.hero-visual img,.module-card-visual img,.lesson-visual img{display:block;width:100%;height:100%;object-fit:cover}
 .eyebrow{text-transform:uppercase;letter-spacing:.12em;font-size:.72rem;font-weight:600;color:var(--leaf);margin:0 0 8px}
 h1{font-family:var(--serif);font-weight:400;font-size:clamp(1.9rem,4vw,2.6rem);line-height:1.15;margin:0 0 12px}
 h2{font-family:var(--serif);font-weight:400;font-size:1.35rem;line-height:1.25;margin:0 0 10px}
@@ -35,6 +35,10 @@ h2{font-family:var(--serif);font-weight:400;font-size:1.35rem;line-height:1.25;m
 .primary:hover{background:var(--deep)}
 .module-list,.lesson-list{display:grid;gap:18px}
 .module-card,.lesson-card,.panel{background:#fff;border:1px solid var(--line);border-radius:16px;padding:22px 24px}
+.module-card{display:grid;grid-template-columns:190px minmax(0,1fr);gap:22px;padding:0;overflow:hidden}
+.module-card-copy{padding:22px 24px 22px 0}
+.module-card-visual{margin:0;min-height:100%;background:var(--sand)}
+.lesson-visual{margin:0 0 26px;overflow:hidden;border-radius:20px;aspect-ratio:16/7;background:var(--sand)}
 .module-card h2,.lesson-card h2{margin:0 0 7px}
 .module-card h2 a,.lesson-card h2 a{color:var(--ink);text-decoration:none}
 .module-card h2 a:hover,.lesson-card h2 a:hover{color:var(--leaf)}
@@ -81,7 +85,7 @@ footer{border-top:1px solid var(--line);padding:26px max(24px,calc((100vw - 1080
 footer .disclaimer{max-width:86ch}
 footer a{color:var(--leaf)}
 @media(max-width:780px){.lesson-layout{display:block}.toc{position:static;margin-bottom:20px}.topbar nav a:nth-child(2){display:none}.pager{flex-direction:column}.pager a{max-width:none}.flow-track{flex-direction:column;gap:20px;overflow:visible}.flow-track li{flex:none;flex-direction:row;align-items:center;gap:12px}.flow-step-no{flex:none}.flow-track li:not(:last-child)::after{content:"↓";top:auto;right:auto;bottom:-21px;left:13px;width:30px;transform:none;font-size:1.05rem}}
-@media(max-width:760px){.hero{grid-template-columns:1fr}.hero-visual{grid-column:1;grid-row:1;aspect-ratio:16/10}.hero-copy{grid-row:2}}
+@media(max-width:760px){.topbar{height:auto;min-height:72px;flex-wrap:wrap;gap:10px;padding-top:10px;padding-bottom:10px}.topbar nav{width:100%;overflow-x:auto;padding-bottom:2px;scrollbar-width:thin}.hero{grid-template-columns:1fr}.hero-visual{grid-column:1;grid-row:1;aspect-ratio:16/10}.hero-copy{grid-row:2}.module-card{grid-template-columns:1fr}.module-card-visual{min-height:0;aspect-ratio:16/9}.module-card-copy{padding:0 20px 20px}.lesson-visual{aspect-ratio:4/3}}
 
 /* Journey catalogue and blueprint — shared by all 21 canonical journeys. */
 .journey-catalogue-hero{background:linear-gradient(135deg,var(--deep),var(--forest));color:#fff;border:0;border-radius:22px;padding:42px;margin-top:16px}

@@ -1,6 +1,6 @@
 import { journeyCasebookLessons, technicalJourneyLessons } from "./journey-lessons.mjs";
 
-const verified = "17 Jul 2026";
+const verified = "22 Jul 2026";
 
 const lesson = (id, title, duration, objectives, sections, flow, sources, extra = {}) => ({
   id, title, duration, verified, objectives, sections, flow, sources, ...extra
@@ -326,18 +326,18 @@ export const course = {
   audience: "Engineers, solution architects, technical business analysts, implementation leads, security reviewers and operators.",
   verified,
   modules: [
-    { id: "t01-system", title: "System orientation", tagline: "See the whole operating system before opening a file.", lessons: architecture },
-    { id: "t02-tenancy", title: "Tenancy, identity and activation", tagline: "Who is acting, for which regulated entity, with what authority.", lessons: tenancy },
-    { id: "t02-platform-internals", title: "Channels, APIs, storage and data", tagline: "Follow information from a user surface through contracts, persistence and governed projections.", lessons: platformInternals },
-    { id: "t02-customer-risk", title: "Customers, identity and application risk", tagline: "Follow people, consent and evidence from acquisition through verified identity and risk operations.", lessons: customerAndRisk },
-    { id: "t03-lending", title: "The lending lifecycle in code", tagline: "From application facts to a closed, reconstructable account.", lessons: lending },
-    { id: "t03-credit-assets", title: "Credit, collateral and payments", tagline: "Deep technical control of underwriting, secured lending and money movement.", lessons: creditAndAssets },
-    { id: "t04-rules-engine", title: "The Rules Engine", tagline: "Author, sign, evaluate, replay and operate deterministic policy as a first-class platform runtime.", lessons: rulesEngine },
-    { id: "t04-controls", title: "Workflow, AI and evidence", tagline: "The human and machine control machinery around every governed decision.", lessons: controls },
-    { id: "t05-journeys", title: "All product journeys", tagline: "How 21 journeys compose the common lifecycle with specialist controls.", lessons: journeys },
-    { id: "t06-institutional", title: "Institutional control and economics", tagline: "Operate products, partners, finance, risk, customer protection and regulatory reporting as one governed institution.", lessons: institutional },
-    { id: "t06-delivery-experience", title: "Field delivery, implementation and engineering quality", tagline: "Take the platform into branches, devices and production with reconciled evidence.", lessons: deliveryAndExperience },
-    { id: "t06-operations", title: "Integrations, security and operations", tagline: "Run, observe, recover and admit the platform without overstating maturity.", lessons: operations }
+    { id: "t01-system", title: "System orientation", tagline: "See the whole operating system before opening a file.", lessons: architecture, image: ["system-architecture.webp", "Indian engineering team mapping the LoanOS system architecture together"] },
+    { id: "t02-tenancy", title: "Tenancy, identity and activation", tagline: "Who is acting, for which regulated entity, with what authority.", lessons: tenancy, image: ["identity-data-boundaries.webp", "Indian security engineers reviewing tenant and identity boundaries"] },
+    { id: "t02-platform-internals", title: "Channels, APIs, storage and data", tagline: "Follow information from a user surface through contracts, persistence and governed projections.", lessons: platformInternals, image: ["identity-data-boundaries.webp", "Indian platform engineers tracing access and data boundaries"] },
+    { id: "t02-customer-risk", title: "Customers, identity and application risk", tagline: "Follow people, consent and evidence from acquisition through verified identity and risk operations.", lessons: customerAndRisk, image: ["identity-data-boundaries.webp", "Indian technology specialists reviewing identity and evidence controls"] },
+    { id: "t03-lending", title: "The lending lifecycle in code", tagline: "From application facts to a closed, reconstructable account.", lessons: lending, image: ["lending-money-controls.webp", "Indian lending technology team tracing a controlled loan lifecycle"] },
+    { id: "t03-credit-assets", title: "Credit, collateral and payments", tagline: "Deep technical control of underwriting, secured lending and money movement.", lessons: creditAndAssets, image: ["lending-money-controls.webp", "Indian lending specialists reviewing underwriting evidence and money controls"] },
+    { id: "t04-rules-engine", title: "The Rules Engine", tagline: "Author, sign, evaluate, replay and operate deterministic policy as a first-class platform runtime.", lessons: rulesEngine, image: ["policy-human-oversight.webp", "Indian engineers and risk reviewers examining deterministic policy paths"] },
+    { id: "t04-controls", title: "Workflow, AI and evidence", tagline: "The human and machine control machinery around every governed decision.", lessons: controls, image: ["policy-human-oversight.webp", "Indian technical and risk specialists independently reviewing decision evidence"] },
+    { id: "t05-journeys", title: "All product journeys", tagline: "How 21 journeys compose the common lifecycle with specialist controls.", lessons: journeys, image: ["journeys-institution.webp", "Indian cross-functional team mapping lending journeys and institutional controls"] },
+    { id: "t06-institutional", title: "Institutional control and economics", tagline: "Operate products, partners, finance, risk, customer protection and regulatory reporting as one governed institution.", lessons: institutional, image: ["journeys-institution.webp", "Indian product, finance and compliance team reconciling institutional evidence"] },
+    { id: "t06-delivery-experience", title: "Field delivery, implementation and engineering quality", tagline: "Take the platform into branches, devices and production with reconciled evidence.", lessons: deliveryAndExperience, image: ["release-recovery.webp", "Indian implementation and operations team validating a controlled release"] },
+    { id: "t06-operations", title: "Integrations, security and operations", tagline: "Run, observe, recover and admit the platform without overstating maturity.", lessons: operations, image: ["release-recovery.webp", "Indian platform operations team reviewing service health and recovery evidence"] }
   ]
 };
 
