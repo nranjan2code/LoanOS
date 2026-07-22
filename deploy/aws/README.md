@@ -126,6 +126,11 @@ Inspect the environment at any time:
 ./deploy/aws/release-demo.sh smoke --stack loanos-showcase
 ```
 
+The smoke suite verifies the homepage, a product deep link, the public
+discovery files (`robots.txt`, `sitemap.xml`, and `llms.txt`), browser entry
+points, and runtime health. These exact discovery paths are public; tenant and
+data-plane routes keep their existing authentication boundaries.
+
 Use the returned CloudFront hostname until custom DNS is ready. This cleanly
 separates infrastructure acceptance from public DNS cutover.
 

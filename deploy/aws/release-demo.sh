@@ -192,14 +192,14 @@ smoke_url() {
   local base=${1%/}
   local path status_code
   curl -fsS "$base/health" | grep -q '"status"[[:space:]]*:[[:space:]]*"ok"'
-  for path in / /t/dev/ /t/dev/staff/ /t/dev/portal/ /t/dev/partners/ /help/ '/t/dev/staff/?scope=platform'; do
+  for path in / /robots.txt /sitemap.xml /llms.txt /loan-types/commercial-vehicle-finance/ /t/dev/ /t/dev/staff/ /t/dev/portal/ /t/dev/partners/ /help/ '/t/dev/staff/?scope=platform'; do
     status_code=$(curl -fsS -o /dev/null -w '%{http_code}' "${base}${path}")
     [[ "$status_code" == "200" ]] || {
       echo "Smoke check failed: ${base}${path} returned ${status_code}" >&2
       return 1
     }
   done
-  printf 'Smoke test passed: %s (health plus public, staff, portal, partner, admin-login, and help routes)\n' "$base"
+  printf 'Smoke test passed: %s (health, discovery, deep-link, staff, portal, partner, admin-login, and help routes)\n' "$base"
 }
 
 smoke() {

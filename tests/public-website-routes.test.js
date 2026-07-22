@@ -34,3 +34,27 @@ test("every product journey is publicly served without tenant authentication", a
     assert.doesNotMatch(await response.text(), /tenant_auth_required/);
   }
 });
+
+test("public discovery files are crawlable without tenant authentication", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "loanos-public-discovery-"));
+  const server = createLoanOsServer({ dataDir });
+  await new Promise((resolve, reject) => {
+    server.listen(0, "127.0.0.1", (error) => error ? reject(error) : resolve());
+  });
+  t.after(async () => {
+    await new Promise((resolve) => server.close(resolve));
+    await rm(dataDir, { recursive: true, force: true });
+  });
+
+  const base = `http://127.0.0.1:${server.address().port}`;
+  for (const [path, contentType] of [
+    ["/robots.txt", /^text\/plain/],
+    ["/sitemap.xml", /^application\/xml/],
+    ["/llms.txt", /^text\/plain/]
+  ]) {
+    const response = await fetch(`${base}${path}`);
+    assert.equal(response.status, 200, `${path} should be public`);
+    assert.match(response.headers.get("content-type") ?? "", contentType);
+    assert.doesNotMatch(await response.text(), /tenant_auth_required/);
+  }
+});

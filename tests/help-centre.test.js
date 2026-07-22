@@ -14,6 +14,8 @@ test("help centre exposes role guidance, readable learning paths and governed st
   assert.match(html, /Guide & Academy/);
   assert.match(html, /My learning/);
   assert.match(html, /aria-label="Help centre"/);
+  assert.match(html, /<meta name="robots" content="index, follow/);
+  assert.match(html, /<link rel="canonical" href="https:\/\/help\.aitailorworkshop\.in\/help\/">/);
   assert.match(js, /Tenant owner/);
   assert.match(js, /Controlled first slice/);
   assert.match(js, /Content scope: LoanOS canonical/);

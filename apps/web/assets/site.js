@@ -17,8 +17,8 @@ if (pageNames[path]) {
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
     itemListElement: [
-      { '@type': 'ListItem', position: 1, name: 'LoanOS India', item: 'https://aitailorworkshop.in/' },
-      { '@type': 'ListItem', position: 2, name: pageNames[path], item: `https://aitailorworkshop.in${path}/` }
+      { '@type': 'ListItem', position: 1, name: 'LoanOS India', item: 'https://demo.aitailorworkshop.in/' },
+      { '@type': 'ListItem', position: 2, name: pageNames[path], item: `https://demo.aitailorworkshop.in${path}/` }
     ]
   });
   document.head.append(breadcrumbData);

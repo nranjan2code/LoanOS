@@ -58,6 +58,9 @@ Publish decision: draft / approved / published
   roadmap language that makes a buyer doubt the product.
 - Every page requires a title, description, canonical URL, Open Graph data,
   appropriate structured data, an accessible image description and a clear CTA.
+- The deployed showcase origin, `https://demo.aitailorworkshop.in`, is the
+  canonical public-site origin used by page metadata, structured data, robots
+  and the sitemap.
 - Every external contact action uses `hello@aitailorworkshop.in`.
 - Brand mark changes require design-owner approval and trademark clearance
   before external use or registration.

@@ -787,6 +787,14 @@ async function route(req, res, dataDir, platformAdminKey, observability, allowDi
     return;
   }
 
+  // Public discovery files are deliberately allow-listed. Keep this narrow so
+  // crawler access cannot turn an API path or tenant surface into a static
+  // mount.
+  const publicDiscoveryFiles = new Set(["/robots.txt", "/sitemap.xml", "/llms.txt"]);
+  if (method === "GET" && publicDiscoveryFiles.has(path)) {
+    return serveStaticFile(res, appsRoot, "web", path, "/");
+  }
+
   // --- Public website pages and original media ---
   const publicWebPages = new Set([
     "for-msmes",
@@ -8656,6 +8664,7 @@ async function serveStaticFile(res, appsRoot, appDir, urlPath, urlPrefix, req = 
     else if (fileSubpath.endsWith(".css")) contentType = "text/css; charset=utf-8";
     else if (fileSubpath.endsWith(".js")) contentType = "application/javascript; charset=utf-8";
     else if (fileSubpath.endsWith(".json")) contentType = "application/json; charset=utf-8";
+    else if (fileSubpath.endsWith(".xml")) contentType = "application/xml; charset=utf-8";
     else if (fileSubpath.endsWith(".webmanifest")) contentType = "application/manifest+json; charset=utf-8";
     else if (fileSubpath.endsWith(".svg")) contentType = "image/svg+xml";
     else if (fileSubpath.endsWith(".png")) contentType = "image/png";

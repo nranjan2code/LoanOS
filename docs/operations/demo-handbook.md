@@ -161,6 +161,7 @@ recording.
 | Experience | Path |
 | --- | --- |
 | Public platform website | `/` |
+| Public discovery | `/robots.txt`, `/sitemap.xml`, `/llms.txt` |
 | Product journey library and deep pages | `/loan-types/` and `/loan-types/<journey>/` |
 | Tenant landing | `/t/dev/` |
 | Staff workspace | `/t/dev/staff/` |
@@ -182,6 +183,8 @@ authentication result from the browser route.
 export DEMO_URL="https://demo.example.com"
 curl -fsS "$DEMO_URL/health"
 curl -fsS -o /dev/null -w 'website=%{http_code}\n' "$DEMO_URL/"
+curl -fsS -o /dev/null -w 'robots=%{http_code}\n' "$DEMO_URL/robots.txt"
+curl -fsS -o /dev/null -w 'sitemap=%{http_code}\n' "$DEMO_URL/sitemap.xml"
 curl -fsS -o /dev/null -w 'journey=%{http_code}\n' \
   "$DEMO_URL/loan-types/commercial-vehicle-finance/"
 curl -fsS -o /dev/null -w 'tenant=%{http_code}\n' "$DEMO_URL/t/dev/"

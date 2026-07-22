@@ -223,6 +223,11 @@ The minimum release evidence retained for a demonstration is:
 - demo profile audit result (`showcase-v1`, 21 products, 14 personas, 105
   grants, 15 mocked integration families).
 
+Public release smoke coverage includes the platform homepage, one product
+journey deep link, `robots.txt`, `sitemap.xml`, `llms.txt`, the specialised
+browser entry points, and both runtime health gates. Discovery files are exact
+public allow-list entries; this does not broaden tenant or API access.
+
 This evidence demonstrates repeatability of the synthetic showcase. It is not
 production release, security, compliance, backup, or regulatory evidence.
 

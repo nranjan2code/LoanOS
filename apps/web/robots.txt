@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://aitailorworkshop.in/sitemap.xml
+Sitemap: https://demo.aitailorworkshop.in/sitemap.xml

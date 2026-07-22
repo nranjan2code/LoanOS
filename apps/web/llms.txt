@@ -4,13 +4,13 @@
 
 ## Core platform
 
-- [Platform overview](https://aitailorworkshop.in/platform/): loan origination, loan management, human workflow, compliance controls and human-governed AI.
-- [Financial institutions](https://aitailorworkshop.in/financial-institutions/): the operating model for banks, NBFCs, HFCs and other regulated lenders.
-- [Lending partners](https://aitailorworkshop.in/partners/): scoped participation for LSPs, DLAs, fintechs, DSAs, co-lenders and service providers.
-- [Borrower experience](https://aitailorworkshop.in/for-msmes/): the customer journey from application through servicing and closure.
-- [Loan journeys](https://aitailorworkshop.in/loan-types/): configurable business, retail, secured, asset, trade and specialised lending patterns, with individual journey pages for MSME working capital and term finance, asset and vehicle finance, trade and supply-chain patterns, home and personal lending, secured lending, inclusion and co-lending programmes.
-- [Trust centre](https://aitailorworkshop.in/trust/): tenant isolation, evidence, India boundaries, customer protection and human-governed AI.
-- [Resources](https://aitailorworkshop.in/resources/): buyer questions, FAQs and a plain-language lending glossary.
+- [Platform overview](https://demo.aitailorworkshop.in/platform/): loan origination, loan management, human workflow, compliance controls and human-governed AI.
+- [Financial institutions](https://demo.aitailorworkshop.in/financial-institutions/): the operating model for banks, NBFCs, HFCs and other regulated lenders.
+- [Lending partners](https://demo.aitailorworkshop.in/partners/): scoped participation for LSPs, DLAs, fintechs, DSAs, co-lenders and service providers.
+- [Borrower experience](https://demo.aitailorworkshop.in/for-msmes/): the customer journey from application through servicing and closure.
+- [Loan journeys](https://demo.aitailorworkshop.in/loan-types/): configurable business, retail, secured, asset, trade and specialised lending patterns, with individual journey pages for MSME working capital and term finance, asset and vehicle finance, trade and supply-chain patterns, home and personal lending, secured lending, inclusion and co-lending programmes.
+- [Trust centre](https://demo.aitailorworkshop.in/trust/): tenant isolation, evidence, India boundaries, customer protection and human-governed AI.
+- [Resources](https://demo.aitailorworkshop.in/resources/): buyer questions, FAQs and a plain-language lending glossary.
 
 ## Important boundaries
 

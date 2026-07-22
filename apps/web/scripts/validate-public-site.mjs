@@ -4,9 +4,9 @@ import { fileURLToPath } from 'node:url';
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const webRoot = path.resolve(scriptDir, '..');
-const siteRoot = 'https://aitailorworkshop.in';
+const siteRoot = 'https://demo.aitailorworkshop.in';
 const contactEmail = 'hello@aitailorworkshop.in';
-const stylesheetVersion = 13;
+const stylesheetVersion = 14;
 const errors = [];
 const warnings = [];
 
@@ -29,6 +29,7 @@ function requireMatch(source, pattern, message) {
 
 const pages = walk(webRoot).filter(file => file.endsWith('.html'));
 const sitemap = read(path.join(webRoot, 'sitemap.xml'));
+const robots = read(path.join(webRoot, 'robots.txt'));
 const stylesheet = read(path.join(webRoot, 'assets', 'site.css'));
 const canonicalUrls = [];
 const heroImages = new Map();
@@ -131,6 +132,7 @@ const duplicateCanonical = canonicalUrls.filter((url, index) => canonicalUrls.in
 if (duplicateCanonical.length) errors.push(`duplicate canonical URL: ${duplicateCanonical[0]}`);
 if (!fs.existsSync(path.join(webRoot, 'assets', 'loanos-logo-mark.png'))) errors.push('approved logo image is missing');
 if (!sitemap.includes(siteRoot)) errors.push('sitemap does not identify the public site');
+if (!robots.includes(`Sitemap: ${siteRoot}/sitemap.xml`)) errors.push('robots.txt does not identify the canonical sitemap');
 if (canonicalUrls.some(url => !url.startsWith(siteRoot))) warnings.push('one or more canonical URLs do not use the public site origin');
 
 if (warnings.length) console.warn(`Website validation warnings:\n${warnings.map(item => `- ${item}`).join('\n')}`);
