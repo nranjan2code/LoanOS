@@ -7,12 +7,12 @@
       "runtimeArgs": [
         "LOANOS_DEV_TENANT_KEY=dev-service-key",
         "LOANOS_PLATFORM_ADMIN_KEY=platform-secret",
-        "LOANOS_DATA_DIR=/private/tmp/claude-501/-Users-nisheethranjan-Projects-AIBank/1a26472d-661b-4dac-9edf-39101ec60a9b/scratchpad/loanos-preview-data",
-        "PORT=3040",
+        "LOANOS_DATA_DIR=/private/tmp/claude-501/-Users-nisheethranjan-Projects-AIBank/d9c59782-7a53-4ff7-8a45-34c34e384b54/scratchpad/loanos-preview-data",
         "node",
         "apps/api/src/server.js"
       ],
-      "port": 3040
+      "port": 3040,
+      "autoPort": true
     }
   ]
 }

@@ -52,7 +52,8 @@ const TASK_SLA_HOURS = {
   "cersai.repair": 24,
   "specialist_journey.action": 8,
   "specialist_journey.exception": 4,
-  "specialist_journey.recovery": 4
+  "specialist_journey.recovery": 4,
+  "agent.proposal_review": 4
 };
 
 export function normalizeWorkflowTaskStore(store = {}) {
@@ -75,12 +76,54 @@ export function deriveWorkflowTasks(state, options = {}) {
     ...deriveCkycrrTasks(state, asOf),
     ...deriveFiuTasks(state, asOf),
     ...deriveCersaiTasks(state, asOf),
-    ...deriveSpecialistJourneyTasks(state)
+    ...deriveSpecialistJourneyTasks(state),
+    ...deriveAgentExecutionTasks(state, asOf)
   ]
     .map((task) => applyTaskRecord(task, taskStore.records[task.taskId]))
     .map((task) => withTaskSla(task, asOf));
 
   return tasks.filter((task) => matchesTaskFilters(task, options.filters ?? {}));
+}
+
+function deriveAgentExecutionTasks(state, asOf) {
+  const platformState = state?.aiAgentPlatform ?? state;
+  const executions = Object.values(platformState?.executions ?? {});
+  const installations = platformState?.installations ?? {};
+
+  return executions.flatMap((execution) => {
+    if (!execution?.executionId) return [];
+    const needsReview = (execution.outcome === "proposal_created" || execution.outcome === "human_handoff") && !execution.humanReview?.disposition;
+    if (!needsReview) return [];
+
+    const installation = installations[execution.installationId] ?? {};
+    const openedAt = normalizeDate(execution.updatedAt ?? execution.createdAt) ?? asOf;
+
+    return [{
+      taskId: `task_agent_review_${execution.executionId}`,
+      entityType: "agent_execution",
+      entityId: execution.executionId,
+      type: "agent.proposal_review",
+      title: `Review AI Digital Worker proposal (${installation.templateId ?? "agent_execution"})`,
+      description: `Material model output proposal produced by installation ${execution.installationId} requires independent human review.`,
+      queue: "model_risk",
+      role: "human_reviewer",
+      priority: "high",
+      regulatoryRefs: ["FREE-AI-2025", "RBI-IT-GRC"],
+      openedAt,
+      action: {
+        method: "POST",
+        path: `/ai/agents/executions/${execution.executionId}/human-review`,
+        description: "Record human review outcome for agent proposal."
+      },
+      context: {
+        executionId: execution.executionId,
+        installationId: execution.installationId,
+        outcome: execution.outcome,
+        outputRef: execution.outputRef ?? null,
+        outputHash: execution.outputHash ?? null
+      }
+    }];
+  });
 }
 
 function deriveSpecialistJourneyTasks(state) {

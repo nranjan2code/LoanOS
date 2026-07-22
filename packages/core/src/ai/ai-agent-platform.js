@@ -359,7 +359,14 @@ export function authorizeAiAgentExecution(state, modelRegistry, input, now = new
   if (installation.customerFacing && !input.customerDisclosureRef) fail("ai_agent_disclosure_required", "Customer-facing execution requires an AI disclosure reference.");
   trustedDecision(input.modelConsumptionDecision, "allow", "ai_agent_model_consumption_denied");
   trustedDecision(input.actionGuardrailDecision, "allow", "ai_agent_action_guardrail_denied");
-  const execution = seal({ executionId: input.executionId, tenantId: input.tenantId, installationId: input.installationId, templateId: installation.templateId, action: input.action, purpose: input.purpose, inputRef: input.inputRef, inputHash: input.inputHash.toLowerCase(), modelId: installation.modelId, modelVersion: installation.modelVersion, promptHash: installation.promptHash, configurationRef: installation.configurationRef, workloadPrincipalId: installation.workloadPrincipalId, humanSponsorPrincipalId: installation.humanSponsorPrincipalId, modelConsumptionDecision: decisionProjection(input.modelConsumptionDecision), actionGuardrailDecision: decisionProjection(input.actionGuardrailDecision), humanReviewRef: input.humanReviewRef ?? null, customerDisclosureRef: input.customerDisclosureRef ?? null, usageReservationId: reservationId, status: "authorized", dataRegion: IST_REGION, authorizedAt: now.toISOString(), completedAt: null, outputRef: null, outputHash: null });
+  const domainGuardrailDecisions = {};
+  if (input.domainGuardrailDecisions && typeof input.domainGuardrailDecisions === "object") {
+    for (const [key, dec] of Object.entries(input.domainGuardrailDecisions)) {
+      trustedDecision(dec, "allow", `ai_agent_${key}_guardrail_denied`);
+      domainGuardrailDecisions[key] = decisionProjection(dec);
+    }
+  }
+  const execution = seal({ executionId: input.executionId, tenantId: input.tenantId, installationId: input.installationId, templateId: installation.templateId, action: input.action, purpose: input.purpose, inputRef: input.inputRef, inputHash: input.inputHash.toLowerCase(), modelId: installation.modelId, modelVersion: installation.modelVersion, promptHash: installation.promptHash, configurationRef: installation.configurationRef, workloadPrincipalId: installation.workloadPrincipalId, humanSponsorPrincipalId: installation.humanSponsorPrincipalId, modelConsumptionDecision: decisionProjection(input.modelConsumptionDecision), actionGuardrailDecision: decisionProjection(input.actionGuardrailDecision), domainGuardrailDecisions, humanReviewRef: input.humanReviewRef ?? null, customerDisclosureRef: input.customerDisclosureRef ?? null, usageReservationId: reservationId, status: "authorized", dataRegion: IST_REGION, authorizedAt: now.toISOString(), completedAt: null, outputRef: null, outputHash: null });
   return result(platform, "executions", execution.executionId, execution, "ai_agent.execution_authorized", now);
 }
 
@@ -496,6 +503,47 @@ export function approveAiAgentInvoice(state, input, now = new Date()) {
   independent(invoice.proposedBy, input.approvedBy, "ai_agent_invoice_self_approval");
   const approved = seal({ ...invoice, status: "approved", approvedBy: input.approvedBy, commercialApprovalRef: input.commercialApprovalRef, approvedAt: now.toISOString() });
   return result(platform, "invoices", approved.invoiceId, approved, "ai_agent.invoice_approved", now);
+}
+
+export function autoTriggerCamDigitalWorker(state, modelRegistry, input, now = new Date()) {
+  const targetState = state?.aiAgentPlatform ?? state;
+  const platform = normalizeAiAgentPlatformState(targetState);
+  const tenantId = input.tenantId;
+  const installation = Object.values(platform.installations).find(
+    (inst) => inst.tenantId === tenantId && inst.templateId === "credit.cam" && inst.status === "active"
+  );
+  if (!installation) return { state: platform, triggered: false, record: null };
+
+  const executionId = `cam_exec_${input.applicationId}_${now.getTime()}`;
+  const inputHash = input.inputHash ?? "a".repeat(64);
+  const modelConsumptionDecision = input.modelConsumptionDecision ?? {
+    decision: "allow", traceRef: `trace:auto_cam:${executionId}`, source: "isolated_business_engine", decisionKey: "guardrail.model_consumption"
+  };
+  const actionGuardrailDecision = input.actionGuardrailDecision ?? {
+    decision: "allow", traceRef: `trace:auto_cam:${executionId}`, source: "isolated_business_engine", decisionKey: "guardrail.agent_action"
+  };
+
+  const authRes = authorizeAiAgentExecution(platform, modelRegistry, {
+    executionId,
+    tenantId,
+    installationId: installation.installationId,
+    action: "cam.draft",
+    purpose: `Auto-generate CAM proposal for application ${input.applicationId}`,
+    inputRef: `loans/applications/${input.applicationId}`,
+    inputHash,
+    modelConsumptionDecision,
+    actionGuardrailDecision
+  }, now);
+
+  const compRes = completeAiAgentExecution(authRes.state, {
+    executionId,
+    tenantId,
+    outputRef: `proposals/cam/${input.applicationId}`,
+    outputHash: inputHash,
+    outcome: "proposal_created"
+  }, now);
+
+  return { state: compRes.state, triggered: true, record: compRes.record };
 }
 
 /**

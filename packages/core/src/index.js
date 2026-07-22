@@ -136,6 +136,7 @@ export {
   recordAiAgentProposalReview,
   recordAiAgentUsage,
   suspendTenantAiAgent,
+  autoTriggerCamDigitalWorker,
   buildAiAgentGovernanceReport
 } from "./ai/ai-agent-platform.js";
 
