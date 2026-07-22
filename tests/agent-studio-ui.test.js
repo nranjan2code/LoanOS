@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { createLoanOsServer } from "../apps/api/src/server.js";
 import { checkedValues, rupeesToPaise } from "../apps/agent-studio/agent-studio-state.js";
 
@@ -19,9 +21,9 @@ test("Agent Studio is business-first and exposes governed creation choices", asy
     readFile(new URL("../apps/agent-studio/index.html", import.meta.url), "utf8"),
     readFile(new URL("../apps/agent-studio/agent-studio.js", import.meta.url), "utf8")
   ]);
-  assert.match(html, /Use a banking template/);
-  assert.match(html, /Copy an existing assistant/);
-  assert.match(html, /Create a new assistant/);
+  assert.match(html, /Use a template/);
+  assert.match(html, /Copy an assistant/);
+  assert.match(html, /Guided setup/);
   assert.match(html, /enabled-products/);
   assert.match(html, /name="memoryMode"/);
   assert.doesNotMatch(html, /\(paise\)/i);
@@ -37,7 +39,10 @@ test("Agent Studio is business-first and exposes governed creation choices", asy
   for (const route of ["/ai/agents/memory-stores", "/ai/usage-budgets/"]) assert.match(js, new RegExp(route.replaceAll("/", "\\/")));
   for (const marker of ["provider-form", "provider-list", "admission-list"]) assert.match(html, new RegExp(marker));
   assert.match(js, /\/ai\/agents\/provider-evidence/);
-  for (const view of ["create", "knowledge", "test-release", "operations", "governance"]) assert.match(html, new RegExp(`data-studio-view="${view}"`));
+  for (const view of ["overview", "create", "knowledge", "test-release", "operations", "governance"]) assert.match(html, new RegExp(`data-studio-view="${view}"`));
+  for (const step of [1, 2, 3, 4]) assert.match(html, new RegExp(`data-builder-panel="${step}"`));
+  assert.match(html, /reference-dialog/);
+  assert.doesNotMatch(js, /window\.prompt/);
   // The Studio must never fabricate rehearsal outcomes client-side; it only
   // asks the server harness to run, and reviews proposals via human-review.
   assert.doesNotMatch(js, /observedOutcome:\s*testCase\.expectedOutcome/);
@@ -47,6 +52,16 @@ test("Agent Studio is business-first and exposes governed creation choices", asy
   assert.match(js, /function setStudioView/);
   assert.match(js, /hashchange/);
   assert.match(js, /ArrowLeft/);
+});
+
+test("Agent Studio client script parses and declares critical handlers once", async () => {
+  const scriptUrl = new URL("../apps/agent-studio/agent-studio.js", import.meta.url);
+  const js = await readFile(scriptUrl, "utf8");
+  const syntax = spawnSync(process.execPath, ["--check", fileURLToPath(scriptUrl)], { encoding: "utf8" });
+  assert.equal(syntax.status, 0, syntax.stderr);
+  for (const handler of ["submitApproval", "submitActivation", "lifecycleAction", "renderInstallations", "renderJourneyEntitlements"]) {
+    assert.equal((js.match(new RegExp(`function ${handler}\\b`, "g")) ?? []).length, 1, `${handler} must be declared once`);
+  }
 });
 
 test("Agent Studio is a tenant-scoped staff surface with governed configuration affordances", async (t) => {
@@ -71,7 +86,8 @@ test("Agent Studio exposes template selection, controlled configuration, simulat
   for (const marker of ["template-gallery", "agent-form", "simulation-preview", "approval-readiness", "knowledge-sources", "commercial-form", "installation-list", "governance-report"]) assert.match(html, new RegExp(marker));
   for (const route of ["/ai/marketplace", "/ai/agents", "/ai/models", "/ai/agents/installations", "/ai/pricing-contracts", "/ai/agents/governance-report"]) assert.match(js, new RegExp(route.replaceAll("/", "\\/")));
   assert.match(js, /proposal only/i);
-  assert.match(js, /cannot expand/i);
+  assert.match(html, /cannot add authority/i);
   assert.match(css, /var\(--bg-surface-1\)/);
   assert.match(css, /:focus-visible/);
+  assert.match(css, /prefers-reduced-motion/);
 });

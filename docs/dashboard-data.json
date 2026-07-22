@@ -1,41 +1,51 @@
 {
   "schemaVersion": 2,
-  "generated": "2026-07-22T01:52:26.176Z",
-  "sourceDigest": "ddef7563c8723fd8",
-  "snapshotId": "ed81586bb782a124",
+  "generated": "2026-07-22T02:45:02.131Z",
+  "sourceDigest": "a095a2075230e448",
+  "snapshotId": "d1bb613ec66dfee9",
   "sources": {
     "catalogue": "docs/product/complete-system-capability-catalog.md",
     "trace": "docs/product/capability-trace.json",
     "planes": "scripts/planes.mjs",
     "backlog": "docs/product/build-backlog.md",
-    "tests": "reused build test log"
+    "tests": "live Node test run"
   },
   "git": {
     "branch": "main",
-    "sha": "d4e6b975dc42",
-    "count": 234,
+    "sha": "5e06dd0a2445",
+    "count": 236,
     "dirty": true,
-    "changeCount": 18,
+    "changeCount": 13,
     "commits": [
+      {
+        "hash": "5e06dd0",
+        "subject": "feat(ai-agent): integrate Amazon Bedrock provider, agent bindings, and domain guardrails",
+        "when": "40 minutes ago"
+      },
+      {
+        "hash": "74e4ab0",
+        "subject": "fix(ai-agent): close five Agent Studio control gaps and add proposal human-review loop",
+        "when": "51 minutes ago"
+      },
       {
         "hash": "d4e6b97",
         "subject": "feat(ai-agent): strengthen production admission, workflow binding, and staffing controls",
-        "when": "23 minutes ago"
+        "when": "75 minutes ago"
       },
       {
         "hash": "1ed9e08",
         "subject": "feat(agents): deliver governed no-code Agent Studio",
-        "when": "7 hours ago"
+        "when": "8 hours ago"
       },
       {
         "hash": "ba05f91",
         "subject": "feat(metering): implement usage metering and tenant cost-recovery model",
-        "when": "8 hours ago"
+        "when": "9 hours ago"
       },
       {
         "hash": "6d9fd6d",
         "subject": "feat(help): converge Guide, BA Academy and Technical Academy on one design system",
-        "when": "2 days ago"
+        "when": "3 days ago"
       },
       {
         "hash": "00b1dc5",
@@ -65,16 +75,6 @@
       {
         "hash": "3e38e32",
         "subject": "feat(platform): complete operational UI and status surfaces",
-        "when": "4 days ago"
-      },
-      {
-        "hash": "daec00d",
-        "subject": "feat(workspaces): ship role-specific operational desks",
-        "when": "4 days ago"
-      },
-      {
-        "hash": "207bfea",
-        "subject": "refactor(api): extract route modules and add documentation governance",
         "when": "4 days ago"
       }
     ]
@@ -25906,15 +25906,15 @@
     }
   ],
   "tests": {
-    "pass": 779,
+    "pass": 797,
     "fail": 0,
     "skipped": 12,
     "cancelled": 0,
     "todo": 0,
-    "total": 791,
-    "durationMs": 25761.014875,
+    "total": 809,
+    "durationMs": 23216.122833,
     "ran": true,
-    "source": "provided-log",
+    "source": "live",
     "error": ""
   }
 }
