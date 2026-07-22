@@ -50,13 +50,23 @@ export function approveAgentProviderEvidence(state, input, now = new Date()) {
   const platform = normalize(state); required(input, ["evidenceId", "tenantId", "approvedBy", "approvalRef"]); const evidence = own(platform.providerEvidence[input.evidenceId], input.tenantId, "agent_provider_evidence_missing"); if (evidence.status !== "pending_approval") fail("agent_provider_evidence_not_pending", "Provider evidence is not awaiting approval.", 409); if (evidence.proposedBy === input.approvedBy) fail("agent_provider_self_approval", "Provider evidence needs an independent checker.", 403); const record = seal({ ...evidence, status: "active", approvedBy: input.approvedBy, approvalRef: input.approvalRef, approvedAt: now.toISOString() }); return save(platform, "providerEvidence", record.evidenceId, record, "ai_agent.provider_evidence_approved", now);
 }
 
-export function assessAgentProductionAdmission(state, input, now = new Date()) {
+export function assessAgentProductionAdmission(state, input, now = new Date(), modelRegistry = null) {
   const platform = normalize(state); const installation = own(platform.installations[input.installationId], input.tenantId, "ai_agent_installation_missing"); const reasons = [];
+  if (installation.status !== "active") reasons.push("installation_not_active");
   if (!installation.currentVersionId || !platform.agentVersions[installation.currentVersionId]) reasons.push("published_version_missing");
+  if (Object.keys(installation.approvedByRole ?? {}).length !== 4) reasons.push("approvals_incomplete");
+  if (installation.workflowId) {
+    const workflow = platform.workflowDrafts[installation.workflowId];
+    if (!workflow || workflow.tenantId !== input.tenantId) reasons.push("workflow_invalid_or_missing");
+  }
   const provider = Object.values(platform.providerEvidence).find((item) => item.tenantId === input.tenantId && item.installationId === installation.installationId && item.status === "active" && Date.parse(item.validUntil) > now.getTime()); if (!provider) reasons.push("provider_evidence_missing_or_stale");
   if ((installation.knowledgeSources ?? []).some((source) => { const pack = platform.knowledgePacks[source.ref]; return !pack || pack.status !== "active" || Date.parse(pack.validUntil) <= now.getTime(); })) reasons.push("knowledge_not_current");
   if (installation.memoryMode === "governed_persistent") { const memory = platform.memoryStores[installation.memoryStoreId]; if (!memory || memory.status !== "active" || memory.region !== "ap-south-1") reasons.push("memory_store_not_approved"); }
   if (installation.contractId && !Object.values(platform.usageBudgets).some((budget) => budget.tenantId === input.tenantId && budget.contractId === installation.contractId && budget.status === "active" && Date.parse(budget.validUntil) > now.getTime())) reasons.push("active_budget_missing");
+  if (modelRegistry) {
+    const modelUse = evaluateModelUse(modelRegistry, { modelId: installation.modelId });
+    if (!modelUse.allowed) reasons.push("model_not_usable");
+  }
   return { installationId: installation.installationId, tenantId: input.tenantId, ready: reasons.length === 0, outcome: reasons.length ? "deny" : "allow", reasons, providerEvidenceId: provider?.evidenceId ?? null, assessedAt: now.toISOString(), productionCertificationClaimed: false };
 }
 
@@ -153,5 +163,5 @@ function iso(value) { const date = new Date(value); if (!Number.isFinite(date.ge
 function setDiff(left = [], right = []) { return { added: right.filter((item) => !left.includes(item)), removed: left.filter((item) => !right.includes(item)) }; }
 function scalar(from, to) { return { from, to, changed: from !== to }; }
 function hash(value) { return createHash("sha256").update(JSON.stringify(value)).digest("hex"); }
-function snapshot(installation) { return Object.fromEntries(["templateId", "templateVersion", "modelId", "modelVersion", "allowedActions", "productTypes", "dataScopes", "memoryMode", "promptRef", "promptHash", "configurationRef", "knowledgeSources", "workloadPrincipalId", "humanSponsorPrincipalId"].filter((key) => installation[key] !== undefined).map((key) => [key, installation[key]])); }
+function snapshot(installation) { return Object.fromEntries(["templateId", "templateVersion", "modelId", "modelVersion", "allowedActions", "productTypes", "dataScopes", "memoryMode", "promptRef", "promptHash", "configurationRef", "knowledgeSources", "workloadPrincipalId", "humanSponsorPrincipalId", "workflowId"].filter((key) => installation[key] !== undefined).map((key) => [key, installation[key]])); }
 function fail(code, message, status = 422) { throw Object.assign(new Error(message), { code, status }); }

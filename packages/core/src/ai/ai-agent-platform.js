@@ -238,13 +238,19 @@ export function installTenantAiAgent(state, modelRegistry, input, now = new Date
   const memoryMode = input.memoryMode ?? "execution_scoped";
   if (!["none", "execution_scoped", "governed_persistent"].includes(memoryMode)) fail("ai_agent_memory_mode_invalid", "Memory mode is not permitted.");
   let memoryStoreId = null; if (memoryMode === "governed_persistent") { const memoryStore = platform.memoryStores[input.memoryStoreId]; tenantRecord(memoryStore, input.tenantId, "ai_agent_memory_store_invalid"); if (memoryStore.status !== "active" || memoryStore.region !== IST_REGION) fail("ai_agent_memory_store_inactive", "Persistent memory requires an active approved India-resident memory store.", 403); memoryStoreId = memoryStore.memoryStoreId; }
+  let workflowId = null;
+  if (input.workflowId) {
+    const workflow = platform.workflowDrafts[input.workflowId];
+    if (!workflow || workflow.tenantId !== input.tenantId) fail("ai_agent_workflow_invalid", "Bound workflow draft is invalid or missing.", 404);
+    workflowId = workflow.workflowId;
+  }
   const installation = seal({
     installationId: input.installationId, tenantId: input.tenantId, templateId: input.templateId, templateVersion: templateDef.version,
     contractId: input.contractId, modelId: input.modelId, modelVersion: String(input.modelVersion), workloadPrincipalId: input.workloadPrincipalId,
     humanSponsorPrincipalId: input.humanSponsorPrincipalId, autonomy: templateDef.maximumAutonomy, allowedActions: actions,
     languages: unique(input.languages ?? ["en-IN"]), productTypes, dataScopes: unique(input.dataScopes ?? []),
     promptRef: input.promptRef, promptHash: input.promptHash.toLowerCase(), configurationRef: input.configurationRef,
-    knowledgeSources: normalizeKnowledge(input.knowledgeSources), memoryMode, memoryStoreId, dataRegion: IST_REGION,
+    workflowId, knowledgeSources: normalizeKnowledge(input.knowledgeSources), memoryMode, memoryStoreId, dataRegion: IST_REGION,
     requiredGuardrails: templateDef.requiredGuardrails, customerFacing: templateDef.customerFacing, status: "pending_approval",
     proposedBy: input.proposedBy, approvedByRole: {}, governanceEvidence: {}, activationControl: null, createdAt: now.toISOString(), activatedAt: null
   });

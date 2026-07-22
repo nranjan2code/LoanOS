@@ -61,6 +61,17 @@ test("production admission remains blocked until independent current provider ev
   const assessment = assessAgentProductionAdmission(state, { tenantId: "bank-a", installationId: "original" }, NOW);
   assert.equal(assessment.ready, false);
   assert.ok(assessment.reasons.includes("published_version_missing"));
+  assert.ok(assessment.reasons.includes("approvals_incomplete"));
+});
+
+test("production admission evaluates installation status, approvals, workflow and model kill-switch", () => {
+  const state = base();
+  state.installations.pending = { installationId: "pending", tenantId: "bank-a", status: "pending_approval", workflowId: "missing-wf" };
+  const assessment = assessAgentProductionAdmission(state, { tenantId: "bank-a", installationId: "pending" }, NOW);
+  assert.equal(assessment.ready, false);
+  assert.ok(assessment.reasons.includes("installation_not_active"));
+  assert.ok(assessment.reasons.includes("approvals_incomplete"));
+  assert.ok(assessment.reasons.includes("workflow_invalid_or_missing"));
 });
 
 test("visual workflow accepts only safe business steps and requires a human handoff", () => {
