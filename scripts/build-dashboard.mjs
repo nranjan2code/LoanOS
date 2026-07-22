@@ -9,6 +9,7 @@ import { dirname, isAbsolute, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { PLANE_ORDER, normalizeStatus, parseRegister } from './planes.mjs';
+import { buildSvg as buildArchitectureSvg } from './build-architecture-diagram.mjs';
 import {
   DASHBOARD_STATUSES,
   parseBacklogEpics,
@@ -48,7 +49,37 @@ const atomicWrite = (path, contents) => {
 const catalogueSource = read('docs/product/complete-system-capability-catalog.md');
 const traceSource = read('docs/product/capability-trace.json');
 const backlogSource = read('docs/product/build-backlog.md');
+const architectureModelSource = read('docs/architecture/loanos-system-map.json');
+const architectureSvgSource = read('docs/architecture/loanos-system-architecture.svg');
+const journeyDepthSource = read('docs/product/product-journey-platform-depth.json');
 const trace = JSON.parse(traceSource);
+const architectureModel = JSON.parse(architectureModelSource);
+const journeyDepth = JSON.parse(journeyDepthSource);
+
+const expectedArchitectureSvg = buildArchitectureSvg(architectureModel);
+if (architectureSvgSource !== expectedArchitectureSvg) {
+  throw new Error('Architecture SVG is stale. Run npm run architecture:diagram.');
+}
+const architecture = {
+  artifact: architectureModel.artifact,
+  source: 'docs/architecture/loanos-system-map.json',
+  sourceCount: architectureModel.sources.length,
+  layers: architectureModel.bands.length,
+  nodes: architectureModel.bands.reduce((total, band) => total + band.items.length, 0),
+  principles: architectureModel.principles.length,
+  digest: createHash('sha256').update(architectureSvgSource).digest('hex').slice(0, 16),
+};
+const journeyReadiness = {
+  total: journeyDepth.journeys.length,
+  controlledFirstSlice: journeyDepth.journeys.filter((journey) => journey.maturity === 'controlled_first_slice').length,
+  configurablePattern: journeyDepth.journeys.filter((journey) => journey.maturity === 'configurable_pattern').length,
+  productionReady: 0,
+  openBatches: Object.entries(journeyDepth.batches).filter(([batchId]) => journeyDepth.journeys.some((journey) => journey.gaps?.includes(batchId))).map(([batchId, batch]) => ({
+    id: batchId,
+    name: batch.name,
+    affectedJourneys: journeyDepth.journeys.filter((journey) => journey.gaps?.includes(batchId)).length,
+  })),
+};
 
 const categories = parseRegister(catalogueSource).map((category) => ({
   ...category,
@@ -211,12 +242,42 @@ try {
 }
 
 const generated = new Date().toISOString();
+const issueQueue = [
+  ...((tests.fail ?? 0) > 0 ? [{ severity: 'blocker', area: 'Tests', issue: `${tests.fail} test failures`, action: 'Fix failing executable evidence before treating the snapshot as usable.' }] : []),
+  ...((tests.cancelled ?? 0) > 0 ? [{ severity: 'blocker', area: 'Tests', issue: `${tests.cancelled} cancelled tests`, action: 'Complete the interrupted test lane and regenerate the dashboard.' }] : []),
+  ...((tests.skipped ?? 0) > 0 ? [{ severity: 'attention', area: 'Environment coverage', issue: `${tests.skipped} skipped tests`, action: 'Run selected-environment lanes where their external prerequisites are available.' }] : []),
+  ...(overall.counts.Missing > 0 ? [{ severity: 'attention', area: 'Capability scope', issue: `${overall.counts.Missing} missing capabilities`, action: 'Use the constraint queue and capability evidence to choose the next bounded slice.' }] : []),
+  ...(attention.length > 0 ? [{ severity: 'attention', area: 'Delivery scope', issue: `${attention.length} capabilities retain internal build scope`, action: 'Review Missing, Mock, Partial/Mock and Partial items by owner and product plane.' }] : []),
+  ...(journeyReadiness.productionReady < journeyReadiness.total ? [{ severity: 'attention', area: 'Journey readiness', issue: `${journeyReadiness.productionReady}/${journeyReadiness.total} journeys are production-ready`, action: 'Complete current provider and institution evidence; repository maturity alone cannot promote readiness.' }] : []),
+  ...(git.dirty ? [{ severity: 'info', area: 'Snapshot lineage', issue: `${git.changeCount} uncommitted worktree changes`, action: 'Review or commit the changes before treating the snapshot as committed lineage.' }] : []),
+];
+const blockerCount = issueQueue.filter((item) => item.severity === 'blocker').length;
+const attentionCount = issueQueue.filter((item) => item.severity === 'attention').length;
+const repositoryHealth = {
+  state: blockerCount ? 'blocked' : attentionCount ? 'attention' : 'healthy',
+  blockerCount,
+  attentionCount,
+  issueCount: issueQueue.length,
+  runtimeTelemetry: 'not_connected',
+  signals: [
+    { label: 'Build verification', value: tests.ran ? `${tests.pass ?? 0}/${tests.total ?? 0}` : 'Unavailable', state: tests.ran && !tests.fail && !tests.cancelled ? 'healthy' : 'blocked', detail: tests.ran ? `${tests.fail ?? 0} failing · ${tests.skipped ?? 0} skipped` : (tests.error || 'TAP summary unavailable') },
+    { label: 'Evidence integrity', value: `${overall.evidenceQualifiedCount}/${overall.total}`, state: overall.evidenceQualifiedCount === overall.total ? 'healthy' : 'attention', detail: 'Capability trace entries that meet repository evidence rules.' },
+    { label: 'Journey readiness', value: `${journeyReadiness.productionReady}/${journeyReadiness.total}`, state: journeyReadiness.productionReady === journeyReadiness.total ? 'healthy' : 'attention', detail: `${journeyReadiness.controlledFirstSlice} controlled first slices · ${journeyReadiness.configurablePattern} configurable patterns.` },
+    { label: 'Architecture freshness', value: `${architecture.layers} layers`, state: 'healthy', detail: `${architecture.nodes} mapped nodes · SVG ${architecture.digest}.` },
+  ],
+};
 const sourceDigest = createHash('sha256')
   .update(catalogueSource)
   .update('\0')
   .update(traceSource)
   .update('\0')
   .update(backlogSource)
+  .update('\0')
+  .update(architectureModelSource)
+  .update('\0')
+  .update(architectureSvgSource)
+  .update('\0')
+  .update(journeyDepthSource)
   .update('\0')
   .update(read('scripts/build-dashboard.mjs'))
   .update('\0')
@@ -244,7 +305,7 @@ const snapshotId = createHash('sha256').update(JSON.stringify({
   },
 })).digest('hex').slice(0, 16);
 const data = {
-  schemaVersion: 2,
+  schemaVersion: 3,
   generated,
   sourceDigest,
   snapshotId,
@@ -253,6 +314,8 @@ const data = {
     trace: 'docs/product/capability-trace.json',
     planes: 'scripts/planes.mjs',
     backlog: 'docs/product/build-backlog.md',
+    architecture: architecture.source,
+    journeyDepth: 'docs/product/product-journey-platform-depth.json',
     tests: tests.source === 'provided-log' ? 'reused build test log' : 'live Node test run',
   },
   git,
@@ -263,6 +326,10 @@ const data = {
   attention,
   epics,
   tests,
+  architecture,
+  journeyReadiness,
+  repositoryHealth,
+  issueQueue,
 };
 
 const STATUS_STYLE = {
@@ -299,6 +366,9 @@ const testMetric = tests.ran ? `${tests.pass ?? 0} / ${tests.total ?? 0}` : 'Not
 const testTone = tests.ran && tests.fail === 0 && (tests.cancelled ?? 0) === 0 ? 'good' : 'attention';
 const dirtyLabel = git.dirty ? `${git.changeCount} uncommitted change${git.changeCount === 1 ? '' : 's'} included` : 'Clean working tree';
 const logoData = readFileSync(join(ROOT, 'apps/web/assets/loanos-logo-mark.png')).toString('base64');
+const architectureSvgData = Buffer.from(architectureSvgSource).toString('base64');
+const healthSignalCards = repositoryHealth.signals.map((signal) => `<article class="health-signal health-${signal.state}"><span class="health-state"><i></i>${escapeHtml(signal.state)}</span><strong>${escapeHtml(signal.value)}</strong><h3>${escapeHtml(signal.label)}</h3><p>${escapeHtml(signal.detail)}</p></article>`).join('');
+const issueRows = issueQueue.map((issue) => `<tr><td><span class="issue-severity severity-${issue.severity}">${escapeHtml(issue.severity)}</span></td><td><strong>${escapeHtml(issue.area)}</strong><span class="meta">${escapeHtml(issue.issue)}</span></td><td>${escapeHtml(issue.action)}</td></tr>`).join('');
 const attentionRows = attention.slice(0, 12).map((feature) => `<tr><td><button class="queue-jump" type="button" data-capability="${feature.id}"><span class="mono">${feature.id}</span><strong>${escapeHtml(feature.name)}</strong></button><span class="meta">${escapeHtml(feature.plane)} · ${escapeHtml(feature.owner)}</span></td><td><span class="tag" style="background:${STATUS_STYLE[feature.status].soft};color:${STATUS_STYLE[feature.status].text}">${escapeHtml(feature.status)}</span></td></tr>`).join('');
 const ownerRows = owners.map((owner) => `<tr><td><button class="owner-jump" type="button" data-owner="${escapeHtml(owner.name)}">${escapeHtml(owner.name)}</button></td><td>${owner.total}</td><td>${owner.counts.Implemented}</td><td>${owner.open}</td><td><strong>${owner.maturityPct}%</strong></td></tr>`).join('');
 const planeOptions = planes.map((plane) => `<option value="${escapeHtml(plane.name)}">${escapeHtml(plane.name)} · ${plane.total}</option>`).join('');
@@ -327,14 +397,16 @@ const html = `<!doctype html>
     .section{padding:var(--space-7) 0}.section.sand{background:var(--sand)}.section.white{background:var(--white)}.section.forest{background:var(--forest-deep);color:var(--white)}.section-head{display:flex;align-items:start;justify-content:space-between;gap:var(--space-6);margin-bottom:var(--space-5)}.section-title{max-width:44rem;margin:0;font-family:var(--display);font-size:var(--type-display-sm);font-weight:400;letter-spacing:var(--tracking-display);line-height:var(--leading-tight)}.section-note{max-width:27rem;margin:0;padding-top:var(--space-3);border-top:1px solid var(--line);color:var(--muted);font-size:var(--type-body-sm)}
     .metrics{display:grid;grid-template-columns:repeat(3,1fr);border-block:1px solid var(--line)}.metric{min-height:10rem;padding:var(--space-4) var(--space-4) var(--space-4) 0}.metric:nth-child(3n+2),.metric:nth-child(3n+3){padding-left:var(--space-4);border-left:1px solid var(--line)}.metric:nth-child(n+4){border-top:1px solid var(--line)}.metric-value{display:block;font-family:var(--display);font-size:var(--type-display-sm);font-weight:400;line-height:var(--leading-tight);color:var(--forest)}.metric-label{display:block;margin-top:var(--space-1);font-weight:700}.meta{color:var(--muted);font-size:var(--type-meta)}.metric .meta{display:block;margin-top:var(--space-1)}.signal{display:inline-flex;align-items:center;gap:var(--space-1);color:var(--leaf)}.signal.attention{color:#792d29}
     .status-bar{display:flex;height:.875rem;overflow:hidden;border-radius:var(--radius-pill);background:rgba(8,43,35,.08)}.bar-segment{display:block;min-width:1px}.legend{display:flex;flex-wrap:wrap;gap:var(--space-2) var(--space-4);margin-top:var(--space-3)}.legend-item{display:inline-flex;align-items:center;gap:.375rem;color:var(--muted);font-size:var(--type-meta)}.legend-item i{width:.625rem;height:.625rem;border-radius:50%}.legend-item strong{color:var(--ink)}
+    .architecture-frame{overflow:hidden;border:1px solid var(--line);border-radius:var(--radius-md);background:#f7f3e8;box-shadow:var(--shadow)}.architecture-frame img{display:block;width:100%;height:auto}.architecture-frame figcaption{padding:var(--space-2) var(--space-3);border-top:1px solid var(--line);color:var(--muted);font-size:var(--type-meta)}.architecture-facts{display:grid;grid-template-columns:repeat(4,1fr);margin-top:var(--space-4);border-block:1px solid var(--line)}.architecture-fact{padding:var(--space-3) var(--space-4) var(--space-3) 0}.architecture-fact+.architecture-fact{padding-left:var(--space-4);border-left:1px solid var(--line)}.architecture-fact strong{display:block;color:var(--forest);font-size:var(--type-title-md)}.architecture-fact span{display:block;color:var(--muted);font-size:var(--type-meta)}
+    .health-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--space-3);margin-bottom:var(--space-5)}.health-signal{min-height:12rem;padding:var(--space-4);border:1px solid var(--line);border-radius:var(--radius-md);background:rgba(255,255,255,.72)}.health-signal>strong{display:block;margin-top:var(--space-3);font-family:var(--display);font-size:var(--type-display-card);font-weight:400;color:var(--forest)}.health-signal h3{margin:var(--space-1) 0 0;font-size:var(--type-body);color:var(--forest)}.health-signal p{margin:var(--space-2) 0 0;color:var(--muted);font-size:var(--type-meta)}.health-state{display:inline-flex;align-items:center;gap:.4rem;color:var(--muted);font-size:var(--type-label);font-weight:700;letter-spacing:var(--tracking-label);text-transform:uppercase}.health-state i{width:.55rem;height:.55rem;border-radius:50%;background:var(--leaf)}.health-attention .health-state i{background:var(--saffron)}.health-blocked .health-state i{background:#a33f3a}.issue-severity{display:inline-flex;padding:.25rem .55rem;border-radius:var(--radius-pill);font-size:var(--type-label);font-weight:700;text-transform:uppercase}.severity-blocker{background:#f4dcda;color:#792d29}.severity-attention{background:#fae6d6;color:#6f3515}.severity-info{background:#dceff0;color:#20595c}.issue-table td:first-child{width:7rem}.issue-table td:nth-child(2){width:15rem}.issue-table td:nth-child(2) strong,.issue-table td:nth-child(2) span{display:block}.runtime-boundary{padding:var(--space-4);border-left:4px solid var(--saffron);background:rgba(255,255,255,.72)}.runtime-boundary h3{margin:0;color:var(--forest)}.runtime-boundary p{margin:var(--space-2) 0 0;color:var(--muted)}.runtime-boundary code{background:var(--white)}
     .plane-grid{display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--line)}.plane-row{padding:var(--space-4) var(--space-4) var(--space-5) 0;border-bottom:1px solid var(--line)}.plane-row:nth-child(even){padding-right:0;padding-left:var(--space-4);border-left:1px solid var(--line)}.plane-heading{display:flex;align-items:start;justify-content:space-between;gap:var(--space-3);margin-bottom:var(--space-3)}.plane-name{margin:0;color:var(--forest);font-weight:700}.plane-heading p{margin-top:0;margin-bottom:0}.plane-pct{font-family:var(--display);font-size:var(--type-display-card);font-weight:400;color:var(--forest)}.category-chips{display:flex;flex-wrap:wrap;gap:var(--space-1);margin-top:var(--space-3)}.category-chips span{padding:.25rem .625rem;border:1px solid var(--line);border-radius:var(--radius-pill);background:rgba(255,255,255,.56);color:var(--muted);font-size:var(--type-meta)}.category-chips strong{color:var(--forest)}
     .controls{display:grid;grid-template-columns:minmax(18rem,1.4fr) minmax(11rem,.7fr) minmax(12rem,.8fr) auto;gap:var(--space-3);align-items:end;padding:var(--space-4);border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--paper)}.search-group label,.select-group label,.control-label{display:block;margin-bottom:var(--space-1);color:var(--leaf);font-size:var(--type-label);font-weight:700;letter-spacing:var(--tracking-label);text-transform:uppercase}.search-group input,.select-group select{width:100%;min-height:3rem;padding:0 var(--space-3);border:1px solid var(--line);border-radius:var(--radius-md);background:var(--white);color:var(--ink)}.filter-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:var(--space-1)}.filter-row{grid-column:1/-1;display:flex;align-items:center;flex-wrap:wrap;gap:var(--space-1)}.filter-button,.text-button{min-height:2.75rem;padding:0 var(--space-3);border:1px solid var(--line);border-radius:var(--radius-pill);background:transparent;color:var(--forest);font-size:var(--type-body-sm);font-weight:700;cursor:pointer}.filter-button[aria-pressed="true"]{background:var(--forest);color:var(--white);border-color:var(--forest)}.filter-button i{display:inline-block;width:.5rem;height:.5rem;margin-right:.375rem;border-radius:50%}.text-button{border-radius:var(--radius-md);background:var(--white)}.result-count{grid-column:1/-1;color:var(--muted);font-size:var(--type-body-sm)}
     .category-list{margin-top:var(--space-4);border-top:1px solid var(--line)}.category{border-bottom:1px solid var(--line)}.category>summary{list-style:none;display:grid;grid-template-columns:2.5rem 1fr auto;gap:var(--space-3);align-items:center;padding:var(--space-4) 0;cursor:pointer}.category>summary::-webkit-details-marker{display:none}.category>summary:hover{background:rgba(241,236,223,.52)}.category-number{width:2.25rem;height:2.25rem;display:grid;place-items:center;border:1px solid var(--line);border-radius:50%;color:var(--leaf);font-size:var(--type-meta);font-weight:700}.category-title{font-weight:700;color:var(--forest)}.plane-label{margin-left:var(--space-2);color:var(--leaf);font-size:var(--type-label);font-weight:700;letter-spacing:var(--tracking-label);text-transform:uppercase}.category-sub{display:block;margin-top:.25rem;color:var(--muted);font-size:var(--type-meta);font-weight:400}.category-score{font-family:var(--display);font-size:var(--type-display-card);font-weight:400;color:var(--forest)}
     .table-scroll{overflow-x:auto;padding:0 0 var(--space-4) 3.5rem}table{width:100%;border-collapse:collapse}th,td{text-align:left;vertical-align:top;padding:.75rem var(--space-2);border-bottom:1px solid var(--line)}th{color:var(--muted);font-size:var(--type-label);font-weight:700;letter-spacing:var(--tracking-label);text-transform:uppercase}.mono{font-family:var(--mono);font-size:var(--type-meta);color:var(--leaf)}.feature-button{display:flex;align-items:start;gap:var(--space-2);width:100%;padding:0;border:0;background:transparent;color:var(--ink);text-align:left;cursor:pointer}.feature-button:hover{color:var(--leaf)}.chevron{width:1.25rem;flex:0 0 1.25rem;color:var(--leaf);font-weight:700}.tag{display:inline-flex;padding:.25rem .625rem;border-radius:var(--radius-pill);font-size:var(--type-meta);font-weight:700;white-space:nowrap}.evidence-count{font-size:var(--type-meta);font-weight:700;color:var(--leaf)}.detail-row td{padding:var(--space-4);background:var(--paper)}.detail-grid{display:grid;grid-template-columns:minmax(12rem,.35fr) 1fr;gap:var(--space-5)}.detail-meta{margin:0}.detail-meta div{padding:var(--space-1) 0;border-bottom:1px solid var(--line)}.detail-meta dt{color:var(--muted);font-size:var(--type-meta)}.detail-meta dd{margin:0;font-size:var(--type-body-sm);font-weight:700}.detail-copy h3{margin:0 0 var(--space-2);font-family:var(--display);font-size:var(--type-title-lg);font-weight:400}.detail-copy p{margin:var(--space-1) 0;color:var(--muted);font-size:var(--type-body-sm)}.evidence-list{display:grid;gap:var(--space-1);margin-top:var(--space-3)}.evidence-row{display:grid;grid-template-columns:5rem minmax(10rem,.45fr) 1fr;gap:var(--space-2);align-items:start;padding-top:var(--space-1);border-top:1px solid var(--line);font-size:var(--type-meta)}.evidence-type{padding:.2rem .45rem;border-radius:var(--radius-md);font-weight:700;text-align:center;text-transform:uppercase}.evidence-ref{overflow-wrap:anywhere;color:var(--leaf);font-family:var(--mono);text-decoration:none}.evidence-ref:hover{text-decoration:underline}.empty{padding:var(--space-5);border-bottom:1px solid var(--line);color:var(--muted);text-align:center}
     .operating-loop{display:grid;grid-template-columns:repeat(4,1fr);margin-bottom:var(--space-6);border-block:1px solid var(--line)}.loop-step{position:relative;padding:var(--space-4) var(--space-4) var(--space-4) 0}.loop-step+.loop-step{padding-left:var(--space-4);border-left:1px solid var(--line)}.loop-step span{display:block;color:var(--leaf);font-size:var(--type-label);font-weight:700;letter-spacing:var(--tracking-label);text-transform:uppercase}.loop-step strong{display:block;margin-top:var(--space-1);color:var(--forest)}.loop-step p{margin:var(--space-1) 0 0;color:var(--muted);font-size:var(--type-meta)}.founder-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:var(--space-6)}.founder-panel h3{margin:0 0 var(--space-2);font-family:var(--display);font-size:var(--type-title-lg);font-weight:400}.founder-panel>p{margin:0 0 var(--space-3);color:var(--muted);font-size:var(--type-body-sm)}.queue-jump,.owner-jump{padding:0;border:0;background:transparent;color:var(--forest);text-align:left;cursor:pointer}.queue-jump strong{display:block;margin-top:.2rem}.queue-jump:hover strong,.owner-jump:hover{text-decoration:underline}.owner-scroll{max-height:36rem;overflow:auto;border-top:1px solid var(--line)}.owner-table td,.owner-table th{padding-inline:.5rem}.owner-table td:first-child{width:auto}.agent-actions{display:flex;align-items:center;flex-wrap:wrap;gap:var(--space-2);margin-top:var(--space-3)}.copy-status{color:var(--leaf);font-size:var(--type-meta)}.split{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-6)}.data-table{border-top:1px solid var(--line)}.data-table td:first-child{width:8rem}.source-list{border-top:1px solid var(--line)}.source-row{display:grid;grid-template-columns:10rem 1fr;gap:var(--space-4);padding:var(--space-3) 0;border-bottom:1px solid var(--line)}.source-row strong{color:var(--forest)}.source-row p{margin:0;color:var(--muted);font-size:var(--type-body-sm)}code{padding:.15rem .35rem;border-radius:var(--radius-sm);background:var(--sand);font-family:var(--mono);font-size:var(--type-meta);overflow-wrap:anywhere}
     .footer{padding:var(--space-5) 0}.footer-inner{display:flex;justify-content:space-between;gap:var(--space-4);align-items:end}.footer .eyebrow{color:var(--lime)}.footer p{max-width:46rem;margin:0;color:rgba(255,255,255,.68);font-size:var(--type-body-sm)}.footer strong{color:var(--white)}
-    @media (max-width:56rem){.metrics{grid-template-columns:repeat(2,1fr)}.metric:nth-child(3n+2),.metric:nth-child(3n+3){padding-left:0;border-left:0}.metric:nth-child(even){padding-left:var(--space-4);border-left:1px solid var(--line)}.metric:nth-child(n+3){border-top:1px solid var(--line)}.plane-grid,.split,.founder-grid{grid-template-columns:1fr}.plane-row:nth-child(even){padding-left:0;border-left:0}.controls{grid-template-columns:1fr 1fr}.search-group,.filter-actions{grid-column:1/-1}.filter-actions{justify-content:flex-start}.detail-grid{grid-template-columns:1fr}.section-head{display:block}.section-note{margin-top:var(--space-4)}}
-    @media (max-width:38rem){.wrap{width:min(100% - 2rem,var(--max))}.snapshot-label{display:none}.hero{padding-top:var(--space-6)}.metrics,.operating-loop{grid-template-columns:1fr}.loop-step,.loop-step+.loop-step{padding:var(--space-3) 0;border-left:0;border-top:1px solid var(--line)}.loop-step:first-child{border-top:0}.metric,.metric:nth-child(even),.metric:nth-child(3n+2),.metric:nth-child(3n+3){padding:var(--space-4) 0;border-left:0}.metric:nth-child(n+2){border-top:1px solid var(--line)}.controls{grid-template-columns:1fr}.search-group,.filter-actions{grid-column:auto}.category>summary{grid-template-columns:2.5rem 1fr}.category-score{grid-column:2}.plane-label{display:block;margin:.25rem 0 0}.table-scroll{padding-left:0}.result-count{width:100%;margin-left:0}.evidence-row,.source-row{grid-template-columns:1fr}.footer-inner{display:block}.footer .meta{margin-top:var(--space-3)}}
+    @media (max-width:56rem){.metrics{grid-template-columns:repeat(2,1fr)}.metric:nth-child(3n+2),.metric:nth-child(3n+3){padding-left:0;border-left:0}.metric:nth-child(even){padding-left:var(--space-4);border-left:1px solid var(--line)}.metric:nth-child(n+3){border-top:1px solid var(--line)}.plane-grid,.split,.founder-grid{grid-template-columns:1fr}.health-grid,.architecture-facts{grid-template-columns:repeat(2,1fr)}.architecture-frame{overflow-x:auto}.architecture-frame img{min-width:75rem}.architecture-fact:nth-child(3){padding-left:0;border-left:0;border-top:1px solid var(--line)}.architecture-fact:nth-child(4){border-top:1px solid var(--line)}.plane-row:nth-child(even){padding-left:0;border-left:0}.controls{grid-template-columns:1fr 1fr}.search-group,.filter-actions{grid-column:1/-1}.filter-actions{justify-content:flex-start}.detail-grid{grid-template-columns:1fr}.section-head{display:block}.section-note{margin-top:var(--space-4)}}
+    @media (max-width:38rem){.wrap{width:min(100% - 2rem,var(--max))}.snapshot-label{display:none}.hero{padding-top:var(--space-6)}.metrics,.operating-loop,.health-grid,.architecture-facts{grid-template-columns:1fr}.architecture-fact,.architecture-fact+.architecture-fact,.architecture-fact:nth-child(3){padding:var(--space-3) 0;border-left:0;border-top:1px solid var(--line)}.architecture-fact:first-child{border-top:0}.loop-step,.loop-step+.loop-step{padding:var(--space-3) 0;border-left:0;border-top:1px solid var(--line)}.loop-step:first-child{border-top:0}.metric,.metric:nth-child(even),.metric:nth-child(3n+2),.metric:nth-child(3n+3){padding:var(--space-4) 0;border-left:0}.metric:nth-child(n+2){border-top:1px solid var(--line)}.controls{grid-template-columns:1fr}.search-group,.filter-actions{grid-column:auto}.category>summary{grid-template-columns:2.5rem 1fr}.category-score{grid-column:2}.plane-label{display:block;margin:.25rem 0 0}.table-scroll{padding-left:0}.result-count{width:100%;margin-left:0}.evidence-row,.source-row{grid-template-columns:1fr}.issue-table td:first-child,.issue-table td:nth-child(2){width:auto}.footer-inner{display:block}.footer .meta{margin-top:var(--space-3)}}
     @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
     @media print{.masthead{position:static}.controls{display:none}.section{padding:var(--space-5) 0}.category>summary{break-inside:avoid}}
   </style>
@@ -353,7 +425,7 @@ const html = `<!doctype html>
   <main id="main">
     <section class="hero">
       <div class="wrap">
-        <p class="eyebrow">Capability &amp; build dashboard</p>
+        <p class="eyebrow">Capability, architecture &amp; build dashboard</p>
         <h1 class="display">Capability status, backed by <em>repository evidence.</em></h1>
         <p class="lede">A worktree-aware planning view across LOS, LMS, LWS, Compliance OS and the supporting platform. Maturity is derived from the catalogue; it is not a claim of regulatory certification or production approval.</p>
         <div class="snapshot-meta">
@@ -374,6 +446,30 @@ const html = `<!doctype html>
           <div class="metric"><strong class="metric-value">${overall.counts.Missing}</strong><span class="metric-label">Missing</span><span class="meta">No meaningful executable slice</span></div>
           <div class="metric"><strong class="metric-value">${overall.evidenceQualifiedPct}%</strong><span class="metric-label">Evidence integrity</span><span class="meta">${overall.evidenceQualifiedCount} / ${overall.total} entries qualified</span></div>
           <div class="metric"><strong class="metric-value">${escapeHtml(testMetric)}</strong><span class="metric-label"><span class="signal ${testTone}"><span class="dot ${testTone === 'good' ? 'good' : ''}"></span>Test suite</span></span><span class="meta">${escapeHtml(testParts)} · ${tests.source === 'provided-log' ? 'reused build run' : 'live run'}</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="architecture-heading">
+      <div class="wrap">
+        <div class="section-head"><div><p class="eyebrow">Whole-system map</p><h2 class="section-title" id="architecture-heading">See the complete platform before choosing the next constraint.</h2></div><p class="section-note">This SVG is rebuilt from the governed architecture model. It shows repository structure and control boundaries; completion and production readiness remain in the status panels below.</p></div>
+        <figure class="architecture-frame"><img src="data:image/svg+xml;base64,${architectureSvgData}" alt="LoanOS India layered system architecture: people and ecosystems, channels, APIs, domain services, isolated decision engines, data and evidence, platform operations, infrastructure, external systems and cross-cutting controls."><figcaption>Flow runs from channels through APIs and domain services into governed decisions, evidence, operations and delivery. Side arrows mark ecosystem and external-system boundaries. Scroll horizontally on narrow screens to preserve label size.</figcaption></figure>
+        <div class="architecture-facts" aria-label="Architecture map facts">
+          <div class="architecture-fact"><strong>${architecture.layers}</strong><span>governed architecture layers</span></div>
+          <div class="architecture-fact"><strong>${architecture.nodes}</strong><span>mapped system nodes</span></div>
+          <div class="architecture-fact"><strong>${architecture.sourceCount}</strong><span>load-bearing source documents</span></div>
+          <div class="architecture-fact"><strong>${architecture.digest}</strong><span>current SVG digest</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section sand" aria-labelledby="health-heading">
+      <div class="wrap">
+        <div class="section-head"><div><p class="eyebrow">Engineering &amp; operational readiness</p><h2 class="section-title" id="health-heading">What is healthy, what needs attention, and what this snapshot cannot know.</h2></div><p class="section-note">State: <strong>${escapeHtml(repositoryHealth.state)}</strong> · ${repositoryHealth.blockerCount} blockers · ${repositoryHealth.attentionCount} attention signals. These are build and readiness signals, not live tenant incidents.</p></div>
+        <div class="health-grid">${healthSignalCards}</div>
+        <div class="split">
+          <div><h3>Issue &amp; readiness queue</h3><div class="table-scroll" style="padding-left:0"><table class="issue-table"><thead><tr><th>Severity</th><th>Area and signal</th><th>Required response</th></tr></thead><tbody>${issueRows || '<tr><td colspan="3">No repository issues detected in this snapshot.</td></tr>'}</tbody></table></div></div>
+          <aside class="runtime-boundary"><h3>Live operations are a separate, protected view</h3><p>This generated page does not query tenant loans, provider queues, incidents, SLO breaches or customer data. Those belong behind authenticated tenant/platform health APIs with tenant isolation.</p><p>Use <code>/health</code>, authenticated platform health endpoints, observability workspaces and incident queues for deployed-runtime diagnosis. A future authenticated operations console can consume those APIs without weakening this public repository dashboard.</p></aside>
         </div>
       </div>
     </section>
@@ -549,7 +645,7 @@ const html = `<!doctype html>
       if(location.protocol==='file:'){syncState.textContent='Offline repository snapshot';snapshotMode.title='Serve docs/dashboard.html over HTTP to enable automatic refresh.';return}
       try{
         const response=await fetch('./dashboard-data.json?check='+Date.now(),{cache:'no-store',credentials:'same-origin'});if(!response.ok)throw new Error('HTTP '+response.status);const remote=await response.json();
-        if(remote.schemaVersion!==2||!remote.snapshotId)throw new Error('unsupported dashboard data');
+        if(remote.schemaVersion!==3||!remote.snapshotId)throw new Error('unsupported dashboard data');
         if(remote.snapshotId!==EMBEDDED_SNAPSHOT.snapshotId){syncState.textContent='New snapshot detected · refreshing';const url=new URL(location.href);url.searchParams.set('snapshot',remote.snapshotId);url.searchParams.set('at',Date.now());setTimeout(()=>location.replace(url),300);return}
         const ageMinutes=Math.max(0,Math.floor((Date.now()-Date.parse(remote.generated))/60000));syncState.textContent='Live sync · checked now · snapshot '+ageMinutes+'m old';snapshotMode.title='Polling dashboard-data.json every 30 seconds with cache bypass.';
       }catch(error){syncState.textContent='Live sync unavailable · showing embedded snapshot';snapshotMode.title=error instanceof Error?error.message:'Live sync failed'}

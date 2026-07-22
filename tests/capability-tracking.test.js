@@ -49,7 +49,13 @@ test('trace and dashboard artifacts cover every parsed capability', async () => 
   assert.ok(dashboard.epics.every((epic) => epic.status), 'every backlog epic must have an explicit status');
   assert.equal(dashboard.overall.evidenceCount, dashboardCapabilities.filter((capability) => capability.evidence.length).length);
   assert.equal(dashboard.overall.scored + dashboard.overall.excluded, dashboard.overall.total);
-  assert.equal(dashboard.schemaVersion, 2);
+  assert.equal(dashboard.schemaVersion, 3);
+  assert.equal(dashboard.architecture.layers, 7);
+  assert.ok(dashboard.architecture.nodes > 40);
+  assert.equal(dashboard.journeyReadiness.total, 21);
+  assert.equal(dashboard.journeyReadiness.productionReady, 0);
+  assert.equal(dashboard.repositoryHealth.signals.length, 4);
+  assert.ok(Array.isArray(dashboard.issueQueue));
   assert.match(dashboard.snapshotId, /^[a-f0-9]{16}$/);
   assert.equal(dashboard.owners.reduce((total, owner) => total + owner.total, 0), parsed.length);
   assert.equal(dashboard.attention.length, dashboardCapabilities.filter((capability) => ['Missing', 'Mock', 'Partial/Mock', 'Partial'].includes(capability.status)).length);
@@ -57,8 +63,19 @@ test('trace and dashboard artifacts cover every parsed capability', async () => 
   assert.match(dashboardHtml, /Copy agent work packet/);
   assert.match(dashboardHtml, /Offline repository snapshot/);
   assert.match(dashboardHtml, /dashboard-data\.json\?check=/);
+  assert.match(dashboardHtml, /data:image\/svg\+xml;base64,/);
+  assert.match(dashboardHtml, /Engineering &amp; operational readiness/);
+  assert.match(dashboardHtml, /Live operations are a separate, protected view/);
+  assert.match(dashboardHtml, /<figcaption>Flow runs from channels through APIs and domain services/);
+  assert.match(dashboardHtml, /\.architecture-frame img\{min-width:75rem\}/);
   assert.match(dashboardHtml, /--forest:#123e32/);
   assert.match(dashboardHtml, /data:image\/png;base64,/);
+  assert.equal((dashboardHtml.match(/<h1\b/g) ?? []).length, 1, 'dashboard must have one page heading');
+  for (const headingId of ['snapshot-heading', 'architecture-heading', 'health-heading', 'founder-heading', 'status-heading', 'planes-heading', 'matrix-heading', 'provenance-heading', 'activity-heading']) {
+    assert.match(dashboardHtml, new RegExp(`<h2[^>]+id="${headingId}"`));
+  }
+  const elementIds = [...dashboardHtml.matchAll(/\sid="([^"]+)"/g)].map((match) => match[1]);
+  assert.equal(new Set(elementIds).size, elementIds.length, 'dashboard element IDs must be unique');
   assert.ok(trace['UX-001']);
   assert.ok(dashboardCapabilities.some((capability) => capability.id === 'UX-018'));
 });

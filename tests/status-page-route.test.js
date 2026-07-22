@@ -47,7 +47,10 @@ test("canonical build status remains a direct evidence route and is absent from 
   assert.equal(dataResponse.status, 200);
   assert.match(dataResponse.headers.get("content-type") ?? "", /^application\/json/);
   const snapshot = await dataResponse.json();
-  assert.equal(snapshot.schemaVersion, 2);
+  assert.equal(snapshot.schemaVersion, 3);
+  assert.equal(snapshot.architecture.layers, 7);
+  assert.equal(snapshot.journeyReadiness.total, 21);
+  assert.ok(Array.isArray(snapshot.issueQueue));
   assert.equal(snapshot.overall.total, 465);
 
   const blocked = await fetch(`${base}/status/README.md`);

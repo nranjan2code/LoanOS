@@ -1,81 +1,83 @@
 {
-  "schemaVersion": 2,
-  "generated": "2026-07-22T12:38:31.034Z",
-  "sourceDigest": "20f2d8b2d5fb9406",
-  "snapshotId": "65b9c5d369771aa1",
+  "schemaVersion": 3,
+  "generated": "2026-07-22T16:44:24.070Z",
+  "sourceDigest": "f898bcb0022e918c",
+  "snapshotId": "52ace08743ecdf85",
   "sources": {
     "catalogue": "docs/product/complete-system-capability-catalog.md",
     "trace": "docs/product/capability-trace.json",
     "planes": "scripts/planes.mjs",
     "backlog": "docs/product/build-backlog.md",
+    "architecture": "docs/architecture/loanos-system-map.json",
+    "journeyDepth": "docs/product/product-journey-platform-depth.json",
     "tests": "reused build test log"
   },
   "git": {
     "branch": "main",
-    "sha": "766ac7328f71",
-    "count": 240,
+    "sha": "f9fbfa4e9de1",
+    "count": 242,
     "dirty": true,
-    "changeCount": 22,
+    "changeCount": 16,
     "commits": [
+      {
+        "hash": "f9fbfa4",
+        "subject": "feat(ui): unify banking operating surfaces",
+        "when": "52 minutes ago"
+      },
+      {
+        "hash": "d323f71",
+        "subject": "feat(agent-studio): implement digital worker runtime boundary, tool registry, and runtime jobs (ADR 0010)",
+        "when": "4 hours ago"
+      },
       {
         "hash": "766ac73",
         "subject": "feat(showcase): align public discovery and typography",
-        "when": "38 minutes ago"
+        "when": "5 hours ago"
       },
       {
         "hash": "2cd3c18",
         "subject": "feat(help): add Technical Academy visual system",
-        "when": "73 minutes ago"
+        "when": "5 hours ago"
       },
       {
         "hash": "8ca4124",
         "subject": "fix(aws): isolate release installs from repo hooks",
-        "when": "4 hours ago"
+        "when": "8 hours ago"
       },
       {
         "hash": "b13b427",
         "subject": "feat(agent-studio): add Agent Studio platform experience and model governance module",
-        "when": "10 hours ago"
+        "when": "14 hours ago"
       },
       {
         "hash": "5e06dd0",
         "subject": "feat(ai-agent): integrate Amazon Bedrock provider, agent bindings, and domain guardrails",
-        "when": "11 hours ago"
+        "when": "15 hours ago"
       },
       {
         "hash": "74e4ab0",
         "subject": "fix(ai-agent): close five Agent Studio control gaps and add proposal human-review loop",
-        "when": "11 hours ago"
+        "when": "15 hours ago"
       },
       {
         "hash": "d4e6b97",
         "subject": "feat(ai-agent): strengthen production admission, workflow binding, and staffing controls",
-        "when": "11 hours ago"
+        "when": "15 hours ago"
       },
       {
         "hash": "1ed9e08",
         "subject": "feat(agents): deliver governed no-code Agent Studio",
-        "when": "18 hours ago"
+        "when": "22 hours ago"
       },
       {
         "hash": "ba05f91",
         "subject": "feat(metering): implement usage metering and tenant cost-recovery model",
-        "when": "19 hours ago"
+        "when": "23 hours ago"
       },
       {
         "hash": "6d9fd6d",
         "subject": "feat(help): converge Guide, BA Academy and Technical Academy on one design system",
         "when": "3 days ago"
-      },
-      {
-        "hash": "00b1dc5",
-        "subject": "feat(journeys): execute browser and production evidence controls",
-        "when": "4 days ago"
-      },
-      {
-        "hash": "5b96f2e",
-        "subject": "feat(platform): implement journey certifications, payment operations, fraud cases, and workspace administration updates",
-        "when": "4 days ago"
       }
     ]
   },
@@ -25906,15 +25908,101 @@
     }
   ],
   "tests": {
-    "pass": 806,
+    "pass": 818,
     "fail": 0,
     "skipped": 12,
     "cancelled": 0,
     "todo": 0,
-    "total": 818,
-    "durationMs": 21602.332208,
+    "total": 830,
+    "durationMs": 25077.586833,
     "ran": true,
     "source": "provided-log",
     "error": ""
-  }
+  },
+  "architecture": {
+    "artifact": "docs/architecture/loanos-system-architecture.svg",
+    "source": "docs/architecture/loanos-system-map.json",
+    "sourceCount": 6,
+    "layers": 7,
+    "nodes": 47,
+    "principles": 8,
+    "digest": "59509545f7d174e5"
+  },
+  "journeyReadiness": {
+    "total": 21,
+    "controlledFirstSlice": 3,
+    "configurablePattern": 18,
+    "productionReady": 0,
+    "openBatches": [
+      {
+        "id": "JD-05",
+        "name": "Journey conformance factory",
+        "affectedJourneys": 21
+      },
+      {
+        "id": "JD-06",
+        "name": "Provider and production operations",
+        "affectedJourneys": 21
+      }
+    ]
+  },
+  "repositoryHealth": {
+    "state": "attention",
+    "blockerCount": 0,
+    "attentionCount": 3,
+    "issueCount": 4,
+    "runtimeTelemetry": "not_connected",
+    "signals": [
+      {
+        "label": "Build verification",
+        "value": "818/830",
+        "state": "healthy",
+        "detail": "0 failing · 12 skipped"
+      },
+      {
+        "label": "Evidence integrity",
+        "value": "465/465",
+        "state": "healthy",
+        "detail": "Capability trace entries that meet repository evidence rules."
+      },
+      {
+        "label": "Journey readiness",
+        "value": "0/21",
+        "state": "attention",
+        "detail": "3 controlled first slices · 18 configurable patterns."
+      },
+      {
+        "label": "Architecture freshness",
+        "value": "7 layers",
+        "state": "healthy",
+        "detail": "47 mapped nodes · SVG 59509545f7d174e5."
+      }
+    ]
+  },
+  "issueQueue": [
+    {
+      "severity": "attention",
+      "area": "Environment coverage",
+      "issue": "12 skipped tests",
+      "action": "Run selected-environment lanes where their external prerequisites are available."
+    },
+    {
+      "severity": "attention",
+      "area": "Delivery scope",
+      "issue": "363 capabilities retain internal build scope",
+      "action": "Review Missing, Mock, Partial/Mock and Partial items by owner and product plane."
+    },
+    {
+      "severity": "attention",
+      "area": "Journey readiness",
+      "issue": "0/21 journeys are production-ready",
+      "action": "Complete current provider and institution evidence; repository maturity alone cannot promote readiness."
+    },
+    {
+      "severity": "info",
+      "area": "Snapshot lineage",
+      "issue": "16 uncommitted worktree changes",
+      "action": "Review or commit the changes before treating the snapshot as committed lineage."
+    }
+  ]
 }

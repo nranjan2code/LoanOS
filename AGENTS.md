@@ -62,6 +62,8 @@ npm test                                   # Node suite (148+ tests)
 npm run dev:api                            # local API (file store)
 ./loanos.sh build|start|stop|clean         # orchestration
 npm run knowledge:check                    # docs + evidence + cross-link graph + journey depth + currency, in one pass
+npm run architecture:diagram               # regenerate the governed repository architecture SVG
+npm run architecture:diagram:check         # fail if the committed SVG is stale
 npm run graph:check                        # identifier cross-links resolve (see docs/identifier-registry.md)
 npm run depth:check                        # journey platform-depth audit vs canonical catalogues + evidence refs
 npm run currency:check -- --staged         # advisory: did companion docs move with this change?

@@ -1,0 +1,159 @@
+{
+  "schemaVersion": 1,
+  "title": "LoanOS India — System Architecture",
+  "subtitle": "Multi-tenant · RBI-compliance-first · deterministic decisions · evidence by construction",
+  "artifact": "docs/architecture/loanos-system-architecture.svg",
+  "sources": [
+    "AGENTS.md",
+    "docs/architecture/current-implementation.md",
+    "docs/architecture/loanos-india-blueprint.md",
+    "docs/architecture/decision-engine-design.md",
+    "docs/architecture/platform-module-integration-api-map.md",
+    "docs/product/complete-system-capability-catalog.md"
+  ],
+  "leftLane": {
+    "title": "People & ecosystems",
+    "groups": [
+      {
+        "label": "Users",
+        "items": ["Borrowers & customers", "Tenant operations staff", "Compliance, risk & audit", "LoanOS platform operators"]
+      },
+      {
+        "label": "Partners",
+        "items": ["LSP, DLA & DSA partners", "Field & recovery agencies", "Regulated entities", "Regulators & bureaus"]
+      }
+    ]
+  },
+  "rightLane": {
+    "title": "External systems",
+    "groups": [
+      {
+        "label": "Identity & trust",
+        "items": ["IdP · OIDC · SAML · SCIM", "KMS · HSM · secrets vault", "SIEM · WORM · trusted time"]
+      },
+      {
+        "label": "Lending rails",
+        "items": ["CKYCRR · CIC · AA", "Bank verify · eSign · V-CIP", "NACH · UPI · payment rails", "CBS · GL · bank statements"]
+      },
+      {
+        "label": "Regulatory & operations",
+        "items": ["FIU-IND · CERSAI · RBI", "DMS · email · SMS · voice", "Cloud · database · queues", "Support · paging · telemetry"]
+      }
+    ]
+  },
+  "bands": [
+    {
+      "number": 1,
+      "title": "Experience & delivery channels",
+      "tone": "channel",
+      "columns": 6,
+      "items": [
+        {"label": "Borrower experience", "detail": "applications · servicing", "ref": "apps/customer"},
+        {"label": "Tenant operations", "detail": "workspaces · administration", "ref": "apps/tenant"},
+        {"label": "Platform control", "detail": "onboarding · assurance", "ref": "apps/dashboard"},
+        {"label": "Public experience", "detail": "product journeys", "ref": "apps/web"},
+        {"label": "Guide & Academy", "detail": "governed learning", "ref": "apps/help"},
+        {"label": "Field & DSA apps", "detail": "offline · zero-local-data", "ref": "apps/android-*"}
+      ]
+    },
+    {
+      "number": 2,
+      "title": "API, orchestration & connectivity",
+      "tone": "api",
+      "columns": 6,
+      "items": [
+        {"label": "Node HTTP API", "detail": "built-in server · /v1", "ref": "apps/api"},
+        {"label": "Domain routes", "detail": "composition by module", "ref": "apps/api/src/routes"},
+        {"label": "Auth & tenancy", "detail": "sessions · scoped keys", "ref": "apps/api/identity.js"},
+        {"label": "Workflow runtime", "detail": "timers · leases · replay", "ref": "core/journeys/workflow"},
+        {"label": "Contracts & events", "detail": "OpenAPI · webhooks", "ref": "core/integrations"},
+        {"label": "Provider gateways", "detail": "certify · reconcile", "ref": "core/integrations"}
+      ]
+    },
+    {
+      "number": 3,
+      "title": "Business services & domain kernel",
+      "tone": "domain",
+      "columns": 6,
+      "items": [
+        {"label": "Origination & KYC", "detail": "intake · consent · identity", "ref": "core/lending"},
+        {"label": "Products & pricing", "detail": "journeys · KFS · terms", "ref": "core/journeys"},
+        {"label": "Eligibility", "detail": "affordability · policy", "ref": "core/lending"},
+        {"label": "Servicing & ledger", "detail": "schedule · balance · closure", "ref": "core/lending"},
+        {"label": "Payments", "detail": "mandates · settlement", "ref": "core/finance"},
+        {"label": "Collections", "detail": "contact · field · recovery", "ref": "core/lending"},
+        {"label": "Collateral", "detail": "valuation · custody · release", "ref": "core/lending"},
+        {"label": "Finance & tax", "detail": "GL · GST · TDS · close", "ref": "core/finance"},
+        {"label": "Compliance", "detail": "controls · reporting · audit", "ref": "core/compliance"},
+        {"label": "Risk, AML & fraud", "detail": "screen · monitor · investigate", "ref": "core/compliance"},
+        {"label": "AI governance", "detail": "inventory · validation · pause", "ref": "core/ai"},
+        {"label": "Tenant platform", "detail": "identity · commercial · ops", "ref": "core/platform"}
+      ]
+    },
+    {
+      "number": 4,
+      "title": "Decision & control plane",
+      "tone": "decision",
+      "columns": 5,
+      "items": [
+        {"label": "JS domain policy", "detail": "default control-plane path", "ref": "core/lending/eligibility.js"},
+        {"label": "Decision gateways", "detail": "off · shadow · active", "ref": "apps/api/src/*rules-engine.js"},
+        {"label": "Business engines", "detail": "one Rust runtime / tenant", "ref": "rules/rules-service"},
+        {"label": "Control engines", "detail": "isolated ctrl-* fleet", "ref": "ADR 0005"},
+        {"label": "AI kill switch", "detail": "guardrails · manual review", "ref": "core/ai/model-governance.js"}
+      ]
+    },
+    {
+      "number": 5,
+      "title": "Data, evidence & intelligence",
+      "tone": "data",
+      "columns": 6,
+      "items": [
+        {"label": "Development store", "detail": "tenant-partitioned JSON", "ref": "apps/api/file-store.js"},
+        {"label": "PostgreSQL", "detail": "transactions · tenant RLS", "ref": "apps/api/postgres-store.js"},
+        {"label": "Audit spine", "detail": "SHA-256 hash chain", "ref": "core/shared/audit.js"},
+        {"label": "Evidence custody", "detail": "retention · hold · export", "ref": "core/compliance"},
+        {"label": "Data governance", "detail": "lineage · quality · CDC", "ref": "core/compliance"},
+        {"label": "Reports & packs", "detail": "regulatory · operational", "ref": "core/compliance"}
+      ]
+    },
+    {
+      "number": 6,
+      "title": "Platform runtime & operations",
+      "tone": "runtime",
+      "columns": 6,
+      "items": [
+        {"label": "Adapter boundary", "detail": "mock / real readiness", "ref": "core/integrations"},
+        {"label": "Durable workers", "detail": "fences · retry · DLQ", "ref": "core/integrations"},
+        {"label": "Callbacks", "detail": "signed · idempotent", "ref": "apps/api/routes"},
+        {"label": "Observability", "detail": "SLI · SLO · health", "ref": "core/operations"},
+        {"label": "Identity runtime", "detail": "federation · revocation", "ref": "core/identity"},
+        {"label": "Usage metering", "detail": "only fail-open seam", "ref": "ADR 0009"}
+      ]
+    },
+    {
+      "number": 7,
+      "title": "Delivery, infrastructure & verification",
+      "tone": "delivery",
+      "columns": 6,
+      "items": [
+        {"label": "Local runtime", "detail": "Docker · Compose", "ref": "docker-compose.yml"},
+        {"label": "AWS showcase", "detail": "synthetic · isolated", "ref": "deploy/aws"},
+        {"label": "Immutable release", "detail": "allowlist · SHA-256", "ref": "package-demo.sh"},
+        {"label": "Atomic update", "detail": "SSM · health rollback", "ref": "release-demo.sh"},
+        {"label": "Test lanes", "detail": "Node · Postgres · Rust", "ref": ".github/workflows/ci.yml"},
+        {"label": "Knowledge gates", "detail": "docs · graph · evidence", "ref": "npm run knowledge:check"}
+      ]
+    }
+  ],
+  "principles": [
+    {"label": "Tenant isolation", "detail": "absolute"},
+    {"label": "Fail closed", "detail": "restrictive by default"},
+    {"label": "Exact money", "detail": "no float math"},
+    {"label": "Deterministic", "detail": "replayable decisions"},
+    {"label": "Policy as data", "detail": "signed bundles"},
+    {"label": "AI gated", "detail": "facts + provenance"},
+    {"label": "Maker-checker", "detail": "independent authority"},
+    {"label": "Evidence lineage", "detail": "audit by construction"}
+  ]
+}

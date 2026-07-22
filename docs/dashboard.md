@@ -1,4 +1,4 @@
-# Capability & Build Dashboard
+# Capability, Architecture & Build Dashboard
 
 `docs/dashboard.html` is the LoanOS India founder control dashboard: a branded,
 repository-backed view of overall maturity, current constraints, owner/persona
@@ -36,7 +36,7 @@ Both are build artifacts; edit source documents and implementation evidence, not
 these files. Writes are atomic per artifact so an interrupted render does not
 leave a partially written page.
 
-The portal link is labelled **Build status** deliberately: this dashboard reports repository capability, evidence and test state. It is not a production uptime page and does not establish tenant or journey production readiness.
+The portal link is labelled **Build status** deliberately: this dashboard reports repository capability, architecture, evidence, test and journey-readiness state. It is not a production uptime page and does not establish tenant or journey production readiness.
 
 ## Live and offline behaviour
 
@@ -53,24 +53,33 @@ The word *live* is used narrowly:
 - the generated timestamp, source digest, Git SHA, dirty-worktree count and test
   source make snapshot age and provenance visible.
 
-This is live repository status, not production runtime telemetry. Production
-loan, queue, provider, SLO and control data belongs in authenticated tenant
-workspaces with tenant isolation, not in this documentation artifact.
+This is live repository status, not production runtime telemetry. The engineering
+and operational-readiness panel derives its signals from the test result,
+capability/evidence registers, journey-depth audit, architecture freshness and
+Git worktree. Production loan, queue, provider, SLO, incident and control data
+belongs in authenticated tenant/platform workspaces with tenant isolation, not
+in this documentation artifact. The dashboard says `not_connected` for runtime
+telemetry rather than implying that an absent signal is healthy.
 
 ## Solo-founder drill-down model
 
 The page is ordered for progressive decisions:
 
 1. **Executive snapshot** — maturity, evidence integrity, tests and worktree state.
-2. **Founder operating desk** — a deterministic constraint queue plus owner/persona
+2. **Whole-system map** — the governed seven-layer architecture SVG, embedded into
+   the generated page with source/digest lineage.
+3. **Engineering and operational readiness** — build health, evidence integrity,
+   journey readiness, diagram freshness and a deterministic issue queue, plus an
+   explicit boundary around live runtime telemetry.
+4. **Founder operating desk** — a deterministic constraint queue plus owner/persona
    lanes. Queue order is restrictive status then capability ID, not inferred
    commercial priority.
-3. **Product planes** — LOS, LMS, LWS, Compliance OS and supporting-plane rollups.
-4. **Evidence explorer** — status, plane and owner filters plus full-text search
+5. **Product planes** — LOS, LMS, LWS, Compliance OS and supporting-plane rollups.
+6. **Evidence explorer** — status, plane and owner filters plus full-text search
    over names, acceptance, gaps, dependencies and evidence.
-5. **Agent handoff** — copy a bounded Markdown work packet from any capability;
+7. **Agent handoff** — copy a bounded Markdown work packet from any capability;
    the agent proposes work and verification, while the human decides completion.
-6. **Lineage** — exact sources, test accounting, source digest and Git state.
+8. **Lineage** — exact sources, test accounting, source digest and Git state.
 
 ## Data sources
 
@@ -83,6 +92,9 @@ nothing is hand-maintained in the HTML:
 | Owner/persona lanes, acceptance, remaining scope, dependencies, evidence | `docs/product/capability-trace.json` |
 | Product-plane grouping | The shared mapping in `scripts/planes.mjs` (`PLANE`), derived from `docs/product/what-we-are-building.md` |
 | Backlog epics | `docs/product/build-backlog.md` (`## Epic` headings + `Status:` lines) |
+| Whole-system architecture | `docs/architecture/loanos-system-map.json` plus its checked generated SVG |
+| Journey readiness | `docs/product/product-journey-platform-depth.json` (production-ready remains explicitly zero until governed external/institution evidence exists) |
+| Engineering/readiness issue queue | Derived from tests, capability statuses, evidence integrity, journey depth and Git state; never hand-maintained in HTML |
 | Commits, branch, SHA, dirty state | `git log`, `git rev-list`, `git status` |
 | Test suite | Live `node --test tests/*.test.js` run (or a reused build log) |
 | Brand system | `docs/gtm/brand/brand-guide.md` and the approved `apps/web/assets/loanos-logo-mark.png` |
@@ -210,5 +222,7 @@ it correct:
    `capability-evidence-policy.json` when the catalogue grows.
 4. Run `npm run dashboard:watch` for a continuously refreshed local view, and
    serve the repository over HTTP so browser polling is active.
-5. Keep the canonical brand guide, generator tokens and approved mark aligned;
+5. Edit the architecture model, regenerate the SVG, and visually inspect both
+   the standalone image and its embedded desktop/mobile dashboard layout.
+6. Keep the canonical brand guide, generator tokens and approved mark aligned;
    `npm run dashboard:check` enforces the critical brand/live-control contract.
