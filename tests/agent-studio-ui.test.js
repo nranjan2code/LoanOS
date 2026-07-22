@@ -38,6 +38,11 @@ test("Agent Studio is business-first and exposes governed creation choices", asy
   for (const marker of ["provider-form", "provider-list", "admission-list"]) assert.match(html, new RegExp(marker));
   assert.match(js, /\/ai\/agents\/provider-evidence/);
   for (const view of ["create", "knowledge", "test-release", "operations", "governance"]) assert.match(html, new RegExp(`data-studio-view="${view}"`));
+  // The Studio must never fabricate rehearsal outcomes client-side; it only
+  // asks the server harness to run, and reviews proposals via human-review.
+  assert.doesNotMatch(js, /observedOutcome:\s*testCase\.expectedOutcome/);
+  assert.match(js, /\/human-review/);
+  assert.match(js, /data-review-execution/i);
   assert.match(html, /workspace-intro/);
   assert.match(js, /function setStudioView/);
   assert.match(js, /hashchange/);

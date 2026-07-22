@@ -133,6 +133,7 @@ export {
   activateTenantAiAgent,
   authorizeAiAgentExecution,
   completeAiAgentExecution,
+  recordAiAgentProposalReview,
   recordAiAgentUsage,
   suspendTenantAiAgent,
   buildAiAgentGovernanceReport

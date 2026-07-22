@@ -72,7 +72,7 @@ test("tenant customization cannot expand template tools and activation needs fou
 
 test("staff assistants stay within tenant journeys and use only bounded memory", () => {
   const state = contracted();
-  const base = { installationId: "bounded", tenantId: "re1", templateId: "credit.cam", contractId: "price1", modelId: "fm1", modelVersion: "2026-07", workloadPrincipalId: "agent", humanSponsorPrincipalId: "owner", promptRef: "p", promptHash: H, configurationRef: "c", proposedBy: "staff", allowedProductTypes: ["personal_loan"] };
+  const base = { installationId: "bounded", tenantId: "re1", templateId: "credit.cam", contractId: "price1", modelId: "fm1", modelVersion: "2026-07", workloadPrincipalId: "agent", humanSponsorPrincipalId: "owner", promptRef: "p", promptHash: H, configurationRef: "c", proposedBy: "staff", productTypes: ["personal_loan"], allowedProductTypes: ["personal_loan"] };
   assert.throws(() => installTenantAiAgent(state, registry(), { ...base, productTypes: ["gold_loan"] }, NOW), (error) => error.code === "ai_agent_product_scope_not_entitled");
   assert.throws(() => installTenantAiAgent(state, registry(), { ...base, memoryMode: "persistent" }, NOW), (error) => error.code === "ai_agent_memory_mode_invalid");
   const result = installTenantAiAgent(state, registry(), { ...base, memoryMode: "none", productTypes: ["personal_loan"] }, NOW);
@@ -117,6 +117,25 @@ test("approved tenant budget reserves exact paise before model work and cannot b
   assert.throws(() => recordAiAgentUsage(state, { usageId: "bad-use", executionId: "budget-run", tenantId: "re1", inputTokens: "1002", outputTokens: "999" }, NOW), (e) => e.code === "ai_agent_budget_reservation_exceeded");
   state = recordAiAgentUsage(state, { usageId: "good-use", executionId: "budget-run", tenantId: "re1", inputTokens: "1001", outputTokens: "999" }, NOW).state;
   assert.equal(state.budgetReservations.reserve1.status, "consumed");
+});
+
+test("expired unattached budget reservations release capacity while in-flight executions stay counted", () => {
+  let state = active(proposed(contracted()));
+  state = proposeAiAgentUsageBudget(state, { budgetId: "budget-expiry", tenantId: "re1", contractId: "price1", effectiveFrom: "2026-07-01", validUntil: "2026-08-01", proposedBy: "commercial_maker", limits: { maxExecutions: "1", maxInputTokens: "2000", maxOutputTokens: "2000", maxChargePaise: "200" } }, NOW).state;
+  state = approveAiAgentUsageBudget(state, { budgetId: "budget-expiry", tenantId: "re1", approvedBy: "commercial_checker", commercialApprovalRef: "budget/approval/expiry" }, NOW).state;
+  state = reserveAiAgentUsageBudget(state, { reservationId: "abandoned", tenantId: "re1", installationId: "agent1", expectedInputTokens: "1000", expectedOutputTokens: "1000" }, NOW).state;
+  const afterExpiry = new Date(NOW.getTime() + 16 * 60_000);
+  // The abandoned reservation expired unused: its capacity must return to the budget.
+  state = reserveAiAgentUsageBudget(state, { reservationId: "retry", tenantId: "re1", installationId: "agent1", expectedInputTokens: "1000", expectedOutputTokens: "1000" }, afterExpiry).state;
+  state = authorizeAiAgentExecution(state, registry(), { executionId: "in-flight", tenantId: "re1", installationId: "agent1", action: "cam.draft", purpose: "CAM", inputRef: "app/1", inputHash: H, usageReservationId: "retry", modelConsumptionDecision: decision("guardrail.model_consumption"), actionGuardrailDecision: decision("guardrail.agent_action") }, afterExpiry).state;
+  const longAfter = new Date(afterExpiry.getTime() + 60 * 60_000);
+  // A reservation attached to an authorized execution keeps counting even past its expiry stamp.
+  assert.throws(() => reserveAiAgentUsageBudget(state, { reservationId: "should-block", tenantId: "re1", installationId: "agent1", expectedInputTokens: "1000", expectedOutputTokens: "1000" }, longAfter), (e) => e.code === "ai_agent_budget_exceeded");
+});
+
+test("installations and workflow drafts require at least one product journey scope", () => {
+  const state = contracted();
+  assert.throws(() => installTenantAiAgent(state, registry(), { installationId: "no-journey", tenantId: "re1", templateId: "credit.cam", contractId: "price1", modelId: "fm1", modelVersion: "2026-07", workloadPrincipalId: "agent", humanSponsorPrincipalId: "owner", promptRef: "p", promptHash: H, configurationRef: "c", productTypes: [], proposedBy: "staff" }, NOW), (e) => e.code === "ai_agent_product_scope_required");
 });
 
 test("GST-ready invoice uses immutable ledger lineage and independent commercial approval", () => {

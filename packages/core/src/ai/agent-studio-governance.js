@@ -1,5 +1,6 @@
-import { createHash } from "node:crypto";
 import { AI_AGENT_MARKETPLACE_TEMPLATES } from "./ai-agent-platform.js";
+import { evaluateModelUse } from "./model-governance.js";
+import { contentHash, sealRecord } from "./record-seal.js";
 
 const SAFE_STEP_TYPES = new Set(["receive", "check", "prepare", "request_information", "route", "human_review", "notify", "close"]);
 
@@ -39,7 +40,11 @@ export function projectAgentOperationsQueue(state, tenantId, now = new Date()) {
   for (const run of Object.values(platform.testRuns)) if (run.tenantId === tenantId && run.status === "failed") items.push({ taskId: `test:${run.runId}`, type: "failed_test", title: `Review failed rehearsal ${run.runId}`, ownerRole: "model_validator", dueAt: now.toISOString(), resourceId: run.runId, severity: "high" });
   for (const request of Object.values(platform.rollbackRequests)) if (request.tenantId === tenantId && request.status === "pending_approval") items.push({ taskId: `rollback:${request.rollbackId}`, type: "rollback_approval", title: `Independently review rollback ${request.rollbackId}`, ownerRole: "operator", dueAt: now.toISOString(), resourceId: request.rollbackId, severity: "high" });
   for (const pack of Object.values(platform.knowledgePacks)) if (pack.tenantId === tenantId && ["draft", "active"].includes(pack.status)) { const days = Math.ceil((Date.parse(pack.validUntil) - now.getTime()) / 86_400_000); if (pack.status === "draft") items.push({ taskId: `knowledge-approval:${pack.packId}`, type: "knowledge_approval", title: `Approve knowledge pack ${pack.name}`, ownerRole: "compliance", dueAt: pack.validUntil, resourceId: pack.packId, severity: "medium" }); else if (days <= 30) items.push({ taskId: `knowledge-expiry:${pack.packId}`, type: "knowledge_expiry", title: `${pack.name} expires in ${Math.max(0, days)} days`, ownerRole: "compliance", dueAt: pack.validUntil, resourceId: pack.packId, severity: days <= 7 ? "high" : "medium" }); }
-  for (const budget of Object.values(platform.usageBudgets ?? {})) if (budget.tenantId === tenantId && budget.status === "pending_approval") items.push({ taskId: `budget:${budget.budgetId}`, type: "budget_approval", title: `Approve spending limit ${budget.budgetId}`, ownerRole: "finance", dueAt: budget.validUntil, resourceId: budget.budgetId, severity: "medium" }); return items.sort((a, b) => a.dueAt.localeCompare(b.dueAt));
+  for (const budget of Object.values(platform.usageBudgets ?? {})) if (budget.tenantId === tenantId && budget.status === "pending_approval") items.push({ taskId: `budget:${budget.budgetId}`, type: "budget_approval", title: `Approve spending limit ${budget.budgetId}`, ownerRole: "finance", dueAt: budget.validUntil, resourceId: budget.budgetId, severity: "medium" });
+  // Completed agent proposals are not done until a person disposes of them:
+  // every unreviewed proposal/handoff execution is owned human work.
+  for (const execution of Object.values(platform.executions)) if (execution.tenantId === tenantId && execution.status === "completed" && ["proposal_created", "human_handoff"].includes(execution.outcome) && !execution.humanReview) items.push({ taskId: `proposal:${execution.executionId}`, type: "proposal_review", title: `Review agent proposal from ${execution.installationId}`, ownerRole: "human_reviewer", dueAt: execution.completedAt ?? now.toISOString(), resourceId: execution.executionId, severity: execution.outcome === "human_handoff" ? "high" : "medium" });
+  return items.sort((a, b) => a.dueAt.localeCompare(b.dueAt));
 }
 
 export function proposeAgentProviderEvidence(state, input, now = new Date()) {
@@ -88,21 +93,54 @@ export function createAgentTestSuite(state, input, now = new Date()) {
   const installation = own(platform.installations[input.installationId], input.tenantId, "agent_test_installation_missing");
   if (!Array.isArray(input.cases) || input.cases.length < 2) fail("agent_test_cases_invalid", "Add at least two test cases.");
   if (!input.cases.some((item) => item.kind === "adverse")) fail("agent_test_adverse_required", "Include at least one uncertain, missing-data or unsafe case.");
-  const cases = input.cases.map((item) => { required(item, ["caseId", "kind", "scenario", "expectedOutcome"]); if (!["expected", "adverse"].includes(item.kind) || !["proposal", "human_review", "deny"].includes(item.expectedOutcome)) fail("agent_test_case_invalid", "Test case kind or expected outcome is invalid."); return { caseId: item.caseId, kind: item.kind, scenario: item.scenario, expectedOutcome: item.expectedOutcome }; });
+  const cases = input.cases.map((item) => { required(item, ["caseId", "kind", "scenario", "expectedOutcome"]); if (!["expected", "adverse"].includes(item.kind) || !["proposal", "human_review", "deny"].includes(item.expectedOutcome)) fail("agent_test_case_invalid", "Test case kind or expected outcome is invalid."); if (item.probeAction !== undefined && (typeof item.probeAction !== "string" || !item.probeAction)) fail("agent_test_probe_invalid", "probeAction must be a non-empty action name when present."); return { caseId: item.caseId, kind: item.kind, scenario: item.scenario, expectedOutcome: item.expectedOutcome, probeAction: item.probeAction ?? null }; });
   const record = seal({ suiteId: input.suiteId, tenantId: input.tenantId, name: input.name, installationId: installation.installationId, installationHash: installation.recordHash ?? null, cases, caseCount: cases.length, status: "draft", proposedBy: input.proposedBy, createdAt: now.toISOString() });
   return save(platform, "testSuites", record.suiteId, record, "ai_agent.test_suite_created", now);
 }
 
-export function recordAgentTestRun(state, input, now = new Date()) {
-  const platform = normalize(state); required(input, ["runId", "suiteId", "tenantId", "source", "results", "runBy"]);
+/**
+ * Execute a rehearsal suite inside the governed server harness. The
+ * observed outcome of every case is DERIVED HERE from the recorded
+ * configuration — never accepted from a client — so a browser (or any
+ * other caller) cannot fabricate a passing release gate:
+ *
+ * - an `expected` case observes `proposal` only when the configuration is
+ *   coherent (known template, non-empty action subset within the template,
+ *   valid prompt checksum, installation not suspended/retired);
+ * - an `adverse` case with a `probeAction` outside the approved action
+ *   subset observes `deny` — the harness proves out-of-scope requests are
+ *   refused rather than escalated;
+ * - any other `adverse` case observes `human_review` only when the human
+ *   path is guaranteed (a human sponsor is recorded and any bound
+ *   workflow contains an explicit `human_review` step); otherwise `deny`.
+ *
+ * Each result carries a recomputable evidence checksum over the checks the
+ * harness evaluated. Runs remain synthetic: they verify configuration and
+ * release controls, not live-model quality (`simulated: true`).
+ */
+export function runAgentTestSuite(state, input, now = new Date()) {
+  const platform = normalize(state); required(input, ["runId", "suiteId", "tenantId", "runBy"]);
   if (platform.testRuns[input.runId]) fail("agent_test_run_exists", "Test run already exists.", 409);
-  if (input.source !== "synthetic_harness") fail("agent_test_source_untrusted", "Only the governed synthetic harness is available in this release.", 403);
   const suite = own(platform.testSuites[input.suiteId], input.tenantId, "agent_test_suite_missing");
-  if (!Array.isArray(input.results) || input.results.length !== suite.cases.length) fail("agent_test_results_incomplete", "Every test case needs one result.");
-  const byCase = new Map(input.results.map((item) => [item.caseId, item])); if (byCase.size !== suite.cases.length) fail("agent_test_results_incomplete", "Test results must contain each case exactly once.");
-  const results = suite.cases.map((testCase) => { const observed = byCase.get(testCase.caseId); required(observed, ["caseId", "observedOutcome", "evidenceHash"]); if (!/^[a-f0-9]{64}$/i.test(observed.evidenceHash)) fail("agent_test_evidence_invalid", "Every result needs a SHA-256 evidence checksum."); const passed = observed.observedOutcome === testCase.expectedOutcome; return { caseId: testCase.caseId, kind: testCase.kind, expectedOutcome: testCase.expectedOutcome, observedOutcome: observed.observedOutcome, passed, evidenceHash: observed.evidenceHash.toLowerCase() }; });
+  const installation = own(platform.installations[suite.installationId], input.tenantId, "agent_test_installation_missing");
+  const template = AI_AGENT_MARKETPLACE_TEMPLATES[installation.templateId];
+  const allowedActions = installation.allowedActions ?? [];
+  const configOk = Boolean(template) && !["suspended", "retired"].includes(installation.status)
+    && allowedActions.length > 0 && allowedActions.every((action) => template.allowedActions.includes(action))
+    && /^[a-f0-9]{64}$/i.test(installation.promptHash ?? "");
+  const workflow = installation.workflowId ? platform.workflowDrafts[installation.workflowId] : null;
+  const humanPathOk = Boolean(installation.humanSponsorPrincipalId)
+    && (!installation.workflowId || Boolean(workflow && workflow.tenantId === input.tenantId && workflow.steps.some((step) => step.type === "human_review")));
+  const results = suite.cases.map((testCase) => {
+    const observedOutcome = testCase.kind === "expected"
+      ? (configOk ? "proposal" : "deny")
+      : (testCase.probeAction && !allowedActions.includes(testCase.probeAction)) ? "deny"
+      : (configOk && humanPathOk) ? "human_review" : "deny";
+    const evidenceHash = hash({ runId: input.runId, caseId: testCase.caseId, checks: { configOk, humanPathOk, probeAction: testCase.probeAction ?? null }, observedOutcome });
+    return { caseId: testCase.caseId, kind: testCase.kind, expectedOutcome: testCase.expectedOutcome, observedOutcome, passed: observedOutcome === testCase.expectedOutcome, evidenceHash };
+  });
   const passedCount = results.filter((item) => item.passed).length; const scorePercent = Math.floor((passedCount * 100) / results.length); const adversePassed = results.filter((item) => item.kind === "adverse").every((item) => item.passed);
-  const record = seal({ runId: input.runId, suiteId: suite.suiteId, tenantId: input.tenantId, installationId: suite.installationId, installationHash: suite.installationHash, source: input.source, simulated: true, commerciallyLive: false, results, passedCount, caseCount: results.length, scorePercent, adversePassed, status: passedCount === results.length && adversePassed ? "passed" : "failed", runBy: input.runBy, runAt: now.toISOString() });
+  const record = seal({ runId: input.runId, suiteId: suite.suiteId, tenantId: input.tenantId, installationId: suite.installationId, installationHash: suite.installationHash, source: "synthetic_harness", simulated: true, commerciallyLive: false, results, passedCount, caseCount: results.length, scorePercent, adversePassed, status: passedCount === results.length && adversePassed ? "passed" : "failed", runBy: input.runBy, runAt: now.toISOString() });
   return save(platform, "testRuns", record.runId, record, "ai_agent.test_run_recorded", now);
 }
 
@@ -153,15 +191,15 @@ export function projectAgentConfigurationExport(state, input) {
   return { schemaVersion: 1, exportedAt: new Date().toISOString(), installation: Object.fromEntries(Object.entries(installation).filter(([key]) => !["approvedByRole", "governanceEvidence", "activationControl"].includes(key))), approvalsExcluded: true, borrowerDataIncluded: false };
 }
 
-function normalize(state = {}) { return { ...state, installations: state.installations ?? {}, knowledgePacks: state.knowledgePacks ?? {}, memoryStores: state.memoryStores ?? {}, providerEvidence: state.providerEvidence ?? {}, workflowDrafts: state.workflowDrafts ?? {}, testSuites: state.testSuites ?? {}, testRuns: state.testRuns ?? {}, agentVersions: state.agentVersions ?? {}, rollbackRequests: state.rollbackRequests ?? {}, usageBudgets: state.usageBudgets ?? {}, events: state.events ?? [] }; }
+function normalize(state = {}) { return { ...state, installations: state.installations ?? {}, executions: state.executions ?? {}, knowledgePacks: state.knowledgePacks ?? {}, memoryStores: state.memoryStores ?? {}, providerEvidence: state.providerEvidence ?? {}, workflowDrafts: state.workflowDrafts ?? {}, testSuites: state.testSuites ?? {}, testRuns: state.testRuns ?? {}, agentVersions: state.agentVersions ?? {}, rollbackRequests: state.rollbackRequests ?? {}, usageBudgets: state.usageBudgets ?? {}, events: state.events ?? [] }; }
 function save(state, collection, id, record, type, now) { return { state: { ...state, [collection]: { ...state[collection], [id]: record }, events: [...state.events, { type, resourceId: id, recordHash: record.recordHash, at: now.toISOString() }] }, record }; }
-function seal(value) { return { ...value, recordHash: createHash("sha256").update(JSON.stringify(value)).digest("hex") }; }
+const seal = sealRecord;
 function required(value, keys) { for (const key of keys) if (value?.[key] === undefined || value?.[key] === null || value?.[key] === "") fail("agent_studio_field_required", `${key} is required.`); }
 function own(record, tenantId, code) { if (!record || record.tenantId !== tenantId) fail(code, "A same-tenant record is required.", 404); return record; }
 function unique(values) { if (!Array.isArray(values)) fail("agent_studio_array_invalid", "Expected a list."); return [...new Set(values.map(String))]; }
 function iso(value) { const date = new Date(value); if (!Number.isFinite(date.getTime())) fail("agent_studio_date_invalid", "Enter a valid date."); return date.toISOString(); }
 function setDiff(left = [], right = []) { return { added: right.filter((item) => !left.includes(item)), removed: left.filter((item) => !right.includes(item)) }; }
 function scalar(from, to) { return { from, to, changed: from !== to }; }
-function hash(value) { return createHash("sha256").update(JSON.stringify(value)).digest("hex"); }
+const hash = contentHash;
 function snapshot(installation) { return Object.fromEntries(["templateId", "templateVersion", "modelId", "modelVersion", "allowedActions", "productTypes", "dataScopes", "memoryMode", "promptRef", "promptHash", "configurationRef", "knowledgeSources", "workloadPrincipalId", "humanSponsorPrincipalId", "workflowId"].filter((key) => installation[key] !== undefined).map((key) => [key, installation[key]])); }
 function fail(code, message, status = 422) { throw Object.assign(new Error(message), { code, status }); }

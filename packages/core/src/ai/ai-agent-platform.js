@@ -29,8 +29,8 @@
  * (`recordAiAgentUsage`) must not exceed what was reserved — cost is
  * capped before it's incurred, not discovered after the fact.
  */
-import { createHash } from "node:crypto";
 import { evaluateModelUse } from "./model-governance.js";
+import { sealRecord } from "./record-seal.js";
 
 const IST_REGION = "ap-south-1";
 const APPROVAL_ROLES = Object.freeze(["model_owner", "model_validator", "human_reviewer", "model_risk_manager"]);
@@ -196,7 +196,7 @@ export function reserveAiAgentUsageBudget(state, input, now = new Date()) {
   if (!budget) fail("ai_agent_budget_not_active", "No active usage budget exists for this installation's contract.", 403);
   const metrics = { executions: "1", inputTokens: integerString(input.expectedInputTokens, "expectedInputTokens"), outputTokens: integerString(input.expectedOutputTokens, "expectedOutputTokens") };
   const chargePaise = priceUsage(metrics, contract.pricing).toString();
-  const totals = budgetCommitted(platform, budget.budgetId);
+  const totals = budgetCommitted(platform, budget.budgetId, now);
   enforceBudget(budget, addMetrics(totals, { ...metrics, chargePaise }));
   const reservation = seal({ reservationId: input.reservationId, tenantId: input.tenantId, budgetId: budget.budgetId, contractId: contract.contractId, installationId: installation.installationId, metrics, chargePaise, status: "reserved", reservedAt: now.toISOString(), expiresAt: new Date(now.getTime() + 15 * 60_000).toISOString() });
   return result(platform, "budgetReservations", reservation.reservationId, reservation, "ai_agent.usage_budget_reserved", now);
@@ -234,6 +234,9 @@ export function installTenantAiAgent(state, modelRegistry, input, now = new Date
   const actions = unique(input.allowedActions ?? templateDef.allowedActions);
   if (actions.some((action) => !templateDef.allowedActions.includes(action))) fail("ai_agent_action_scope_expanded", "Tenant customization cannot expand marketplace action scope.");
   const productTypes = unique(input.productTypes ?? []);
+  // The documented contract is a server-enforced active product-journey scope:
+  // an assistant with no journey binding would be unscoped, so it fails closed.
+  if (!productTypes.length) fail("ai_agent_product_scope_required", "An installation must declare at least one active product journey.");
   if (Array.isArray(input.allowedProductTypes) && productTypes.some((productType) => !input.allowedProductTypes.includes(productType))) fail("ai_agent_product_scope_not_entitled", "Assistant journeys must stay within the tenant's active product subscriptions.", 403);
   const memoryMode = input.memoryMode ?? "execution_scoped";
   if (!["none", "execution_scoped", "governed_persistent"].includes(memoryMode)) fail("ai_agent_memory_mode_invalid", "Memory mode is not permitted.");
@@ -382,6 +385,34 @@ export function completeAiAgentExecution(state, input, now = new Date()) {
 }
 
 /**
+ * Record the mandatory human review of a completed proposal or handoff
+ * execution — the closing half of the digital-worker operating model: the
+ * agent proposes, a person disposes. Fails closed unless the reviewer is a
+ * human principal distinct from the agent's workload identity, the
+ * execution is completed with a reviewable outcome (`proposal_created` or
+ * `human_handoff`), and no review is already recorded (review evidence is
+ * append-once — a second disposition cannot overwrite the first).
+ * Unreviewed proposals surface in the Agent Studio operations queue via
+ * `projectAgentOperationsQueue` until this record exists.
+ * @param {object} state - platform state.
+ * @param {object} input - executionId, tenantId, reviewerId, reviewerType, disposition, reviewRef.
+ * @param {Date} [now]
+ * @returns {{state: object, record: object}} the execution with its sealed `humanReview`.
+ */
+export function recordAiAgentProposalReview(state, input, now = new Date()) {
+  const platform = normalizeAiAgentPlatformState(state);
+  required(input, ["executionId", "tenantId", "reviewerId", "reviewerType", "disposition", "reviewRef"]);
+  if (input.reviewerType !== "human") fail("ai_agent_review_human_required", "Proposal review must be performed by a human principal.", 403);
+  const execution = tenantRecord(platform.executions[input.executionId], input.tenantId, "ai_agent_execution_missing");
+  if (execution.status !== "completed" || !["proposal_created", "human_handoff"].includes(execution.outcome)) fail("ai_agent_review_not_reviewable", "Only a completed proposal or handoff execution can be reviewed.", 409);
+  if (execution.humanReview) fail("ai_agent_review_already_recorded", "This execution already has a recorded human review.", 409);
+  if (!["accepted", "rejected", "returned_for_changes"].includes(input.disposition)) fail("ai_agent_review_disposition_invalid", "Review disposition must be accepted, rejected or returned_for_changes.");
+  if (input.reviewerId === execution.workloadPrincipalId) fail("ai_agent_review_independence_required", "The agent's own workload identity cannot review its proposal.", 403);
+  const reviewed = seal({ ...execution, humanReview: { reviewerId: input.reviewerId, disposition: input.disposition, reviewRef: input.reviewRef, reviewedAt: now.toISOString() } });
+  return result(platform, "executions", reviewed.executionId, reviewed, "ai_agent.proposal_reviewed", now);
+}
+
+/**
  * Record actual metered usage for a finalized execution and price it
  * against the contract's rate card. Fails closed on a duplicate usage id,
  * an execution not yet in a final state, an execution that already has a
@@ -504,7 +535,7 @@ export function buildAiAgentGovernanceReport(state, tenantId, { from, to } = {})
   const installations = Object.values(platform.installations).filter((x) => x.tenantId === tenantId);
   const executions = Object.values(platform.executions).filter((x) => x.tenantId === tenantId && Date.parse(x.authorizedAt) >= start && Date.parse(x.authorizedAt) <= end);
   const usage = Object.values(platform.usageLedger).filter((x) => x.tenantId === tenantId && Date.parse(x.recordedAt) >= start && Date.parse(x.recordedAt) <= end);
-  const report = { tenantId, period: { from: from ?? null, to: to ?? null }, installations: { total: installations.length, active: installations.filter((x) => x.status === "active").length, suspended: installations.filter((x) => x.status === "suspended").length }, executions: { total: executions.length, completed: executions.filter((x) => x.status === "completed").length, failed: executions.filter((x) => x.status === "failed").length, humanHandoffs: executions.filter((x) => x.outcome === "human_handoff").length }, usage: { inputTokens: sum(usage, "inputTokens"), outputTokens: sum(usage, "outputTokens"), toolCalls: sum(usage, "toolCalls"), chargePaise: usage.reduce((n, x) => n + BigInt(x.chargePaise), 0n).toString(), currency: "INR" }, lineage: { traceComplete: executions.every((x) => x.recordHash && x.inputHash && x.modelConsumptionDecision?.traceRef && x.actionGuardrailDecision?.traceRef), rawPromptsStored: false }, regulatoryControlFamilies: ["RBI-DLD-2025", "RBI-IT-23", "DPDP-ACT-2023", "FREE-AI-2025", "RBI-MRM-DRAFT-2026"] };
+  const report = { tenantId, period: { from: from ?? null, to: to ?? null }, installations: { total: installations.length, active: installations.filter((x) => x.status === "active").length, suspended: installations.filter((x) => x.status === "suspended").length }, executions: { total: executions.length, completed: executions.filter((x) => x.status === "completed").length, failed: executions.filter((x) => x.status === "failed").length, humanHandoffs: executions.filter((x) => x.outcome === "human_handoff").length, humanReviewed: executions.filter((x) => x.humanReview).length, pendingHumanReview: executions.filter((x) => x.status === "completed" && ["proposal_created", "human_handoff"].includes(x.outcome) && !x.humanReview).length }, usage: { inputTokens: sum(usage, "inputTokens"), outputTokens: sum(usage, "outputTokens"), toolCalls: sum(usage, "toolCalls"), chargePaise: usage.reduce((n, x) => n + BigInt(x.chargePaise), 0n).toString(), currency: "INR" }, lineage: { traceComplete: executions.every((x) => x.recordHash && x.inputHash && x.modelConsumptionDecision?.traceRef && x.actionGuardrailDecision?.traceRef), rawPromptsStored: false }, regulatoryControlFamilies: ["RBI-DLD-2025", "RBI-IT-23", "DPDP-ACT-2023", "FREE-AI-2025", "RBI-MRM-DRAFT-2026"] };
   return seal(report);
 }
 
@@ -524,7 +555,17 @@ function perThousand(units, rate) { const count = BigInt(units); return ((count 
 function priceUsage(metrics, pricing) { return (BigInt(pricing.per_execution_paise) * BigInt(metrics.executions)) + perThousand(metrics.inputTokens, pricing.per_1k_input_tokens_paise) + perThousand(metrics.outputTokens, pricing.per_1k_output_tokens_paise); }
 function budgetLimits(limits) { return Object.fromEntries(["maxExecutions", "maxInputTokens", "maxOutputTokens", "maxChargePaise"].map((key) => [key, integerString(limits[key] ?? "0", `limits.${key}`)])); }
 function activeBudget(platform, tenantId, contractId, now) { return Object.values(platform.usageBudgets).find((x) => x.tenantId === tenantId && x.contractId === contractId && x.status === "active" && Date.parse(x.effectiveFrom) <= now.getTime() && now.getTime() <= Date.parse(x.validUntil)); }
-function budgetCommitted(platform, budgetId) { const blank = { executions: "0", inputTokens: "0", outputTokens: "0", chargePaise: "0" }; const used = Object.values(platform.usageLedger).filter((x) => x.budgetId === budgetId).reduce((total, x) => addMetrics(total, { ...x.metrics, chargePaise: x.chargePaise }), blank); return Object.values(platform.budgetReservations).filter((x) => x.budgetId === budgetId && x.status === "reserved").reduce((total, x) => addMetrics(total, { ...x.metrics, chargePaise: x.chargePaise }), used); }
+/**
+ * Total capacity already committed against a budget: recorded usage plus
+ * outstanding reservations. A reservation counts while it is unexpired
+ * (the runtime may still authorize against it) or while an execution is
+ * attached to it (the work is in flight and its usage will still be
+ * metered against the reservation, even past the 15-minute stamp).
+ * An expired reservation that no execution ever consumed can never be
+ * used again — `authorizeAiAgentExecution` refuses it — so its capacity
+ * returns to the budget instead of leaking away permanently.
+ */
+function budgetCommitted(platform, budgetId, now) { const blank = { executions: "0", inputTokens: "0", outputTokens: "0", chargePaise: "0" }; const used = Object.values(platform.usageLedger).filter((x) => x.budgetId === budgetId).reduce((total, x) => addMetrics(total, { ...x.metrics, chargePaise: x.chargePaise }), blank); const attached = new Set(Object.values(platform.executions).map((x) => x.usageReservationId).filter(Boolean)); return Object.values(platform.budgetReservations).filter((x) => x.budgetId === budgetId && x.status === "reserved" && (Date.parse(x.expiresAt) > now.getTime() || attached.has(x.reservationId))).reduce((total, x) => addMetrics(total, { ...x.metrics, chargePaise: x.chargePaise }), used); }
 function addMetrics(left, right) { return Object.fromEntries(["executions", "inputTokens", "outputTokens", "chargePaise"].map((key) => [key, (BigInt(left[key] ?? "0") + BigInt(right[key] ?? "0")).toString()])); }
 function enforceBudget(budget, total) { const pairs = [["maxExecutions", "executions"], ["maxInputTokens", "inputTokens"], ["maxOutputTokens", "outputTokens"], ["maxChargePaise", "chargePaise"]]; for (const [limit, actual] of pairs) if (BigInt(total[actual]) > BigInt(budget.limits[limit])) fail("ai_agent_budget_exceeded", `Usage budget ${limit} would be exceeded.`, 403, { budgetId: budget.budgetId, limit, allowed: budget.limits[limit], requested: total[actual] }); }
 function usageTotals(usage) { return usage.reduce((total, x) => addMetrics(total, { ...x.metrics, chargePaise: x.chargePaise }), { executions: "0", inputTokens: "0", outputTokens: "0", chargePaise: "0" }); }
@@ -533,7 +574,5 @@ function maxZero(value, allowance) { const delta = BigInt(value) - BigInt(allowa
 function invoiceTax(value, subtotalPaise) { required(value, ["supplyType", "rateBasisPoints", "supplierGstinRef", "recipientGstinRef", "placeOfSupplyState"]); if (!["intra_state", "inter_state"].includes(value.supplyType)) fail("ai_agent_invoice_supply_type_invalid", "supplyType must be intra_state or inter_state."); const rateBasisPoints = integerString(value.rateBasisPoints, "tax.rateBasisPoints"); const totalTax = divideRoundHalfUp(BigInt(subtotalPaise) * BigInt(rateBasisPoints), 10_000n); const base = { supplyType: value.supplyType, rateBasisPoints, supplierGstinRef: value.supplierGstinRef, recipientGstinRef: value.recipientGstinRef, placeOfSupplyState: value.placeOfSupplyState, totalTaxPaise: totalTax.toString(), rounding: "half_up_to_paise", legalInvoiceStatus: "commercial_record_pending_tax_validation" }; return value.supplyType === "intra_state" ? { ...base, cgstPaise: (totalTax / 2n).toString(), sgstPaise: (totalTax - (totalTax / 2n)).toString(), igstPaise: "0" } : { ...base, cgstPaise: "0", sgstPaise: "0", igstPaise: totalTax.toString() }; }
 function divideRoundHalfUp(numerator, denominator) { return (numerator + (denominator / 2n)) / denominator; }
 function sum(records, key) { return records.reduce((n, x) => n + BigInt(x.metrics[key]), 0n).toString(); }
-function seal(value) { const clean = JSON.parse(JSON.stringify(value)); delete clean.recordHash; return { ...clean, recordHash: hash(clean) }; }
-function hash(value) { return createHash("sha256").update(canonical(value)).digest("hex"); }
-function canonical(value) { if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`; if (value && typeof value === "object") return `{${Object.keys(value).sort().map((k) => `${JSON.stringify(k)}:${canonical(value[k])}`).join(",")}}`; return JSON.stringify(value); }
+const seal = sealRecord;
 function fail(code, message, status = 422, details = undefined) { throw Object.assign(new Error(message), { code, status, details }); }

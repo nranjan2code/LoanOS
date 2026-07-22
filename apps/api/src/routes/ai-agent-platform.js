@@ -1,13 +1,13 @@
 import {
   activateTenantAiAgent, approveAiAgentPricingContract, authorizeAiAgentExecution, buildAiAgentGovernanceReport,
   completeAiAgentExecution, installTenantAiAgent, projectAiAgentMarketplace,
-  proposeAiAgentPricingContract, recordAiAgentUsage, recordTenantAiAgentApproval, suspendTenantAiAgent,
-  approveAiAgentUsageBudget, proposeAiAgentUsageBudget, reserveAiAgentUsageBudget,
+  proposeAiAgentPricingContract, recordAiAgentProposalReview, recordAiAgentUsage, recordTenantAiAgentApproval,
+  suspendTenantAiAgent, approveAiAgentUsageBudget, proposeAiAgentUsageBudget, reserveAiAgentUsageBudget,
   approveAiAgentInvoice, proposeAiAgentInvoice
 } from "@loanos/core/ai/ai-agent-platform.js";
 import { invokeDigitalWorkerProvider } from "@loanos/core/ai/digital-worker-provider.js";
 import { createDemoDigitalWorkerProvider } from "@loanos/core/ai/digital-worker-demo-provider.js";
-import { approveAgentKnowledgePack, approveAgentMemoryStore, approveAgentProviderEvidence, approveAgentRollback, assessAgentProductionAdmission, compareAgentInstallations, containExpiredAgentKnowledge, createAgentKnowledgePack, createAgentMemoryStore, createAgentTestSuite, createAgentWorkflowDraft, projectAgentConfigurationExport, projectAgentOperationsQueue, proposeAgentProviderEvidence, proposeAgentRollback, publishAgentVersion, recordAgentTestRun, retireAgentInstallation } from "@loanos/core/ai/agent-studio-governance.js";
+import { approveAgentKnowledgePack, approveAgentMemoryStore, approveAgentProviderEvidence, approveAgentRollback, assessAgentProductionAdmission, compareAgentInstallations, containExpiredAgentKnowledge, createAgentKnowledgePack, createAgentMemoryStore, createAgentTestSuite, createAgentWorkflowDraft, projectAgentConfigurationExport, projectAgentOperationsQueue, proposeAgentProviderEvidence, proposeAgentRollback, publishAgentVersion, retireAgentInstallation, runAgentTestSuite } from "@loanos/core/ai/agent-studio-governance.js";
 import { authorizeStaffedFeatureAction, projectTenantFeatureStaffing } from "@loanos/core/identity/saas-identity-governance.js";
 import { decidePlatformControlStaffing } from "../control-rules-engine.js";
 import { decideAiAgentAction, decideAiModelConsumption } from "../rules-engine.js";
@@ -53,7 +53,9 @@ export async function routeAiAgentPlatform(context) {
     else if (match(path, "/ai/agents/provider-evidence/:id/approve")) outcome = approveAgentProviderEvidence(state.aiAgentPlatform, { ...body, evidenceId: idOf(path, 4), tenantId, approvedBy: actor });
     else if (path === "/ai/agents/workflows") outcome = createAgentWorkflowDraft(state.aiAgentPlatform, { ...body, tenantId, proposedBy: actor, allowedProductTypes: enabledProductTypes(state, tenantId) });
     else if (path === "/ai/agents/test-suites") outcome = createAgentTestSuite(state.aiAgentPlatform, { ...body, tenantId, proposedBy: actor });
-    else if (match(path, "/ai/agents/test-suites/:id/runs")) outcome = recordAgentTestRun(state.aiAgentPlatform, { ...body, suiteId: idOf(path, 4), tenantId, source: "synthetic_harness", runBy: actor });
+    // The harness derives every observed outcome server-side; client-supplied
+    // results are never read, so a browser cannot fabricate a passing gate.
+    else if (match(path, "/ai/agents/test-suites/:id/runs")) outcome = runAgentTestSuite(state.aiAgentPlatform, { runId: body.runId, suiteId: idOf(path, 4), tenantId, runBy: actor });
     else if (path === "/ai/agents/versions") outcome = publishAgentVersion(state.aiAgentPlatform, { ...body, tenantId, publishedBy: actor });
     else if (path === "/ai/agents/rollbacks") outcome = proposeAgentRollback(state.aiAgentPlatform, { ...body, tenantId, proposedBy: actor });
     else if (match(path, "/ai/agents/rollbacks/:id/approve")) outcome = approveAgentRollback(state.aiAgentPlatform, { ...body, rollbackId: idOf(path, 4), tenantId, approvedBy: actor });
@@ -85,6 +87,9 @@ export async function routeAiAgentPlatform(context) {
       outcome = await runDemoExecution(state, tenantId, idOf(path, 4), body.scenario);
     }
     else if (match(path, "/ai/agents/executions/:id/complete")) outcome = completeAiAgentExecution(state.aiAgentPlatform, { ...body, executionId: idOf(path, 4), tenantId });
+    // Reviewer identity binds to the authenticated principal; the disposition
+    // and reference come from the body, the reviewer never does.
+    else if (match(path, "/ai/agents/executions/:id/human-review")) outcome = recordAiAgentProposalReview(state.aiAgentPlatform, { disposition: body.disposition, reviewRef: body.reviewRef, executionId: idOf(path, 4), tenantId, reviewerId: actor, reviewerType: "human" });
     else if (path === "/ai/agents/usage") outcome = recordAiAgentUsage(state.aiAgentPlatform, { ...body, tenantId });
     else return false;
     const next = { ...state, aiAgentPlatform: outcome.state };

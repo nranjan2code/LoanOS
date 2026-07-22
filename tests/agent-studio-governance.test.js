@@ -1,12 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import {
   createAgentKnowledgePack, createAgentTestSuite, createAgentWorkflowDraft,
   approveAgentKnowledgePack, approveAgentMemoryStore, approveAgentRollback,
   approveAgentProviderEvidence, assessAgentProductionAdmission, compareAgentInstallations,
   containExpiredAgentKnowledge, createAgentMemoryStore, projectAgentOperationsQueue,
   publishAgentVersion, proposeAgentProviderEvidence, proposeAgentRollback,
-  recordAgentTestRun, retireAgentInstallation
+  retireAgentInstallation, runAgentTestSuite
 } from "@loanos/core/ai/agent-studio-governance.js";
 import { routeAiAgentPlatform } from "../apps/api/src/routes/ai-agent-platform.js";
 
@@ -15,7 +16,7 @@ const HASH = "a".repeat(64);
 const approvals = Object.fromEntries(["model_owner", "model_validator", "human_reviewer", "model_risk_manager"].map((role, index) => [role, { principalId: `human-${index}`, approvalRef: `approval/${role}` }]));
 const base = () => ({ knowledgePacks: {}, memoryStores: {}, providerEvidence: {}, workflowDrafts: {}, testSuites: {}, testRuns: {}, agentVersions: {}, rollbackRequests: {}, installations: {
   original: { installationId: "original", tenantId: "bank-a", templateId: "credit.cam", allowedActions: ["cam.draft"], productTypes: ["personal_loan"], dataScopes: ["application.read"], memoryMode: "none", promptHash: HASH, status: "active" },
-  draft: { installationId: "draft", tenantId: "bank-a", templateId: "credit.cam", templateVersion: 1, modelId: "fm1", modelVersion: "1", allowedActions: ["cam.draft", "evidence.gap_list"], productTypes: ["personal_loan"], dataScopes: ["application.read"], memoryMode: "execution_scoped", promptHash: "b".repeat(64), approvedByRole: approvals, proposedBy: "staff", status: "pending_approval" }
+  draft: { installationId: "draft", tenantId: "bank-a", templateId: "credit.cam", templateVersion: 1, modelId: "fm1", modelVersion: "1", allowedActions: ["cam.draft", "evidence.gap_list"], productTypes: ["personal_loan"], dataScopes: ["application.read"], memoryMode: "execution_scoped", promptHash: "b".repeat(64), humanSponsorPrincipalId: "sponsor-1", approvedByRole: approvals, proposedBy: "staff", status: "pending_approval" }
 }, events: [] });
 
 test("knowledge packs are tenant scoped, checksum bound and cannot silently become persistent memory", () => {
@@ -74,6 +75,26 @@ test("production admission evaluates installation status, approvals, workflow an
   assert.ok(assessment.reasons.includes("workflow_invalid_or_missing"));
 });
 
+test("production admission consults the model registry without crashing and reports kill-switched models", () => {
+  const registry = (globalActive) => ({ globalKillSwitch: { active: globalActive, reason: globalActive ? "incident" : null }, models: { fm1: { modelId: "fm1", version: "1", status: "active", validationStatus: "approved", riskTier: "low", materialDecision: false, customerFacing: false } }, incidents: {}, events: [] });
+  const state = base();
+  state.installations.original = { ...state.installations.original, modelId: "fm1", modelVersion: "1" };
+  const healthy = assessAgentProductionAdmission(state, { tenantId: "bank-a", installationId: "original" }, NOW, registry(false));
+  assert.equal(healthy.reasons.includes("model_not_usable"), false);
+  const killSwitched = assessAgentProductionAdmission(state, { tenantId: "bank-a", installationId: "original" }, NOW, registry(true));
+  assert.ok(killSwitched.reasons.includes("model_not_usable"));
+  assert.equal(killSwitched.ready, false);
+});
+
+test("agent studio record seals are recomputable from canonical content", () => {
+  const canonical = (value) => Array.isArray(value) ? `[${value.map(canonical).join(",")}]` : value && typeof value === "object" ? `{${Object.keys(value).sort().map((k) => `${JSON.stringify(k)}:${canonical(value[k])}`).join(",")}}` : JSON.stringify(value);
+  const recomputed = (record) => { const { recordHash, ...content } = record; return createHash("sha256").update(canonical(content)).digest("hex"); };
+  let state = createAgentKnowledgePack(base(), { packId: "seal-pack", tenantId: "bank-a", name: "Seal policy", version: "1", contentHash: HASH, sourceRef: "policy/seal/v1", validUntil: "2027-07-21", proposedBy: "maker" }, NOW).state;
+  assert.equal(state.knowledgePacks["seal-pack"].recordHash, recomputed(state.knowledgePacks["seal-pack"]));
+  state = approveAgentKnowledgePack(state, { packId: "seal-pack", tenantId: "bank-a", approvedBy: "checker", approvalRef: "committee/seal" }, NOW).state;
+  assert.equal(state.knowledgePacks["seal-pack"].recordHash, recomputed(state.knowledgePacks["seal-pack"]));
+});
+
 test("visual workflow accepts only safe business steps and requires a human handoff", () => {
   const safe = createAgentWorkflowDraft(base(), { workflowId: "wf1", tenantId: "bank-a", name: "Application summary", templateId: "credit.cam", productTypes: ["personal_loan"], allowedProductTypes: ["personal_loan"], steps: [{ type: "receive", label: "Receive application" }, { type: "prepare", label: "Prepare summary" }, { type: "human_review", label: "Credit officer reviews" }], proposedBy: "staff" }, NOW);
   assert.equal(safe.record.status, "draft");
@@ -106,7 +127,7 @@ test("Agent Studio API persists visual plans and exposes tenant-scoped exports",
   assert.equal(exported.payload.borrowerDataIncluded, false);
   assert.equal(exported.payload.approvalsExcluded, true);
   await call("POST", "/ai/agents/test-suites", { suiteId: "api-suite", name: "API suite", installationId: "draft", cases: [{ caseId: "normal", kind: "expected", scenario: "Complete", expectedOutcome: "proposal" }, { caseId: "adverse", kind: "adverse", scenario: "Missing", expectedOutcome: "human_review" }] });
-  const run = await call("POST", "/ai/agents/test-suites/api-suite/runs", { runId: "api-run", results: [{ caseId: "normal", observedOutcome: "proposal", evidenceHash: HASH }, { caseId: "adverse", observedOutcome: "human_review", evidenceHash: HASH }] });
+  const run = await call("POST", "/ai/agents/test-suites/api-suite/runs", { runId: "api-run" });
   assert.equal(run.payload.status, "passed");
   const version = await call("POST", "/ai/agents/versions", { versionId: "api-v1", installationId: "draft", testRunId: "api-run" }, "release-checker");
   assert.equal(version.payload.status, "published");
@@ -122,17 +143,21 @@ test("Agent Studio API persists visual plans and exposes tenant-scoped exports",
 });
 
 test("synthetic test runs score every case and fail release on any unsafe result", () => {
+  // An adverse case expecting an outright deny is only satisfied when the probe
+  // targets an action outside the approved subset; an in-scope adverse case
+  // escalates to a human instead, so this suite fails and blocks release.
   let state = createAgentTestSuite(base(), { suiteId: "suite-run", tenantId: "bank-a", name: "Release gate", installationId: "draft", cases: [{ caseId: "normal", kind: "expected", scenario: "Complete", expectedOutcome: "proposal" }, { caseId: "unsafe", kind: "adverse", scenario: "Prompt injection", expectedOutcome: "deny" }], proposedBy: "tester" }, NOW).state;
-  const failed = recordAgentTestRun(state, { runId: "run-bad", suiteId: "suite-run", tenantId: "bank-a", source: "synthetic_harness", results: [{ caseId: "normal", observedOutcome: "proposal", evidenceHash: HASH }, { caseId: "unsafe", observedOutcome: "proposal", evidenceHash: HASH }], runBy: "tester" }, NOW);
+  const failed = runAgentTestSuite(state, { runId: "run-bad", suiteId: "suite-run", tenantId: "bank-a", runBy: "tester" }, NOW);
   assert.equal(failed.record.status, "failed");
   assert.throws(() => publishAgentVersion(failed.state, { versionId: "draft-v1", tenantId: "bank-a", installationId: "draft", testRunId: "run-bad", publishedBy: "release-checker" }, NOW), (error) => error.code === "agent_version_test_gate_failed");
-  const passed = recordAgentTestRun(state, { runId: "run-good", suiteId: "suite-run", tenantId: "bank-a", source: "synthetic_harness", results: [{ caseId: "normal", observedOutcome: "proposal", evidenceHash: HASH }, { caseId: "unsafe", observedOutcome: "deny", evidenceHash: HASH }], runBy: "tester" }, NOW);
+  state = createAgentTestSuite(state, { suiteId: "suite-safe", tenantId: "bank-a", name: "Safe gate", installationId: "draft", cases: [{ caseId: "normal", kind: "expected", scenario: "Complete", expectedOutcome: "proposal" }, { caseId: "unsafe", kind: "adverse", scenario: "Prompt injection", probeAction: "loan.sanction", expectedOutcome: "deny" }], proposedBy: "tester" }, NOW).state;
+  const passed = runAgentTestSuite(state, { runId: "run-good", suiteId: "suite-safe", tenantId: "bank-a", runBy: "tester" }, NOW);
   assert.equal(passed.record.scorePercent, 100);
 });
 
 test("published versions are immutable and rollback requires an independent checker", () => {
   let state = createAgentTestSuite(base(), { suiteId: "suite-release", tenantId: "bank-a", name: "Release", installationId: "draft", cases: [{ caseId: "normal", kind: "expected", scenario: "Complete", expectedOutcome: "proposal" }, { caseId: "adverse", kind: "adverse", scenario: "Missing", expectedOutcome: "human_review" }], proposedBy: "tester" }, NOW).state;
-  state = recordAgentTestRun(state, { runId: "run-release", suiteId: "suite-release", tenantId: "bank-a", source: "synthetic_harness", results: [{ caseId: "normal", observedOutcome: "proposal", evidenceHash: HASH }, { caseId: "adverse", observedOutcome: "human_review", evidenceHash: HASH }], runBy: "tester" }, NOW).state;
+  state = runAgentTestSuite(state, { runId: "run-release", suiteId: "suite-release", tenantId: "bank-a", runBy: "tester" }, NOW).state;
   state = publishAgentVersion(state, { versionId: "draft-v1", tenantId: "bank-a", installationId: "draft", testRunId: "run-release", publishedBy: "release-checker" }, NOW).state;
   assert.equal(state.agentVersions["draft-v1"].status, "published");
   state = proposeAgentRollback(state, { rollbackId: "rb1", tenantId: "bank-a", installationId: "draft", targetVersionId: "draft-v1", reason: "Production regression", proposedBy: "operator" }, NOW).state;

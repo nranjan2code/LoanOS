@@ -34,7 +34,9 @@ The repository now implements the provider-neutral governance and commercial bou
 - tenant-specific installation records with pinned model/prompt/configuration/knowledge versions, India region, workload identity, human sponsor, action allow-list, server-enforced active product-journey scope, data scopes, and either no memory or execution-scoped memory;
 - FST-034 activation requiring distinct human model owner, model validator, human reviewer, and model-risk manager approvals, governance evidence, and an isolated control-engine trace;
 - local model-registry and global/model kill-switch checks plus isolated business-engine decisions for `guardrail.model_consumption` and `guardrail.agent_action` before every execution;
-- hash-sealed input/output/configuration lineage, proposal-only outcomes, append-only audit events, usage/cost records, emergency suspension, and tenant governance reports.
+- hash-sealed input/output/configuration lineage, proposal-only outcomes, append-only audit events, usage/cost records, emergency suspension, and tenant governance reports;
+- a closed human-review loop: every completed proposal/handoff execution surfaces as owned `human_reviewer` queue work and requires an authenticated human's append-once disposition before it counts as disposed;
+- server-derived configuration rehearsals: release-gate test outcomes are computed by the governed harness from recorded configuration, never accepted from a client.
 
 The implementation anchors are `packages/core/src/ai/ai-agent-platform.js`, `apps/api/src/routes/ai-agent-platform.js`, `packages/core/src/ai/digital-worker-provider.js`, `apps/agent-studio/`, and the domain guardrail fixtures. It intentionally does **not** call an LLM yet. The injected Bedrock/Strands-compatible provider boundary, commercial budgets, invoice-ready records, and the first visual tenant Agent Studio slice are implemented; durable worker, India-region AWS infrastructure, evaluation service, completed administration journeys, legal invoice integration, and live-provider conformance remain production gaps.
 
@@ -314,7 +316,7 @@ Tenant-scoped authenticated endpoints are:
 - `GET /ai/marketplace`, `GET /ai/agents`, and `GET /ai/agents/governance-report?from=&to=`;
 - `POST /ai/pricing-contracts`, `/pricing-contracts/{id}/approve`, and `/ai/agents/installations`;
 - `POST /ai/agents/installations/{id}/approvals/{role}`, `/activate`, and `/suspend`;
-- `POST /ai/agents/executions/authorize`, `/executions/{id}/complete`, and `/usage`.
+- `POST /ai/agents/executions/authorize`, `/executions/{id}/complete`, `/executions/{id}/human-review`, and `/usage`.
 
 All mutations classify under FST-034. Commercial contracts use separate authenticated proposal and approval calls. Each FST-034 role approval is also a separate call bound to the authenticated human and their effective canonical role; clients cannot submit a bundle of approver identities. Activation consumes those stored approvals and obtains a fresh isolated control-engine decision. The execution route additionally obtains fresh isolated business-engine traces; a missing or untrusted engine returns a denial.
 

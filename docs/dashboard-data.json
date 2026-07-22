@@ -1,8 +1,8 @@
 {
   "schemaVersion": 2,
-  "generated": "2026-07-21T19:04:25.698Z",
-  "sourceDigest": "85c357ee97ba6e7d",
-  "snapshotId": "76ebb22a4d028db2",
+  "generated": "2026-07-22T01:52:26.176Z",
+  "sourceDigest": "ddef7563c8723fd8",
+  "snapshotId": "ed81586bb782a124",
   "sources": {
     "catalogue": "docs/product/complete-system-capability-catalog.md",
     "trace": "docs/product/capability-trace.json",
@@ -12,15 +12,25 @@
   },
   "git": {
     "branch": "main",
-    "sha": "ba05f91242ab",
-    "count": 232,
+    "sha": "d4e6b975dc42",
+    "count": 234,
     "dirty": true,
-    "changeCount": 30,
+    "changeCount": 18,
     "commits": [
+      {
+        "hash": "d4e6b97",
+        "subject": "feat(ai-agent): strengthen production admission, workflow binding, and staffing controls",
+        "when": "23 minutes ago"
+      },
+      {
+        "hash": "1ed9e08",
+        "subject": "feat(agents): deliver governed no-code Agent Studio",
+        "when": "7 hours ago"
+      },
       {
         "hash": "ba05f91",
         "subject": "feat(metering): implement usage metering and tenant cost-recovery model",
-        "when": "81 minutes ago"
+        "when": "8 hours ago"
       },
       {
         "hash": "6d9fd6d",
@@ -30,27 +40,27 @@
       {
         "hash": "00b1dc5",
         "subject": "feat(journeys): execute browser and production evidence controls",
-        "when": "3 days ago"
+        "when": "4 days ago"
       },
       {
         "hash": "5b96f2e",
         "subject": "feat(platform): implement journey certifications, payment operations, fraud cases, and workspace administration updates",
-        "when": "3 days ago"
+        "when": "4 days ago"
       },
       {
         "hash": "711caa5",
         "subject": "docs(architecture): canonical testing strategy and design system standards",
-        "when": "3 days ago"
+        "when": "4 days ago"
       },
       {
         "hash": "1dca57c",
         "subject": "feat(governance): add task-type entry skills and scenario routing",
-        "when": "3 days ago"
+        "when": "4 days ago"
       },
       {
         "hash": "e1a3258",
         "subject": "feat(governance): make the agent-execution layer executable",
-        "when": "3 days ago"
+        "when": "4 days ago"
       },
       {
         "hash": "3e38e32",
@@ -65,16 +75,6 @@
       {
         "hash": "207bfea",
         "subject": "refactor(api): extract route modules and add documentation governance",
-        "when": "4 days ago"
-      },
-      {
-        "hash": "edb1a8b",
-        "subject": "docs: deep documentation pass for the @loanos/core package boundary",
-        "when": "4 days ago"
-      },
-      {
-        "hash": "4a9ef90",
-        "subject": "refactor(core): group domain kernel into @loanos/core package domains",
         "when": "4 days ago"
       }
     ]
@@ -25906,13 +25906,13 @@
     }
   ],
   "tests": {
-    "pass": 768,
+    "pass": 779,
     "fail": 0,
     "skipped": 12,
     "cancelled": 0,
     "todo": 0,
-    "total": 780,
-    "durationMs": 23800.811083,
+    "total": 791,
+    "durationMs": 25761.014875,
     "ran": true,
     "source": "provided-log",
     "error": ""

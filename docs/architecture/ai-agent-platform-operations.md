@@ -2,7 +2,7 @@
 
 Status: Executable control-plane baseline; no external model or agent runtime is connected.
 
-Last reviewed: 2026-07-15.
+Last reviewed: 2026-07-22.
 
 This runbook is the operational companion to [Agentic AI Digital Workers on AWS](agentic-ai-digital-workers.md). It defines how a regulated-entity tenant prices, installs, approves, authorizes, traces, meters, reports and suspends LoanOS digital workers. It does not authorize production use by itself.
 
@@ -110,11 +110,17 @@ Both decision traces and ruleset hashes are projected into the execution. Engine
 
 `POST /ai/agents/executions/{id}/complete` accepts only an authorized execution and one of `proposal_created`, `human_handoff`, `no_action` or `failed`. The platform stores output reference/hash and citations, not raw prompts or large raw outputs in general logs.
 
+A completed `proposal_created` or `human_handoff` execution is not disposed until a person reviews it. The unreviewed execution appears in the Agent Studio operations queue as owned `human_reviewer` work, and `POST /ai/agents/executions/{id}/human-review` records the authenticated human's disposition (`accepted`, `rejected` or `returned_for_changes`) with a review reference. The reviewer identity binds to the authenticated principal — a workload identity or the agent's own principal is refused — and the review is append-once: a second disposition cannot overwrite the first. The governance report exposes `humanReviewed` and `pendingHumanReview` counts so an RE can evidence that no proposal bypassed a person.
+
+### Configuration rehearsals
+
+Rehearsal test suites bind normal and adverse cases (optionally with a `probeAction`) to an installation draft. `POST /ai/agents/test-suites/{id}/runs` executes the suite inside the governed server harness: every observed outcome is derived server-side from the recorded configuration (template validity, action subset, prompt checksum, human sponsor, bound-workflow human-review step), so a client cannot fabricate a passing release gate. An adverse case with a `probeAction` outside the approved action subset must observe `deny`; an in-scope adverse case must reach `human_review` through a guaranteed human path. Runs stay synthetic (`simulated: true`): they verify configuration and release controls, never live-model quality.
+
 `POST /ai/agents/usage` accepts one record per final execution. It stores model/version, Mumbai region, input/output token counts, tool-call count and exact variable charge:
 
 `charge_paise = per_execution_paise + ceil(input_tokens / 1000) × input_rate + ceil(output_tokens / 1000) × output_rate`
 
-`GET /ai/agents/governance-report?from=&to=` returns tenant-local installation, execution, handoff, token/tool, charge and lineage completeness measures. It is an operational evidence projection, not an invoice or regulatory return.
+`GET /ai/agents/governance-report?from=&to=` returns tenant-local installation, execution, handoff, human-review, token/tool, charge and lineage completeness measures. It is an operational evidence projection, not an invoice or regulatory return.
 
 ## 8. Suspension and incident response
 
@@ -148,7 +154,7 @@ The control plane is not a production digital-worker runtime. Production admissi
 - specialized domain guardrails are executable as platform-pack policy models for tenant-scoped data access/minimization, outbound communication, underwriting influence and case mutation; the future runtime adapter must call the applicable model before retrieval, dispatch or mutation. Collections contact is separately guarded today;
 - representative Indian-language, fairness, hallucination, injection, exfiltration, cross-tenant, excessive-agency and denial-of-wallet evaluation corpora;
 - continuous quality/drift/complaint/override monitoring and automated suspension thresholds;
-- completed Agent Studio lifecycle journeys for live-provider evaluation execution and scheduled operational notification delivery. The current business-language slice implements eleven banking templates, template/guided/copy creation, active-journey enforcement, visual workflows, independently approved knowledge and expiry containment, independently approved purpose/field/retention-bound India memory stores, synthetic rehearsals, immutable versions, rollback, exact-rupee budget approval/monitoring, role queues, provider-evidence review and fail-closed production-admission projection. External evidence and institution production authorization remain outside the repository; synthetic passing evidence never constitutes live-provider certification;
+- completed Agent Studio lifecycle journeys for live-provider evaluation execution and scheduled operational notification delivery. The current business-language slice implements eleven banking templates, template/guided/copy creation, active-journey enforcement (every installation must bind at least one active product journey), visual workflows, independently approved knowledge and expiry containment, independently approved purpose/field/retention-bound India memory stores, server-derived synthetic rehearsals, immutable versions, rollback, exact-rupee budget approval/monitoring, role queues including mandatory proposal human review, provider-evidence review and fail-closed production-admission projection. External evidence and institution production authorization remain outside the repository; synthetic passing evidence never constitutes live-provider certification;
 - credits/refunds, accounting/IRP/e-invoicing integration, tax validation and payment/billing reconciliation;
 - provider contracting, outsourcing due diligence, incident/BCP/DR, audit/RBI access, portability and exit evidence;
 - tenant UAT, independent model validation, risk/board approval and a witnessed kill-switch/fallback drill.
@@ -157,8 +163,8 @@ Until these are evidenced, externally describe the feature as a **governed AI-ag
 
 ## 11. Verification anchors
 
-- Domain/API tests: `tests/ai-agent-platform.test.js`
-- Domain controls: `packages/core/src/ai/ai-agent-platform.js`
+- Domain/API tests: `tests/ai-agent-platform.test.js`, `tests/agent-studio-governance.test.js`, `tests/agent-rehearsal-and-review.test.js`
+- Domain controls: `packages/core/src/ai/ai-agent-platform.js`, `packages/core/src/ai/agent-studio-governance.js`, `packages/core/src/ai/record-seal.js`
 - API boundary: `apps/api/src/routes/ai-agent-platform.js`
 - Business guardrail: `rules/fixtures/guardrail-agent-action.json`
 - Rust regression: `rules/crates/rules-service/tests/ai_control.rs`
