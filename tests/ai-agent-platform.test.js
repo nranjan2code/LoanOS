@@ -51,7 +51,7 @@ test("pricing API binds maker and checker to their authenticated identities", as
     let response;
     const handled = await routeAiAgentPlatform({ method: "POST", path, req: { url: path, _loanosRequestId: `req:${actor}` }, res: {}, store,
       readJson: async () => body, sendJson: (_res, status, payload) => { response = { status, payload }; }, appendEvent: (state) => state,
-      authContext: { tenantId: "re1" }, hasTenantAdminRole: () => true, authActor: () => actor });
+      authContext: { tenantId: "re1", userId: actor, principalType: "tenant_user", roles: [actor === "maker" ? "finance_maker" : "finance_checker"] }, authActor: () => actor });
     assert.equal(handled, true); return response;
   };
   let response = await call("/ai/pricing-contracts", "maker", { contractId: "api-price", templateIds: ["credit.cam"], effectiveFrom: "2026-07-01", validUntil: "2027-07-01", proposedBy: "spoofed", pricing: {} });
@@ -164,7 +164,7 @@ test("explicit demo mode runs an already-authorized execution through the mock p
     let response;
     await routeAiAgentPlatform({ method: "POST", path: "/ai/agents/executions/demo-run/demo-run", req: { url: "/ai/agents/executions/demo-run/demo-run", _loanosRequestId: "demo-request" }, res: {}, store,
       readJson: async () => ({ scenario: "incomplete_evidence" }), sendJson: (_res, status, payload) => { response = { status, payload }; }, appendEvent: (state) => state,
-      authContext: { tenantId: "re1" }, hasTenantAdminRole: () => true, authActor: () => "demo_operator" });
+      authContext: { tenantId: "re1", userId: "demo_operator", principalType: "tenant_user", roles: ["operator"] }, authActor: () => "demo_operator" });
     return response;
   };
   const original = process.env.LOANOS_AI_DEMO_MODE;

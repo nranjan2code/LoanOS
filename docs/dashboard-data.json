@@ -1,46 +1,66 @@
 {
   "schemaVersion": 2,
-  "generated": "2026-07-22T02:45:02.131Z",
-  "sourceDigest": "a095a2075230e448",
-  "snapshotId": "d1bb613ec66dfee9",
+  "generated": "2026-07-22T12:38:31.034Z",
+  "sourceDigest": "20f2d8b2d5fb9406",
+  "snapshotId": "65b9c5d369771aa1",
   "sources": {
     "catalogue": "docs/product/complete-system-capability-catalog.md",
     "trace": "docs/product/capability-trace.json",
     "planes": "scripts/planes.mjs",
     "backlog": "docs/product/build-backlog.md",
-    "tests": "live Node test run"
+    "tests": "reused build test log"
   },
   "git": {
     "branch": "main",
-    "sha": "5e06dd0a2445",
-    "count": 236,
+    "sha": "766ac7328f71",
+    "count": 240,
     "dirty": true,
-    "changeCount": 13,
+    "changeCount": 22,
     "commits": [
+      {
+        "hash": "766ac73",
+        "subject": "feat(showcase): align public discovery and typography",
+        "when": "38 minutes ago"
+      },
+      {
+        "hash": "2cd3c18",
+        "subject": "feat(help): add Technical Academy visual system",
+        "when": "73 minutes ago"
+      },
+      {
+        "hash": "8ca4124",
+        "subject": "fix(aws): isolate release installs from repo hooks",
+        "when": "4 hours ago"
+      },
+      {
+        "hash": "b13b427",
+        "subject": "feat(agent-studio): add Agent Studio platform experience and model governance module",
+        "when": "10 hours ago"
+      },
       {
         "hash": "5e06dd0",
         "subject": "feat(ai-agent): integrate Amazon Bedrock provider, agent bindings, and domain guardrails",
-        "when": "40 minutes ago"
+        "when": "11 hours ago"
       },
       {
         "hash": "74e4ab0",
         "subject": "fix(ai-agent): close five Agent Studio control gaps and add proposal human-review loop",
-        "when": "51 minutes ago"
+        "when": "11 hours ago"
       },
       {
         "hash": "d4e6b97",
         "subject": "feat(ai-agent): strengthen production admission, workflow binding, and staffing controls",
-        "when": "75 minutes ago"
+        "when": "11 hours ago"
       },
       {
         "hash": "1ed9e08",
         "subject": "feat(agents): deliver governed no-code Agent Studio",
-        "when": "8 hours ago"
+        "when": "18 hours ago"
       },
       {
         "hash": "ba05f91",
         "subject": "feat(metering): implement usage metering and tenant cost-recovery model",
-        "when": "9 hours ago"
+        "when": "19 hours ago"
       },
       {
         "hash": "6d9fd6d",
@@ -55,26 +75,6 @@
       {
         "hash": "5b96f2e",
         "subject": "feat(platform): implement journey certifications, payment operations, fraud cases, and workspace administration updates",
-        "when": "4 days ago"
-      },
-      {
-        "hash": "711caa5",
-        "subject": "docs(architecture): canonical testing strategy and design system standards",
-        "when": "4 days ago"
-      },
-      {
-        "hash": "1dca57c",
-        "subject": "feat(governance): add task-type entry skills and scenario routing",
-        "when": "4 days ago"
-      },
-      {
-        "hash": "e1a3258",
-        "subject": "feat(governance): make the agent-execution layer executable",
-        "when": "4 days ago"
-      },
-      {
-        "hash": "3e38e32",
-        "subject": "feat(platform): complete operational UI and status surfaces",
         "when": "4 days ago"
       }
     ]
@@ -25906,15 +25906,15 @@
     }
   ],
   "tests": {
-    "pass": 797,
+    "pass": 806,
     "fail": 0,
     "skipped": 12,
     "cancelled": 0,
     "todo": 0,
-    "total": 809,
-    "durationMs": 23216.122833,
+    "total": 818,
+    "durationMs": 21602.332208,
     "ran": true,
-    "source": "live",
+    "source": "provided-log",
     "error": ""
   }
 }

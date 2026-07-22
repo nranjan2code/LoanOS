@@ -118,25 +118,25 @@ test("retirement is reversible in record history and blocks active use without d
 
 test("Agent Studio API persists visual plans and exposes tenant-scoped exports", async () => {
   let tenantState = { aiAgentPlatform: base(), tenantProductSubscriptions: { sub: { tenantId: "bank-a", status: "active", effectiveFrom: "2026-01-01", validUntil: "2027-01-01", productTypes: ["personal_loan"] } }, events: [] };
-  const call = async (method, path, body = {}, actor = "staff") => { let response; const handled = await routeAiAgentPlatform({ method, path, req: { url: path, _loanosRequestId: "req" }, res: {}, store: { load: async () => tenantState, save: async (next) => { tenantState = next; } }, readJson: async () => body, sendJson: (_res, status, payload) => { response = { status, payload }; }, appendEvent: (state) => state, authContext: { tenantId: "bank-a" }, hasTenantAdminRole: () => true, authActor: () => actor }); assert.equal(handled, true); return response; };
-  const created = await call("POST", "/ai/agents/workflows", { workflowId: "wf-api", name: "API plan", templateId: "credit.cam", productTypes: ["personal_loan"], steps: [{ type: "receive", label: "Receive" }, { type: "human_review", label: "Review" }] });
+  const call = async (method, path, body = {}, actor = "staff", roles = ["auditor"]) => { let response; const handled = await routeAiAgentPlatform({ method, path, req: { url: path, _loanosRequestId: "req" }, res: {}, store: { load: async () => tenantState, save: async (next) => { tenantState = next; } }, readJson: async () => body, sendJson: (_res, status, payload) => { response = { status, payload }; }, appendEvent: (state) => state, authContext: { tenantId: "bank-a", userId: actor, principalType: "tenant_user", roles }, authActor: () => actor }); assert.equal(handled, true); return response; };
+  const created = await call("POST", "/ai/agents/workflows", { workflowId: "wf-api", name: "API plan", templateId: "credit.cam", productTypes: ["personal_loan"], steps: [{ type: "receive", label: "Receive" }, { type: "human_review", label: "Review" }] }, "staff", ["model_owner"]);
   assert.equal(created.status, 201);
   const workspace = await call("GET", "/ai/agents");
   assert.equal(workspace.payload.workflowDrafts.length, 1);
   const exported = await call("GET", "/ai/agents/installations/original/export");
   assert.equal(exported.payload.borrowerDataIncluded, false);
   assert.equal(exported.payload.approvalsExcluded, true);
-  await call("POST", "/ai/agents/test-suites", { suiteId: "api-suite", name: "API suite", installationId: "draft", cases: [{ caseId: "normal", kind: "expected", scenario: "Complete", expectedOutcome: "proposal" }, { caseId: "adverse", kind: "adverse", scenario: "Missing", expectedOutcome: "human_review" }] });
-  const run = await call("POST", "/ai/agents/test-suites/api-suite/runs", { runId: "api-run" });
+  await call("POST", "/ai/agents/test-suites", { suiteId: "api-suite", name: "API suite", installationId: "draft", cases: [{ caseId: "normal", kind: "expected", scenario: "Complete", expectedOutcome: "proposal" }, { caseId: "adverse", kind: "adverse", scenario: "Missing", expectedOutcome: "human_review" }] }, "staff", ["model_owner"]);
+  const run = await call("POST", "/ai/agents/test-suites/api-suite/runs", { runId: "api-run" }, "validator", ["model_validator"]);
   assert.equal(run.payload.status, "passed");
-  const version = await call("POST", "/ai/agents/versions", { versionId: "api-v1", installationId: "draft", testRunId: "api-run" }, "release-checker");
+  const version = await call("POST", "/ai/agents/versions", { versionId: "api-v1", installationId: "draft", testRunId: "api-run" }, "release-checker", ["model_validator"]);
   assert.equal(version.payload.status, "published");
-  await call("POST", "/ai/agents/rollbacks", { rollbackId: "api-rb", installationId: "draft", targetVersionId: "api-v1", reason: "Regression" }, "operator");
-  const rollback = await call("POST", "/ai/agents/rollbacks/api-rb/approve", { approvalRef: "change/api" }, "checker");
+  await call("POST", "/ai/agents/rollbacks", { rollbackId: "api-rb", installationId: "draft", targetVersionId: "api-v1", reason: "Regression" }, "operator", ["model_owner"]);
+  const rollback = await call("POST", "/ai/agents/rollbacks/api-rb/approve", { approvalRef: "change/api" }, "checker", ["model_validator"]);
   assert.equal(rollback.payload.status, "completed");
   const memoryInput = { memoryStoreId: "api-memory", name: "Preferences", purpose: "Accessibility", allowedFields: ["preferred_language"], region: "ap-south-1", retentionDays: 30, consentRef: "consent/api", accessPolicyRef: "access/api", correctionProcessRef: "correct/api", deletionProcessRef: "delete/api", legalHoldPolicyRef: "hold/api", encryptionRef: "kms/api" };
-  await call("POST", "/ai/agents/memory-stores", memoryInput, "privacy-maker");
-  const approvedMemory = await call("POST", "/ai/agents/memory-stores/api-memory/approve", { approvalRef: "privacy/api" }, "privacy-checker");
+  await call("POST", "/ai/agents/memory-stores", memoryInput, "privacy-maker", ["privacy_analyst"]);
+  const approvedMemory = await call("POST", "/ai/agents/memory-stores/api-memory/approve", { approvalRef: "privacy/api" }, "privacy-checker", ["data_protection_officer"]);
   assert.equal(approvedMemory.payload.status, "active");
   const queue = await call("GET", "/ai/agents/operations-queue");
   assert.ok(Array.isArray(queue.payload.items));

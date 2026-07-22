@@ -151,6 +151,22 @@ export {
 } from "./ai/digital-worker-demo-provider.js";
 
 export {
+  DIGITAL_WORKER_TOOL_CATALOGUE,
+  executeGovernedDigitalWorkerTool,
+  projectDigitalWorkerToolCatalogue
+} from "./ai/digital-worker-tool-registry.js";
+
+export {
+  claimDigitalWorkerRuntimeJob,
+  completeDigitalWorkerRuntimeJob,
+  digitalWorkerRuntimeHealth,
+  digitalWorkerRuntimePayloadChecksum,
+  enqueueDigitalWorkerRuntimeJob,
+  failDigitalWorkerRuntimeJob,
+  replayDigitalWorkerDeadLetter
+} from "./ai/digital-worker-runtime-jobs.js";
+
+export {
   ALLOWED_RE_TYPES,
   acceptKfs,
   attachKfs,

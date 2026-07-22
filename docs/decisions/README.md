@@ -9,5 +9,6 @@
 - [ADR 0007 — Greenfield product applications and administration](0007-greenfield-product-applications-and-administration.md)
 - [ADR 0008 — Domain-grouped core kernel behind an explicit package boundary](0008-core-domain-package-boundary.md)
 - [ADR 0009 — Usage metering is fail-open](0009-usage-metering-is-fail-open.md)
+- [ADR 0010 — Production digital-worker runtime boundary](0010-production-digital-worker-runtime-boundary.md)
 
 Accepted ADRs are immutable decision history. Material reversals require a new ADR that supersedes the earlier record.

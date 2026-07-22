@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { INDIA_REGION, invokeDigitalWorkerProvider } from "./digital-worker-provider.js";
 
 /**
@@ -8,41 +7,30 @@ import { INDIA_REGION, invokeDigitalWorkerProvider } from "./digital-worker-prov
 export function createBedrockDigitalWorkerProvider(options = {}) {
   const providerId = options.providerId ?? "aws.bedrock";
   const endpointRegion = options.region ?? INDIA_REGION;
-  const mockClient = options.bedrockClient ?? null;
+  const bedrockClient = options.bedrockClient ?? null;
 
   return {
     id: providerId,
     region: endpointRegion,
 
     async invoke(request) {
-      if (request.region !== INDIA_REGION) {
+      if (endpointRegion !== INDIA_REGION || request.region !== INDIA_REGION) {
         throw Object.assign(new Error("Bedrock digital workers must execute in ap-south-1."), {
           code: "digital_worker_region_invalid", status: 403
         });
       }
+      if (!bedrockClient || typeof bedrockClient.invokeModel !== "function") {
+        throw Object.assign(new Error("A configured live Bedrock client is required; simulation belongs only to explicit demo mode."), {
+          code: "digital_worker_bedrock_client_unavailable", status: 503
+        });
+      }
 
       const startTime = Date.now();
-      let bedrockResponse;
-
-      if (mockClient && typeof mockClient.invokeModel === "function") {
-        bedrockResponse = await mockClient.invokeModel(request);
-      } else {
-        // Fallback / simulated Bedrock response when no live AWS credentials/client are present
-        bedrockResponse = {
-          bedrockRequestId: `bedrock-req-${createHash("sha256").update(request.requestId).digest("hex").slice(0, 16)}`,
-          outputPayload: {
-            proposal_summary: `Bedrock Digital Worker (${request.modelId}) proposal for ${request.action}`,
-            status: "proposal_created",
-            generated_at: new Date().toISOString(),
-            confidence_score: 0.95,
-            findings: ["Completed automated evidence synthesis under ap-south-1 Bedrock execution."]
-          },
-          usage: {
-            inputTokens: 450,
-            outputTokens: 180,
-            toolCalls: 1
-          }
-        };
+      const bedrockResponse = await bedrockClient.invokeModel(request);
+      if (!bedrockResponse?.bedrockRequestId || !bedrockResponse?.outputPayload || !bedrockResponse?.usage) {
+        throw Object.assign(new Error("Bedrock response is missing request, proposal or usage evidence."), {
+          code: "digital_worker_bedrock_response_invalid", status: 502
+        });
       }
 
       const latencyMs = Date.now() - startTime;

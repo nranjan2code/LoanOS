@@ -27,6 +27,23 @@ actually runs), then WS-D (credit depth) and REV-42 (GST) to make a single real 
 The current large-bundle execution order and completion status are maintained in
 the [build backlog's Large Delivery Bundle Sequence](build-backlog.md#large-delivery-bundle-sequence-2026-07-14).
 
+## Agent Studio and Workspace Production Integration (2026-07-22)
+
+The governed Studio and role workspaces are executable first slices, not a live
+digital-worker production claim. The authoritative production-completion plan is
+the [`ASW-01..16` review tracker](review-findings-agent-studio-workspace-2026-07-22.md);
+update item status there rather than in this rollup.
+
+| Wave | Outcome | Exit condition |
+| --- | --- | --- |
+| 0 · Trust gates | Live India worker, call-site guardrails, transactional/idempotent execution state and operation-level RBAC/SoD | ASW-01..04 done before any production-provider activation |
+| 1 · Complete journey | Real knowledge and evaluation, authenticated admission evidence, typed workspace operations and proposal-to-owning-domain completion | One CAM slice works end to end without demo mode or raw-JSON operator contracts |
+| 2 · Institution operation | Privacy-complete memory, schedules/notifications, SLO/incident recovery and measured staff experience | Selected-environment evidence and institution UAT exist |
+| 3 · Reference release and scale | Witnessed CAM release, then governed template breadth and commercial integration | ASW-16 done; only the evidenced slice may be called production-ready |
+
+This sequence deliberately favors one complete, operated banking workflow over
+adding more assistant templates to an unconnected runtime.
+
 Bundle D status: audit/data-governance product controls are complete for verified external-anchor evidence, critical business-event completeness, evidence custody/legal holds/deletion proof, field lineage, and declarative DQ certification. Production TSA/WORM infrastructure and institution-wide stewardship remain external/deployment work.
 
 Bundle E status: enterprise-security/scale product controls are complete for certified federation and SCIM identity state, purpose-attested managed keys, security-log custody, PostgreSQL HA/PITR/capacity dependencies, OpenAPI/event/webhook governance, and deployment-automation readiness. Live IdP, KMS/HSM, SIEM/WORM/NTP, managed database/queue, and cloud rollout controllers remain external deployment work.

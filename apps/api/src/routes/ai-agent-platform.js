@@ -7,18 +7,20 @@ import {
 } from "@loanos/core/ai/ai-agent-platform.js";
 import { invokeDigitalWorkerProvider } from "@loanos/core/ai/digital-worker-provider.js";
 import { createDemoDigitalWorkerProvider } from "@loanos/core/ai/digital-worker-demo-provider.js";
+import { claimDigitalWorkerRuntimeJob, completeDigitalWorkerRuntimeJob, digitalWorkerRuntimeHealth, enqueueDigitalWorkerRuntimeJob, failDigitalWorkerRuntimeJob, replayDigitalWorkerDeadLetter } from "@loanos/core/ai/digital-worker-runtime-jobs.js";
 import { approveAgentKnowledgePack, approveAgentMemoryStore, approveAgentProviderEvidence, approveAgentRollback, assessAgentProductionAdmission, compareAgentInstallations, containExpiredAgentKnowledge, createAgentKnowledgePack, createAgentMemoryStore, createAgentTestSuite, createAgentWorkflowDraft, projectAgentConfigurationExport, projectAgentOperationsQueue, proposeAgentProviderEvidence, proposeAgentRollback, publishAgentVersion, retireAgentInstallation, runAgentTestSuite } from "@loanos/core/ai/agent-studio-governance.js";
 import { authorizeStaffedFeatureAction, projectTenantFeatureStaffing } from "@loanos/core/identity/saas-identity-governance.js";
 import { decidePlatformControlStaffing } from "../control-rules-engine.js";
 import { decideAiAgentAction, decideAiModelConsumption } from "../rules-engine.js";
 
 export async function routeAiAgentPlatform(context) {
-  const { method, path, req, res, store, readJson, sendJson, appendEvent, authContext, hasTenantAdminRole, authActor } = context;
-  if (path !== "/ai" && !path.startsWith("/ai/")) return false;
-  if (!hasTenantAdminRole(authContext, method === "GET" ? ["tenant_admin", "security_admin", "auditor", "operator"] : ["tenant_admin", "security_admin", "operator"])) {
-    sendJson(res, 403, { error: { code: "ai_agent_platform_forbidden", message: "AI agent governance access is required." } }); return true;
-  }
+  const { method, path, req, res, store, readJson, sendJson, appendEvent, authContext, authActor } = context;
+  if (!ownsAiAgentPath(path)) return false;
   let state = await store.load();
+  const authority = authorizeAiAgentOperation({ method, path, authContext, state });
+  if (!authority.allowed) {
+    sendJson(res, 403, { error: { code: "ai_agent_platform_forbidden", message: "The authenticated principal does not hold the operation-specific AI governance authority." }, authority: { operation: authority.operation, requiredRoles: authority.requiredRoles } }); return true;
+  }
   const tenantId = authContext.tenantId;
   if (method === "GET" && path === "/ai/marketplace") { sendJson(res, 200, projectAiAgentMarketplace()); return true; }
   if (method === "GET" && path === "/ai/agents") { sendJson(res, 200, workspace(state, tenantId)); return true; }
@@ -31,6 +33,7 @@ export async function routeAiAgentPlatform(context) {
     catch (cause) { sendJson(res, cause.status ?? 422, { error: { code: cause.code ?? "ai_agent_report_invalid", message: cause.message } }); }
     return true;
   }
+  if (method === "GET" && path === "/ai/agents/runtime/health") { sendJson(res, 200, digitalWorkerRuntimeHealth(state.aiAgentPlatform, tenantId)); return true; }
   if (method !== "POST") return false;
   const body = await readJson(req);
   const actor = authActor(authContext);
@@ -91,6 +94,11 @@ export async function routeAiAgentPlatform(context) {
     // and reference come from the body, the reviewer never does.
     else if (match(path, "/ai/agents/executions/:id/human-review")) outcome = recordAiAgentProposalReview(state.aiAgentPlatform, { disposition: body.disposition, reviewRef: body.reviewRef, executionId: idOf(path, 4), tenantId, reviewerId: actor, reviewerType: "human" });
     else if (path === "/ai/agents/usage") outcome = recordAiAgentUsage(state.aiAgentPlatform, { ...body, tenantId });
+    else if (path === "/ai/agents/runtime/jobs") outcome = runtimeOutcome(enqueueDigitalWorkerRuntimeJob(state.aiAgentPlatform, { ...body, tenantId }));
+    else if (path === "/ai/agents/runtime/jobs/claim") outcome = runtimeOutcome(claimDigitalWorkerRuntimeJob(state.aiAgentPlatform, { ...body, tenantId, workerId: actor }), "job");
+    else if (match(path, "/ai/agents/runtime/jobs/:id/complete")) outcome = runtimeOutcome(completeDigitalWorkerRuntimeJob(state.aiAgentPlatform, { ...body, tenantId, jobId: idOf(path, 5), workerId: actor }));
+    else if (match(path, "/ai/agents/runtime/jobs/:id/fail")) outcome = runtimeOutcome(failDigitalWorkerRuntimeJob(state.aiAgentPlatform, { ...body, tenantId, jobId: idOf(path, 5), workerId: actor }));
+    else if (match(path, "/ai/agents/runtime/jobs/:id/replay")) outcome = runtimeOutcome(replayDigitalWorkerDeadLetter(state.aiAgentPlatform, { ...body, tenantId, jobId: idOf(path, 5), proposedBy: body.proposedBy ?? actor }));
     else return false;
     const next = { ...state, aiAgentPlatform: outcome.state };
     const record = outcome.record;
@@ -103,9 +111,62 @@ export async function routeAiAgentPlatform(context) {
   }
 }
 
+const AI_OPERATION_RULES = Object.freeze([
+  rule("commercial.approve", "POST", /^\/ai\/(pricing-contracts|usage-budgets|invoices)\/[^/]+\/approve$/, ["finance_checker"]),
+  rule("commercial.propose", "POST", /^\/ai\/(pricing-contracts|usage-budgets|invoices)$/, ["finance_maker", "finance_admin"]),
+  rule("commercial.reserve", "POST", /^\/ai\/usage-budgets\/reservations$/, ["finance_maker", "finance_admin", "automation_agent"]),
+  rule("installation.propose", "POST", /^\/ai\/agents\/installations$/, ["model_owner"]),
+  rule("resource.propose", "POST", /^\/ai\/agents\/(knowledge-packs|memory-stores)$/, ["model_owner", "privacy_analyst"]),
+  rule("resource.approve", "POST", /^\/ai\/agents\/(knowledge-packs|memory-stores)\/[^/]+\/approve$/, ["model_validator", "data_protection_officer"]),
+  rule("resource.contain", "POST", /^\/ai\/agents\/knowledge-packs\/contain-expired$/, ["model_risk_manager", "security_admin"]),
+  rule("provider.propose", "POST", /^\/ai\/agents\/provider-evidence$/, ["vendor_manager", "integration_admin", "security_admin"]),
+  rule("provider.approve", "POST", /^\/ai\/agents\/provider-evidence\/[^/]+\/approve$/, ["vendor_risk_approver", "chief_information_security_officer"]),
+  rule("workflow.propose", "POST", /^\/ai\/agents\/(workflows|test-suites)$/, ["model_owner"]),
+  rule("evaluation.run", "POST", /^\/ai\/agents\/test-suites\/[^/]+\/runs$/, ["model_validator"]),
+  rule("release.publish", "POST", /^\/ai\/agents\/versions$/, ["model_validator", "model_risk_manager"]),
+  rule("rollback.propose", "POST", /^\/ai\/agents\/rollbacks$/, ["model_owner", "model_risk_manager"]),
+  rule("rollback.approve", "POST", /^\/ai\/agents\/rollbacks\/[^/]+\/approve$/, ["model_validator"]),
+  rule("configuration.compare", "POST", /^\/ai\/agents\/compare$/, ["model_owner", "model_validator", "model_risk_manager", "auditor"]),
+  rule("installation.retire", "POST", /^\/ai\/agents\/installations\/[^/]+\/retire$/, ["model_owner", "model_risk_manager"]),
+  rule("installation.approve", "POST", /^\/ai\/agents\/installations\/[^/]+\/approvals\/[^/]+$/, ["dynamic_approval_role"]),
+  rule("installation.activate", "POST", /^\/ai\/agents\/installations\/[^/]+\/activate$/, ["model_risk_manager"]),
+  rule("installation.suspend", "POST", /^\/ai\/agents\/installations\/[^/]+\/suspend$/, ["model_risk_manager", "security_admin", "chief_information_security_officer"]),
+  rule("execution.authorize", "POST", /^\/ai\/agents\/executions\/authorize$/, ["automation_agent", "ai_agent"], true),
+  rule("execution.demo", "POST", /^\/ai\/agents\/executions\/[^/]+\/demo-run$/, ["model_validator", "operator"]),
+  rule("execution.complete", "POST", /^\/ai\/agents\/executions\/[^/]+\/complete$/, ["automation_agent", "ai_agent"], true),
+  rule("execution.review", "POST", /^\/ai\/agents\/executions\/[^/]+\/human-review$/, ["human_reviewer"]),
+  rule("execution.usage", "POST", /^\/ai\/agents\/usage$/, ["automation_agent", "ai_agent", "finance_maker"], true),
+  rule("runtime.enqueue", "POST", /^\/ai\/agents\/runtime\/jobs$/, ["automation_agent", "ai_agent"], true),
+  rule("runtime.claim", "POST", /^\/ai\/agents\/runtime\/jobs\/claim$/, ["ai_agent_worker"], true),
+  rule("runtime.complete", "POST", /^\/ai\/agents\/runtime\/jobs\/[^/]+\/(complete|fail)$/, ["ai_agent_worker"], true),
+  rule("runtime.replay", "POST", /^\/ai\/agents\/runtime\/jobs\/[^/]+\/replay$/, ["model_risk_manager", "operator"])
+]);
+const AI_READ_ROLES = Object.freeze(["tenant_admin", "security_admin", "auditor", "operator", "model_owner", "model_validator", "model_risk_manager", "human_reviewer", "finance_admin", "finance_maker", "finance_checker", "privacy_analyst", "data_protection_officer", "vendor_manager", "vendor_risk_approver", "chief_information_security_officer"]);
+
+export function authorizeAiAgentOperation({ method, path, authContext = {}, state = {} }) {
+  const user = authContext.userId ? state.users?.[authContext.userId] : null;
+  const roles = new Set([...(authContext.roles ?? []), ...(authContext.adminRoles ?? []), ...(user?.roles ?? []), ...(user?.adminRoles ?? []), ...(authContext.serviceScopes ?? [])]);
+  if (method === "GET") return decision("read", AI_READ_ROLES, authContext.principalType === "tenant_user" && intersects(roles, AI_READ_ROLES));
+  const found = AI_OPERATION_RULES.find((item) => item.method === method && item.pattern.test(path));
+  if (!found) return decision("unclassified", [], false);
+  if (found.serviceAllowed && ["service", "tenant_service", "workload"].includes(authContext.principalType)) return decision(found.operation, found.roles, intersects(roles, found.roles));
+  if (authContext.principalType !== "tenant_user") return decision(found.operation, found.roles, false);
+  if (found.roles.includes("dynamic_approval_role")) {
+    const requiredRole = decodeURIComponent(path.split("/").at(-1));
+    return decision(found.operation, [requiredRole], roles.has(requiredRole));
+  }
+  return decision(found.operation, found.roles, intersects(roles, found.roles));
+}
+
+function rule(operation, method, pattern, roles, serviceAllowed = false) { return Object.freeze({ operation, method, pattern, roles: Object.freeze(roles), serviceAllowed }); }
+function decision(operation, requiredRoles, allowed) { return { allowed, operation, requiredRoles: [...requiredRoles] }; }
+function intersects(actual, expected) { return expected.some((role) => actual.has(role)); }
+function ownsAiAgentPath(path) { return path === "/ai/marketplace" || path === "/ai/agents" || path.startsWith("/ai/agents/") || path === "/ai/pricing-contracts" || path.startsWith("/ai/pricing-contracts/") || path === "/ai/usage-budgets" || path.startsWith("/ai/usage-budgets/") || path === "/ai/invoices" || path.startsWith("/ai/invoices/"); }
+
 function workspace(state = {}, tenantId) { const platform = state.aiAgentPlatform ?? {}; const own = (values) => Object.values(values ?? {}).filter((x) => x.tenantId === tenantId); const installations = own(platform.installations); return { marketplace: projectAiAgentMarketplace(), enabledProductTypes: enabledProductTypes(state, tenantId), pricingContracts: own(platform.pricingContracts), usageBudgets: own(platform.usageBudgets), budgetReservations: own(platform.budgetReservations), invoices: own(platform.invoices), installations, knowledgePacks: own(platform.knowledgePacks), memoryStores: own(platform.memoryStores), providerEvidence: own(platform.providerEvidence), productionAdmission: installations.map((item) => assessAgentProductionAdmission(platform, { tenantId, installationId: item.installationId }, new Date(), state.modelRegistry)), workflowDrafts: own(platform.workflowDrafts), testSuites: own(platform.testSuites), testRuns: own(platform.testRuns), agentVersions: own(platform.agentVersions), rollbackRequests: own(platform.rollbackRequests), operationsQueue: projectAgentOperationsQueue(platform, tenantId), executions: own(platform.executions), usage: own(platform.usageLedger) }; }
 function enabledProductTypes(state, tenantId, now = new Date()) { return [...new Set(Object.values(state.tenantProductSubscriptions ?? {}).filter((item) => item.tenantId === tenantId && item.status === "active" && Date.parse(item.effectiveFrom) <= now.getTime() && Date.parse(item.validUntil) > now.getTime()).flatMap((item) => item.productTypes ?? []))].sort(); }
-function resourceId(record) { return record.versionId ?? record.memoryStoreId ?? record.containmentId ?? record.rollbackId ?? record.runId ?? record.installationId ?? record.workflowId ?? record.packId ?? record.suiteId ?? record.executionId ?? record.usageId ?? record.contractId ?? record.budgetId ?? record.reservationId ?? record.invoiceId ?? record.toInstallationId; }
+function resourceId(record) { return record.versionId ?? record.memoryStoreId ?? record.containmentId ?? record.rollbackId ?? record.runId ?? record.jobId ?? record.installationId ?? record.workflowId ?? record.packId ?? record.suiteId ?? record.executionId ?? record.usageId ?? record.contractId ?? record.budgetId ?? record.reservationId ?? record.invoiceId ?? record.toInstallationId; }
+function runtimeOutcome(result, required = "job") { if (!result[required]) throw Object.assign(new Error("No eligible tenant-local runtime job is available."), { code: "digital_worker_job_unavailable", status: 404 }); return { state: result.state, record: result[required] }; }
 function match(path, pattern) { const a = path.split("/"), b = pattern.split("/"); return a.length === b.length && b.every((x, i) => x.startsWith(":") || x === a[i]); }
 function idOf(path, index) { return decodeURIComponent(path.split("/")[index]); }
 

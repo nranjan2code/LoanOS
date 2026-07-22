@@ -79,7 +79,7 @@ test("the runs API ignores fabricated client results and derives outcomes server
     store: { load: async () => tenantState, save: async (next) => { tenantState = next; } },
     readJson: async () => ({ runId: "api-run", results: [{ caseId: "complete-file", observedOutcome: "proposal", evidenceHash: H }, { caseId: "missing-income", observedOutcome: "human_review", evidenceHash: H }, { caseId: "injection", observedOutcome: "deny", evidenceHash: H }] }),
     sendJson: (_res, status, payload) => { response = { status, payload }; }, appendEvent: (state) => state,
-    authContext: { tenantId: "bank-a" }, hasTenantAdminRole: () => true, authActor: () => "tester"
+    authContext: { tenantId: "bank-a", userId: "tester", principalType: "tenant_user", roles: ["model_validator"] }, authActor: () => "tester"
   });
   assert.equal(handled, true);
   assert.equal(response.status, 201);

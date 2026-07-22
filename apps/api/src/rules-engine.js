@@ -248,7 +248,29 @@ export async function decideAiModelConsumption({ tenantId, requestId, modelId, m
  * @returns {Promise<{decision: "allow"|"deny"|"require_human", traceRef: string, source: string, decisionKey: string, rulesetHash: string|null, failClosed?: boolean, error?: string}>}
  */
 export async function decideAiAgentAction({ tenantId, requestId, facts, now = new Date() }) {
-  const request = { request_id: requestId, tenant_id: tenantId, decision_key: "guardrail.agent_action", effective_at: toIstIso(now), facts, fact_provenance: {}, context: { channel: "agent-runtime", caller: "workflow:ai-agent", audience: "internal" } };
+  return decideAiGuardrail({ tenantId, requestId, decisionKey: "guardrail.agent_action", facts, now });
+}
+
+const SPECIALIZED_AI_GUARDRAILS = new Set([
+  "guardrail.data_access",
+  "guardrail.outbound_communication",
+  "guardrail.underwriting_influence",
+  "guardrail.case_mutation"
+]);
+
+// ADR 0010: a tool call-site supplies the exact decision key declared by the
+// versioned tool catalogue. Unknown keys are denied locally, and every engine
+// error or malformed response becomes a synthetic denial rather than a throw
+// that a caller might accidentally ignore.
+export async function decideAiSpecializedGuardrail({ tenantId, requestId, decisionKey, facts, now = new Date() }) {
+  if (!SPECIALIZED_AI_GUARDRAILS.has(decisionKey)) {
+    return { decision: "deny", traceRef: `fail_closed:${requestId ?? "missing"}`, source: "isolated_business_engine", decisionKey: decisionKey ?? "unknown", rulesetHash: null, failClosed: true, error: "specialized_guardrail_unregistered" };
+  }
+  return decideAiGuardrail({ tenantId, requestId, decisionKey, facts, now });
+}
+
+async function decideAiGuardrail({ tenantId, requestId, decisionKey, facts, now }) {
+  const request = { request_id: requestId, tenant_id: tenantId, decision_key: decisionKey, effective_at: toIstIso(now), facts, fact_provenance: {}, context: { channel: "agent-runtime", caller: "workflow:ai-agent", audience: "internal" } };
   try {
     const response = await fetch(`${engineBaseUrl(tenantId)}/v1/decide`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(request), signal: AbortSignal.timeout(Number(process.env.LOANOS_RULES_ENGINE_TIMEOUT_MS ?? 3000)) });
     if (!response.ok) throw new Error(`rules-engine: HTTP ${response.status}`);

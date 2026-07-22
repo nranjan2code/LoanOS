@@ -37,8 +37,24 @@ function buildValidRequest(overrides = {}) {
   };
 }
 
-test("invokeBedrockWorker executes successfully in ap-south-1 with allow-listed Bedrock provider", async () => {
-  const result = await invokeBedrockWorker(buildValidRequest());
+test("invokeBedrockWorker fails closed when no live Bedrock client is injected", async () => {
+  await assert.rejects(
+    () => invokeBedrockWorker(buildValidRequest()),
+    (err) => err.code === "digital_worker_bedrock_client_unavailable"
+  );
+});
+
+test("invokeBedrockWorker executes successfully in ap-south-1 only through an injected Bedrock client", async () => {
+  const bedrockClient = {
+    async invokeModel(request) {
+      return {
+        bedrockRequestId: "bedrock-live-request-1",
+        outputPayload: { proposal_summary: `Proposal for ${request.action}`, status: "proposal_created" },
+        usage: { inputTokens: 450, outputTokens: 180, toolCalls: 0 }
+      };
+    }
+  };
+  const result = await invokeBedrockWorker(buildValidRequest(), { bedrockClient });
   assert.equal(result.proposal.status, "proposal_created");
   assert.equal(result.evidence.providerId, "aws.bedrock");
   assert.equal(result.evidence.region, "ap-south-1");

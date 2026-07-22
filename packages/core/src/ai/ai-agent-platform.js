@@ -60,7 +60,7 @@ export const AI_AGENT_PRICING_DIMENSIONS = Object.freeze([
  *   contracts, installations, executions, usage, budgets, invoices, events).
  */
 export function createAiAgentPlatformState() {
-  return { pricingContracts: {}, installations: {}, executions: {}, usageLedger: {}, usageBudgets: {}, budgetReservations: {}, invoices: {}, knowledgePacks: {}, memoryStores: {}, providerEvidence: {}, workflowDrafts: {}, testSuites: {}, testRuns: {}, agentVersions: {}, rollbackRequests: {}, events: [] };
+  return { revision: 0, pricingContracts: {}, installations: {}, executions: {}, runtimeJobs: {}, usageLedger: {}, usageBudgets: {}, budgetReservations: {}, invoices: {}, knowledgePacks: {}, memoryStores: {}, providerEvidence: {}, workflowDrafts: {}, testSuites: {}, testRuns: {}, agentVersions: {}, rollbackRequests: {}, events: [] };
 }
 
 /**
@@ -72,8 +72,9 @@ export function createAiAgentPlatformState() {
 export function normalizeAiAgentPlatformState(state) {
   const empty = createAiAgentPlatformState();
   return state && typeof state === "object" ? {
+    revision: Number.isSafeInteger(state.revision) && state.revision >= 0 ? state.revision : 0,
     pricingContracts: state.pricingContracts ?? {}, installations: state.installations ?? {},
-    executions: state.executions ?? {}, usageLedger: state.usageLedger ?? {}, usageBudgets: state.usageBudgets ?? {},
+    executions: state.executions ?? {}, runtimeJobs: state.runtimeJobs ?? {}, usageLedger: state.usageLedger ?? {}, usageBudgets: state.usageBudgets ?? {},
     budgetReservations: state.budgetReservations ?? {}, invoices: state.invoices ?? {}, knowledgePacks: state.knowledgePacks ?? {}, memoryStores: state.memoryStores ?? {}, providerEvidence: state.providerEvidence ?? {}, workflowDrafts: state.workflowDrafts ?? {}, testSuites: state.testSuites ?? {}, testRuns: state.testRuns ?? {}, agentVersions: state.agentVersions ?? {}, rollbackRequests: state.rollbackRequests ?? {},
     events: Array.isArray(state.events) ? state.events : []
   } : empty;
