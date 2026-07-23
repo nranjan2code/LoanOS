@@ -22,6 +22,11 @@ networkState();
 void bootstrap();
 
 function configureSurface() {
+  const urlLang = new URLSearchParams(location.search).get("lang");
+  if (urlLang && (urlLang === "en" || urlLang === "hi")) {
+    ui.language.value = urlLang;
+    document.documentElement.lang = urlLang;
+  }
   const staff = surface === "staff";
   ui.staff_channel.hidden = !staff;
   ui.staff_channel_label.hidden = !staff;
@@ -40,6 +45,9 @@ function bindEvents() {
   });
   ui.language.addEventListener("change", () => {
     document.documentElement.lang = ui.language.value;
+    const url = new URL(location.href);
+    url.searchParams.set("lang", ui.language.value);
+    history.replaceState(null, "", url);
     renderCatalogue();
     if (current) renderSchema(current);
   });

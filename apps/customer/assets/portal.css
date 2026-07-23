@@ -238,7 +238,8 @@ button { color: inherit; }
 .loan-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
 .schedule-wrap { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--portal-line); }
 .schedule-wrap h3 { margin: 0 0 12px; color: var(--portal-forest); font-family: var(--portal-display); font-size: 1.25rem; font-weight: 400; }
-.table-scroll { width: 100%; overflow-x: auto; }
+.table-scroll { width: 100%; overflow-x: auto; position: relative; -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
+.table-scroll::after { content: ''; position: absolute; top: 0; right: 0; bottom: 0; width: 24px; pointer-events: none; background: linear-gradient(to right, rgba(255,255,255,0), rgba(23,63,53,0.12)); opacity: 0.8; }
 .repayment-table { width: 100%; min-width: 620px; border-collapse: collapse; font-size: .67rem; }
 .repayment-table th { padding: 9px 10px; border-bottom: 1px solid var(--portal-line); color: var(--portal-muted); font-weight: 700; text-align: left; }.repayment-table td { padding: 11px 10px; border-bottom: 1px solid rgba(23, 63, 53, .07); }
 

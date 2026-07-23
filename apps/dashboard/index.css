@@ -67,8 +67,8 @@
 }
 
 .identity-live-warning {
-  border-left: 4px solid #b7791f;
-  background: #fffaf0;
+  border-left: 4px solid var(--status-warning);
+  background: var(--status-warning-subtle);
 }
 
 .iam-control-header {
@@ -110,11 +110,11 @@
 }
 
 .iam-readiness-ready {
-  border-left: 3px solid var(--success, #2f855a);
+  border-left: 3px solid var(--status-success);
 }
 
 .iam-readiness-blocked {
-  border-left: 3px solid var(--danger, #c53030);
+  border-left: 3px solid var(--status-danger);
 }
 
 .iam-workspace-section select[multiple] {
