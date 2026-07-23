@@ -31,6 +31,7 @@
  */
 import { evaluateModelUse } from "./model-governance.js";
 import { sealRecord } from "./record-seal.js";
+import { digitalWorkerRuntimePayloadChecksum, enqueueDigitalWorkerRuntimeJob } from "./digital-worker-runtime-jobs.js";
 
 const IST_REGION = "ap-south-1";
 const APPROVAL_ROLES = Object.freeze(["model_owner", "model_validator", "human_reviewer", "model_risk_manager"]);
@@ -541,15 +542,18 @@ export function autoTriggerCamDigitalWorker(state, modelRegistry, input, now = n
     actionGuardrailDecision: input.actionGuardrailDecision
   }, now);
 
-  const compRes = completeAiAgentExecution(authRes.state, {
-    executionId,
+  const payload = { applicationId: input.applicationId, inputHash, installationId: installation.installationId, action: "cam.draft" };
+  const payloadChecksumSha256 = digitalWorkerRuntimePayloadChecksum(payload);
+  const enqueueRes = enqueueDigitalWorkerRuntimeJob(authRes.state, {
     tenantId,
-    outputRef: `proposals/cam/${input.applicationId}`,
-    outputHash: inputHash,
-    outcome: "proposal_created"
+    jobId: `job_${executionId}`,
+    executionId,
+    idempotencyKey: `auto_cam_${input.applicationId}`,
+    payload,
+    payloadChecksumSha256
   }, now);
 
-  return { state: compRes.state, triggered: true, record: compRes.record };
+  return { state: enqueueRes.state, triggered: true, record: authRes.record, job: enqueueRes.job };
 }
 
 /**

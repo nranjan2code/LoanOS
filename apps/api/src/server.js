@@ -1032,11 +1032,13 @@ async function route(req, res, dataDir, platformAdminKey, observability, allowDi
     const resolvedService = resolveTenantServiceCredential(controlPlaneState, apiKey);
     tenant = resolvedService?.tenant ?? null;
     if (tenant) {
+      const assignedRoles = resolvedService.credential?.roles ?? resolvedService.credential?.scopes ?? ["tenant_service", "ai_agent_worker", "automation_agent", "ai_agent"];
       authContext = {
         principalType: "tenant_service",
         tenantId: tenant.tenantId,
-        roles: ["tenant_service"],
-        actor: tenant.tenantId,
+        roles: [...new Set(["tenant_service", ...assignedRoles])],
+        serviceScopes: [...new Set([...assignedRoles])],
+        actor: resolvedService.credential?.principalId ?? tenant.tenantId,
         serviceCredential: resolvedService.credential
       };
     }

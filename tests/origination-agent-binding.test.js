@@ -5,6 +5,7 @@ import {
   createAiAgentPlatformState, installTenantAiAgent, proposeAiAgentPricingContract,
   recordTenantAiAgentApproval
 } from "@loanos/core/ai/ai-agent-platform.js";
+import { claimDigitalWorkerRuntimeJob, completeDigitalWorkerRuntimeJob } from "@loanos/core/ai/digital-worker-runtime-jobs.js";
 import { deriveWorkflowTasks } from "@loanos/core/journeys/workflow-tasks.js";
 
 const NOW = new Date("2026-07-21T10:00:00.000Z");
@@ -43,8 +44,23 @@ test("autoTriggerCamDigitalWorker generates CAM proposal for loan application an
 
   assert.equal(result.triggered, true);
   assert.ok(result.record.executionId);
+  assert.ok(result.job.jobId);
+  assert.equal(result.job.status, "queued");
 
-  const updatedState = { aiAgentPlatform: result.state };
+  // Worker claims and completes the runtime job with real provider output evidence
+  const claimed = claimDigitalWorkerRuntimeJob(result.state, { tenantId: "re1", workerId: "worker_1" }, NOW);
+  const completed = completeDigitalWorkerRuntimeJob(claimed.state, {
+    tenantId: "re1",
+    jobId: result.job.jobId,
+    workerId: "worker_1",
+    fence: claimed.job.lease.fence,
+    outputRef: "proposals/cam/app_1001",
+    outputHash: H,
+    providerEvidenceRef: "evidence/bedrock/run_1001",
+    outcome: "proposal_created"
+  }, NOW);
+
+  const updatedState = { aiAgentPlatform: completed.state };
   const tasks = deriveWorkflowTasks(updatedState, { asOf: NOW });
   const camTask = tasks.find((t) => t.entityId === result.record.executionId);
 

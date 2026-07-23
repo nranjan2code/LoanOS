@@ -99,7 +99,7 @@ export async function routeAiAgentPlatform(context) {
     else if (path === "/ai/agents/runtime/jobs/claim") outcome = runtimeOutcome(claimDigitalWorkerRuntimeJob(state.aiAgentPlatform, { ...body, tenantId, workerId: actor }), "job");
     else if (match(path, "/ai/agents/runtime/jobs/:id/complete")) outcome = runtimeOutcome(completeDigitalWorkerRuntimeJob(state.aiAgentPlatform, { ...body, tenantId, jobId: idOf(path, 5), workerId: actor }));
     else if (match(path, "/ai/agents/runtime/jobs/:id/fail")) outcome = runtimeOutcome(failDigitalWorkerRuntimeJob(state.aiAgentPlatform, { ...body, tenantId, jobId: idOf(path, 5), workerId: actor }));
-    else if (match(path, "/ai/agents/runtime/jobs/:id/replay")) outcome = runtimeOutcome(replayDigitalWorkerDeadLetter(state.aiAgentPlatform, { ...body, tenantId, jobId: idOf(path, 5), proposedBy: body.proposedBy ?? actor }));
+    else if (match(path, "/ai/agents/runtime/jobs/:id/replay")) outcome = runtimeOutcome(replayDigitalWorkerDeadLetter(state.aiAgentPlatform, { ...body, tenantId, jobId: idOf(path, 5), proposedBy: body.proposedBy, approvedBy: actor }));
     else return false;
     const next = { ...state, aiAgentPlatform: outcome.state };
     const record = outcome.record;
@@ -146,11 +146,27 @@ const AI_READ_ROLES = Object.freeze(["tenant_admin", "security_admin", "auditor"
 
 export function authorizeAiAgentOperation({ method, path, authContext = {}, state = {} }) {
   const user = authContext.userId ? state.users?.[authContext.userId] : null;
-  const roles = new Set([...(authContext.roles ?? []), ...(authContext.adminRoles ?? []), ...(user?.roles ?? []), ...(user?.adminRoles ?? []), ...(authContext.serviceScopes ?? [])]);
-  if (method === "GET") return decision("read", AI_READ_ROLES, authContext.principalType === "tenant_user" && intersects(roles, AI_READ_ROLES));
+  const canonicalGrants = Object.values(state.saasRoleGrants ?? {})
+    .filter((g) => g.tenantId === authContext.tenantId && g.principalId === (authContext.userId ?? authContext.actor) && g.status === "active")
+    .map((g) => g.roleId);
+  const roles = new Set([
+    ...(authContext.roles ?? []),
+    ...(authContext.adminRoles ?? []),
+    ...(authContext.activeRoleIds ?? []),
+    ...canonicalGrants,
+    ...(user?.roles ?? []),
+    ...(user?.adminRoles ?? []),
+    ...(authContext.serviceScopes ?? [])
+  ]);
+  const isService = ["service", "tenant_service", "workload"].includes(authContext.principalType);
+  if (method === "GET") {
+    const isAllowedUser = authContext.principalType === "tenant_user" && intersects(roles, AI_READ_ROLES);
+    const isAllowedService = isService && (path === "/ai/agents/runtime/health" || intersects(roles, AI_READ_ROLES) || intersects(roles, new Set(["tenant_service", "ai_agent_worker"])));
+    return decision("read", AI_READ_ROLES, isAllowedUser || isAllowedService);
+  }
   const found = AI_OPERATION_RULES.find((item) => item.method === method && item.pattern.test(path));
   if (!found) return decision("unclassified", [], false);
-  if (found.serviceAllowed && ["service", "tenant_service", "workload"].includes(authContext.principalType)) return decision(found.operation, found.roles, intersects(roles, found.roles));
+  if (found.serviceAllowed && isService) return decision(found.operation, found.roles, intersects(roles, found.roles));
   if (authContext.principalType !== "tenant_user") return decision(found.operation, found.roles, false);
   if (found.roles.includes("dynamic_approval_role")) {
     const requiredRole = decodeURIComponent(path.split("/").at(-1));

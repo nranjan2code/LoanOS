@@ -124,6 +124,7 @@ const ROLE_ROWS = [
   // Non-human principals have deliberately narrow execution/suggestion roles.
   ["automation_agent", "Deterministic automation agent", "automation", ["tenant", "product"], "automation", ["automation.execute"]],
   ["ai_agent", "AI agent", "automation", ["tenant", "product"], "automation", ["ai.suggest", "ai.request_human"]],
+  ["ai_agent_worker", "AI agent execution worker", "automation", ["tenant"], "automation", ["ai.execute", "runtime.job"]],
   ["integration_worker", "Integration workload", "automation", ["tenant"], "automation", ["integration.execute"]]
 ];
 
@@ -214,7 +215,7 @@ export const FEATURE_STAFFING_POLICIES = Object.freeze(Object.fromEntries([
 ].map((item) => [item.featureId, item])));
 
 export const FEATURE_STAFFING_POLICY_IDS = Object.freeze(Object.keys(FEATURE_STAFFING_POLICIES));
-export const AGENT_ASSIGNABLE_ROLE_IDS = Object.freeze(["automation_agent", "ai_agent", "integration_worker"]);
+export const AGENT_ASSIGNABLE_ROLE_IDS = Object.freeze(["automation_agent", "ai_agent", "ai_agent_worker", "integration_worker"]);
 
 /** Looks up a role in the canonical catalogue; fails closed on any unknown roleId rather than treating it as no-access. */
 export function getCanonicalRole(roleId) {

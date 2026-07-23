@@ -101,6 +101,13 @@ to eliminate fabricated engine decision defaults (`source: "isolated_business_en
 and fake SHA-256 hashes, requiring explicit isolated engine decisions; the HTTP API
 `/ai/agents/executions/authorize` endpoint was updated to strip untrusted
 `domainGuardrailDecisions` from client payloads, enforcing fail-closed lineage integrity.
+Dead-letter replay SoD four-eyes binding was fixed on `POST /ai/agents/runtime/jobs/:id/replay`
+(`approvedBy` bound to authenticated caller); `ai_agent_worker` was added to `CANONICAL_ROLE_CATALOGUE`
+and `AGENT_ASSIGNABLE_ROLE_IDS` and attached to tenant service workload identities in `server.js`;
+`authorizeAiAgentOperation` authority plane was unified with canonical `saasRoleGrants`;
+`autoTriggerCamDigitalWorker` now authorizes execution and enqueues a runtime job without
+fabricating completion evidence; agent proposal review SLA clock (`openedAt`) derivation was fixed;
+and operations queue owner roles were mapped to canonical role IDs (`data_protection_officer`, `finance_checker`).
 
 **Current evidence/gap:** `data_access`, `outbound_communication`,
 `underwriting_influence` and `case_mutation` policies have deterministic corpora,

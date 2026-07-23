@@ -96,7 +96,7 @@ function deriveAgentExecutionTasks(state, asOf) {
     if (!needsReview) return [];
 
     const installation = installations[execution.installationId] ?? {};
-    const openedAt = normalizeDate(execution.updatedAt ?? execution.createdAt) ?? asOf;
+    const openedAt = normalizeDate(execution.completedAt ?? execution.authorizedAt ?? execution.createdAt) ?? asOf;
 
     return [{
       taskId: `task_agent_review_${execution.executionId}`,
