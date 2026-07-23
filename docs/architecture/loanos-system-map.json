@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "title": "LoanOS India — System Architecture",
   "subtitle": "Multi-tenant · RBI-compliance-first · deterministic decisions · evidence by construction",
   "artifact": "docs/architecture/loanos-system-architecture.svg",
@@ -155,5 +155,63 @@
     {"label": "AI gated", "detail": "facts + provenance"},
     {"label": "Maker-checker", "detail": "independent authority"},
     {"label": "Evidence lineage", "detail": "audit by construction"}
+  ],
+  "relationships": [
+    {
+      "id": "people-to-experience",
+      "from": "lane:left",
+      "to": "band:1",
+      "type": "request",
+      "label": "People initiate governed journeys through authorised channels"
+    },
+    {
+      "id": "experience-to-api",
+      "from": "band:1",
+      "to": "band:2",
+      "type": "request",
+      "label": "Channels submit authenticated commands and queries"
+    },
+    {
+      "id": "api-to-domain",
+      "from": "band:2",
+      "to": "band:3",
+      "type": "request",
+      "label": "API orchestration invokes tenant-scoped domain services"
+    },
+    {
+      "id": "domain-to-decision",
+      "from": "band:3",
+      "to": "band:4",
+      "type": "decision",
+      "label": "Domain facts request deterministic policy decisions"
+    },
+    {
+      "id": "decision-to-evidence",
+      "from": "band:4",
+      "to": "band:5",
+      "type": "evidence",
+      "label": "Decision lineage is sealed into tenant evidence"
+    },
+    {
+      "id": "evidence-to-operations",
+      "from": "band:5",
+      "to": "band:6",
+      "type": "event",
+      "label": "State and evidence changes drive operational events"
+    },
+    {
+      "id": "operations-to-delivery",
+      "from": "band:6",
+      "to": "band:7",
+      "type": "evidence",
+      "label": "Operational health and assurance evidence gate delivery"
+    },
+    {
+      "id": "operations-to-external",
+      "from": "band:6",
+      "to": "lane:right",
+      "type": "integration",
+      "label": "Certified gateways exchange with external systems"
+    }
   ]
 }

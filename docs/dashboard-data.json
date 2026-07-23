@@ -1,8 +1,8 @@
 {
   "schemaVersion": 3,
-  "generated": "2026-07-22T16:44:24.070Z",
-  "sourceDigest": "f898bcb0022e918c",
-  "snapshotId": "52ace08743ecdf85",
+  "generated": "2026-07-23T05:42:59.609Z",
+  "sourceDigest": "5bdb2350169da029",
+  "snapshotId": "39588ebdda94039b",
   "sources": {
     "catalogue": "docs/product/complete-system-capability-catalog.md",
     "trace": "docs/product/capability-trace.json",
@@ -10,74 +10,74 @@
     "backlog": "docs/product/build-backlog.md",
     "architecture": "docs/architecture/loanos-system-map.json",
     "journeyDepth": "docs/product/product-journey-platform-depth.json",
-    "tests": "reused build test log"
+    "tests": "live Node test run"
   },
   "git": {
     "branch": "main",
-    "sha": "f9fbfa4e9de1",
-    "count": 242,
+    "sha": "cf1d311a97e4",
+    "count": 244,
     "dirty": true,
-    "changeCount": 16,
+    "changeCount": 14,
     "commits": [
+      {
+        "hash": "cf1d311",
+        "subject": "feat(workspace): sync language selection in journey workspace via URL and refine UI styles",
+        "when": "4 hours ago"
+      },
+      {
+        "hash": "8e258e3",
+        "subject": "feat(docs): add governed architecture and health dashboard",
+        "when": "13 hours ago"
+      },
       {
         "hash": "f9fbfa4",
         "subject": "feat(ui): unify banking operating surfaces",
-        "when": "52 minutes ago"
+        "when": "14 hours ago"
       },
       {
         "hash": "d323f71",
         "subject": "feat(agent-studio): implement digital worker runtime boundary, tool registry, and runtime jobs (ADR 0010)",
-        "when": "4 hours ago"
+        "when": "17 hours ago"
       },
       {
         "hash": "766ac73",
         "subject": "feat(showcase): align public discovery and typography",
-        "when": "5 hours ago"
+        "when": "18 hours ago"
       },
       {
         "hash": "2cd3c18",
         "subject": "feat(help): add Technical Academy visual system",
-        "when": "5 hours ago"
+        "when": "18 hours ago"
       },
       {
         "hash": "8ca4124",
         "subject": "fix(aws): isolate release installs from repo hooks",
-        "when": "8 hours ago"
+        "when": "21 hours ago"
       },
       {
         "hash": "b13b427",
         "subject": "feat(agent-studio): add Agent Studio platform experience and model governance module",
-        "when": "14 hours ago"
+        "when": "27 hours ago"
       },
       {
         "hash": "5e06dd0",
         "subject": "feat(ai-agent): integrate Amazon Bedrock provider, agent bindings, and domain guardrails",
-        "when": "15 hours ago"
+        "when": "28 hours ago"
       },
       {
         "hash": "74e4ab0",
         "subject": "fix(ai-agent): close five Agent Studio control gaps and add proposal human-review loop",
-        "when": "15 hours ago"
+        "when": "28 hours ago"
       },
       {
         "hash": "d4e6b97",
         "subject": "feat(ai-agent): strengthen production admission, workflow binding, and staffing controls",
-        "when": "15 hours ago"
+        "when": "28 hours ago"
       },
       {
         "hash": "1ed9e08",
         "subject": "feat(agents): deliver governed no-code Agent Studio",
-        "when": "22 hours ago"
-      },
-      {
-        "hash": "ba05f91",
-        "subject": "feat(metering): implement usage metering and tenant cost-recovery model",
-        "when": "23 hours ago"
-      },
-      {
-        "hash": "6d9fd6d",
-        "subject": "feat(help): converge Guide, BA Academy and Technical Academy on one design system",
-        "when": "3 days ago"
+        "when": "35 hours ago"
       }
     ]
   },
@@ -25908,15 +25908,15 @@
     }
   ],
   "tests": {
-    "pass": 818,
+    "pass": 823,
     "fail": 0,
     "skipped": 12,
     "cancelled": 0,
     "todo": 0,
-    "total": 830,
-    "durationMs": 25077.586833,
+    "total": 835,
+    "durationMs": 22285.401291,
     "ran": true,
-    "source": "provided-log",
+    "source": "live",
     "error": ""
   },
   "architecture": {
@@ -25926,7 +25926,7 @@
     "layers": 7,
     "nodes": 47,
     "principles": 8,
-    "digest": "59509545f7d174e5"
+    "digest": "31dc8ae2a3c5e10d"
   },
   "journeyReadiness": {
     "total": 21,
@@ -25955,7 +25955,7 @@
     "signals": [
       {
         "label": "Build verification",
-        "value": "818/830",
+        "value": "823/835",
         "state": "healthy",
         "detail": "0 failing · 12 skipped"
       },
@@ -25975,7 +25975,7 @@
         "label": "Architecture freshness",
         "value": "7 layers",
         "state": "healthy",
-        "detail": "47 mapped nodes · SVG 59509545f7d174e5."
+        "detail": "47 mapped nodes · SVG 31dc8ae2a3c5e10d."
       }
     ]
   },
@@ -26001,7 +26001,7 @@
     {
       "severity": "info",
       "area": "Snapshot lineage",
-      "issue": "16 uncommitted worktree changes",
+      "issue": "14 uncommitted worktree changes",
       "action": "Review or commit the changes before treating the snapshot as committed lineage."
     }
   ]

@@ -58,8 +58,25 @@ test("autoTriggerCamDigitalWorker returns triggered false when no active CAM age
   const result = autoTriggerCamDigitalWorker(state, registry(), {
     tenantId: "re1",
     applicationId: "app_1002",
-    inputHash: H
+    inputHash: H,
+    modelConsumptionDecision: decision("guardrail.model_consumption"),
+    actionGuardrailDecision: decision("guardrail.agent_action")
   }, NOW);
 
   assert.equal(result.triggered, false);
 });
+
+test("autoTriggerCamDigitalWorker fails closed when explicit engine decisions are missing", () => {
+  const platformState = setupActiveCamAgent();
+  const state = { aiAgentPlatform: platformState };
+
+  assert.throws(() => {
+    autoTriggerCamDigitalWorker(state, registry(), {
+      tenantId: "re1",
+      applicationId: "app_1003",
+      inputHash: H
+      // missing modelConsumptionDecision and actionGuardrailDecision
+    }, NOW);
+  }, (err) => err.code === "ai_agent_field_required");
+});
+

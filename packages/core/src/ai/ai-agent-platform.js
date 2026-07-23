@@ -506,9 +506,20 @@ export function approveAiAgentInvoice(state, input, now = new Date()) {
   return result(platform, "invoices", approved.invoiceId, approved, "ai_agent.invoice_approved", now);
 }
 
+/**
+ * Auto-trigger a credit CAM digital worker for an application, provided an active
+ * `credit.cam` agent installation exists for the tenant. Requires explicit isolated-engine
+ * decisions (`modelConsumptionDecision`, `actionGuardrailDecision`) and a SHA-256 input hash.
+ * @param {object} state - platform state.
+ * @param {object} modelRegistry - model registry.
+ * @param {object} input - tenantId, applicationId, inputHash, modelConsumptionDecision, actionGuardrailDecision.
+ * @param {Date} [now]
+ * @returns {{state: object, triggered: boolean, record: object|null}}
+ */
 export function autoTriggerCamDigitalWorker(state, modelRegistry, input, now = new Date()) {
   const targetState = state?.aiAgentPlatform ?? state;
   const platform = normalizeAiAgentPlatformState(targetState);
+  required(input, ["tenantId", "applicationId", "inputHash", "modelConsumptionDecision", "actionGuardrailDecision"]);
   const tenantId = input.tenantId;
   const installation = Object.values(platform.installations).find(
     (inst) => inst.tenantId === tenantId && inst.templateId === "credit.cam" && inst.status === "active"
@@ -516,13 +527,7 @@ export function autoTriggerCamDigitalWorker(state, modelRegistry, input, now = n
   if (!installation) return { state: platform, triggered: false, record: null };
 
   const executionId = `cam_exec_${input.applicationId}_${now.getTime()}`;
-  const inputHash = input.inputHash ?? "a".repeat(64);
-  const modelConsumptionDecision = input.modelConsumptionDecision ?? {
-    decision: "allow", traceRef: `trace:auto_cam:${executionId}`, source: "isolated_business_engine", decisionKey: "guardrail.model_consumption"
-  };
-  const actionGuardrailDecision = input.actionGuardrailDecision ?? {
-    decision: "allow", traceRef: `trace:auto_cam:${executionId}`, source: "isolated_business_engine", decisionKey: "guardrail.agent_action"
-  };
+  const inputHash = input.inputHash;
 
   const authRes = authorizeAiAgentExecution(platform, modelRegistry, {
     executionId,
@@ -532,8 +537,8 @@ export function autoTriggerCamDigitalWorker(state, modelRegistry, input, now = n
     purpose: `Auto-generate CAM proposal for application ${input.applicationId}`,
     inputRef: `loans/applications/${input.applicationId}`,
     inputHash,
-    modelConsumptionDecision,
-    actionGuardrailDecision
+    modelConsumptionDecision: input.modelConsumptionDecision,
+    actionGuardrailDecision: input.actionGuardrailDecision
   }, now);
 
   const compRes = completeAiAgentExecution(authRes.state, {

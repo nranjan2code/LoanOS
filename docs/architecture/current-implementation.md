@@ -4,6 +4,8 @@ This document describes what exists in the repository today.
 
 The repository-level shape is also available as the generated [LoanOS system architecture diagram](loanos-system-architecture.svg). Its controlled source is `loanos-system-map.json`; regenerate it with `npm run architecture:diagram` and verify it with `npm run architecture:diagram:check`. The model is intentionally curated from the load-bearing architecture sources rather than inferred from folder names, so architectural meaning remains reviewable while the check prevents the committed SVG from drifting from that model.
 
+The architecture-map schema is versioned and fail-closed. Schema version 2 records typed `request`, `decision`, `event`, `evidence`, and `integration` relationships between the two external lanes and numbered system bands. The generator rejects malformed or unknown endpoints with exact JSON paths, verifies every declared source exists, wraps card content, and grows band, lane, and canvas geometry from the controlled content instead of relying on a two-row layout ceiling. The generated SVG exposes every relationship through an accessible title and diagram description, includes the relationship legend, has no remote assets, and remains byte-deterministic so the committed artifact is a reliable drift gate.
+
 ## Runtime Shape
 
 The current implementation is intentionally small:

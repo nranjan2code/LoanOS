@@ -26,19 +26,6 @@ export function containExpiredAgentKnowledge(state, input, now = new Date()) {
   const knowledgePacks = Object.fromEntries(Object.entries(platform.knowledgePacks).map(([id, pack]) => [id, expiredIds.has(id) ? seal({ ...pack, status: "expired", expiredAt: now.toISOString() }) : pack])); const record = seal({ containmentId: `knowledge-expiry:${input.tenantId}:${now.toISOString()}`, tenantId: input.tenantId, expiredPackIds: [...expiredIds], suspendedInstallations, actor: input.actor, containedAt: now.toISOString() }); return { state: { ...platform, installations, knowledgePacks, events: [...platform.events, { type: "ai_agent.knowledge_expiry_contained", resourceId: record.containmentId, recordHash: record.recordHash, at: now.toISOString() }] }, record };
 }
 
-export function scheduleKnowledgeExpiryContainment(state, input, now = new Date()) {
-  const containment = containExpiredAgentKnowledge(state, input, now);
-  const nextScheduledAt = new Date(now.getTime() + 60 * 60_000).toISOString();
-  return {
-    ...containment,
-    schedule: {
-      tenantId: input.tenantId,
-      intervalMinutes: 60,
-      nextScheduledAt,
-      actor: input.actor
-    }
-  };
-}
 
 export function createAgentMemoryStore(state, input, now = new Date()) {
   const platform = normalize(state); required(input, ["memoryStoreId", "tenantId", "name", "purpose", "allowedFields", "region", "retentionDays", "consentRef", "accessPolicyRef", "correctionProcessRef", "deletionProcessRef", "legalHoldPolicyRef", "encryptionRef", "proposedBy"]); if (platform.memoryStores[input.memoryStoreId]) fail("agent_memory_store_exists", "Memory store already exists.", 409); if (input.region !== "ap-south-1") fail("agent_memory_region_invalid", "Agent memory must remain in the approved India region.", 403); const retentionDays = Number(input.retentionDays); if (!Number.isInteger(retentionDays) || retentionDays < 1 || retentionDays > 365) fail("agent_memory_retention_invalid", "Memory retention must be between 1 and 365 days."); const allowedFields = unique(input.allowedFields); if (!allowedFields.length) fail("agent_memory_fields_required", "Declare at least one permitted memory field.");

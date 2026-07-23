@@ -96,6 +96,12 @@ installation, workload, trace, ruleset and outcome before invoking a port.
 Direct worker dispatch/write remains prohibited. Production domain ports still
 need to adopt the catalogue before the no-bypass acceptance condition is met.
 
+**Implementation update (2026-07-23):** `autoTriggerCamDigitalWorker` was refactored
+to eliminate fabricated engine decision defaults (`source: "isolated_business_engine"`)
+and fake SHA-256 hashes, requiring explicit isolated engine decisions; the HTTP API
+`/ai/agents/executions/authorize` endpoint was updated to strip untrusted
+`domainGuardrailDecisions` from client payloads, enforcing fail-closed lineage integrity.
+
 **Current evidence/gap:** `data_access`, `outbound_communication`,
 `underwriting_influence` and `case_mutation` policies have deterministic corpora,
 but the live provider/domain call-sites that must consume them do not yet exist.

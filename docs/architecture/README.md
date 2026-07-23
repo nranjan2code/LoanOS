@@ -6,7 +6,7 @@ This index is the navigation root for LoanOS architecture. The current implement
 
 - [LoanOS India blueprint](loanos-india-blueprint.md)
 - [Current implementation map](current-implementation.md)
-- [Generated LoanOS system architecture diagram](loanos-system-architecture.svg) — edit `loanos-system-map.json`, then run `npm run architecture:diagram`
+- [Generated LoanOS system architecture diagram](loanos-system-architecture.svg) — edit the versioned bands, lanes and typed relationships in `loanos-system-map.json`, then run `npm run architecture:diagram`; `npm run architecture:diagram:check` rejects invalid sources, endpoints and stale output
 - [Knowledge-to-execution stack audit](knowledge-execution-stack/README.md)
 - [Persistent specialist journey service](persistent-specialist-journey-service.md)
 - [Archetype journey workspaces](archetype-journey-workspaces.md)

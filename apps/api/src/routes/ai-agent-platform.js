@@ -84,7 +84,8 @@ export async function routeAiAgentPlatform(context) {
         action: { approved: installation?.allowedActions?.includes(body.action) === true, proposal_only: true, human_control_attempt: body.humanControlAttempt === true },
         data: { india_region: installation?.dataRegion === "ap-south-1" }, customer: { customer_facing: installation?.customerFacing === true, disclosure_present: Boolean(body.customerDisclosureRef) }
       }});
-      outcome = authorizeAiAgentExecution(state.aiAgentPlatform, state.modelRegistry, { ...body, tenantId, modelConsumptionDecision: modelDecision, actionGuardrailDecision: actionDecision });
+      const { domainGuardrailDecisions: _untrustedDomain, ...safeBody } = body;
+      outcome = authorizeAiAgentExecution(state.aiAgentPlatform, state.modelRegistry, { ...safeBody, tenantId, modelConsumptionDecision: modelDecision, actionGuardrailDecision: actionDecision });
     }
     else if (match(path, "/ai/agents/executions/:id/demo-run")) {
       outcome = await runDemoExecution(state, tenantId, idOf(path, 4), body.scenario);

@@ -181,3 +181,44 @@ test("explicit demo mode runs an already-authorized execution through the mock p
   assert.equal(tenantState.aiAgentPlatform.executions["demo-run"].status, "completed");
   assert.ok(tenantState.aiAgentPlatform.usageLedger["demo-usage:demo-run"]);
 });
+
+test("authorizeAiAgentExecution validates domainGuardrailDecisions with trustedDecision fail-closed rules", () => {
+  const state = active(proposed(contracted()));
+
+  // Untrusted source (e.g. client-forged) fails closed
+  assert.throws(() => {
+    authorizeAiAgentExecution(state, registry(), {
+      executionId: "domain-test-1",
+      tenantId: "re1",
+      installationId: "agent1",
+      action: "cam.draft",
+      purpose: "test domain decision validation",
+      inputRef: "loans/1",
+      inputHash: H,
+      modelConsumptionDecision: decision("guardrail.model_consumption"),
+      actionGuardrailDecision: decision("guardrail.agent_action"),
+      domainGuardrailDecisions: {
+        custom_fake: { decision: "allow", traceRef: "fake_trace", source: "client_untrusted" }
+      }
+    }, NOW);
+  }, (e) => e.code === "ai_agent_custom_fake_guardrail_denied");
+
+  // Valid isolated_business_engine decision is projected
+  const valid = authorizeAiAgentExecution(state, registry(), {
+    executionId: "domain-test-2",
+    tenantId: "re1",
+    installationId: "agent1",
+    action: "cam.draft",
+    purpose: "test domain decision validation",
+    inputRef: "loans/1",
+    inputHash: H,
+    modelConsumptionDecision: decision("guardrail.model_consumption"),
+    actionGuardrailDecision: decision("guardrail.agent_action"),
+    domainGuardrailDecisions: {
+      underwriting_influence: decision("guardrail.underwriting_influence")
+    }
+  }, NOW);
+
+  assert.equal(valid.record.domainGuardrailDecisions.underwriting_influence.source, "isolated_business_engine");
+});
+

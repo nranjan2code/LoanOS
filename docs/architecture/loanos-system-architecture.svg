@@ -1,10 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1180" role="img" aria-labelledby="diagram-title diagram-desc">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1277" role="img" aria-labelledby="diagram-title diagram-desc">
   <title id="diagram-title">LoanOS India — System Architecture</title>
-  <desc id="diagram-desc">A layered architecture map of LoanOS India showing people and partner ecosystems, delivery channels, API orchestration, the domain kernel, isolated decision engines, data and evidence, platform operations, infrastructure, external systems, and cross-cutting engineering principles.</desc>
+  <desc id="diagram-desc">A layered architecture map of LoanOS India showing people and partner ecosystems, delivery channels, API orchestration, the domain kernel, isolated decision engines, data and evidence, platform operations, infrastructure, external systems, and cross-cutting engineering principles. Relationships: People initiate governed journeys through authorised channels; Channels submit authenticated commands and queries; API orchestration invokes tenant-scoped domain services; Domain facts request deterministic policy decisions; Decision lineage is sealed into tenant evidence; State and evidence changes drive operational events; Operational health and assurance evidence gate delivery; Certified gateways exchange with external systems.</desc>
   <defs>
-    <marker id="arrow-left" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M 0 0 L 8 4 L 0 8 z"/></marker>
-    <marker id="arrow-right" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M 0 0 L 8 4 L 0 8 z"/></marker>
-    <marker id="arrow-flow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M 0 0 L 7 3.5 L 0 7 z"/></marker>
+    <marker id="arrow-request" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M 0 0 L 8 4 L 0 8 z"/></marker>
+    <marker id="arrow-decision" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M 0 0 L 8 4 L 0 8 z"/></marker>
+    <marker id="arrow-event" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M 0 0 L 8 4 L 0 8 z"/></marker>
+    <marker id="arrow-evidence" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M 0 0 L 8 4 L 0 8 z"/></marker>
+    <marker id="arrow-integration" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M 0 0 L 8 4 L 0 8 z"/></marker>
     <filter id="soft-shadow" x="-10%" y="-10%" width="120%" height="130%"><feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.08"/></filter>
     <style>
       :root { color-scheme: light; }
@@ -34,11 +36,20 @@
       .lane-group { fill: #397367; font-size: 10px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
       .lane-item circle { fill: #d69b37; }
       .lane-item text { fill: #314e47; font-size: 10.5px; }
-      .lane-arrow { fill: none; stroke: #397367; stroke-width: 1.5; }
-      .band-flow { fill: none; stroke: #397367; stroke-width: 1.4; }
-      #arrow-left path, #arrow-right path, #arrow-flow path { fill: #397367; }
-      .principles-title { fill: #173f36; font-size: 13px; font-weight: 800; }
-      .principles > path { stroke: #b9c8c2; stroke-width: 1; }
+      .relationship path, .relationship-key path { fill: none; stroke-width: 1.7; }
+      .relationship-request path, path.relationship-request { stroke: #397367; }
+      .relationship-decision path, path.relationship-decision { stroke: #76558f; }
+      .relationship-event path, path.relationship-event { stroke: #3f7184; stroke-dasharray: 6 4; }
+      .relationship-evidence path, path.relationship-evidence { stroke: #b77819; stroke-dasharray: 2 3; }
+      .relationship-integration path, path.relationship-integration { stroke: #257b78; stroke-dasharray: 9 4; }
+      #arrow-request path { fill: #397367; }
+      #arrow-decision path { fill: #76558f; }
+      #arrow-event path { fill: #3f7184; }
+      #arrow-evidence path { fill: #b77819; }
+      #arrow-integration path { fill: #257b78; }
+      .relationship-key text { fill: #314e47; font-size: 10px; font-weight: 650; }
+      .section-title { fill: #173f36; font-size: 13px; font-weight: 800; }
+      .section-rule { stroke: #b9c8c2; stroke-width: 1; }
       .principle rect { fill: #173f36; }
       .principle-label { fill: #fffdf7; font-size: 10px; font-weight: 750; }
       .principle-detail { fill: #d9e5df; font-size: 8.5px; }
@@ -50,15 +61,14 @@
     <text x="800" y="87" text-anchor="middle" class="subtitle">Multi-tenant · RBI-compliance-first · deterministic decisions · evidence by construction</text>
   </g>
   <g class="side-lane side-left">
-    <rect x="24" y="106" width="218" height="944" rx="10"/>
+    <rect x="24" y="106" width="218" height="979" rx="10"/>
     <rect class="lane-heading" x="24" y="106" width="218" height="34" rx="10"/>
     <path class="heading-mask" d="M 24 132 h 218 v 8 h -218 z"/>
     <text x="133" y="128" text-anchor="middle" class="lane-title">People &amp; ecosystems</text>
     <text x="57" y="162" class="lane-group">Users</text><g class="lane-item"><circle cx="45" cy="186" r="4"/><text x="57" y="190">Borrowers &amp; customers</text></g><g class="lane-item"><circle cx="45" cy="213" r="4"/><text x="57" y="217">Tenant operations staff</text></g><g class="lane-item"><circle cx="45" cy="240" r="4"/><text x="57" y="244">Compliance, risk &amp; audit</text></g><g class="lane-item"><circle cx="45" cy="267" r="4"/><text x="57" y="271">LoanOS platform operators</text></g><text x="57" y="301" class="lane-group">Partners</text><g class="lane-item"><circle cx="45" cy="325" r="4"/><text x="57" y="329">LSP, DLA &amp; DSA partners</text></g><g class="lane-item"><circle cx="45" cy="352" r="4"/><text x="57" y="356">Field &amp; recovery agencies</text></g><g class="lane-item"><circle cx="45" cy="379" r="4"/><text x="57" y="383">Regulated entities</text></g><g class="lane-item"><circle cx="45" cy="406" r="4"/><text x="57" y="410">Regulators &amp; bureaus</text></g>
-    <path class="lane-arrow" d="M 236 578 H 262" marker-end="url(#arrow-left)"/>
   </g>
   <g class="band band-channel">
-    <rect class="band-frame" x="270" y="106" width="1060" height="116" rx="10"/>
+    <rect class="band-frame" x="270" y="106" width="1060" height="114" rx="10"/>
     <rect class="band-heading" x="270" y="106" width="1060" height="30" rx="10"/>
     <path class="heading-mask" d="M 270 128 h 1060 v 8 h -1060 z"/>
     <circle cx="288" cy="121" r="10" class="band-number"/>
@@ -66,385 +76,434 @@
     <text x="306" y="126" class="band-title">Experience &amp; delivery channels</text>
     <g class="item item-channel">
     <rect x="282" y="144" width="166" height="66" rx="8"/>
-    <text x="365" y="169" class="item-label" text-anchor="middle"><tspan x="365" dy="0">Borrower experience</tspan></text>
-    <text x="365" y="187" class="item-detail" text-anchor="middle"><tspan x="365" dy="0">applications · servicing</tspan></text>
-    <text x="365" y="200" class="item-ref" text-anchor="middle"><tspan x="365" dy="0">apps/customer</tspan></text>
+    <text x="365" y="164" class="item-label" text-anchor="middle"><tspan x="365" dy="0">Borrower experience</tspan></text>
+    <text x="365" y="180" class="item-detail" text-anchor="middle"><tspan x="365" dy="0">applications · servicing</tspan></text>
+    <text x="365" y="201" class="item-ref" text-anchor="middle"><tspan x="365" dy="0">apps/customer</tspan></text>
   </g>
 <g class="item item-channel">
     <rect x="456" y="144" width="166" height="66" rx="8"/>
-    <text x="539" y="169" class="item-label" text-anchor="middle"><tspan x="539" dy="0">Tenant operations</tspan></text>
-    <text x="539" y="187" class="item-detail" text-anchor="middle"><tspan x="539" dy="0">workspaces · administration</tspan></text>
-    <text x="539" y="200" class="item-ref" text-anchor="middle"><tspan x="539" dy="0">apps/tenant</tspan></text>
+    <text x="539" y="164" class="item-label" text-anchor="middle"><tspan x="539" dy="0">Tenant operations</tspan></text>
+    <text x="539" y="180" class="item-detail" text-anchor="middle"><tspan x="539" dy="0">workspaces · administration</tspan></text>
+    <text x="539" y="201" class="item-ref" text-anchor="middle"><tspan x="539" dy="0">apps/tenant</tspan></text>
   </g>
 <g class="item item-channel">
     <rect x="630" y="144" width="166" height="66" rx="8"/>
-    <text x="713" y="169" class="item-label" text-anchor="middle"><tspan x="713" dy="0">Platform control</tspan></text>
-    <text x="713" y="187" class="item-detail" text-anchor="middle"><tspan x="713" dy="0">onboarding · assurance</tspan></text>
-    <text x="713" y="200" class="item-ref" text-anchor="middle"><tspan x="713" dy="0">apps/dashboard</tspan></text>
+    <text x="713" y="164" class="item-label" text-anchor="middle"><tspan x="713" dy="0">Platform control</tspan></text>
+    <text x="713" y="180" class="item-detail" text-anchor="middle"><tspan x="713" dy="0">onboarding · assurance</tspan></text>
+    <text x="713" y="201" class="item-ref" text-anchor="middle"><tspan x="713" dy="0">apps/dashboard</tspan></text>
   </g>
 <g class="item item-channel">
     <rect x="804" y="144" width="166" height="66" rx="8"/>
-    <text x="887" y="169" class="item-label" text-anchor="middle"><tspan x="887" dy="0">Public experience</tspan></text>
-    <text x="887" y="187" class="item-detail" text-anchor="middle"><tspan x="887" dy="0">product journeys</tspan></text>
-    <text x="887" y="200" class="item-ref" text-anchor="middle"><tspan x="887" dy="0">apps/web</tspan></text>
+    <text x="887" y="164" class="item-label" text-anchor="middle"><tspan x="887" dy="0">Public experience</tspan></text>
+    <text x="887" y="180" class="item-detail" text-anchor="middle"><tspan x="887" dy="0">product journeys</tspan></text>
+    <text x="887" y="201" class="item-ref" text-anchor="middle"><tspan x="887" dy="0">apps/web</tspan></text>
   </g>
 <g class="item item-channel">
     <rect x="978" y="144" width="166" height="66" rx="8"/>
-    <text x="1061" y="169" class="item-label" text-anchor="middle"><tspan x="1061" dy="0">Guide &amp; Academy</tspan></text>
-    <text x="1061" y="187" class="item-detail" text-anchor="middle"><tspan x="1061" dy="0">governed learning</tspan></text>
-    <text x="1061" y="200" class="item-ref" text-anchor="middle"><tspan x="1061" dy="0">apps/help</tspan></text>
+    <text x="1061" y="164" class="item-label" text-anchor="middle"><tspan x="1061" dy="0">Guide &amp; Academy</tspan></text>
+    <text x="1061" y="180" class="item-detail" text-anchor="middle"><tspan x="1061" dy="0">governed learning</tspan></text>
+    <text x="1061" y="201" class="item-ref" text-anchor="middle"><tspan x="1061" dy="0">apps/help</tspan></text>
   </g>
 <g class="item item-channel">
     <rect x="1152" y="144" width="166" height="66" rx="8"/>
-    <text x="1235" y="169" class="item-label" text-anchor="middle"><tspan x="1235" dy="0">Field &amp; DSA apps</tspan></text>
-    <text x="1235" y="187" class="item-detail" text-anchor="middle"><tspan x="1235" dy="0">offline · zero-local-data</tspan></text>
-    <text x="1235" y="200" class="item-ref" text-anchor="middle"><tspan x="1235" dy="0">apps/android-*</tspan></text>
+    <text x="1235" y="164" class="item-label" text-anchor="middle"><tspan x="1235" dy="0">Field &amp; DSA apps</tspan></text>
+    <text x="1235" y="180" class="item-detail" text-anchor="middle"><tspan x="1235" dy="0">offline · zero-local-data</tspan></text>
+    <text x="1235" y="201" class="item-ref" text-anchor="middle"><tspan x="1235" dy="0">apps/android-*</tspan></text>
   </g>
   </g>
 <g class="band band-api">
-    <rect class="band-frame" x="270" y="232" width="1060" height="116" rx="10"/>
-    <rect class="band-heading" x="270" y="232" width="1060" height="30" rx="10"/>
-    <path class="heading-mask" d="M 270 254 h 1060 v 8 h -1060 z"/>
-    <circle cx="288" cy="247" r="10" class="band-number"/>
-    <text x="288" y="251" class="band-number-text" text-anchor="middle">2</text>
-    <text x="306" y="252" class="band-title">API, orchestration &amp; connectivity</text>
+    <rect class="band-frame" x="270" y="236" width="1060" height="114" rx="10"/>
+    <rect class="band-heading" x="270" y="236" width="1060" height="30" rx="10"/>
+    <path class="heading-mask" d="M 270 258 h 1060 v 8 h -1060 z"/>
+    <circle cx="288" cy="251" r="10" class="band-number"/>
+    <text x="288" y="255" class="band-number-text" text-anchor="middle">2</text>
+    <text x="306" y="256" class="band-title">API, orchestration &amp; connectivity</text>
     <g class="item item-api">
-    <rect x="282" y="270" width="166" height="66" rx="8"/>
-    <text x="365" y="295" class="item-label" text-anchor="middle"><tspan x="365" dy="0">Node HTTP API</tspan></text>
-    <text x="365" y="313" class="item-detail" text-anchor="middle"><tspan x="365" dy="0">built-in server · /v1</tspan></text>
-    <text x="365" y="326" class="item-ref" text-anchor="middle"><tspan x="365" dy="0">apps/api</tspan></text>
+    <rect x="282" y="274" width="166" height="66" rx="8"/>
+    <text x="365" y="294" class="item-label" text-anchor="middle"><tspan x="365" dy="0">Node HTTP API</tspan></text>
+    <text x="365" y="310" class="item-detail" text-anchor="middle"><tspan x="365" dy="0">built-in server · /v1</tspan></text>
+    <text x="365" y="331" class="item-ref" text-anchor="middle"><tspan x="365" dy="0">apps/api</tspan></text>
   </g>
 <g class="item item-api">
-    <rect x="456" y="270" width="166" height="66" rx="8"/>
-    <text x="539" y="295" class="item-label" text-anchor="middle"><tspan x="539" dy="0">Domain routes</tspan></text>
-    <text x="539" y="313" class="item-detail" text-anchor="middle"><tspan x="539" dy="0">composition by module</tspan></text>
-    <text x="539" y="326" class="item-ref" text-anchor="middle"><tspan x="539" dy="0">apps/api/src/routes</tspan></text>
+    <rect x="456" y="274" width="166" height="66" rx="8"/>
+    <text x="539" y="294" class="item-label" text-anchor="middle"><tspan x="539" dy="0">Domain routes</tspan></text>
+    <text x="539" y="310" class="item-detail" text-anchor="middle"><tspan x="539" dy="0">composition by module</tspan></text>
+    <text x="539" y="331" class="item-ref" text-anchor="middle"><tspan x="539" dy="0">apps/api/src/routes</tspan></text>
   </g>
 <g class="item item-api">
-    <rect x="630" y="270" width="166" height="66" rx="8"/>
-    <text x="713" y="295" class="item-label" text-anchor="middle"><tspan x="713" dy="0">Auth &amp; tenancy</tspan></text>
-    <text x="713" y="313" class="item-detail" text-anchor="middle"><tspan x="713" dy="0">sessions · scoped keys</tspan></text>
-    <text x="713" y="326" class="item-ref" text-anchor="middle"><tspan x="713" dy="0">apps/api/identity.js</tspan></text>
+    <rect x="630" y="274" width="166" height="66" rx="8"/>
+    <text x="713" y="294" class="item-label" text-anchor="middle"><tspan x="713" dy="0">Auth &amp; tenancy</tspan></text>
+    <text x="713" y="310" class="item-detail" text-anchor="middle"><tspan x="713" dy="0">sessions · scoped keys</tspan></text>
+    <text x="713" y="331" class="item-ref" text-anchor="middle"><tspan x="713" dy="0">apps/api/identity.js</tspan></text>
   </g>
 <g class="item item-api">
-    <rect x="804" y="270" width="166" height="66" rx="8"/>
-    <text x="887" y="295" class="item-label" text-anchor="middle"><tspan x="887" dy="0">Workflow runtime</tspan></text>
-    <text x="887" y="313" class="item-detail" text-anchor="middle"><tspan x="887" dy="0">timers · leases · replay</tspan></text>
-    <text x="887" y="326" class="item-ref" text-anchor="middle"><tspan x="887" dy="0">core/journeys/workflow</tspan></text>
+    <rect x="804" y="274" width="166" height="66" rx="8"/>
+    <text x="887" y="294" class="item-label" text-anchor="middle"><tspan x="887" dy="0">Workflow runtime</tspan></text>
+    <text x="887" y="310" class="item-detail" text-anchor="middle"><tspan x="887" dy="0">timers · leases · replay</tspan></text>
+    <text x="887" y="331" class="item-ref" text-anchor="middle"><tspan x="887" dy="0">core/journeys/workflow</tspan></text>
   </g>
 <g class="item item-api">
-    <rect x="978" y="270" width="166" height="66" rx="8"/>
-    <text x="1061" y="295" class="item-label" text-anchor="middle"><tspan x="1061" dy="0">Contracts &amp; events</tspan></text>
-    <text x="1061" y="313" class="item-detail" text-anchor="middle"><tspan x="1061" dy="0">OpenAPI · webhooks</tspan></text>
-    <text x="1061" y="326" class="item-ref" text-anchor="middle"><tspan x="1061" dy="0">core/integrations</tspan></text>
+    <rect x="978" y="274" width="166" height="66" rx="8"/>
+    <text x="1061" y="294" class="item-label" text-anchor="middle"><tspan x="1061" dy="0">Contracts &amp; events</tspan></text>
+    <text x="1061" y="310" class="item-detail" text-anchor="middle"><tspan x="1061" dy="0">OpenAPI · webhooks</tspan></text>
+    <text x="1061" y="331" class="item-ref" text-anchor="middle"><tspan x="1061" dy="0">core/integrations</tspan></text>
   </g>
 <g class="item item-api">
-    <rect x="1152" y="270" width="166" height="66" rx="8"/>
-    <text x="1235" y="295" class="item-label" text-anchor="middle"><tspan x="1235" dy="0">Provider gateways</tspan></text>
-    <text x="1235" y="313" class="item-detail" text-anchor="middle"><tspan x="1235" dy="0">certify · reconcile</tspan></text>
-    <text x="1235" y="326" class="item-ref" text-anchor="middle"><tspan x="1235" dy="0">core/integrations</tspan></text>
+    <rect x="1152" y="274" width="166" height="66" rx="8"/>
+    <text x="1235" y="294" class="item-label" text-anchor="middle"><tspan x="1235" dy="0">Provider gateways</tspan></text>
+    <text x="1235" y="310" class="item-detail" text-anchor="middle"><tspan x="1235" dy="0">certify · reconcile</tspan></text>
+    <text x="1235" y="331" class="item-ref" text-anchor="middle"><tspan x="1235" dy="0">core/integrations</tspan></text>
   </g>
   </g>
 <g class="band band-domain">
-    <rect class="band-frame" x="270" y="358" width="1060" height="188" rx="10"/>
-    <rect class="band-heading" x="270" y="358" width="1060" height="30" rx="10"/>
-    <path class="heading-mask" d="M 270 380 h 1060 v 8 h -1060 z"/>
-    <circle cx="288" cy="373" r="10" class="band-number"/>
-    <text x="288" y="377" class="band-number-text" text-anchor="middle">3</text>
-    <text x="306" y="378" class="band-title">Business services &amp; domain kernel</text>
+    <rect class="band-frame" x="270" y="366" width="1060" height="199" rx="10"/>
+    <rect class="band-heading" x="270" y="366" width="1060" height="30" rx="10"/>
+    <path class="heading-mask" d="M 270 388 h 1060 v 8 h -1060 z"/>
+    <circle cx="288" cy="381" r="10" class="band-number"/>
+    <text x="288" y="385" class="band-number-text" text-anchor="middle">3</text>
+    <text x="306" y="386" class="band-title">Business services &amp; domain kernel</text>
     <g class="item item-domain">
-    <rect x="282" y="396" width="166" height="68" rx="8"/>
-    <text x="365" y="421" class="item-label" text-anchor="middle"><tspan x="365" dy="0">Origination &amp; KYC</tspan></text>
-    <text x="365" y="439" class="item-detail" text-anchor="middle"><tspan x="365" dy="0">intake · consent · identity</tspan></text>
-    <text x="365" y="454" class="item-ref" text-anchor="middle"><tspan x="365" dy="0">core/lending</tspan></text>
+    <rect x="282" y="404" width="166" height="66" rx="8"/>
+    <text x="365" y="424" class="item-label" text-anchor="middle"><tspan x="365" dy="0">Origination &amp; KYC</tspan></text>
+    <text x="365" y="440" class="item-detail" text-anchor="middle"><tspan x="365" dy="0">intake · consent · identity</tspan></text>
+    <text x="365" y="461" class="item-ref" text-anchor="middle"><tspan x="365" dy="0">core/lending</tspan></text>
   </g>
 <g class="item item-domain">
-    <rect x="456" y="396" width="166" height="68" rx="8"/>
-    <text x="539" y="421" class="item-label" text-anchor="middle"><tspan x="539" dy="0">Products &amp; pricing</tspan></text>
-    <text x="539" y="439" class="item-detail" text-anchor="middle"><tspan x="539" dy="0">journeys · KFS · terms</tspan></text>
-    <text x="539" y="454" class="item-ref" text-anchor="middle"><tspan x="539" dy="0">core/journeys</tspan></text>
+    <rect x="456" y="404" width="166" height="66" rx="8"/>
+    <text x="539" y="424" class="item-label" text-anchor="middle"><tspan x="539" dy="0">Products &amp; pricing</tspan></text>
+    <text x="539" y="440" class="item-detail" text-anchor="middle"><tspan x="539" dy="0">journeys · KFS · terms</tspan></text>
+    <text x="539" y="461" class="item-ref" text-anchor="middle"><tspan x="539" dy="0">core/journeys</tspan></text>
   </g>
 <g class="item item-domain">
-    <rect x="630" y="396" width="166" height="68" rx="8"/>
-    <text x="713" y="421" class="item-label" text-anchor="middle"><tspan x="713" dy="0">Eligibility</tspan></text>
-    <text x="713" y="439" class="item-detail" text-anchor="middle"><tspan x="713" dy="0">affordability · policy</tspan></text>
-    <text x="713" y="454" class="item-ref" text-anchor="middle"><tspan x="713" dy="0">core/lending</tspan></text>
+    <rect x="630" y="404" width="166" height="66" rx="8"/>
+    <text x="713" y="424" class="item-label" text-anchor="middle"><tspan x="713" dy="0">Eligibility</tspan></text>
+    <text x="713" y="440" class="item-detail" text-anchor="middle"><tspan x="713" dy="0">affordability · policy</tspan></text>
+    <text x="713" y="461" class="item-ref" text-anchor="middle"><tspan x="713" dy="0">core/lending</tspan></text>
   </g>
 <g class="item item-domain">
-    <rect x="804" y="396" width="166" height="68" rx="8"/>
-    <text x="887" y="421" class="item-label" text-anchor="middle"><tspan x="887" dy="0">Servicing &amp; ledger</tspan></text>
-    <text x="887" y="439" class="item-detail" text-anchor="middle"><tspan x="887" dy="0">schedule · balance · closure</tspan></text>
-    <text x="887" y="454" class="item-ref" text-anchor="middle"><tspan x="887" dy="0">core/lending</tspan></text>
+    <rect x="804" y="404" width="166" height="66" rx="8"/>
+    <text x="887" y="424" class="item-label" text-anchor="middle"><tspan x="887" dy="0">Servicing &amp; ledger</tspan></text>
+    <text x="887" y="440" class="item-detail" text-anchor="middle"><tspan x="887" dy="0">schedule · balance · closure</tspan></text>
+    <text x="887" y="461" class="item-ref" text-anchor="middle"><tspan x="887" dy="0">core/lending</tspan></text>
   </g>
 <g class="item item-domain">
-    <rect x="978" y="396" width="166" height="68" rx="8"/>
-    <text x="1061" y="421" class="item-label" text-anchor="middle"><tspan x="1061" dy="0">Payments</tspan></text>
-    <text x="1061" y="439" class="item-detail" text-anchor="middle"><tspan x="1061" dy="0">mandates · settlement</tspan></text>
-    <text x="1061" y="454" class="item-ref" text-anchor="middle"><tspan x="1061" dy="0">core/finance</tspan></text>
+    <rect x="978" y="404" width="166" height="66" rx="8"/>
+    <text x="1061" y="424" class="item-label" text-anchor="middle"><tspan x="1061" dy="0">Payments</tspan></text>
+    <text x="1061" y="440" class="item-detail" text-anchor="middle"><tspan x="1061" dy="0">mandates · settlement</tspan></text>
+    <text x="1061" y="461" class="item-ref" text-anchor="middle"><tspan x="1061" dy="0">core/finance</tspan></text>
   </g>
 <g class="item item-domain">
-    <rect x="1152" y="396" width="166" height="68" rx="8"/>
-    <text x="1235" y="421" class="item-label" text-anchor="middle"><tspan x="1235" dy="0">Collections</tspan></text>
-    <text x="1235" y="439" class="item-detail" text-anchor="middle"><tspan x="1235" dy="0">contact · field · recovery</tspan></text>
-    <text x="1235" y="454" class="item-ref" text-anchor="middle"><tspan x="1235" dy="0">core/lending</tspan></text>
+    <rect x="1152" y="404" width="166" height="66" rx="8"/>
+    <text x="1235" y="424" class="item-label" text-anchor="middle"><tspan x="1235" dy="0">Collections</tspan></text>
+    <text x="1235" y="440" class="item-detail" text-anchor="middle"><tspan x="1235" dy="0">contact · field · recovery</tspan></text>
+    <text x="1235" y="461" class="item-ref" text-anchor="middle"><tspan x="1235" dy="0">core/lending</tspan></text>
   </g>
 <g class="item item-domain">
-    <rect x="282" y="472" width="166" height="68" rx="8"/>
-    <text x="365" y="497" class="item-label" text-anchor="middle"><tspan x="365" dy="0">Collateral</tspan></text>
-    <text x="365" y="515" class="item-detail" text-anchor="middle"><tspan x="365" dy="0">valuation · custody · release</tspan></text>
-    <text x="365" y="530" class="item-ref" text-anchor="middle"><tspan x="365" dy="0">core/lending</tspan></text>
+    <rect x="282" y="478" width="166" height="77" rx="8"/>
+    <text x="365" y="498" class="item-label" text-anchor="middle"><tspan x="365" dy="0">Collateral</tspan></text>
+    <text x="365" y="514" class="item-detail" text-anchor="middle"><tspan x="365" dy="0">valuation · custody ·</tspan><tspan x="365" dy="13">release</tspan></text>
+    <text x="365" y="546" class="item-ref" text-anchor="middle"><tspan x="365" dy="0">core/lending</tspan></text>
   </g>
 <g class="item item-domain">
-    <rect x="456" y="472" width="166" height="68" rx="8"/>
-    <text x="539" y="497" class="item-label" text-anchor="middle"><tspan x="539" dy="0">Finance &amp; tax</tspan></text>
-    <text x="539" y="515" class="item-detail" text-anchor="middle"><tspan x="539" dy="0">GL · GST · TDS · close</tspan></text>
-    <text x="539" y="530" class="item-ref" text-anchor="middle"><tspan x="539" dy="0">core/finance</tspan></text>
+    <rect x="456" y="478" width="166" height="77" rx="8"/>
+    <text x="539" y="498" class="item-label" text-anchor="middle"><tspan x="539" dy="0">Finance &amp; tax</tspan></text>
+    <text x="539" y="514" class="item-detail" text-anchor="middle"><tspan x="539" dy="0">GL · GST · TDS · close</tspan></text>
+    <text x="539" y="546" class="item-ref" text-anchor="middle"><tspan x="539" dy="0">core/finance</tspan></text>
   </g>
 <g class="item item-domain">
-    <rect x="630" y="472" width="166" height="68" rx="8"/>
-    <text x="713" y="497" class="item-label" text-anchor="middle"><tspan x="713" dy="0">Compliance</tspan></text>
-    <text x="713" y="515" class="item-detail" text-anchor="middle"><tspan x="713" dy="0">controls · reporting · audit</tspan></text>
-    <text x="713" y="530" class="item-ref" text-anchor="middle"><tspan x="713" dy="0">core/compliance</tspan></text>
+    <rect x="630" y="478" width="166" height="77" rx="8"/>
+    <text x="713" y="498" class="item-label" text-anchor="middle"><tspan x="713" dy="0">Compliance</tspan></text>
+    <text x="713" y="514" class="item-detail" text-anchor="middle"><tspan x="713" dy="0">controls · reporting · audit</tspan></text>
+    <text x="713" y="546" class="item-ref" text-anchor="middle"><tspan x="713" dy="0">core/compliance</tspan></text>
   </g>
 <g class="item item-domain">
-    <rect x="804" y="472" width="166" height="68" rx="8"/>
-    <text x="887" y="497" class="item-label" text-anchor="middle"><tspan x="887" dy="0">Risk, AML &amp; fraud</tspan></text>
-    <text x="887" y="515" class="item-detail" text-anchor="middle"><tspan x="887" dy="0">screen · monitor · investigate</tspan></text>
-    <text x="887" y="530" class="item-ref" text-anchor="middle"><tspan x="887" dy="0">core/compliance</tspan></text>
+    <rect x="804" y="478" width="166" height="77" rx="8"/>
+    <text x="887" y="498" class="item-label" text-anchor="middle"><tspan x="887" dy="0">Risk, AML &amp; fraud</tspan></text>
+    <text x="887" y="514" class="item-detail" text-anchor="middle"><tspan x="887" dy="0">screen · monitor ·</tspan><tspan x="887" dy="13">investigate</tspan></text>
+    <text x="887" y="546" class="item-ref" text-anchor="middle"><tspan x="887" dy="0">core/compliance</tspan></text>
   </g>
 <g class="item item-domain">
-    <rect x="978" y="472" width="166" height="68" rx="8"/>
-    <text x="1061" y="497" class="item-label" text-anchor="middle"><tspan x="1061" dy="0">AI governance</tspan></text>
-    <text x="1061" y="515" class="item-detail" text-anchor="middle"><tspan x="1061" dy="0">inventory · validation · pause</tspan></text>
-    <text x="1061" y="530" class="item-ref" text-anchor="middle"><tspan x="1061" dy="0">core/ai</tspan></text>
+    <rect x="978" y="478" width="166" height="77" rx="8"/>
+    <text x="1061" y="498" class="item-label" text-anchor="middle"><tspan x="1061" dy="0">AI governance</tspan></text>
+    <text x="1061" y="514" class="item-detail" text-anchor="middle"><tspan x="1061" dy="0">inventory · validation ·</tspan><tspan x="1061" dy="13">pause</tspan></text>
+    <text x="1061" y="546" class="item-ref" text-anchor="middle"><tspan x="1061" dy="0">core/ai</tspan></text>
   </g>
 <g class="item item-domain">
-    <rect x="1152" y="472" width="166" height="68" rx="8"/>
-    <text x="1235" y="497" class="item-label" text-anchor="middle"><tspan x="1235" dy="0">Tenant platform</tspan></text>
-    <text x="1235" y="515" class="item-detail" text-anchor="middle"><tspan x="1235" dy="0">identity · commercial · ops</tspan></text>
-    <text x="1235" y="530" class="item-ref" text-anchor="middle"><tspan x="1235" dy="0">core/platform</tspan></text>
+    <rect x="1152" y="478" width="166" height="77" rx="8"/>
+    <text x="1235" y="498" class="item-label" text-anchor="middle"><tspan x="1235" dy="0">Tenant platform</tspan></text>
+    <text x="1235" y="514" class="item-detail" text-anchor="middle"><tspan x="1235" dy="0">identity · commercial · ops</tspan></text>
+    <text x="1235" y="546" class="item-ref" text-anchor="middle"><tspan x="1235" dy="0">core/platform</tspan></text>
   </g>
   </g>
 <g class="band band-decision">
-    <rect class="band-frame" x="270" y="556" width="1060" height="116" rx="10"/>
-    <rect class="band-heading" x="270" y="556" width="1060" height="30" rx="10"/>
-    <path class="heading-mask" d="M 270 578 h 1060 v 8 h -1060 z"/>
-    <circle cx="288" cy="571" r="10" class="band-number"/>
-    <text x="288" y="575" class="band-number-text" text-anchor="middle">4</text>
-    <text x="306" y="576" class="band-title">Decision &amp; control plane</text>
+    <rect class="band-frame" x="270" y="581" width="1060" height="114" rx="10"/>
+    <rect class="band-heading" x="270" y="581" width="1060" height="30" rx="10"/>
+    <path class="heading-mask" d="M 270 603 h 1060 v 8 h -1060 z"/>
+    <circle cx="288" cy="596" r="10" class="band-number"/>
+    <text x="288" y="600" class="band-number-text" text-anchor="middle">4</text>
+    <text x="306" y="601" class="band-title">Decision &amp; control plane</text>
     <g class="item item-decision">
-    <rect x="282" y="594" width="200.8" height="66" rx="8"/>
-    <text x="382.4" y="619" class="item-label" text-anchor="middle"><tspan x="382.4" dy="0">JS domain policy</tspan></text>
-    <text x="382.4" y="637" class="item-detail" text-anchor="middle"><tspan x="382.4" dy="0">default control-plane path</tspan></text>
-    <text x="382.4" y="650" class="item-ref" text-anchor="middle"><tspan x="382.4" dy="0">core/lending/eligibility.js</tspan></text>
+    <rect x="282" y="619" width="200.8" height="66" rx="8"/>
+    <text x="382.4" y="639" class="item-label" text-anchor="middle"><tspan x="382.4" dy="0">JS domain policy</tspan></text>
+    <text x="382.4" y="655" class="item-detail" text-anchor="middle"><tspan x="382.4" dy="0">default control-plane path</tspan></text>
+    <text x="382.4" y="676" class="item-ref" text-anchor="middle"><tspan x="382.4" dy="0">core/lending/eligibility.js</tspan></text>
   </g>
 <g class="item item-decision">
-    <rect x="490.8" y="594" width="200.8" height="66" rx="8"/>
-    <text x="591.2" y="619" class="item-label" text-anchor="middle"><tspan x="591.2" dy="0">Decision gateways</tspan></text>
-    <text x="591.2" y="637" class="item-detail" text-anchor="middle"><tspan x="591.2" dy="0">off · shadow · active</tspan></text>
-    <text x="591.2" y="650" class="item-ref" text-anchor="middle"><tspan x="591.2" dy="0">apps/api/src/*rules-engine.js</tspan></text>
+    <rect x="490.8" y="619" width="200.8" height="66" rx="8"/>
+    <text x="591.2" y="639" class="item-label" text-anchor="middle"><tspan x="591.2" dy="0">Decision gateways</tspan></text>
+    <text x="591.2" y="655" class="item-detail" text-anchor="middle"><tspan x="591.2" dy="0">off · shadow · active</tspan></text>
+    <text x="591.2" y="676" class="item-ref" text-anchor="middle"><tspan x="591.2" dy="0">apps/api/src/*rules-engine.js</tspan></text>
   </g>
 <g class="item item-decision">
-    <rect x="699.6" y="594" width="200.8" height="66" rx="8"/>
-    <text x="800" y="619" class="item-label" text-anchor="middle"><tspan x="800" dy="0">Business engines</tspan></text>
-    <text x="800" y="637" class="item-detail" text-anchor="middle"><tspan x="800" dy="0">one Rust runtime / tenant</tspan></text>
-    <text x="800" y="650" class="item-ref" text-anchor="middle"><tspan x="800" dy="0">rules/rules-service</tspan></text>
+    <rect x="699.6" y="619" width="200.8" height="66" rx="8"/>
+    <text x="800" y="639" class="item-label" text-anchor="middle"><tspan x="800" dy="0">Business engines</tspan></text>
+    <text x="800" y="655" class="item-detail" text-anchor="middle"><tspan x="800" dy="0">one Rust runtime / tenant</tspan></text>
+    <text x="800" y="676" class="item-ref" text-anchor="middle"><tspan x="800" dy="0">rules/rules-service</tspan></text>
   </g>
 <g class="item item-decision">
-    <rect x="908.4000000000001" y="594" width="200.8" height="66" rx="8"/>
-    <text x="1008.8000000000001" y="619" class="item-label" text-anchor="middle"><tspan x="1008.8000000000001" dy="0">Control engines</tspan></text>
-    <text x="1008.8000000000001" y="637" class="item-detail" text-anchor="middle"><tspan x="1008.8000000000001" dy="0">isolated ctrl-* fleet</tspan></text>
-    <text x="1008.8000000000001" y="650" class="item-ref" text-anchor="middle"><tspan x="1008.8000000000001" dy="0">ADR 0005</tspan></text>
+    <rect x="908.4000000000001" y="619" width="200.8" height="66" rx="8"/>
+    <text x="1008.8000000000001" y="639" class="item-label" text-anchor="middle"><tspan x="1008.8000000000001" dy="0">Control engines</tspan></text>
+    <text x="1008.8000000000001" y="655" class="item-detail" text-anchor="middle"><tspan x="1008.8000000000001" dy="0">isolated ctrl-* fleet</tspan></text>
+    <text x="1008.8000000000001" y="676" class="item-ref" text-anchor="middle"><tspan x="1008.8000000000001" dy="0">ADR 0005</tspan></text>
   </g>
 <g class="item item-decision">
-    <rect x="1117.2" y="594" width="200.8" height="66" rx="8"/>
-    <text x="1217.6000000000001" y="619" class="item-label" text-anchor="middle"><tspan x="1217.6000000000001" dy="0">AI kill switch</tspan></text>
-    <text x="1217.6000000000001" y="637" class="item-detail" text-anchor="middle"><tspan x="1217.6000000000001" dy="0">guardrails · manual review</tspan></text>
-    <text x="1217.6000000000001" y="650" class="item-ref" text-anchor="middle"><tspan x="1217.6000000000001" dy="0">core/ai/model-governance.js</tspan></text>
+    <rect x="1117.2" y="619" width="200.8" height="66" rx="8"/>
+    <text x="1217.6000000000001" y="639" class="item-label" text-anchor="middle"><tspan x="1217.6000000000001" dy="0">AI kill switch</tspan></text>
+    <text x="1217.6000000000001" y="655" class="item-detail" text-anchor="middle"><tspan x="1217.6000000000001" dy="0">guardrails · manual review</tspan></text>
+    <text x="1217.6000000000001" y="676" class="item-ref" text-anchor="middle"><tspan x="1217.6000000000001" dy="0">core/ai/model-governance.js</tspan></text>
   </g>
   </g>
 <g class="band band-data">
-    <rect class="band-frame" x="270" y="682" width="1060" height="116" rx="10"/>
-    <rect class="band-heading" x="270" y="682" width="1060" height="30" rx="10"/>
-    <path class="heading-mask" d="M 270 704 h 1060 v 8 h -1060 z"/>
-    <circle cx="288" cy="697" r="10" class="band-number"/>
-    <text x="288" y="701" class="band-number-text" text-anchor="middle">5</text>
-    <text x="306" y="702" class="band-title">Data, evidence &amp; intelligence</text>
+    <rect class="band-frame" x="270" y="711" width="1060" height="114" rx="10"/>
+    <rect class="band-heading" x="270" y="711" width="1060" height="30" rx="10"/>
+    <path class="heading-mask" d="M 270 733 h 1060 v 8 h -1060 z"/>
+    <circle cx="288" cy="726" r="10" class="band-number"/>
+    <text x="288" y="730" class="band-number-text" text-anchor="middle">5</text>
+    <text x="306" y="731" class="band-title">Data, evidence &amp; intelligence</text>
     <g class="item item-data">
-    <rect x="282" y="720" width="166" height="66" rx="8"/>
-    <text x="365" y="745" class="item-label" text-anchor="middle"><tspan x="365" dy="0">Development store</tspan></text>
-    <text x="365" y="763" class="item-detail" text-anchor="middle"><tspan x="365" dy="0">tenant-partitioned JSON</tspan></text>
-    <text x="365" y="776" class="item-ref" text-anchor="middle"><tspan x="365" dy="0">apps/api/file-store.js</tspan></text>
+    <rect x="282" y="749" width="166" height="66" rx="8"/>
+    <text x="365" y="769" class="item-label" text-anchor="middle"><tspan x="365" dy="0">Development store</tspan></text>
+    <text x="365" y="785" class="item-detail" text-anchor="middle"><tspan x="365" dy="0">tenant-partitioned JSON</tspan></text>
+    <text x="365" y="806" class="item-ref" text-anchor="middle"><tspan x="365" dy="0">apps/api/file-store.js</tspan></text>
   </g>
 <g class="item item-data">
-    <rect x="456" y="720" width="166" height="66" rx="8"/>
-    <text x="539" y="745" class="item-label" text-anchor="middle"><tspan x="539" dy="0">PostgreSQL</tspan></text>
-    <text x="539" y="763" class="item-detail" text-anchor="middle"><tspan x="539" dy="0">transactions · tenant RLS</tspan></text>
-    <text x="539" y="776" class="item-ref" text-anchor="middle"><tspan x="539" dy="0">apps/api/postgres-store.js</tspan></text>
+    <rect x="456" y="749" width="166" height="66" rx="8"/>
+    <text x="539" y="769" class="item-label" text-anchor="middle"><tspan x="539" dy="0">PostgreSQL</tspan></text>
+    <text x="539" y="785" class="item-detail" text-anchor="middle"><tspan x="539" dy="0">transactions · tenant RLS</tspan></text>
+    <text x="539" y="806" class="item-ref" text-anchor="middle"><tspan x="539" dy="0">apps/api/postgres-store.js</tspan></text>
   </g>
 <g class="item item-data">
-    <rect x="630" y="720" width="166" height="66" rx="8"/>
-    <text x="713" y="745" class="item-label" text-anchor="middle"><tspan x="713" dy="0">Audit spine</tspan></text>
-    <text x="713" y="763" class="item-detail" text-anchor="middle"><tspan x="713" dy="0">SHA-256 hash chain</tspan></text>
-    <text x="713" y="776" class="item-ref" text-anchor="middle"><tspan x="713" dy="0">core/shared/audit.js</tspan></text>
+    <rect x="630" y="749" width="166" height="66" rx="8"/>
+    <text x="713" y="769" class="item-label" text-anchor="middle"><tspan x="713" dy="0">Audit spine</tspan></text>
+    <text x="713" y="785" class="item-detail" text-anchor="middle"><tspan x="713" dy="0">SHA-256 hash chain</tspan></text>
+    <text x="713" y="806" class="item-ref" text-anchor="middle"><tspan x="713" dy="0">core/shared/audit.js</tspan></text>
   </g>
 <g class="item item-data">
-    <rect x="804" y="720" width="166" height="66" rx="8"/>
-    <text x="887" y="745" class="item-label" text-anchor="middle"><tspan x="887" dy="0">Evidence custody</tspan></text>
-    <text x="887" y="763" class="item-detail" text-anchor="middle"><tspan x="887" dy="0">retention · hold · export</tspan></text>
-    <text x="887" y="776" class="item-ref" text-anchor="middle"><tspan x="887" dy="0">core/compliance</tspan></text>
+    <rect x="804" y="749" width="166" height="66" rx="8"/>
+    <text x="887" y="769" class="item-label" text-anchor="middle"><tspan x="887" dy="0">Evidence custody</tspan></text>
+    <text x="887" y="785" class="item-detail" text-anchor="middle"><tspan x="887" dy="0">retention · hold · export</tspan></text>
+    <text x="887" y="806" class="item-ref" text-anchor="middle"><tspan x="887" dy="0">core/compliance</tspan></text>
   </g>
 <g class="item item-data">
-    <rect x="978" y="720" width="166" height="66" rx="8"/>
-    <text x="1061" y="745" class="item-label" text-anchor="middle"><tspan x="1061" dy="0">Data governance</tspan></text>
-    <text x="1061" y="763" class="item-detail" text-anchor="middle"><tspan x="1061" dy="0">lineage · quality · CDC</tspan></text>
-    <text x="1061" y="776" class="item-ref" text-anchor="middle"><tspan x="1061" dy="0">core/compliance</tspan></text>
+    <rect x="978" y="749" width="166" height="66" rx="8"/>
+    <text x="1061" y="769" class="item-label" text-anchor="middle"><tspan x="1061" dy="0">Data governance</tspan></text>
+    <text x="1061" y="785" class="item-detail" text-anchor="middle"><tspan x="1061" dy="0">lineage · quality · CDC</tspan></text>
+    <text x="1061" y="806" class="item-ref" text-anchor="middle"><tspan x="1061" dy="0">core/compliance</tspan></text>
   </g>
 <g class="item item-data">
-    <rect x="1152" y="720" width="166" height="66" rx="8"/>
-    <text x="1235" y="745" class="item-label" text-anchor="middle"><tspan x="1235" dy="0">Reports &amp; packs</tspan></text>
-    <text x="1235" y="763" class="item-detail" text-anchor="middle"><tspan x="1235" dy="0">regulatory · operational</tspan></text>
-    <text x="1235" y="776" class="item-ref" text-anchor="middle"><tspan x="1235" dy="0">core/compliance</tspan></text>
+    <rect x="1152" y="749" width="166" height="66" rx="8"/>
+    <text x="1235" y="769" class="item-label" text-anchor="middle"><tspan x="1235" dy="0">Reports &amp; packs</tspan></text>
+    <text x="1235" y="785" class="item-detail" text-anchor="middle"><tspan x="1235" dy="0">regulatory · operational</tspan></text>
+    <text x="1235" y="806" class="item-ref" text-anchor="middle"><tspan x="1235" dy="0">core/compliance</tspan></text>
   </g>
   </g>
 <g class="band band-runtime">
-    <rect class="band-frame" x="270" y="808" width="1060" height="116" rx="10"/>
-    <rect class="band-heading" x="270" y="808" width="1060" height="30" rx="10"/>
-    <path class="heading-mask" d="M 270 830 h 1060 v 8 h -1060 z"/>
-    <circle cx="288" cy="823" r="10" class="band-number"/>
-    <text x="288" y="827" class="band-number-text" text-anchor="middle">6</text>
-    <text x="306" y="828" class="band-title">Platform runtime &amp; operations</text>
+    <rect class="band-frame" x="270" y="841" width="1060" height="114" rx="10"/>
+    <rect class="band-heading" x="270" y="841" width="1060" height="30" rx="10"/>
+    <path class="heading-mask" d="M 270 863 h 1060 v 8 h -1060 z"/>
+    <circle cx="288" cy="856" r="10" class="band-number"/>
+    <text x="288" y="860" class="band-number-text" text-anchor="middle">6</text>
+    <text x="306" y="861" class="band-title">Platform runtime &amp; operations</text>
     <g class="item item-runtime">
-    <rect x="282" y="846" width="166" height="66" rx="8"/>
-    <text x="365" y="871" class="item-label" text-anchor="middle"><tspan x="365" dy="0">Adapter boundary</tspan></text>
-    <text x="365" y="889" class="item-detail" text-anchor="middle"><tspan x="365" dy="0">mock / real readiness</tspan></text>
-    <text x="365" y="902" class="item-ref" text-anchor="middle"><tspan x="365" dy="0">core/integrations</tspan></text>
+    <rect x="282" y="879" width="166" height="66" rx="8"/>
+    <text x="365" y="899" class="item-label" text-anchor="middle"><tspan x="365" dy="0">Adapter boundary</tspan></text>
+    <text x="365" y="915" class="item-detail" text-anchor="middle"><tspan x="365" dy="0">mock / real readiness</tspan></text>
+    <text x="365" y="936" class="item-ref" text-anchor="middle"><tspan x="365" dy="0">core/integrations</tspan></text>
   </g>
 <g class="item item-runtime">
-    <rect x="456" y="846" width="166" height="66" rx="8"/>
-    <text x="539" y="871" class="item-label" text-anchor="middle"><tspan x="539" dy="0">Durable workers</tspan></text>
-    <text x="539" y="889" class="item-detail" text-anchor="middle"><tspan x="539" dy="0">fences · retry · DLQ</tspan></text>
-    <text x="539" y="902" class="item-ref" text-anchor="middle"><tspan x="539" dy="0">core/integrations</tspan></text>
+    <rect x="456" y="879" width="166" height="66" rx="8"/>
+    <text x="539" y="899" class="item-label" text-anchor="middle"><tspan x="539" dy="0">Durable workers</tspan></text>
+    <text x="539" y="915" class="item-detail" text-anchor="middle"><tspan x="539" dy="0">fences · retry · DLQ</tspan></text>
+    <text x="539" y="936" class="item-ref" text-anchor="middle"><tspan x="539" dy="0">core/integrations</tspan></text>
   </g>
 <g class="item item-runtime">
-    <rect x="630" y="846" width="166" height="66" rx="8"/>
-    <text x="713" y="871" class="item-label" text-anchor="middle"><tspan x="713" dy="0">Callbacks</tspan></text>
-    <text x="713" y="889" class="item-detail" text-anchor="middle"><tspan x="713" dy="0">signed · idempotent</tspan></text>
-    <text x="713" y="902" class="item-ref" text-anchor="middle"><tspan x="713" dy="0">apps/api/routes</tspan></text>
+    <rect x="630" y="879" width="166" height="66" rx="8"/>
+    <text x="713" y="899" class="item-label" text-anchor="middle"><tspan x="713" dy="0">Callbacks</tspan></text>
+    <text x="713" y="915" class="item-detail" text-anchor="middle"><tspan x="713" dy="0">signed · idempotent</tspan></text>
+    <text x="713" y="936" class="item-ref" text-anchor="middle"><tspan x="713" dy="0">apps/api/routes</tspan></text>
   </g>
 <g class="item item-runtime">
-    <rect x="804" y="846" width="166" height="66" rx="8"/>
-    <text x="887" y="871" class="item-label" text-anchor="middle"><tspan x="887" dy="0">Observability</tspan></text>
-    <text x="887" y="889" class="item-detail" text-anchor="middle"><tspan x="887" dy="0">SLI · SLO · health</tspan></text>
-    <text x="887" y="902" class="item-ref" text-anchor="middle"><tspan x="887" dy="0">core/operations</tspan></text>
+    <rect x="804" y="879" width="166" height="66" rx="8"/>
+    <text x="887" y="899" class="item-label" text-anchor="middle"><tspan x="887" dy="0">Observability</tspan></text>
+    <text x="887" y="915" class="item-detail" text-anchor="middle"><tspan x="887" dy="0">SLI · SLO · health</tspan></text>
+    <text x="887" y="936" class="item-ref" text-anchor="middle"><tspan x="887" dy="0">core/operations</tspan></text>
   </g>
 <g class="item item-runtime">
-    <rect x="978" y="846" width="166" height="66" rx="8"/>
-    <text x="1061" y="871" class="item-label" text-anchor="middle"><tspan x="1061" dy="0">Identity runtime</tspan></text>
-    <text x="1061" y="889" class="item-detail" text-anchor="middle"><tspan x="1061" dy="0">federation · revocation</tspan></text>
-    <text x="1061" y="902" class="item-ref" text-anchor="middle"><tspan x="1061" dy="0">core/identity</tspan></text>
+    <rect x="978" y="879" width="166" height="66" rx="8"/>
+    <text x="1061" y="899" class="item-label" text-anchor="middle"><tspan x="1061" dy="0">Identity runtime</tspan></text>
+    <text x="1061" y="915" class="item-detail" text-anchor="middle"><tspan x="1061" dy="0">federation · revocation</tspan></text>
+    <text x="1061" y="936" class="item-ref" text-anchor="middle"><tspan x="1061" dy="0">core/identity</tspan></text>
   </g>
 <g class="item item-runtime">
-    <rect x="1152" y="846" width="166" height="66" rx="8"/>
-    <text x="1235" y="871" class="item-label" text-anchor="middle"><tspan x="1235" dy="0">Usage metering</tspan></text>
-    <text x="1235" y="889" class="item-detail" text-anchor="middle"><tspan x="1235" dy="0">only fail-open seam</tspan></text>
-    <text x="1235" y="902" class="item-ref" text-anchor="middle"><tspan x="1235" dy="0">ADR 0009</tspan></text>
+    <rect x="1152" y="879" width="166" height="66" rx="8"/>
+    <text x="1235" y="899" class="item-label" text-anchor="middle"><tspan x="1235" dy="0">Usage metering</tspan></text>
+    <text x="1235" y="915" class="item-detail" text-anchor="middle"><tspan x="1235" dy="0">only fail-open seam</tspan></text>
+    <text x="1235" y="936" class="item-ref" text-anchor="middle"><tspan x="1235" dy="0">ADR 0009</tspan></text>
   </g>
   </g>
 <g class="band band-delivery">
-    <rect class="band-frame" x="270" y="934" width="1060" height="116" rx="10"/>
-    <rect class="band-heading" x="270" y="934" width="1060" height="30" rx="10"/>
-    <path class="heading-mask" d="M 270 956 h 1060 v 8 h -1060 z"/>
-    <circle cx="288" cy="949" r="10" class="band-number"/>
-    <text x="288" y="953" class="band-number-text" text-anchor="middle">7</text>
-    <text x="306" y="954" class="band-title">Delivery, infrastructure &amp; verification</text>
+    <rect class="band-frame" x="270" y="971" width="1060" height="114" rx="10"/>
+    <rect class="band-heading" x="270" y="971" width="1060" height="30" rx="10"/>
+    <path class="heading-mask" d="M 270 993 h 1060 v 8 h -1060 z"/>
+    <circle cx="288" cy="986" r="10" class="band-number"/>
+    <text x="288" y="990" class="band-number-text" text-anchor="middle">7</text>
+    <text x="306" y="991" class="band-title">Delivery, infrastructure &amp; verification</text>
     <g class="item item-delivery">
-    <rect x="282" y="972" width="166" height="66" rx="8"/>
-    <text x="365" y="997" class="item-label" text-anchor="middle"><tspan x="365" dy="0">Local runtime</tspan></text>
-    <text x="365" y="1015" class="item-detail" text-anchor="middle"><tspan x="365" dy="0">Docker · Compose</tspan></text>
-    <text x="365" y="1028" class="item-ref" text-anchor="middle"><tspan x="365" dy="0">docker-compose.yml</tspan></text>
+    <rect x="282" y="1009" width="166" height="66" rx="8"/>
+    <text x="365" y="1029" class="item-label" text-anchor="middle"><tspan x="365" dy="0">Local runtime</tspan></text>
+    <text x="365" y="1045" class="item-detail" text-anchor="middle"><tspan x="365" dy="0">Docker · Compose</tspan></text>
+    <text x="365" y="1066" class="item-ref" text-anchor="middle"><tspan x="365" dy="0">docker-compose.yml</tspan></text>
   </g>
 <g class="item item-delivery">
-    <rect x="456" y="972" width="166" height="66" rx="8"/>
-    <text x="539" y="997" class="item-label" text-anchor="middle"><tspan x="539" dy="0">AWS showcase</tspan></text>
-    <text x="539" y="1015" class="item-detail" text-anchor="middle"><tspan x="539" dy="0">synthetic · isolated</tspan></text>
-    <text x="539" y="1028" class="item-ref" text-anchor="middle"><tspan x="539" dy="0">deploy/aws</tspan></text>
+    <rect x="456" y="1009" width="166" height="66" rx="8"/>
+    <text x="539" y="1029" class="item-label" text-anchor="middle"><tspan x="539" dy="0">AWS showcase</tspan></text>
+    <text x="539" y="1045" class="item-detail" text-anchor="middle"><tspan x="539" dy="0">synthetic · isolated</tspan></text>
+    <text x="539" y="1066" class="item-ref" text-anchor="middle"><tspan x="539" dy="0">deploy/aws</tspan></text>
   </g>
 <g class="item item-delivery">
-    <rect x="630" y="972" width="166" height="66" rx="8"/>
-    <text x="713" y="997" class="item-label" text-anchor="middle"><tspan x="713" dy="0">Immutable release</tspan></text>
-    <text x="713" y="1015" class="item-detail" text-anchor="middle"><tspan x="713" dy="0">allowlist · SHA-256</tspan></text>
-    <text x="713" y="1028" class="item-ref" text-anchor="middle"><tspan x="713" dy="0">package-demo.sh</tspan></text>
+    <rect x="630" y="1009" width="166" height="66" rx="8"/>
+    <text x="713" y="1029" class="item-label" text-anchor="middle"><tspan x="713" dy="0">Immutable release</tspan></text>
+    <text x="713" y="1045" class="item-detail" text-anchor="middle"><tspan x="713" dy="0">allowlist · SHA-256</tspan></text>
+    <text x="713" y="1066" class="item-ref" text-anchor="middle"><tspan x="713" dy="0">package-demo.sh</tspan></text>
   </g>
 <g class="item item-delivery">
-    <rect x="804" y="972" width="166" height="66" rx="8"/>
-    <text x="887" y="997" class="item-label" text-anchor="middle"><tspan x="887" dy="0">Atomic update</tspan></text>
-    <text x="887" y="1015" class="item-detail" text-anchor="middle"><tspan x="887" dy="0">SSM · health rollback</tspan></text>
-    <text x="887" y="1028" class="item-ref" text-anchor="middle"><tspan x="887" dy="0">release-demo.sh</tspan></text>
+    <rect x="804" y="1009" width="166" height="66" rx="8"/>
+    <text x="887" y="1029" class="item-label" text-anchor="middle"><tspan x="887" dy="0">Atomic update</tspan></text>
+    <text x="887" y="1045" class="item-detail" text-anchor="middle"><tspan x="887" dy="0">SSM · health rollback</tspan></text>
+    <text x="887" y="1066" class="item-ref" text-anchor="middle"><tspan x="887" dy="0">release-demo.sh</tspan></text>
   </g>
 <g class="item item-delivery">
-    <rect x="978" y="972" width="166" height="66" rx="8"/>
-    <text x="1061" y="997" class="item-label" text-anchor="middle"><tspan x="1061" dy="0">Test lanes</tspan></text>
-    <text x="1061" y="1015" class="item-detail" text-anchor="middle"><tspan x="1061" dy="0">Node · Postgres · Rust</tspan></text>
-    <text x="1061" y="1028" class="item-ref" text-anchor="middle"><tspan x="1061" dy="0">.github/workflows/ci.yml</tspan></text>
+    <rect x="978" y="1009" width="166" height="66" rx="8"/>
+    <text x="1061" y="1029" class="item-label" text-anchor="middle"><tspan x="1061" dy="0">Test lanes</tspan></text>
+    <text x="1061" y="1045" class="item-detail" text-anchor="middle"><tspan x="1061" dy="0">Node · Postgres · Rust</tspan></text>
+    <text x="1061" y="1066" class="item-ref" text-anchor="middle"><tspan x="1061" dy="0">.github/workflows/ci.yml</tspan></text>
   </g>
 <g class="item item-delivery">
-    <rect x="1152" y="972" width="166" height="66" rx="8"/>
-    <text x="1235" y="997" class="item-label" text-anchor="middle"><tspan x="1235" dy="0">Knowledge gates</tspan></text>
-    <text x="1235" y="1015" class="item-detail" text-anchor="middle"><tspan x="1235" dy="0">docs · graph · evidence</tspan></text>
-    <text x="1235" y="1028" class="item-ref" text-anchor="middle"><tspan x="1235" dy="0">npm run knowledge:check</tspan></text>
+    <rect x="1152" y="1009" width="166" height="66" rx="8"/>
+    <text x="1235" y="1029" class="item-label" text-anchor="middle"><tspan x="1235" dy="0">Knowledge gates</tspan></text>
+    <text x="1235" y="1045" class="item-detail" text-anchor="middle"><tspan x="1235" dy="0">docs · graph · evidence</tspan></text>
+    <text x="1235" y="1066" class="item-ref" text-anchor="middle"><tspan x="1235" dy="0">npm run knowledge:check</tspan></text>
   </g>
   </g>
-  <path class="band-flow" d="M 800 223 V 230" marker-end="url(#arrow-flow)"/>
-<path class="band-flow" d="M 800 349 V 356" marker-end="url(#arrow-flow)"/>
-<path class="band-flow" d="M 800 547 V 554" marker-end="url(#arrow-flow)"/>
-<path class="band-flow" d="M 800 673 V 680" marker-end="url(#arrow-flow)"/>
-<path class="band-flow" d="M 800 799 V 806" marker-end="url(#arrow-flow)"/>
-<path class="band-flow" d="M 800 925 V 932" marker-end="url(#arrow-flow)"/>
+  <g class="relationship relationship-request" role="group" aria-label="People initiate governed journeys through authorised channels">
+    <title>People initiate governed journeys through authorised channels</title>
+    <path d="M 236 163 H 262" marker-end="url(#arrow-request)"/>
+  </g>
+<g class="relationship relationship-request" role="group" aria-label="Channels submit authenticated commands and queries">
+    <title>Channels submit authenticated commands and queries</title>
+    <path d="M 800 221 V 234" marker-end="url(#arrow-request)"/>
+  </g>
+<g class="relationship relationship-request" role="group" aria-label="API orchestration invokes tenant-scoped domain services">
+    <title>API orchestration invokes tenant-scoped domain services</title>
+    <path d="M 800 351 V 364" marker-end="url(#arrow-request)"/>
+  </g>
+<g class="relationship relationship-decision" role="group" aria-label="Domain facts request deterministic policy decisions">
+    <title>Domain facts request deterministic policy decisions</title>
+    <path d="M 800 566 V 579" marker-end="url(#arrow-decision)"/>
+  </g>
+<g class="relationship relationship-evidence" role="group" aria-label="Decision lineage is sealed into tenant evidence">
+    <title>Decision lineage is sealed into tenant evidence</title>
+    <path d="M 800 696 V 709" marker-end="url(#arrow-evidence)"/>
+  </g>
+<g class="relationship relationship-event" role="group" aria-label="State and evidence changes drive operational events">
+    <title>State and evidence changes drive operational events</title>
+    <path d="M 800 826 V 839" marker-end="url(#arrow-event)"/>
+  </g>
+<g class="relationship relationship-evidence" role="group" aria-label="Operational health and assurance evidence gate delivery">
+    <title>Operational health and assurance evidence gate delivery</title>
+    <path d="M 800 956 V 969" marker-end="url(#arrow-evidence)"/>
+  </g>
+<g class="relationship relationship-integration" role="group" aria-label="Certified gateways exchange with external systems">
+    <title>Certified gateways exchange with external systems</title>
+    <path d="M 1338 898 H 1364" marker-end="url(#arrow-integration)"/>
+  </g>
   <g class="side-lane side-right">
-    <rect x="1358" y="106" width="218" height="944" rx="10"/>
+    <rect x="1358" y="106" width="218" height="979" rx="10"/>
     <rect class="lane-heading" x="1358" y="106" width="218" height="34" rx="10"/>
     <path class="heading-mask" d="M 1358 132 h 218 v 8 h -218 z"/>
     <text x="1467" y="128" text-anchor="middle" class="lane-title">External systems</text>
     <text x="1391" y="162" class="lane-group">Identity &amp; trust</text><g class="lane-item"><circle cx="1379" cy="186" r="4"/><text x="1391" y="190">IdP · OIDC · SAML · SCIM</text></g><g class="lane-item"><circle cx="1379" cy="213" r="4"/><text x="1391" y="217">KMS · HSM · secrets vault</text></g><g class="lane-item"><circle cx="1379" cy="240" r="4"/><text x="1391" y="244">SIEM · WORM · trusted time</text></g><text x="1391" y="274" class="lane-group">Lending rails</text><g class="lane-item"><circle cx="1379" cy="298" r="4"/><text x="1391" y="302">CKYCRR · CIC · AA</text></g><g class="lane-item"><circle cx="1379" cy="325" r="4"/><text x="1391" y="329">Bank verify · eSign · V-CIP</text></g><g class="lane-item"><circle cx="1379" cy="352" r="4"/><text x="1391" y="356">NACH · UPI · payment rails</text></g><g class="lane-item"><circle cx="1379" cy="379" r="4"/><text x="1391" y="383">CBS · GL · bank statements</text></g><text x="1391" y="413" class="lane-group">Regulatory &amp; operations</text><g class="lane-item"><circle cx="1379" cy="437" r="4"/><text x="1391" y="441">FIU-IND · CERSAI · RBI</text></g><g class="lane-item"><circle cx="1379" cy="464" r="4"/><text x="1391" y="468">DMS · email · SMS · voice</text></g><g class="lane-item"><circle cx="1379" cy="491" r="4"/><text x="1391" y="495">Cloud · database · queues</text></g><g class="lane-item"><circle cx="1379" cy="518" r="4"/><text x="1391" y="522">Support · paging · telemetry</text></g>
-    <path class="lane-arrow" d="M 1364 578 H 1338" marker-end="url(#arrow-right)"/>
   </g>
-  <g class="principles">
-    <text x="24" y="1088" class="principles-title">Cross-cutting security, governance &amp; compliance</text>
-    <path d="M 359 1083 H 1576"/>
-    <g class="principle">
-      <rect x="24" y="1102" width="187" height="48" rx="8"/>
-      <text x="117.5" y="1122" text-anchor="middle" class="principle-label">Tenant isolation</text>
-      <text x="117.5" y="1138" text-anchor="middle" class="principle-detail">absolute</text>
-    </g><g class="principle">
-      <rect x="219" y="1102" width="187" height="48" rx="8"/>
-      <text x="312.5" y="1122" text-anchor="middle" class="principle-label">Fail closed</text>
-      <text x="312.5" y="1138" text-anchor="middle" class="principle-detail">restrictive by default</text>
-    </g><g class="principle">
-      <rect x="414" y="1102" width="187" height="48" rx="8"/>
-      <text x="507.5" y="1122" text-anchor="middle" class="principle-label">Exact money</text>
-      <text x="507.5" y="1138" text-anchor="middle" class="principle-detail">no float math</text>
-    </g><g class="principle">
-      <rect x="609" y="1102" width="187" height="48" rx="8"/>
-      <text x="702.5" y="1122" text-anchor="middle" class="principle-label">Deterministic</text>
-      <text x="702.5" y="1138" text-anchor="middle" class="principle-detail">replayable decisions</text>
-    </g><g class="principle">
-      <rect x="804" y="1102" width="187" height="48" rx="8"/>
-      <text x="897.5" y="1122" text-anchor="middle" class="principle-label">Policy as data</text>
-      <text x="897.5" y="1138" text-anchor="middle" class="principle-detail">signed bundles</text>
-    </g><g class="principle">
-      <rect x="999" y="1102" width="187" height="48" rx="8"/>
-      <text x="1092.5" y="1122" text-anchor="middle" class="principle-label">AI gated</text>
-      <text x="1092.5" y="1138" text-anchor="middle" class="principle-detail">facts + provenance</text>
-    </g><g class="principle">
-      <rect x="1194" y="1102" width="187" height="48" rx="8"/>
-      <text x="1287.5" y="1122" text-anchor="middle" class="principle-label">Maker-checker</text>
-      <text x="1287.5" y="1138" text-anchor="middle" class="principle-detail">independent authority</text>
-    </g><g class="principle">
-      <rect x="1389" y="1102" width="187" height="48" rx="8"/>
-      <text x="1482.5" y="1122" text-anchor="middle" class="principle-label">Evidence lineage</text>
-      <text x="1482.5" y="1138" text-anchor="middle" class="principle-detail">audit by construction</text>
+  <g class="relationship-legend">
+    <text x="24" y="1123" class="section-title">Relationship semantics</text>
+    <path class="section-rule" d="M 214 1118 H 1576"/>
+    <g class="relationship-key">
+      <path class="relationship-request" d="M 34 1146 H 66" marker-end="url(#arrow-request)"/>
+      <text x="75" y="1150">Request / command</text>
+    </g>
+<g class="relationship-key">
+      <path class="relationship-decision" d="M 344.4 1146 H 376.4" marker-end="url(#arrow-decision)"/>
+      <text x="385.4" y="1150">Policy decision</text>
+    </g>
+<g class="relationship-key">
+      <path class="relationship-event" d="M 654.8 1146 H 686.8" marker-end="url(#arrow-event)"/>
+      <text x="695.8" y="1150">Event / state change</text>
+    </g>
+<g class="relationship-key">
+      <path class="relationship-evidence" d="M 965.1999999999999 1146 H 997.1999999999999" marker-end="url(#arrow-evidence)"/>
+      <text x="1006.1999999999999" y="1150">Evidence / assurance</text>
+    </g>
+<g class="relationship-key">
+      <path class="relationship-integration" d="M 1275.6 1146 H 1307.6" marker-end="url(#arrow-integration)"/>
+      <text x="1316.6" y="1150">External integration</text>
     </g>
   </g>
-  <text x="800" y="1172" text-anchor="middle" class="source">Controlled source: docs/architecture/loanos-system-map.json · Regenerate: npm run architecture:diagram</text>
+  <g class="principles">
+    <text x="24" y="1185" class="section-title">Cross-cutting security, governance &amp; compliance</text>
+    <path class="section-rule" d="M 359 1180 H 1576"/>
+    <g class="principle">
+      <rect x="24" y="1199" width="187" height="48" rx="8"/>
+      <text x="117.5" y="1219" text-anchor="middle" class="principle-label">Tenant isolation</text>
+      <text x="117.5" y="1235" text-anchor="middle" class="principle-detail">absolute</text>
+    </g><g class="principle">
+      <rect x="219" y="1199" width="187" height="48" rx="8"/>
+      <text x="312.5" y="1219" text-anchor="middle" class="principle-label">Fail closed</text>
+      <text x="312.5" y="1235" text-anchor="middle" class="principle-detail">restrictive by default</text>
+    </g><g class="principle">
+      <rect x="414" y="1199" width="187" height="48" rx="8"/>
+      <text x="507.5" y="1219" text-anchor="middle" class="principle-label">Exact money</text>
+      <text x="507.5" y="1235" text-anchor="middle" class="principle-detail">no float math</text>
+    </g><g class="principle">
+      <rect x="609" y="1199" width="187" height="48" rx="8"/>
+      <text x="702.5" y="1219" text-anchor="middle" class="principle-label">Deterministic</text>
+      <text x="702.5" y="1235" text-anchor="middle" class="principle-detail">replayable decisions</text>
+    </g><g class="principle">
+      <rect x="804" y="1199" width="187" height="48" rx="8"/>
+      <text x="897.5" y="1219" text-anchor="middle" class="principle-label">Policy as data</text>
+      <text x="897.5" y="1235" text-anchor="middle" class="principle-detail">signed bundles</text>
+    </g><g class="principle">
+      <rect x="999" y="1199" width="187" height="48" rx="8"/>
+      <text x="1092.5" y="1219" text-anchor="middle" class="principle-label">AI gated</text>
+      <text x="1092.5" y="1235" text-anchor="middle" class="principle-detail">facts + provenance</text>
+    </g><g class="principle">
+      <rect x="1194" y="1199" width="187" height="48" rx="8"/>
+      <text x="1287.5" y="1219" text-anchor="middle" class="principle-label">Maker-checker</text>
+      <text x="1287.5" y="1235" text-anchor="middle" class="principle-detail">independent authority</text>
+    </g><g class="principle">
+      <rect x="1389" y="1199" width="187" height="48" rx="8"/>
+      <text x="1482.5" y="1219" text-anchor="middle" class="principle-label">Evidence lineage</text>
+      <text x="1482.5" y="1235" text-anchor="middle" class="principle-detail">audit by construction</text>
+    </g>
+  </g>
+  <text x="800" y="1269" text-anchor="middle" class="source">Controlled source: docs/architecture/loanos-system-map.json · Regenerate: npm run architecture:diagram</text>
 </svg>
