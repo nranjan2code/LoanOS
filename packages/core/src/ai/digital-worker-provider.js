@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { contentHash, isSha256Hex } from "./record-seal.js";
 
 // LoanOS-owned boundary around an LLM/agent SDK.  A concrete Bedrock/Strands
 // adapter may implement `invoke`, but it must never receive authority to make
@@ -25,11 +25,11 @@ export async function invokeDigitalWorkerProvider(provider, request, { timeoutMs
     inputRef: request.inputRef, inputHash: request.inputHash, promptHash: request.promptHash,
     outputSchema: request.outputSchema, proposalOnly: true, signal: controller.signal
   });
-  const requestChecksum = checksum({ ...providerRequest, signal: undefined });
+  const requestChecksum = contentHash({ ...providerRequest, signal: undefined });
   try {
     const response = await provider.invoke(providerRequest);
     validateResponse(response, request);
-    const proposalChecksum = checksum(response.proposal);
+    const proposalChecksum = contentHash(response.proposal);
     return Object.freeze({
       proposal: response.proposal,
       evidence: Object.freeze({ providerId, providerRequestId: response.providerRequestId, region: response.region,
@@ -45,7 +45,7 @@ export async function invokeDigitalWorkerProvider(provider, request, { timeoutMs
 
 function validateRequest(x) {
   for (const key of ["requestId", "tenantId", "executionId", "installationId", "action", "purpose", "inputRef", "inputHash", "promptHash", "modelId", "modelVersion", "region"]) required(x?.[key], key);
-  if (!hash(x.inputHash) || !hash(x.promptHash)) fail("digital_worker_checksum_invalid", "Input and prompt checksums must be SHA-256 hex.");
+  if (!isSha256Hex(x.inputHash) || !isSha256Hex(x.promptHash)) fail("digital_worker_checksum_invalid", "Input and prompt checksums must be SHA-256 hex.");
   if (!x.outputSchema || x.outputSchema.type !== "object") fail("digital_worker_output_schema_invalid", "A constrained object output schema is required.");
 }
 
@@ -72,8 +72,5 @@ function validateSchema(value, schema, path = "proposal") {
 
 function normalizeUsage(usage) { return Object.freeze({ inputTokens: integer(usage?.inputTokens, "usage.inputTokens"), outputTokens: integer(usage?.outputTokens, "usage.outputTokens"), toolCalls: integer(usage?.toolCalls ?? 0, "usage.toolCalls") }); }
 function integer(value, name) { if (!Number.isSafeInteger(value) || value < 0) fail("digital_worker_usage_invalid", `${name} must be a non-negative safe integer.`); return value; }
-function checksum(value) { return createHash("sha256").update(stable(value)).digest("hex"); }
-function stable(value) { if (Array.isArray(value)) return `[${value.map(stable).join(",")}]`; if (value && typeof value === "object") return `{${Object.keys(value).sort().map((k) => `${JSON.stringify(k)}:${stable(value[k])}`).join(",")}}`; return JSON.stringify(value); }
-function hash(value) { return typeof value === "string" && /^[a-f0-9]{64}$/i.test(value); }
 function required(value, name) { if (value === undefined || value === null || value === "") fail("digital_worker_request_invalid", `${name} is required.`); }
 function fail(code, message, status = 422) { throw Object.assign(new Error(message), { code, status }); }

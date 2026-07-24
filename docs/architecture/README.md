@@ -23,6 +23,7 @@ This index is the navigation root for LoanOS architecture. The current implement
 
 ## Agentic AI
 
+- [Agentic AI architecture and governance specification](agentic-ai-architecture-and-governance.md)
 - [Agentic AI digital workers on AWS](agentic-ai-digital-workers.md)
 - [AI-agent platform operations](ai-agent-platform-operations.md)
 - [Digital worker provider contract](digital-worker-provider-contract.md)

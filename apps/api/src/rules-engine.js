@@ -255,7 +255,8 @@ const SPECIALIZED_AI_GUARDRAILS = new Set([
   "guardrail.data_access",
   "guardrail.outbound_communication",
   "guardrail.underwriting_influence",
-  "guardrail.case_mutation"
+  "guardrail.case_mutation",
+  "guardrail.collections_contact"
 ]);
 
 // ADR 0010: a tool call-site supplies the exact decision key declared by the

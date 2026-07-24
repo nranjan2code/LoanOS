@@ -68,9 +68,11 @@ export function createModelRegistryState() {
 }
 
 // Local id helper. model-governance is imported by loan-policy, so importing
-// createLoanId from there would create a cycle; this mirrors its format.
+// createLoanId from there would create a cycle; this uses crypto.randomUUID()
+// for collision resistance and auditability.
+import { randomUUID } from "node:crypto";
 function createGovernanceId(prefix) {
-  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+  return `${prefix}_${randomUUID()}`;
 }
 
 /**

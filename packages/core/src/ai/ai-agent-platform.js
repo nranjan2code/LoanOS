@@ -30,7 +30,8 @@
  * capped before it's incurred, not discovered after the fact.
  */
 import { evaluateModelUse } from "./model-governance.js";
-import { sealRecord } from "./record-seal.js";
+import { buildAiDisclosure } from "./ai-interaction.js";
+import { isSha256Hex, sealRecord } from "./record-seal.js";
 import { digitalWorkerRuntimePayloadChecksum, enqueueDigitalWorkerRuntimeJob } from "./digital-worker-runtime-jobs.js";
 
 const IST_REGION = "ap-south-1";
@@ -229,7 +230,7 @@ export function installTenantAiAgent(state, modelRegistry, input, now = new Date
   tenantRecord(contract, input.tenantId, "ai_agent_pricing_contract_invalid");
   if (contract.status !== "active" || !contract.templateIds.includes(input.templateId)) fail("ai_agent_not_entitled", "Pricing contract does not entitle this agent template.", 403);
   if (now.getTime() < Date.parse(contract.effectiveFrom) || now.getTime() > Date.parse(contract.validUntil)) fail("ai_agent_pricing_contract_inactive", "Pricing contract is outside its effective period.", 403);
-  if (!/^[a-f0-9]{64}$/i.test(input.promptHash)) fail("ai_agent_prompt_hash_invalid", "promptHash must be SHA-256 hex.");
+  if (!isSha256Hex(input.promptHash)) fail("ai_agent_prompt_hash_invalid", "promptHash must be SHA-256 hex.");
   const modelUse = evaluateModelUse(modelRegistry, { modelId: input.modelId });
   if (!modelUse.allowed) fail("ai_agent_model_not_usable", "The pinned model is not approved for use.", 409, { findings: modelUse.findings });
   if (String(modelUse.model.version) !== String(input.modelVersion)) fail("ai_agent_model_version_mismatch", "Installation must pin the exact registered model version.", 409);
@@ -354,11 +355,21 @@ export function authorizeAiAgentExecution(state, modelRegistry, input, now = new
     if (reservation.status !== "reserved" || reservation.budgetId !== budget.budgetId || reservation.installationId !== installation.installationId || Date.parse(reservation.expiresAt) < now.getTime()) fail("ai_agent_budget_reservation_invalid", "A current matching budget reservation is required.", 403);
     reservationId = reservation.reservationId;
   }
-  if (!/^[a-f0-9]{64}$/i.test(input.inputHash)) fail("ai_agent_input_hash_invalid", "inputHash must be SHA-256 hex.");
+  if (!isSha256Hex(input.inputHash)) fail("ai_agent_input_hash_invalid", "inputHash must be SHA-256 hex.");
   const modelUse = evaluateModelUse(modelRegistry, { modelId: installation.modelId, humanReviewRef: input.humanReviewRef, customerDisclosureRef: input.customerDisclosureRef });
   if (!modelUse.allowed) fail("ai_agent_model_not_usable", "Model use is blocked by governance or kill switch.", 409, { findings: modelUse.findings });
   if (String(modelUse.model.version) !== installation.modelVersion) fail("ai_agent_model_version_mismatch", "The registered model version no longer matches the approved installation.", 409);
-  if (installation.customerFacing && !input.customerDisclosureRef) fail("ai_agent_disclosure_required", "Customer-facing execution requires an AI disclosure reference.");
+  // O-5: auto-generate mandated AI disclosure for customer-facing installations.
+  // If the caller supplies a ref, use it; otherwise build one server-side.
+  // A failed disclosure (kill switch, model not active) denies the execution.
+  let customerDisclosureRef = input.customerDisclosureRef ?? null;
+  if (installation.customerFacing) {
+    if (!customerDisclosureRef) {
+      const disclosure = buildAiDisclosure(modelRegistry, { modelId: installation.modelId }, now);
+      if (disclosure.summary.status === "blocked") fail("ai_agent_disclosure_generation_failed", "Customer-facing AI disclosure could not be generated; execution denied.", 409, { findings: disclosure.findings });
+      customerDisclosureRef = disclosure.disclosure.disclosureId;
+    }
+  }
   trustedDecision(input.modelConsumptionDecision, "allow", "ai_agent_model_consumption_denied");
   trustedDecision(input.actionGuardrailDecision, "allow", "ai_agent_action_guardrail_denied");
   const domainGuardrailDecisions = {};
@@ -368,7 +379,7 @@ export function authorizeAiAgentExecution(state, modelRegistry, input, now = new
       domainGuardrailDecisions[key] = decisionProjection(dec);
     }
   }
-  const execution = seal({ executionId: input.executionId, tenantId: input.tenantId, installationId: input.installationId, templateId: installation.templateId, action: input.action, purpose: input.purpose, inputRef: input.inputRef, inputHash: input.inputHash.toLowerCase(), modelId: installation.modelId, modelVersion: installation.modelVersion, promptHash: installation.promptHash, configurationRef: installation.configurationRef, workloadPrincipalId: installation.workloadPrincipalId, humanSponsorPrincipalId: installation.humanSponsorPrincipalId, modelConsumptionDecision: decisionProjection(input.modelConsumptionDecision), actionGuardrailDecision: decisionProjection(input.actionGuardrailDecision), domainGuardrailDecisions, humanReviewRef: input.humanReviewRef ?? null, customerDisclosureRef: input.customerDisclosureRef ?? null, usageReservationId: reservationId, status: "authorized", dataRegion: IST_REGION, authorizedAt: now.toISOString(), completedAt: null, outputRef: null, outputHash: null });
+  const execution = seal({ executionId: input.executionId, tenantId: input.tenantId, installationId: input.installationId, templateId: installation.templateId, action: input.action, purpose: input.purpose, inputRef: input.inputRef, inputHash: input.inputHash.toLowerCase(), modelId: installation.modelId, modelVersion: installation.modelVersion, promptHash: installation.promptHash, configurationRef: installation.configurationRef, workloadPrincipalId: installation.workloadPrincipalId, humanSponsorPrincipalId: installation.humanSponsorPrincipalId, modelConsumptionDecision: decisionProjection(input.modelConsumptionDecision), actionGuardrailDecision: decisionProjection(input.actionGuardrailDecision), domainGuardrailDecisions, humanReviewRef: input.humanReviewRef ?? null, customerDisclosureRef, usageReservationId: reservationId, status: "authorized", dataRegion: IST_REGION, authorizedAt: now.toISOString(), completedAt: null, outputRef: null, outputHash: null });
   return result(platform, "executions", execution.executionId, execution, "ai_agent.execution_authorized", now);
 }
 
@@ -387,7 +398,7 @@ export function completeAiAgentExecution(state, input, now = new Date()) {
   required(input, ["executionId", "tenantId", "outputRef", "outputHash", "outcome"]);
   const execution = tenantRecord(platform.executions[input.executionId], input.tenantId, "ai_agent_execution_missing");
   if (execution.status !== "authorized") fail("ai_agent_execution_not_authorized", "Only an authorized execution can be completed.", 409);
-  if (!/^[a-f0-9]{64}$/i.test(input.outputHash)) fail("ai_agent_output_hash_invalid", "outputHash must be SHA-256 hex.");
+  if (!isSha256Hex(input.outputHash)) fail("ai_agent_output_hash_invalid", "outputHash must be SHA-256 hex.");
   if (!['proposal_created', 'human_handoff', 'no_action', 'failed'].includes(input.outcome)) fail("ai_agent_outcome_invalid", "Execution outcome is invalid.");
   const completed = seal({ ...execution, status: input.outcome === "failed" ? "failed" : "completed", outcome: input.outcome, outputRef: input.outputRef, outputHash: input.outputHash.toLowerCase(), citations: unique(input.citations ?? []), completedAt: now.toISOString() });
   return result(platform, "executions", completed.executionId, completed, "ai_agent.execution_completed", now);
@@ -598,7 +609,7 @@ export function buildAiAgentGovernanceReport(state, tenantId, { from, to } = {})
 }
 
 function template(id, name, category, maximumAutonomy, allowedActions, requiredGuardrails, customerFacing) { return Object.freeze({ templateId: id, version: 1, name, category, maximumAutonomy, allowedActions: Object.freeze(allowedActions), requiredGuardrails: Object.freeze(requiredGuardrails), customerFacing, decisionAuthority: "none", outputType: "proposal_only", status: "available" }); }
-function normalizeKnowledge(values = []) { return values.map((x) => { required(x, ["ref", "version", "contentHash"]); if (!/^[a-f0-9]{64}$/i.test(x.contentHash)) fail("ai_agent_knowledge_hash_invalid", "Knowledge contentHash must be SHA-256 hex."); return { ref: x.ref, version: String(x.version), contentHash: x.contentHash.toLowerCase() }; }); }
+function normalizeKnowledge(values = []) { return values.map((x) => { required(x, ["ref", "version", "contentHash"]); if (!isSha256Hex(x.contentHash)) fail("ai_agent_knowledge_hash_invalid", "Knowledge contentHash must be SHA-256 hex."); return { ref: x.ref, version: String(x.version), contentHash: x.contentHash.toLowerCase() }; }); }
 function validateApprovals(value, proposer) { if (!value || typeof value !== "object") fail("ai_agent_approvals_required", "Four-role approval is required."); const ids = APPROVAL_ROLES.map((role) => { const a = value[role]; required(a, ["principalId", "approvalRef"]); if (a.principalType && a.principalType !== "human") fail("ai_agent_human_approval_required", `${role} approval must be human.`); if (a.principalId === proposer) fail("ai_agent_proposer_cannot_approve", "The proposer cannot approve production activation."); return a.principalId; }); if (new Set(ids).size !== ids.length) fail("ai_agent_approval_independence_required", "All four production approval roles must use distinct human principals."); return Object.fromEntries(APPROVAL_ROLES.map((role) => [role, { principalId: value[role].principalId, approvalRef: value[role].approvalRef }])); }
 function trustedDecision(value, outcome, code) { if (!value || value.decision !== outcome || !value.traceRef || !["isolated_business_engine", "isolated_control_engine"].includes(value.source)) fail(code, "An affirmative traceable isolated-engine decision is required.", 403); }
 function decisionProjection(value) { return { decision: value.decision, traceRef: value.traceRef, source: value.source, decisionKey: value.decisionKey ?? null, rulesetHash: value.rulesetHash ?? null }; }
@@ -623,7 +634,13 @@ function activeBudget(platform, tenantId, contractId, now) { return Object.value
  * used again — `authorizeAiAgentExecution` refuses it — so its capacity
  * returns to the budget instead of leaking away permanently.
  */
-function budgetCommitted(platform, budgetId, now) { const blank = { executions: "0", inputTokens: "0", outputTokens: "0", chargePaise: "0" }; const used = Object.values(platform.usageLedger).filter((x) => x.budgetId === budgetId).reduce((total, x) => addMetrics(total, { ...x.metrics, chargePaise: x.chargePaise }), blank); const attached = new Set(Object.values(platform.executions).map((x) => x.usageReservationId).filter(Boolean)); return Object.values(platform.budgetReservations).filter((x) => x.budgetId === budgetId && x.status === "reserved" && (Date.parse(x.expiresAt) > now.getTime() || attached.has(x.reservationId))).reduce((total, x) => addMetrics(total, { ...x.metrics, chargePaise: x.chargePaise }), used); }
+function budgetCommitted(platform, budgetId, now) {
+  const blank = { executions: "0", inputTokens: "0", outputTokens: "0", chargePaise: "0" };
+  const used = Object.values(platform.usageLedger).filter((x) => x.budgetId === budgetId).reduce((total, x) => addMetrics(total, { ...x.metrics, chargePaise: x.chargePaise }), blank);
+  const budgetReservationIds = new Set(Object.values(platform.budgetReservations).filter((x) => x.budgetId === budgetId && x.status === "reserved").map((x) => x.reservationId));
+  const attached = new Set(Object.values(platform.executions).filter((x) => budgetReservationIds.has(x.usageReservationId)).map((x) => x.usageReservationId));
+  return Object.values(platform.budgetReservations).filter((x) => x.budgetId === budgetId && x.status === "reserved" && (Date.parse(x.expiresAt) > now.getTime() || attached.has(x.reservationId))).reduce((total, x) => addMetrics(total, { ...x.metrics, chargePaise: x.chargePaise }), used);
+}
 function addMetrics(left, right) { return Object.fromEntries(["executions", "inputTokens", "outputTokens", "chargePaise"].map((key) => [key, (BigInt(left[key] ?? "0") + BigInt(right[key] ?? "0")).toString()])); }
 function enforceBudget(budget, total) { const pairs = [["maxExecutions", "executions"], ["maxInputTokens", "inputTokens"], ["maxOutputTokens", "outputTokens"], ["maxChargePaise", "chargePaise"]]; for (const [limit, actual] of pairs) if (BigInt(total[actual]) > BigInt(budget.limits[limit])) fail("ai_agent_budget_exceeded", `Usage budget ${limit} would be exceeded.`, 403, { budgetId: budget.budgetId, limit, allowed: budget.limits[limit], requested: total[actual] }); }
 function usageTotals(usage) { return usage.reduce((total, x) => addMetrics(total, { ...x.metrics, chargePaise: x.chargePaise }), { executions: "0", inputTokens: "0", outputTokens: "0", chargePaise: "0" }); }

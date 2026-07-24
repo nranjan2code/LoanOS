@@ -16,6 +16,11 @@
  *    of construction) must not change the hash, so records rebuilt via
  *    spread/merge reseal to the same value when their content is equal.
  *
+ * This module is the **single source** of canonical JSON encoding, content
+ * hashing and SHA-256 validation for the entire AI module. All files under
+ * `packages/core/src/ai/` that need canonical hashing or digest verification
+ * MUST import from here — never re-implement locally.
+ *
  * `ai-agent-platform.js` and `agent-studio-governance.js` both reseal the
  * same installation records at different lifecycle points; they MUST use
  * this one implementation so their seals agree.
@@ -41,6 +46,15 @@ export function canonicalJson(value) {
  */
 export function contentHash(value) {
   return createHash("sha256").update(canonicalJson(value)).digest("hex");
+}
+
+/**
+ * Test whether a string is a valid lowercase or uppercase SHA-256 hex digest.
+ * @param {*} value
+ * @returns {boolean}
+ */
+export function isSha256Hex(value) {
+  return typeof value === "string" && /^[a-f0-9]{64}$/i.test(value);
 }
 
 /**

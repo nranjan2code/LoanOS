@@ -167,6 +167,15 @@ export {
 } from "./ai/digital-worker-runtime-jobs.js";
 
 export {
+  SKILL_ROUTING_TABLE,
+  SKILL_PERMISSION_MANIFESTS,
+  routeAgentSkill,
+  validateSkillPermissions,
+  assessSkillExecutionReadiness,
+  recordSkillExecution
+} from "./ai/agent-skill-execution-contract.js";
+
+export {
   ALLOWED_RE_TYPES,
   acceptKfs,
   attachKfs,

@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { contentHash } from "./record-seal.js";
 
 // ADR 0010: this catalogue is the only bridge from a model worker to a LoanOS
 // capability. It contains authority metadata only; executable ports are always
@@ -50,7 +50,7 @@ export async function executeGovernedDigitalWorkerTool(input = {}) {
     guardrailDecisionKey: definition.guardrailDecisionKey,
     guardrailTraceRef: decision.traceRef,
     guardrailRulesetHash: decision.rulesetHash,
-    requestChecksumSha256: hash(request),
+    requestChecksumSha256: contentHash(request),
     evidenceRef: result.evidenceRef,
     result: structuredClone(result.result ?? null)
   });
@@ -112,6 +112,4 @@ function validateDecision(decision, decisionKey) {
 }
 
 function project({ facts: _facts, ...definition }) { return structuredClone(definition); }
-function hash(value) { return createHash("sha256").update(canonical(value)).digest("hex"); }
-function canonical(value) { if (value === null || typeof value !== "object") return JSON.stringify(value); if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`; return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`).join(",")}}`; }
 function fail(code, message, status = 422, details) { throw Object.assign(new Error(message), { code, status, details }); }
